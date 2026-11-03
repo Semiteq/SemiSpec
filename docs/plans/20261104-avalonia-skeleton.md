@@ -99,10 +99,10 @@ Manual smoke checklist:
 - **Startup.** `Program.Main` creates the Serilog logger through `AppLogging`, which returns a `LogLevelControl`
   wrapping a `LoggingLevelSwitch` at Information, writes to
   `%LOCALAPPDATA%\SpectrumVisualizer\Logs\spectrum-visualizer.log`, builds the service provider through
-  `AddUi(LogLevelControl)`, and runs the Avalonia app. There are no launch keys and no config files: every site runs the same setup. A start failure is
+  `AddUi(LoggingSetup)`, and runs the Avalonia app. There are no launch keys and no config files: every site runs the same setup. A start failure is
   logged and ends with exit code 1. When the failure is the log folder itself nothing is shown; this is an accepted
   gap, SemiPlot's startup failure window is not taken.
-- **App.** `App.axaml` is an include manifest (Palette, Icons, Semi theme, Forms and Buttons styles copied from
+- **App.** `App.axaml` is an include manifest (the Palette and the Semi theme, taken from
   SemiPlot). `BuildAvaloniaApp` follows SemiPlot: `UseWin32`, `UseSkia`, `UseHarfBuzz`, `UseReactiveUI` with the
   process-lifetime `UnhandledErrorObserver` as exception handler, `LogToTrace`.
 - **Errors.** The message panel, entries, severities, `ResultReporting` and `UnhandledErrorObserver` come from SemiPlot.
@@ -114,7 +114,7 @@ Manual smoke checklist:
 - **No instance launcher.** SemiPlot starts extra windows as extra processes; this app has one window and no such menu.
   A second running copy is allowed; later slices handle the port being taken.
 - **Log level switch.** `LogLevelControl` (UI project) wraps the `LoggingLevelSwitch` and exposes `IsVerbose`. It is
-  created before the logger, passed into `AddUi(LogLevelControl)` and registered as a singleton; no static holds it. A
+  created before the logger, passed into `AddUi(LoggingSetup)` and registered as a singleton; no static holds it. A
   checkable menu item "verbose logging" raises the switch to Debug and lowers it back to Information. It is not
   persisted.
 - **Code style.** The canonical `.editorconfig` enables the whole Style category as warnings. SemiPlot's three opt-outs
@@ -191,7 +191,7 @@ Manual smoke checklist:
 - [x] implement `LogLevelControl` wrapping a `LoggingLevelSwitch` (Information default) with `IsVerbose` get/set
 - [x] implement `AppLogging.Create(logFolder)` returning the logger and the `LogLevelControl`, with the file sink
   settings of `Program.cs:97-122`; it creates a missing log folder
-- [x] implement `AddUi(LogLevelControl)` registering the control as a singleton
+- [x] implement `AddUi(LoggingSetup)` registering the control as a singleton and Serilog behind `ILogger<T>`
 - [x] write tests: Debug filtered at Information and passed at Debug through an in-memory sink; missing folder created;
   `AddUi` resolves the same `LogLevelControl` instance
 - [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
@@ -201,7 +201,7 @@ Manual smoke checklist:
 - Create: `SpectrumVisualizer.UI/App.axaml`, `App.axaml.cs`
 - Modify: `SpectrumVisualizer.UI/Program.cs`
 - Create: `SpectrumVisualizer.UI/MainWindow/MainWindow.axaml(.cs)` (empty window, filled in Task 6)
-- Create: `SpectrumVisualizer.UI/Styles/Palette.axaml`, `Icons.axaml`, `Forms.axaml`, `Buttons.axaml`
+- Create: `SpectrumVisualizer.UI/Styles/Palette.axaml` (cut to the keys the views and Semi read)
 - Create: `SpectrumVisualizer.UI/Localization/Resources.resx`, `Resources.ru.resx`
 - Create: `SpectrumVisualizer.Tests.Unit/TestAppBuilder.cs`, `UI/AppResourcesTests.cs`
 
@@ -214,13 +214,13 @@ Manual smoke checklist:
 - [x] add the resx pair with generated accessor (window title, menu items, placeholder, status text, message panel text)
 - [x] add the headless `TestAppBuilder` as in `TestAppBuilder.cs:10-21`
 - [x] write tests that every key in `Resources.resx` exists in `Resources.ru.resx` and is non-empty, and a headless test
-  that the palette keys used by `Forms.axaml` and `Buttons.axaml` resolve (not the unused DataGrid or ColorPicker keys)
+  that the palette keys the views read resolve (not the unused DataGrid or ColorPicker keys)
 - [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 5: Message panel and error route
 **Files:**
 - Create: `SpectrumVisualizer.UI/Messages/MessagePanelViewModel.cs`, `MessagePanelView.axaml(.cs)`, `MessageEntry.cs`,
-  `MessageSeverity.cs`, `MessageView.cs`, `SeverityMatchConverter.cs`, `ResultReporting.cs`, `UnhandledErrorObserver.cs`,
+  `MessageView.cs`, `ResultReporting.cs`, `UnhandledErrorObserver.cs`,
   `ErrorMessageMapper.cs`
 - Modify: `SpectrumVisualizer.UI/App.axaml.cs`
 - Create: `SpectrumVisualizer.Tests.Unit/UI/Messages/MessagePanelViewModelTests.cs`, `ResultReportingTests.cs`,
@@ -259,7 +259,7 @@ Manual smoke checklist:
 - Modify: `SpectrumVisualizer.UI/UiServiceCollectionExtensions.cs`, `App.axaml.cs`
 - Create: `SpectrumVisualizer.Tests.Unit/UI/Di/CompositionRootTests.cs`, `AppBuilderCompositionTests.cs`
 
-- [x] register the message panel, the time provider and the main window view model in `AddUi(LogLevelControl)`; build
+- [x] register the message panel, the time provider and the main window view model in `AddUi(LoggingSetup)`; build
   the main window from the provider in `App`
 - [x] write a test that every registered service resolves from the production composition root
 - [x] write `AppBuilderCompositionTests` in SemiPlot's shape: `BuildAvaloniaApp` reports `WindowingSubsystemName ==
@@ -330,3 +330,28 @@ Manual smoke checklist:
 
 **Remaining slices:** frame-decoder, serial-link, spectrum-view, spectrum-store, intensity-trend, firmware-frame-sender,
 release-3-0.
+
+**Executed by exec:**
+- branch: avalonia-skeleton
+
+## Verify it yourself
+
+Automated, from the repo root on branch `avalonia-skeleton`:
+
+1. `dotnet build SpectrumVisualizer.slnx -c Release` — 0 warnings, 0 errors.
+2. `dotnet test SpectrumVisualizer.slnx` — 67 of 67 pass. The window rows and their order are pinned by
+   `MainWindowViewTests`; the wiring by `CompositionRootTests`; the verbose switch by
+   `MainWindowViewModelTests.ADebugEventReachesTheSinkOnlyWhileVerbose`.
+3. `dotnet format SpectrumVisualizer.slnx --verify-no-changes` and `dotnet terse SpectrumVisualizer` — both exit 0.
+4. `dotnet build SpectrumVisualizer.sln` and `dotnet test SpectrumVisualizer.Tests` — the old app builds and passes 13 of 13;
+   `master` has no new app at all, so steps 1-3 fail there by absence.
+
+By hand (needs a desktop):
+
+1. `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI` — a window titled from the resx opens: menu on top,
+   placeholder text in the middle, status bar at the bottom reading "not connected"; no message panel row.
+2. Windows UI language Russian → Russian text; English → English text.
+3. `%LOCALAPPDATA%\SpectrumVisualizer\Logs\spectrum-visualizer.log` exists and holds a start line.
+4. View → Verbose logging: the log gains "Minimum log level set to Debug" and "Debug events now reach the log file";
+   switching it off adds "Minimum log level set to Information" and no Debug line.
+5. `SprctrumVisualizer/` and `ComPortPopulator/` hold only ignored `bin`/`obj` folders and can be deleted.
