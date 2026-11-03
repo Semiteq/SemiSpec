@@ -34,7 +34,7 @@ internal static class ReportingTestDoubles
 	}
 }
 
-/// <summary>What the poisoned panel throws, so a test tells it from any other failure by type.</summary>
+/// <summary>What the poisoned panel throws.</summary>
 internal sealed class PoisonedPanelException() : InvalidOperationException("the bound list threw");
 
 /// <summary>Reads what a <see cref="FakeLogger"/> kept, in the order the code under test wrote it.</summary>
@@ -51,7 +51,6 @@ internal static class FakeLoggerReading
 	}
 }
 
-/// <summary>A log sink that refuses every call.</summary>
 internal sealed class ThrowingLogger : ILogger
 {
 	public IDisposable? BeginScope<TState>(TState state)

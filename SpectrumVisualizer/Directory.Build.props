@@ -30,8 +30,7 @@
     <DebugType>None</DebugType>
   </PropertyGroup>
 
-  <!-- Publish defaults for win-x64 self-contained deployment.
-       _IsPublishing is set by the SDK during 'dotnet publish'. -->
+  <!-- _IsPublishing is set by the SDK during 'dotnet publish'. -->
   <PropertyGroup Condition="'$(_IsPublishing)' == 'true'">
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>

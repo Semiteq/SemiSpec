@@ -71,8 +71,6 @@ public sealed class UnhandledErrorObserverTests
 		panel.Entries.Should().ContainSingle();
 	}
 
-	// The report runs as a dispatcher job, where an escaping throw is unhandled and takes the process down,
-	// which is the outcome this observer exists to prevent.
 	[AvaloniaFact]
 	public void OnNextWithAPanelThatRefusesTheEntryLogsAndDoesNotEscapeTheScheduledJob()
 	{
@@ -90,8 +88,6 @@ public sealed class UnhandledErrorObserverTests
 		logger.Levels().Should().Equal([LogLevel.Error, LogLevel.Error]);
 	}
 
-	// ReactiveUI hands the handler OnError when the pipeline carrying the failures fails itself; losing
-	// that exception would drop the one failure the operator most needs to see.
 	[AvaloniaFact]
 	public void OnErrorTakesTheSameRouteAsOnNext()
 	{

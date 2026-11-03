@@ -48,8 +48,6 @@ public sealed class MessagePanelViewModelTests
 		panel.Entries.Should().OnlyContain(entry => entry.RepeatCount == 1);
 	}
 
-	// Coalescing is against the newest entry only, so a failure that comes back after another one starts
-	// a new row rather than reviving the old one.
 	[AvaloniaFact]
 	public void ReportStartsANewEntryWhenAnotherFailureCameBetween()
 	{
@@ -92,8 +90,6 @@ public sealed class MessagePanelViewModelTests
 		panel.HasEntries.Should().BeTrue("the entry would otherwise land off screen");
 	}
 
-	// The detail carries the exception's own message, so two different failures of one exception type are
-	// two rows, while the same failure repeated stays one.
 	[AvaloniaFact]
 	public void ReportKeepsDifferentExceptionMessagesApartAndCoalescesIdenticalOnes()
 	{
@@ -119,7 +115,6 @@ public sealed class MessagePanelViewModelTests
 		raised.Should().Contain(nameof(MessagePanelViewModel.HasEntries));
 	}
 
-	// The answer ResultReporting picks its log level from, so the log and the entry count cannot drift apart.
 	[AvaloniaFact]
 	public void ReportAnswersWhetherItCoalescedAgainstTheNewestEntryOnly()
 	{

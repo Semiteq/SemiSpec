@@ -70,7 +70,6 @@ public sealed class ResultReportingTests : IDisposable
 		logger.Levels().Should().Equal(LogLevel.Error, LogLevel.Debug, LogLevel.Debug, LogLevel.Error);
 	}
 
-	// The log and the panel are independent sinks.
 	[AvaloniaFact]
 	public void ReportFailureWithALogSinkThatThrowsStillShowsTheEntry()
 	{
@@ -82,7 +81,6 @@ public sealed class ResultReportingTests : IDisposable
 		_panel.Entries.Should().ContainSingle().Which.View.Should().Be(ErrorMessageMapper.Map(error));
 	}
 
-	// The caller is an Rx onError or a dispatcher job, so the guard swallows what the plain overload throws.
 	[AvaloniaFact]
 	public void TryReportFailureWithAPanelThatThrowsKeepsTheFailureInTheLog()
 	{

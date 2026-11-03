@@ -36,7 +36,6 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 
 	public AppStatusBarViewModel StatusBar { get; }
 
-	/// <summary>Closing a window is view work, so the window listens and this view model only asks.</summary>
 	public IObservable<Unit> ExitRequests => _exitRequests.AsObservable();
 
 	/// <summary>

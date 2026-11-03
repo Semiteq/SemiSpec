@@ -39,13 +39,11 @@ public sealed class MessagePanelViewModel : ReactiveObject, IDisposable
 	/// </summary>
 	public bool Report(MessageView view)
 	{
-		// The operator's zone comes from the clock, not from TimeZoneInfo.Local, so the row a test reads back
-		// does not depend on the host running it.
 		var seenAt = _timeProvider.GetLocalNow();
 
 		if (Coalesces(view))
 		{
-			_entries[0].Restamp(seenAt);
+			_entries[0].RecordRepeat(seenAt);
 
 			return true;
 		}

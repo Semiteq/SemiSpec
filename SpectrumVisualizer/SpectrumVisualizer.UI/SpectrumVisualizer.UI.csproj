@@ -2,7 +2,6 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <!-- Program.Main is the explicit entry point. -->
     <StartupObject>SpectrumVisualizer.UI.Program</StartupObject>
     <NeutralLanguage>en</NeutralLanguage>
   </PropertyGroup>

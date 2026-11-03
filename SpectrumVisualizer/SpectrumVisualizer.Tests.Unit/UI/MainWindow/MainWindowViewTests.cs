@@ -23,7 +23,6 @@ using MainWindowView = SpectrumVisualizer.UI.MainWindow.MainWindow;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.MainWindow;
 
-/// <summary>The realised window: which rows stand and what each of them shows.</summary>
 [Trait("Component", "UI")]
 [Trait("Area", "MainWindow")]
 [Trait("Category", "Unit")]

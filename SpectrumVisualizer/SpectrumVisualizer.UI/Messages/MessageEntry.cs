@@ -31,8 +31,7 @@ public sealed class MessageEntry : ReactiveObject
 
 	public bool HasRepeated => RepeatCount > 1;
 
-	/// <summary>Counts one more occurrence of the same failure and moves the last-seen stamp.</summary>
-	public void Restamp(DateTimeOffset seenAt)
+	public void RecordRepeat(DateTimeOffset seenAt)
 	{
 		RepeatCount++;
 		LastSeen = seenAt;

@@ -22,10 +22,8 @@ public static class ResultReporting
 		}
 		finally
 		{
-			// The log line is written even when the panel throws: no failure stops at the panel.
 			logger.Log(
 				coalesced ? LogLevel.Debug : LogLevel.Error,
-				// The mapped detail keeps type and message only, so the object carries the stack.
 				(error as IExceptionalError)?.Exception,
 				"{Title}. {Detail} {Remedy}",
 				view.Title,
