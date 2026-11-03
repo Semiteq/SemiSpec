@@ -1,3 +1,5 @@
+using Avalonia.Headless.XUnit;
+
 using AwesomeAssertions;
 
 using FluentResults;
@@ -20,7 +22,7 @@ namespace SpectrumVisualizer.Tests.Unit.UI.Messages;
 [Trait("Category", "Unit")]
 public sealed class UnhandledErrorObserverTests
 {
-	[Fact]
+	[AvaloniaFact]
 	public void OnNextReportsTheMappedExceptionThroughTheUiScheduler()
 	{
 		var scheduler = new TestScheduler();
@@ -39,7 +41,7 @@ public sealed class UnhandledErrorObserverTests
 			.Be(ErrorMessageMapper.Map(new ExceptionalError(failure.Message, failure)));
 	}
 
-	[Fact]
+	[AvaloniaFact]
 	public void OnNextLogsTheExceptionAtErrorWhenNoPanelHasBeenResolved()
 	{
 		var scheduler = new TestScheduler();
@@ -54,7 +56,7 @@ public sealed class UnhandledErrorObserverTests
 		logger.Failures().Should().Equal(failure);
 	}
 
-	[Fact]
+	[AvaloniaFact]
 	public void OnNextLogsAndReportsWhenThePanelExists()
 	{
 		var scheduler = new TestScheduler();
@@ -71,7 +73,7 @@ public sealed class UnhandledErrorObserverTests
 
 	// The report runs as a dispatcher job, where an escaping throw is unhandled and takes the process down,
 	// which is the outcome this observer exists to prevent.
-	[Fact]
+	[AvaloniaFact]
 	public void OnNextWithAPanelThatRefusesTheEntryLogsAndDoesNotEscapeTheScheduledJob()
 	{
 		var scheduler = new TestScheduler();
@@ -90,7 +92,7 @@ public sealed class UnhandledErrorObserverTests
 
 	// ReactiveUI hands the handler OnError when the pipeline carrying the failures fails itself; losing
 	// that exception would drop the one failure the operator most needs to see.
-	[Fact]
+	[AvaloniaFact]
 	public void OnErrorTakesTheSameRouteAsOnNext()
 	{
 		var scheduler = new TestScheduler();

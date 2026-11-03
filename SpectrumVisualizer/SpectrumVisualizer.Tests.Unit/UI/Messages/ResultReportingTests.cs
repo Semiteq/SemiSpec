@@ -1,5 +1,7 @@
 using System.Reactive.Concurrency;
 
+using Avalonia.Headless.XUnit;
+
 using AwesomeAssertions;
 
 using FluentResults;
@@ -28,7 +30,7 @@ public sealed class ResultReportingTests : IDisposable
 		_panel.Dispose();
 	}
 
-	[Fact]
+	[AvaloniaFact]
 	public void ReportFailureTakesTitleDetailAndRemedyFromTheMapper()
 	{
 		var error = new Error("the port is taken");
@@ -39,7 +41,7 @@ public sealed class ResultReportingTests : IDisposable
 		_panel.Entries[0].View.Should().Be(ErrorMessageMapper.Map(error));
 	}
 
-	[Fact]
+	[AvaloniaFact]
 	public void ReportFailureLogsAndShowsTheFailure()
 	{
 		var logger = new FakeLogger();
@@ -53,7 +55,7 @@ public sealed class ResultReportingTests : IDisposable
 		logger.Failures().Should().Equal(thrown);
 	}
 
-	[Fact]
+	[AvaloniaFact]
 	public void ReportFailureDropsARepeatOfTheNewestEntryToDebug()
 	{
 		var logger = new FakeLogger();
@@ -69,7 +71,7 @@ public sealed class ResultReportingTests : IDisposable
 	}
 
 	// The log and the panel are independent sinks.
-	[Fact]
+	[AvaloniaFact]
 	public void ReportFailureWithALogSinkThatThrowsStillShowsTheEntry()
 	{
 		var error = new Error("the port is taken");
@@ -81,7 +83,7 @@ public sealed class ResultReportingTests : IDisposable
 	}
 
 	// The caller is an Rx onError or a dispatcher job, so the guard swallows what the plain overload throws.
-	[Fact]
+	[AvaloniaFact]
 	public void TryReportFailureWithAPanelThatThrowsKeepsTheFailureInTheLog()
 	{
 		var logger = new FakeLogger();
@@ -93,7 +95,7 @@ public sealed class ResultReportingTests : IDisposable
 		logger.Levels().Should().Equal(LogLevel.Error, LogLevel.Error);
 	}
 
-	[Fact]
+	[AvaloniaFact]
 	public void TryReportFailureWithALogSinkThatThrowsDoesNotThrow()
 	{
 		var error = new Error("the port is taken");

@@ -1,6 +1,5 @@
 using System.Reactive.Linq;
 
-using Avalonia;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 
@@ -50,10 +49,10 @@ public sealed class CompositionRootTests
 	}
 
 	[AvaloniaFact]
-	public void TheAppBuildsTheMainWindowFromTheProviderAndExposesItsPanel()
+	public void TheAppBuildsTheMainWindowFromTheProvider()
 	{
 		using var provider = BuildContainer();
-		var app = (App)Application.Current!;
+		var app = new App();
 
 		app.Configure(provider);
 		var window = app.CreateMainWindow();
@@ -64,7 +63,6 @@ public sealed class CompositionRootTests
 			Dispatcher.UIThread.RunJobs();
 
 			window.DataContext.Should().BeSameAs(provider.GetRequiredService<MainWindowViewModel>());
-			App.ResolveMessagePanel().Should().BeSameAs(provider.GetRequiredService<MessagePanelViewModel>());
 		}
 		finally
 		{

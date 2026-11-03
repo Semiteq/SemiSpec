@@ -9,7 +9,9 @@ namespace SpectrumVisualizer.Tests.Unit.UI.Messages;
 
 internal static class ReportingTestDoubles
 {
-	/// <summary>Makes the panel's bound collection throw on every edit, until the returned handle is disposed.</summary>
+	/// <summary>
+	/// Makes the panel's bound collection throw on every edit, until the returned handle is disposed.
+	/// </summary>
 	public static IDisposable PoisonEntries(MessagePanelViewModel panel)
 	{
 		var entries = (INotifyCollectionChanged)panel.Entries;

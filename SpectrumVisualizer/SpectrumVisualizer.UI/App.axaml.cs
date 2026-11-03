@@ -34,6 +34,14 @@ public class App : Application
 		SemiTheme.OverrideLocaleResources(this, SemiLocaleFor(CultureInfo.CurrentUICulture));
 	}
 
+	/// <summary>Semi keys its own strings by specific culture and falls back to zh-CN for any other.</summary>
+	internal static CultureInfo SemiLocaleFor(CultureInfo uiCulture)
+	{
+		return uiCulture.TwoLetterISOLanguageName == RussianLanguage
+			? CultureInfo.GetCultureInfo("ru-RU")
+			: CultureInfo.GetCultureInfo("en-US");
+	}
+
 	public override void OnFrameworkInitializationCompleted()
 	{
 		if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -48,7 +56,8 @@ public class App : Application
 	{
 		if (_mainWindowViewModel is not { } viewModel)
 		{
-			throw new InvalidOperationException("The main window view model is not set. Call Run() before starting the app.");
+			throw new InvalidOperationException(
+				"The main window view model is not set. Call Run() before starting the app.");
 		}
 
 		return new MainWindow.MainWindow { DataContext = viewModel };
@@ -72,14 +81,6 @@ public class App : Application
 	{
 		_mainWindowViewModel = services.GetRequiredService<MainWindowViewModel>();
 		_messagePanel = services.GetRequiredService<MessagePanelViewModel>();
-	}
-
-	/// <summary>Semi keys its own strings by specific culture and falls back to zh-CN for any other.</summary>
-	internal static CultureInfo SemiLocaleFor(CultureInfo uiCulture)
-	{
-		return uiCulture.TwoLetterISOLanguageName == RussianLanguage
-			? CultureInfo.GetCultureInfo("ru-RU")
-			: CultureInfo.GetCultureInfo("en-US");
 	}
 
 	internal static AppBuilder BuildAvaloniaApp(IObserver<Exception> unhandledErrors)

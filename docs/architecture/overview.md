@@ -39,7 +39,7 @@ text and the status bar shows a fixed "Not connected".
 `Program.Main` runs these steps in order:
 
 1. `AppDataPaths.Under` resolves the log folder from `Environment.SpecialFolder.LocalApplicationData`.
-2. `AppLogging.Create` creates `%LOCALAPPDATA%\SpectrumVisualizer\Logs` and the logger, and sets `Log.Logger`.
+2. `AppLogging.Create` creates `%LOCALAPPDATA%\SpectrumVisualizer\Logs` and the logger; `Program.Main` sets `Log.Logger` to it.
 3. `AddUi` builds the service provider.
 4. `App.Run` receives a logger from a `SerilogLoggerFactory` over that logger, builds the `UnhandledErrorObserver` and
    the Avalonia app; in `AfterSetup`, `App.Configure` resolves `MainWindowViewModel` and `MessagePanelViewModel`, and

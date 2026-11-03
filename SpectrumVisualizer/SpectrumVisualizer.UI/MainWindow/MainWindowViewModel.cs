@@ -39,7 +39,9 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 	/// <summary>Closing a window is view work, so the window listens and this view model only asks.</summary>
 	public IObservable<Unit> ExitRequests => _exitRequests.AsObservable();
 
-	/// <summary>Mirrors the log level control, which raises no notification; the toggle command is its one writer.</summary>
+	/// <summary>
+	/// Mirrors the log level control, which raises no notification; the toggle command is its one writer.
+	/// </summary>
 	public bool IsVerboseLogging => _logLevelControl.IsVerbose;
 
 	public ReactiveCommand<Unit, Unit> ExitCommand { get; }

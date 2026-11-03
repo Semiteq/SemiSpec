@@ -32,7 +32,7 @@ public sealed class LogLevelControlTests
 		logger.Debug("hidden");
 		logger.Information("shown");
 
-		_sink.Levels.Should().Equal(LogEventLevel.Information);
+		PassedLevels().Should().Equal(LogEventLevel.Information);
 	}
 
 	[Fact]
@@ -44,7 +44,7 @@ public sealed class LogLevelControlTests
 		logger.Debug("shown");
 
 		_control.IsVerbose.Should().BeTrue();
-		_sink.Levels.Should().Equal(LogEventLevel.Debug);
+		PassedLevels().Should().Equal(LogEventLevel.Debug);
 	}
 
 	[Fact]
@@ -56,7 +56,7 @@ public sealed class LogLevelControlTests
 		_control.IsVerbose = false;
 		logger.Debug("hidden");
 
-		_sink.Levels.Should().BeEmpty();
+		_sink.Events.Should().BeEmpty();
 	}
 
 	private Logger CreateLogger()
@@ -67,15 +67,8 @@ public sealed class LogLevelControlTests
 			.CreateLogger();
 	}
 
-	private sealed class CollectingSink : ILogEventSink
+	private IEnumerable<LogEventLevel> PassedLevels()
 	{
-		private readonly List<LogEventLevel> _levels = [];
-
-		public IReadOnlyList<LogEventLevel> Levels => _levels;
-
-		public void Emit(LogEvent logEvent)
-		{
-			_levels.Add(logEvent.Level);
-		}
+		return _sink.Events.Select(logEvent => logEvent.Level);
 	}
 }

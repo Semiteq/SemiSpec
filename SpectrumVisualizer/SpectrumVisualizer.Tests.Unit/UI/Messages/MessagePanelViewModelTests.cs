@@ -1,3 +1,5 @@
+using Avalonia.Headless.XUnit;
+
 using AwesomeAssertions;
 
 using FluentResults;
@@ -8,14 +10,14 @@ using Xunit;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Messages;
 
-// The panel touches no Avalonia type, so these are plain [Fact]. The clock is stepped by hand because a
-// tight loop of reports would otherwise share one timestamp and hide a last-seen stamp that never moves.
+// The clock is stepped by hand because a tight loop of reports would otherwise share one timestamp and
+// hide a last-seen stamp that never moves.
 [Trait("Component", "UI")]
 [Trait("Area", "Messages")]
 [Trait("Category", "Unit")]
 public sealed class MessagePanelViewModelTests
 {
-	[Fact]
+	[AvaloniaFact]
 	public void ReportCoalescesAnIdenticalFailureIntoOneEntry()
 	{
 		var clock = new SteppingClock();
@@ -32,7 +34,7 @@ public sealed class MessagePanelViewModelTests
 		panel.Entries[0].LastSeen.Should().Be(SteppingClock.Origin + (SteppingClock.Step * 19));
 	}
 
-	[Fact]
+	[AvaloniaFact]
 	public void ReportKeepsTwoDifferentFailuresApart()
 	{
 		var clock = new SteppingClock();
@@ -48,7 +50,7 @@ public sealed class MessagePanelViewModelTests
 
 	// Coalescing is against the newest entry only, so a failure that comes back after another one starts
 	// a new row rather than reviving the old one.
-	[Fact]
+	[AvaloniaFact]
 	public void ReportStartsANewEntryWhenAnotherFailureCameBetween()
 	{
 		var clock = new SteppingClock();
@@ -62,7 +64,7 @@ public sealed class MessagePanelViewModelTests
 		panel.Entries.Select(entry => entry.View.Title).Should().Equal("archive", "catalogue", "archive");
 	}
 
-	[Fact]
+	[AvaloniaFact]
 	public void ReportDropsTheOldestEntryOnceTheCapIsReached()
 	{
 		var clock = new SteppingClock();
@@ -78,7 +80,7 @@ public sealed class MessagePanelViewModelTests
 		panel.Entries[^1].View.Title.Should().Be("failure 1");
 	}
 
-	[Fact]
+	[AvaloniaFact]
 	public void ReportOpensThePanelOnTheFirstEntry()
 	{
 		using var panel = new MessagePanelViewModel(new SteppingClock());
@@ -92,7 +94,7 @@ public sealed class MessagePanelViewModelTests
 
 	// The detail carries the exception's own message, so two different failures of one exception type are
 	// two rows, while the same failure repeated stays one.
-	[Fact]
+	[AvaloniaFact]
 	public void ReportKeepsDifferentExceptionMessagesApartAndCoalescesIdenticalOnes()
 	{
 		using var panel = new MessagePanelViewModel(new SteppingClock());
@@ -105,7 +107,7 @@ public sealed class MessagePanelViewModelTests
 		panel.Entries.Select(entry => entry.RepeatCount).Should().Equal(1, 2);
 	}
 
-	[Fact]
+	[AvaloniaFact]
 	public void HasEntriesNotifiesWhenTheFirstEntryArrives()
 	{
 		using var panel = new MessagePanelViewModel(new SteppingClock());
@@ -118,7 +120,7 @@ public sealed class MessagePanelViewModelTests
 	}
 
 	// The answer ResultReporting picks its log level from, so the log and the entry count cannot drift apart.
-	[Fact]
+	[AvaloniaFact]
 	public void ReportAnswersWhetherItCoalescedAgainstTheNewestEntryOnly()
 	{
 		using var panel = new MessagePanelViewModel(new SteppingClock());
@@ -130,7 +132,7 @@ public sealed class MessagePanelViewModelTests
 		panel.Report(archive).Should().BeFalse("another failure is now the newest entry");
 	}
 
-	[Fact]
+	[AvaloniaFact]
 	public void ClearCommandEmptiesTheListAndTakesThePanelOffScreen()
 	{
 		using var panel = new MessagePanelViewModel(new SteppingClock());

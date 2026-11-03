@@ -5,9 +5,8 @@ using Avalonia.Headless.XUnit;
 using AwesomeAssertions;
 
 using Serilog;
-using Serilog.Core;
-using Serilog.Events;
 
+using SpectrumVisualizer.Tests.Unit.UI.Logging;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
@@ -74,7 +73,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 		await _viewModel.ToggleVerboseLoggingCommand.Execute();
 		logger.Debug("after");
 
-		sink.Messages.Should().Equal("verbose");
+		sink.Events.Select(logEvent => logEvent.MessageTemplate.Text).Should().Equal("verbose");
 	}
 
 	[AvaloniaFact]
@@ -92,17 +91,5 @@ public sealed class MainWindowViewModelTests : IDisposable
 	{
 		_viewModel.Dispose();
 		_messagePanel.Dispose();
-	}
-
-	private sealed class CollectingSink : ILogEventSink
-	{
-		private readonly List<string> _messages = [];
-
-		public IReadOnlyList<string> Messages => _messages;
-
-		public void Emit(LogEvent logEvent)
-		{
-			_messages.Add(logEvent.MessageTemplate.Text);
-		}
 	}
 }
