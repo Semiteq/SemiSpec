@@ -1,0 +1,41 @@
+<Project>
+
+  <PropertyGroup>
+    <ArtifactsPath>$(MSBuildThisFileDirectory)Artifacts</ArtifactsPath>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- NuGet audit results depend on the outside world: a new advisory against a transitive
+         package, or an unreachable audit source (NU1900), must not turn restore red with no
+         commit in the repository. -->
+    <WarningsNotAsErrors>NU1900;NU1901;NU1902;NU1903;NU1904</WarningsNotAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <!-- The doc file exists only to unlock IDE0005 (unused usings) at build; doc-comment
+         coverage itself is not required, hence CS1591 stays off. -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <!-- Version: permanent default, overridden at build/publish time via /p:Version=X.Y.Z -->
+  <PropertyGroup>
+    <Version>0.0.0</Version>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)'=='Release'">
+    <DebugSymbols>False</DebugSymbols>
+    <DebugType>None</DebugType>
+  </PropertyGroup>
+
+  <!-- Publish defaults for win-x64 self-contained deployment.
+       _IsPublishing is set by the SDK during 'dotnet publish'. -->
+  <PropertyGroup Condition="'$(_IsPublishing)' == 'true'">
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishReadyToRun>true</PublishReadyToRun>
+  </PropertyGroup>
+
+</Project>
