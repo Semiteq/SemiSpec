@@ -52,8 +52,9 @@ dotnet terse <file.cs>
 ```
 
 `terse` (pinned in `.config/dotnet-tools.json`) is the comment gate. The pre-commit hook `.githooks/pre-commit` runs both
-gates over staged `SpectrumVisualizer/*.cs` files and refuses commits on `master` or `main`; wire it once per clone with
-`git config core.hooksPath .githooks`. `.github/workflows/ci.yml` runs build, tests, format and terse for the new app,
+gates over staged `SpectrumVisualizer/*.cs` files and refuses commits on `master` or `main`; install it once per clone with
+`cp .githooks/pre-commit .git/hooks/pre-commit`, which also works under a global `core.hooksPath` that chains
+`.git/hooks`. `.github/workflows/ci.yml` runs build, tests, format and terse for the new app,
 then builds and tests the old app.
 
 ## Layout
