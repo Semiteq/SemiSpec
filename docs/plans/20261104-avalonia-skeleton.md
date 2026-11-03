@@ -270,9 +270,9 @@ Manual smoke checklist:
 - Delete: `SprctrumVisualizer/`, `ComPortPopulator/`
 - Modify: `SpectrumVisualizer.sln`
 
-- [ ] remove both projects with `dotnet sln SpectrumVisualizer.sln remove` and delete the folders with `git rm -r`
-- [ ] verify no file still references `SprctrumVisualizer` or `ComPortPopulator` (readme excepted, fixed in Task 12)
-- [ ] verify `dotnet build SpectrumVisualizer.sln` succeeds and `dotnet test SpectrumVisualizer.Tests` passes 13
+- [x] remove both projects with `dotnet sln SpectrumVisualizer.sln remove` and delete the folders with `git rm -r`
+- [x] verify no file still references `SprctrumVisualizer` or `ComPortPopulator` (readme excepted, fixed in Task 12)
+- [x] verify `dotnet build SpectrumVisualizer.sln` succeeds and `dotnet test SpectrumVisualizer.Tests` passes 13
 
 ### Task 9: Pre-commit hook and CI
 **Files:**
