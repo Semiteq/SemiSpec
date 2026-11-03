@@ -290,11 +290,11 @@ Manual smoke checklist:
 - Create: `CLAUDE.md`
 - Create: `docs/architecture/README.md`, `overview.md`, `testing-strategy.md`, `ui-theme.md`, `ui-text.md`
 
-- [ ] write `CLAUDE.md` per the `dev:project-layout` canon: identity, build, test, format, layout, docs pointers; every
+- [x] write `CLAUDE.md` per the `dev:project-layout` canon: identity, build, test, format, layout, docs pointers; every
   command names its solution file
-- [ ] write `docs/architecture/README.md` with the index and the Locked decisions table (stack, layout, logging, text,
+- [x] write `docs/architecture/README.md` with the index and the Locked decisions table (stack, layout, logging, text,
   tests, serial library and protocol as decided in the roadmap)
-- [ ] write `overview.md` (purpose, stack, components, data flow), `testing-strategy.md`, `ui-theme.md`, `ui-text.md`
+- [x] write `overview.md` (purpose, stack, components, data flow), `testing-strategy.md`, `ui-theme.md`, `ui-text.md`
   in present tense, adapted from SemiPlot's documents where they apply
 
 ### Task 11: Verify acceptance criteria
