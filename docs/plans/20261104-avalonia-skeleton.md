@@ -185,15 +185,15 @@ Manual smoke checklist:
 - Create: `SpectrumVisualizer.Tests.Unit/UI/Logging/AppLoggingTests.cs`, `LogLevelControlTests.cs`
 - Modify: `SpectrumVisualizer.slnx`
 
-- [ ] create the WinExe UI project modelled on `SemiPlot.UI.csproj:3-47` without ScottPlot, ColorPicker, DataGrid or
+- [x] create the WinExe UI project modelled on `SemiPlot.UI.csproj:3-47` without ScottPlot, ColorPicker, DataGrid or
   YamlDotNet; reference Core; add it to the slnx; a stub `Program.Main` returning 0 keeps it compiling until Task 4
-- [ ] implement `LogLevelControl` wrapping a `LoggingLevelSwitch` (Information default) with `IsVerbose` get/set
-- [ ] implement `AppLogging.Create(logFolder)` returning the logger and the `LogLevelControl`, with the file sink
+- [x] implement `LogLevelControl` wrapping a `LoggingLevelSwitch` (Information default) with `IsVerbose` get/set
+- [x] implement `AppLogging.Create(logFolder)` returning the logger and the `LogLevelControl`, with the file sink
   settings of `Program.cs:97-122`; it creates a missing log folder
-- [ ] implement `AddUi(LogLevelControl)` registering the control as a singleton
-- [ ] write tests: Debug filtered at Information and passed at Debug through an in-memory sink; missing folder created;
+- [x] implement `AddUi(LogLevelControl)` registering the control as a singleton
+- [x] write tests: Debug filtered at Information and passed at Debug through an in-memory sink; missing folder created;
   `AddUi` resolves the same `LogLevelControl` instance
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 4: App shell, theme, text and entry point
 **Files:**
