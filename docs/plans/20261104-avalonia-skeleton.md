@@ -298,10 +298,24 @@ Manual smoke checklist:
   in present tense, adapted from SemiPlot's documents where they apply
 
 ### Task 11: Verify acceptance criteria
-- [ ] run every command of Acceptance Evidence and record the results
-- [ ] walk through the manual smoke checklist
-- [ ] run the `dev:desktop-ui` pre-handover checklist for the main window and fix every miss
-- [ ] confirm the old solution builds and passes 13 tests
+- [x] run every command of Acceptance Evidence and record the results: (1) Release build 0 warnings, 0 errors;
+  (2) unit tests 61 of 61 pass, including `MainWindowViewTests` and `CompositionRootTests`; (3) `dotnet format
+  --verify-no-changes` exit 0, `dotnet terse SpectrumVisualizer` exit 0; (4) old solution builds (15 pre-existing
+  nullable warnings), 13 of 13 pass, `SpectrumVisualizer.sln` lists neither removed project; (5)
+  `MainWindowViewModelTests.ADebugEventReachesTheSinkOnlyWhileVerbose` passes
+- [x] walk through the manual smoke checklist: `timeout 25 dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI`
+  kept the process alive until the timeout (exit 124, no start failure) and appended a "starting" line to
+  `%LOCALAPPDATA%\SpectrumVisualizer\Logs\spectrum-visualizer.log` (item 4); rows and verbose logging are covered by
+  the headless tests; window title, visual row order, Russian/English text and Debug lines in the real log file
+  (items 1, 2, 3, 5) deferred to owner's final check
+- [x] run the `dev:desktop-ui` pre-handover checklist for the main window and fix every miss: spacing (fixed the
+  message panel's empty text at 4 px under the header, now 8 like the entries); field widths (no fields); minimum
+  width (no fixed panes or columns yet, no `MinWidth` set, deferred to the spectrum-view slice); large width (fixed:
+  Clear sat at the far right of the header and the repeat count and time at the far right of each entry; Clear now
+  follows the title with 8 px, the time leads the entry, the repeat count sits under the title); labels on one line
+  (menu, Clear and status texts short in both resx files); states keep the window size (the message panel row
+  appears inside the fixed window and is capped at 140 px)
+- [x] confirm the old solution builds and passes 13 tests: build exit 0, 13 of 13 pass
 
 ### Task 12: [Final] Update documentation
 - [ ] update `readme.md`: remove the old-project section, add the new solution's build and run commands
