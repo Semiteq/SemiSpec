@@ -161,19 +161,19 @@ type is decided by `len` only.
 - Create: `SpectrumVisualizer.Core/Protocol/FrameDecoder.cs`, `FrameReader.cs`
 - Create: `SpectrumVisualizer.Tests.Unit/Core/Protocol/FrameDecoderTests.cs`, `FrameReaderTests.cs`
 
-- [ ] write decoder tests first: heartbeat example; both spectrum forms round-trip (compare with `BeEquivalentTo`,
+- [x] write decoder tests first: heartbeat example; both spectrum forms round-trip (compare with `BeEquivalentTo`,
   because `Pixels` is an array); split at every byte boundary; random chunks from a fixed seed through a `Pipe`; false
   `AA 55` inside pixels; invalid `len`, bad CRC, device/len mismatch (patch the device byte and recompute the CRC) each
   consume one byte and resynchronise; reserved state bits are masked off; garbage before a frame is counted as
   discarded
-- [ ] implement `FrameDecoder.TryReadFrame` over `SequenceReader<byte>` with the semantics of Solution Overview
-- [ ] implement `FrameReader.ReadAllAsync(PipeReader, CancellationToken)`: yield every whole frame before reading again,
+- [x] implement `FrameDecoder.TryReadFrame` over `SequenceReader<byte>` with the semantics of Solution Overview
+- [x] implement `FrameReader.ReadAllAsync(PipeReader, CancellationToken)`: yield every whole frame before reading again,
   `AdvanceTo(consumed, buffer.End)` when more data is needed, end on writer completion, cancellation as
   `OperationCanceledException`; keep the discarded-byte count
-- [ ] write reader tests: frames across many `Pipe` writes; two whole frames in one write with the writer still open are
+- [x] write reader tests: frames across many `Pipe` writes; two whole frames in one write with the writer still open are
   both yielded; completion ends the enumeration; cancellation throws `OperationCanceledException`; every async test has
   a timeout so a spinning reader fails instead of hanging
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 4: Sequence tracker
 **Files:**
