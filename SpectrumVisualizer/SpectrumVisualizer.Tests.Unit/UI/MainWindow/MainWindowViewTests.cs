@@ -34,7 +34,11 @@ public sealed class MainWindowViewTests : IDisposable
 
 	public MainWindowViewTests()
 	{
-		_viewModel = new MainWindowViewModel(_messagePanel, new AppStatusBarViewModel(), new LogLevelControl());
+		_viewModel = new MainWindowViewModel(
+			_messagePanel,
+			new AppStatusBarViewModel(),
+			new LogLevelControl(),
+			NullLogger<MainWindowViewModel>.Instance);
 		_window = new MainWindowView { DataContext = _viewModel };
 	}
 

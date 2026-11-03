@@ -7,6 +7,11 @@ using AwesomeAssertions;
 
 using Microsoft.Extensions.DependencyInjection;
 
+using Serilog;
+using Serilog.Events;
+
+using SpectrumVisualizer.Tests.Unit.UI.Logging;
+
 using SpectrumVisualizer.UI;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
@@ -20,17 +25,28 @@ namespace SpectrumVisualizer.Tests.Unit.UI.Di;
 [Trait("Component", "UI")]
 [Trait("Area", "Di")]
 [Trait("Category", "Unit")]
-public sealed class CompositionRootTests
+public sealed class CompositionRootTests : IDisposable
 {
 	private readonly LogLevelControl _logLevelControl = new();
+	private readonly CollectingSink _sink = new();
+	private readonly LoggingSetup _logging;
+
+	public CompositionRootTests()
+	{
+		var logger = new LoggerConfiguration()
+			.MinimumLevel.ControlledBy(_logLevelControl.Switch)
+			.WriteTo.Sink(_sink)
+			.CreateLogger();
+		_logging = new LoggingSetup(logger, _logLevelControl);
+	}
 
 	[AvaloniaFact]
 	public void EveryRegisteredServiceResolves()
 	{
-		var services = new ServiceCollection().AddUi(_logLevelControl);
+		var services = new ServiceCollection().AddUi(_logging);
 		using var provider = services.BuildServiceProvider();
 
-		foreach (var descriptor in services)
+		foreach (var descriptor in services.Where(descriptor => !descriptor.ServiceType.IsGenericTypeDefinition))
 		{
 			provider.GetRequiredService(descriptor.ServiceType).Should().NotBeNull(descriptor.ServiceType.Name);
 		}
@@ -46,6 +62,17 @@ public sealed class CompositionRootTests
 
 		viewModel.MessagePanel.Should().BeSameAs(provider.GetRequiredService<MessagePanelViewModel>());
 		_logLevelControl.IsVerbose.Should().BeTrue("the command writes the control the container was given");
+	}
+
+	[AvaloniaFact]
+	public async Task TheVerboseToggleWritesThroughTheApplicationLoggerAtBothLevels()
+	{
+		using var provider = BuildContainer();
+
+		await provider.GetRequiredService<MainWindowViewModel>().ToggleVerboseLoggingCommand.Execute();
+
+		_sink.Events.Select(logEvent => logEvent.Level)
+			.Should().Equal(LogEventLevel.Information, LogEventLevel.Debug);
 	}
 
 	[AvaloniaFact]
@@ -81,6 +108,11 @@ public sealed class CompositionRootTests
 
 	private ServiceProvider BuildContainer()
 	{
-		return new ServiceCollection().AddUi(_logLevelControl).BuildServiceProvider();
+		return new ServiceCollection().AddUi(_logging).BuildServiceProvider();
+	}
+
+	public void Dispose()
+	{
+		_logging.Logger.Dispose();
 	}
 }

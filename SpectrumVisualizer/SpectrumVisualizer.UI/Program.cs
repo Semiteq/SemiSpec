@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using Serilog;
-using Serilog.Extensions.Logging;
 
 using SpectrumVisualizer.Core;
 using SpectrumVisualizer.UI.Logging;
@@ -38,9 +38,9 @@ public static class Program
 			Log.Information("SpectrumVisualizer starting; log folder {LogFolder}", paths.Value.LogFolder);
 
 			using var serviceProvider = new ServiceCollection()
-				.AddUi(logging.Value.LevelControl)
+				.AddUi(logging.Value)
 				.BuildServiceProvider();
-			using var loggerFactory = new SerilogLoggerFactory(logging.Value.Logger);
+			var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 
 			App.Run(serviceProvider, loggerFactory.CreateLogger(nameof(UnhandledErrorObserver)));
 

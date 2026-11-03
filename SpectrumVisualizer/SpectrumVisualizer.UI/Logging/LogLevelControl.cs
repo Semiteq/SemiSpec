@@ -8,6 +8,8 @@ public sealed class LogLevelControl
 {
 	internal LoggingLevelSwitch Switch { get; } = new(LogEventLevel.Information);
 
+	public LogEventLevel MinimumLevel => Switch.MinimumLevel;
+
 	public bool IsVerbose
 	{
 		get => Switch.MinimumLevel == LogEventLevel.Debug;

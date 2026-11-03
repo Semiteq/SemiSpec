@@ -25,7 +25,7 @@ text and the status bar shows a fixed "Not connected".
 | `AppDataPaths` | Core | Resolves the log folder `SpectrumVisualizer\Logs` under the local app data root; fails on a root that is not fully qualified |
 | `AppLogging` | UI | Creates the log folder and the Serilog logger: `spectrum-visualizer.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
-| `AddUi(LogLevelControl)` | UI | The composition root: registers the log level control, `TimeProvider.System`, the message panel, the status bar and the main window view model, all singletons |
+| `AddUi(LoggingSetup)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, the message panel, the status bar and the main window view model, all singletons |
 | `Program` | UI | Entry point: paths, logging, container, `App.Run` with the logger for unhandled exceptions |
 | `App` | UI | Builds the Avalonia app with the exception handler, sets Semi's control strings to the UI culture, creates the main window from the container |
 | `MainWindowViewModel` | UI | Exit request and the verbose-logging command |
@@ -41,7 +41,7 @@ text and the status bar shows a fixed "Not connected".
 1. `AppDataPaths.Under` resolves the log folder from `Environment.SpecialFolder.LocalApplicationData`.
 2. `AppLogging.Create` creates `%LOCALAPPDATA%\SpectrumVisualizer\Logs` and the logger; `Program.Main` sets `Log.Logger` to it.
 3. `AddUi` builds the service provider.
-4. `App.Run` receives a logger from a `SerilogLoggerFactory` over that logger, builds the `UnhandledErrorObserver` and
+4. `App.Run` receives a logger from the container's `ILoggerFactory`, which writes to that logger, builds the `UnhandledErrorObserver` and
    the Avalonia app; in `AfterSetup`, `App.Configure` resolves `MainWindowViewModel` and `MessagePanelViewModel`, and
    `OnFrameworkInitializationCompleted` shows `MainWindow` with that view model as its `DataContext`.
 
@@ -68,7 +68,9 @@ subscribes in `OnLoaded`, unsubscribes in `OnUnloaded`, and closes itself.
 
 The Verbose logging item reads `IsVerboseLogging` one-way and writes only through `ToggleVerboseLoggingCommand`, so the
 command is the level's single writer. `LogLevelControl` raises no notification; the command raises
-`IsVerboseLogging` after it flips the switch. The level resets to Information at every start.
+`IsVerboseLogging` after it flips the switch. The level resets to Information at every start. Each toggle writes
+an Information line with the new minimum level and a Debug line; the Debug line reaches the log file only when the
+toggle turned verbose logging on, so the operator sees the switch take effect in the file.
 
 ## Error route
 

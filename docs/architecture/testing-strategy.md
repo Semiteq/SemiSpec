@@ -38,7 +38,7 @@ skipped.
 | Plain unit | Pure logic: folder resolution, log level switching, error mapping | `Core/AppDataPathsTests.cs`, `UI/Logging/LogLevelControlTests.cs` |
 | View model | Commands and state without a window: the verbose-logging command, the panel bound and coalescing, the reporting route | `UI/MainWindow/MainWindowViewModelTests.cs`, `UI/Messages/` |
 | Realised view | What a headless window shows: the row order, the menu, the placeholder, the hidden message panel, the status bar, the panel opening on a report, a realised entry row (time, title, repeat line, remedy), Clear hiding the row, Exit closing the window | `UI/MainWindow/MainWindowViewTests.cs` |
-| Composition root | Every service registered by `AddUi` resolves from the production container; `App` builds the window from it and refuses to before `Configure` | `UI/Di/CompositionRootTests.cs` |
+| Composition root | Every service registered by `AddUi` resolves from the production container; the verbose toggle writes through the application logger at Information and Debug; `App` builds the window from the container and refuses to before `Configure` | `UI/Di/CompositionRootTests.cs` |
 | App builder | `App.BuildAvaloniaApp` selects Win32, Skia and a text shaper | `UI/Di/AppBuilderCompositionTests.cs` |
 | Resources | Every neutral resx key exists in the Russian set and is non-empty; the `App*` palette keys the views read resolve | `UI/AppResourcesTests.cs` |
 

@@ -3,6 +3,8 @@ using System.Reactive.Disposables;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 
+using Microsoft.Extensions.Logging;
+
 using ReactiveUI;
 
 using SpectrumVisualizer.UI.Logging;
@@ -16,15 +18,18 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 	private readonly Subject<Unit> _exitRequests = new();
 
 	private readonly LogLevelControl _logLevelControl;
+	private readonly ILogger<MainWindowViewModel> _logger;
 
 	public MainWindowViewModel(
 		MessagePanelViewModel messagePanel,
 		AppStatusBarViewModel statusBar,
-		LogLevelControl logLevelControl)
+		LogLevelControl logLevelControl,
+		ILogger<MainWindowViewModel> logger)
 	{
 		MessagePanel = messagePanel;
 		StatusBar = statusBar;
 		_logLevelControl = logLevelControl;
+		_logger = logger;
 
 		_disposables.Add(_exitRequests);
 		_disposables.Add(ExitCommand = ReactiveCommand.Create(() => _exitRequests.OnNext(Unit.Default)));
@@ -56,5 +61,8 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 	{
 		_logLevelControl.IsVerbose = !_logLevelControl.IsVerbose;
 		this.RaisePropertyChanged(nameof(IsVerboseLogging));
+
+		_logger.LogInformation("Minimum log level set to {Level}", _logLevelControl.MinimumLevel);
+		_logger.LogDebug("Debug events now reach the log file");
 	}
 }

@@ -4,7 +4,12 @@ using Avalonia.Headless.XUnit;
 
 using AwesomeAssertions;
 
+using Microsoft.Extensions.Logging;
+
 using Serilog;
+using Serilog.Core;
+using Serilog.Events;
+using Serilog.Extensions.Logging;
 
 using SpectrumVisualizer.Tests.Unit.UI.Logging;
 using SpectrumVisualizer.UI.Logging;
@@ -21,12 +26,24 @@ namespace SpectrumVisualizer.Tests.Unit.UI.MainWindow;
 public sealed class MainWindowViewModelTests : IDisposable
 {
 	private readonly LogLevelControl _logLevelControl = new();
+	private readonly CollectingSink _sink = new();
+	private readonly Logger _serilogLogger;
+	private readonly SerilogLoggerFactory _loggerFactory;
 	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
 	private readonly MainWindowViewModel _viewModel;
 
 	public MainWindowViewModelTests()
 	{
-		_viewModel = new MainWindowViewModel(_messagePanel, new AppStatusBarViewModel(), _logLevelControl);
+		_serilogLogger = new LoggerConfiguration()
+			.MinimumLevel.ControlledBy(_logLevelControl.Switch)
+			.WriteTo.Sink(_sink)
+			.CreateLogger();
+		_loggerFactory = new SerilogLoggerFactory(_serilogLogger);
+		_viewModel = new MainWindowViewModel(
+			_messagePanel,
+			new AppStatusBarViewModel(),
+			_logLevelControl,
+			_loggerFactory.CreateLogger<MainWindowViewModel>());
 	}
 
 	[AvaloniaFact]
@@ -59,21 +76,43 @@ public sealed class MainWindowViewModelTests : IDisposable
 	}
 
 	[AvaloniaFact]
+	public async Task EachToggleLogsTheNewLevelAtInformation()
+	{
+		await _viewModel.ToggleVerboseLoggingCommand.Execute();
+		await _viewModel.ToggleVerboseLoggingCommand.Execute();
+
+		_sink.Events
+			.Where(logEvent => logEvent.Level == LogEventLevel.Information)
+			.Select(logEvent => logEvent.Properties["Level"].ToString())
+			.Should().Equal(nameof(LogEventLevel.Debug), nameof(LogEventLevel.Information));
+	}
+
+	[AvaloniaFact]
+	public async Task TheToggleWritesADebugLineOnlyWhenItTurnsVerboseOn()
+	{
+		await _viewModel.ToggleVerboseLoggingCommand.Execute();
+		var debugLinesWhileVerbose = DebugLineCount();
+		await _viewModel.ToggleVerboseLoggingCommand.Execute();
+
+		debugLinesWhileVerbose.Should().Be(1);
+		DebugLineCount().Should().Be(1, "switching verbose off filters the toggle's own Debug line");
+	}
+
+	[AvaloniaFact]
 	public async Task ADebugEventReachesTheSinkOnlyWhileVerbose()
 	{
-		var sink = new CollectingSink();
-		using var logger = new LoggerConfiguration()
-			.MinimumLevel.ControlledBy(_logLevelControl.Switch)
-			.WriteTo.Sink(sink)
-			.CreateLogger();
+		var debugLogger = _serilogLogger.ForContext("Probe", true);
 
-		logger.Debug("before");
+		debugLogger.Debug("before");
 		await _viewModel.ToggleVerboseLoggingCommand.Execute();
-		logger.Debug("verbose");
+		debugLogger.Debug("verbose");
 		await _viewModel.ToggleVerboseLoggingCommand.Execute();
-		logger.Debug("after");
+		debugLogger.Debug("after");
 
-		sink.Events.Select(logEvent => logEvent.MessageTemplate.Text).Should().Equal("verbose");
+		_sink.Events
+			.Where(logEvent => logEvent.Properties.ContainsKey("Probe"))
+			.Select(logEvent => logEvent.MessageTemplate.Text)
+			.Should().Equal("verbose");
 	}
 
 	[AvaloniaFact]
@@ -91,5 +130,12 @@ public sealed class MainWindowViewModelTests : IDisposable
 	{
 		_viewModel.Dispose();
 		_messagePanel.Dispose();
+		_loggerFactory.Dispose();
+		_serilogLogger.Dispose();
+	}
+
+	private int DebugLineCount()
+	{
+		return _sink.Events.Count(logEvent => logEvent.Level == LogEventLevel.Debug);
 	}
 }
