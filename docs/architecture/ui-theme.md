@@ -2,9 +2,9 @@
 
 Every colour the app's own AXAML paints resolves to a key in
 `SpectrumVisualizer/SpectrumVisualizer.UI/Styles/Palette.axaml`. The palette is a subset of the one SemiPlot uses: the
-JetBrains values, in a `Light` and a `Dark` variant with the same key set, cut to the keys this app reads. A later slice
-adds the keys its controls need. `App.axaml` declares `RequestedThemeVariant="Light"` and nothing in the app changes it,
-so the app runs on `Light`. What the palette does not cover keeps Semi's own colour.
+JetBrains values, in a `Light` and a `Dark` variant with the same key set, cut to the `App*` keys the views read plus
+Semi's component overrides. `App.axaml` declares `RequestedThemeVariant="Light"` and nothing in the app changes it, so
+the app runs on `Light`. What the palette does not cover keeps Semi's own colour.
 
 `SpectrumVisualizer/SpectrumVisualizer.UI/App.axaml` is an include manifest and holds no style body:
 

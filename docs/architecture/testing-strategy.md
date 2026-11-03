@@ -29,7 +29,7 @@ skipped.
 
 `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/TestAppBuilder.cs` registers the test application with
 `[assembly: AvaloniaTestApplication]`. It configures the real `App` with `UseHeadless` and `UseReactiveUI(_ => { })`, so
-`App.axaml` loads the same palette, Semi theme and styles as the running app. It installs no exception handler of its own.
+`App.axaml` loads the same palette and Semi theme as the running app. It installs no exception handler of its own.
 
 ## What each kind of test owns
 

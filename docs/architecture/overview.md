@@ -82,8 +82,7 @@ extensions:
 
 `ErrorMessageMapper.Map` turns an `IError` into a `MessageView` (title, detail, remedy). An exception error keeps the
 exception type and message in the detail; any other error keeps its own message. So two different failures stay two
-rows. Every entry is an error and carries the error dot; a severity scale arrives with the first failure that recovers
-by itself.
+rows. Every entry is an error and carries the error dot; the panel has no severity scale.
 
 The panel holds at most 200 entries, newest first. A message equal to the newest entry does not add a row: it raises
 that entry's repeat count and last-seen time, and the log line drops to Debug. The panel row is visible while the list
