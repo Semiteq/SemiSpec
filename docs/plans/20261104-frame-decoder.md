@@ -150,11 +150,11 @@ type is decided by `len` only.
 - Create: `SpectrumVisualizer.Core/Protocol/FrameEncoder.cs`
 - Create: `SpectrumVisualizer.Tests.Unit/Core/Protocol/FrameEncoderTests.cs`
 
-- [ ] write tests first: a heartbeat encodes to `AA 55 02 00 03 2A 80 B3`; an ATP-2000 frame is 4120 bytes and an
+- [x] write tests first: a heartbeat encodes to `AA 55 02 00 03 2A 80 B3`; an ATP-2000 frame is 4120 bytes and an
   ATP-8000 frame 1048 bytes with the fields at the offsets of Technical Details
-- [ ] implement the model types and `FrameEncoder`; `SpectrumMeasurement`'s constructor rejects a pixel count that does
+- [x] implement the model types and `FrameEncoder`; `SpectrumMeasurement`'s constructor rejects a pixel count that does
   not match its device
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 3: Frame decoder
 **Files:**

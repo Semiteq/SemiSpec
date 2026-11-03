@@ -1,0 +1,76 @@
+namespace SpectrumVisualizer.Core.Protocol;
+
+/// <summary>One frame from the board: a heartbeat when Measurement is null, a spectrum frame otherwise.</summary>
+public sealed record BoardFrame(BoardState State, byte Seq, SpectrumMeasurement? Measurement);
+
+[Flags]
+public enum BoardState : byte
+{
+	None = 0,
+	Atp2000Connected = 1 << 0,
+	Atp8000Connected = 1 << 1,
+	Atp2000MeasurementFailed = 1 << 2,
+	Atp8000MeasurementFailed = 1 << 3,
+}
+
+public enum Spectrometer : byte
+{
+	Atp2000 = 1,
+	Atp8000 = 2,
+}
+
+public static class SpectrometerExtensions
+{
+	extension(Spectrometer device)
+	{
+		public int PixelCount => device switch
+		{
+			Spectrometer.Atp2000 => 2048,
+			Spectrometer.Atp8000 => 512,
+			_ => throw new ArgumentOutOfRangeException(nameof(device), device, "Unknown spectrometer."),
+		};
+	}
+}
+
+public sealed record SpectrumMeasurement
+{
+	public SpectrumMeasurement(
+		Spectrometer device,
+		ushort wavelengthNm,
+		byte delta,
+		float amplitude,
+		float snr,
+		float q,
+		ushort[] pixels)
+	{
+		if (pixels.Length != device.PixelCount)
+		{
+			throw new ArgumentException(
+				$"{device} has {device.PixelCount} pixels, got {pixels.Length}.",
+				nameof(pixels));
+		}
+
+		Device = device;
+		WavelengthNm = wavelengthNm;
+		Delta = delta;
+		Amplitude = amplitude;
+		Snr = snr;
+		Q = q;
+		Pixels = pixels;
+	}
+
+	public Spectrometer Device { get; }
+
+	public ushort WavelengthNm { get; }
+
+	/// <summary>Half-width of the measurement window, in nm.</summary>
+	public byte Delta { get; }
+
+	public float Amplitude { get; }
+
+	public float Snr { get; }
+
+	public float Q { get; }
+
+	public ushort[] Pixels { get; }
+}
