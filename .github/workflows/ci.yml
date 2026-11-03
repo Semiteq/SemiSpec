@@ -1,0 +1,88 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - ".github/workflows/ci.yml"
+      - ".editorconfig"
+      - ".gitattributes"
+      - ".config/dotnet-tools.json"
+      - ".githooks/**"
+      - "SpectrumVisualizer/**"
+      - "SpectrumVisualizer.slnx"
+      - "SpectrumVisualizer.Uart/**"
+      - "SpectrumVisualizer.Tests/**"
+      - "SpectrumVisualizer.sln"
+      - "global.json"
+      - "nuget.config"
+      - "!**.md"
+  pull_request:
+    paths:
+      - ".github/workflows/ci.yml"
+      - ".editorconfig"
+      - ".gitattributes"
+      - ".config/dotnet-tools.json"
+      - ".githooks/**"
+      - "SpectrumVisualizer/**"
+      - "SpectrumVisualizer.slnx"
+      - "SpectrumVisualizer.Uart/**"
+      - "SpectrumVisualizer.Tests/**"
+      - "SpectrumVisualizer.sln"
+      - "global.json"
+      - "nuget.config"
+      - "!**.md"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # One Windows job: the old WinForms app targets net9.0-windows and cannot build elsewhere.
+  unit-windows:
+    name: Unit (Windows)
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # global.json pins the SDK; the 9.0 runtime runs the old app's tests.
+      - name: setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          dotnet-version: 9.0.x
+
+      - name: restore
+        run: dotnet restore SpectrumVisualizer.slnx
+
+      - name: build
+        run: dotnet build SpectrumVisualizer.slnx -c Release --no-restore
+
+      - name: unit tests
+        run: dotnet test SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/SpectrumVisualizer.Tests.Unit.csproj -c Release --no-build --logger "console;verbosity=normal"
+
+      - name: format check
+        run: dotnet format SpectrumVisualizer.slnx --verify-no-changes
+
+      # The format check above is the byte order mark gate (error CHARSET); terse is the character gate.
+      - name: comment gate
+        shell: bash
+        run: |
+          dotnet tool restore
+          if [ -z "$(git ls-files 'SpectrumVisualizer/*.cs')" ]; then
+            echo "comment gate: no tracked .cs file to lint" >&2
+            exit 1
+          fi
+          git ls-files -z 'SpectrumVisualizer/*.cs' | xargs -0 dotnet terse
+
+      - name: build old app
+        run: dotnet build SpectrumVisualizer.sln -c Release
+
+      - name: test old app
+        run: dotnet test SpectrumVisualizer.Tests/SpectrumVisualizer.Tests.csproj -c Release --no-build --logger "console;verbosity=normal"

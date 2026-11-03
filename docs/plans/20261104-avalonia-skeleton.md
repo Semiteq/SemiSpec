@@ -278,12 +278,12 @@ Manual smoke checklist:
 **Files:**
 - Create: `.githooks/pre-commit`, `.github/workflows/ci.yml`
 
-- [ ] add the pre-commit hook from SemiPlot (`.githooks/pre-commit:1-35`) pointing at `SpectrumVisualizer.slnx`
-- [ ] add the CI workflow modelled on `ci.yml:1-60`: setup-dotnet with `global-json-file` and `dotnet-version: 9.0.x`;
+- [x] add the pre-commit hook from SemiPlot (`.githooks/pre-commit:1-35`) pointing at `SpectrumVisualizer.slnx`
+- [x] add the CI workflow modelled on `ci.yml:1-60`: setup-dotnet with `global-json-file` and `dotnet-version: 9.0.x`;
   restore, build and test `SpectrumVisualizer.slnx`; `dotnet format SpectrumVisualizer.slnx --verify-no-changes` and
   terse; then build `SpectrumVisualizer.sln` and run its tests. Path filters cover the new tree, the old projects,
   `SpectrumVisualizer.sln` and the build files
-- [ ] run the hook locally on a staged file to confirm it passes and rejects a badly formatted file
+- [x] run the hook locally on a staged file to confirm it passes and rejects a badly formatted file
 
 ### Task 10: Project docs
 **Files:**
