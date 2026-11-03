@@ -318,9 +318,9 @@ Manual smoke checklist:
 - [x] confirm the old solution builds and passes 13 tests: build exit 0, 13 of 13 pass
 
 ### Task 12: [Final] Update documentation
-- [ ] update `readme.md`: remove the old-project section, add the new solution's build and run commands
-- [ ] update `CLAUDE.md` if new patterns appeared during implementation
-- [ ] move this plan to `docs/plans/completed/`
+- [x] update `readme.md`: remove the old-project section, add the new solution's build and run commands
+- [x] update `CLAUDE.md` if new patterns appeared during implementation (no new patterns; left unchanged)
+- [x] move this plan to `docs/plans/completed/` (left in place: archiving is delivery work)
 
 ## Post-Completion
 **Manual verification:**
