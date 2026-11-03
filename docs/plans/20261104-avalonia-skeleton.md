@@ -258,12 +258,12 @@ Manual smoke checklist:
 - Modify: `SpectrumVisualizer.UI/UiServiceCollectionExtensions.cs`, `App.axaml.cs`
 - Create: `SpectrumVisualizer.Tests.Unit/UI/Di/CompositionRootTests.cs`, `AppBuilderCompositionTests.cs`
 
-- [ ] register the message panel, the time provider and the main window view model in `AddUi(LogLevelControl)`; build
+- [x] register the message panel, the time provider and the main window view model in `AddUi(LogLevelControl)`; build
   the main window from the provider in `App`
-- [ ] write a test that every registered service resolves from the production composition root
-- [ ] write `AppBuilderCompositionTests` in SemiPlot's shape: `BuildAvaloniaApp` reports `WindowingSubsystemName ==
+- [x] write a test that every registered service resolves from the production composition root
+- [x] write `AppBuilderCompositionTests` in SemiPlot's shape: `BuildAvaloniaApp` reports `WindowingSubsystemName ==
   "Win32"`, `RenderingSubsystemName == "Skia"`, a non-null text shaping initializer, and restores `Logger.Sink`
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 8: Remove the vendor-SDK project and the COM writer tool
 **Files:**

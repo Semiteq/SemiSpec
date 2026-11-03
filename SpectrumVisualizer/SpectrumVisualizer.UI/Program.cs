@@ -39,7 +39,7 @@ public static class Program
 				.AddUi(logging.Value.LevelControl)
 				.BuildServiceProvider();
 
-			App.Run();
+			App.Run(serviceProvider);
 
 			return 0;
 		}

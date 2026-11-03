@@ -1,8 +1,11 @@
 using System.Globalization;
 
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+
+using Microsoft.Extensions.DependencyInjection;
 
 using ReactiveUI.Avalonia;
 
@@ -10,6 +13,7 @@ using Semi.Avalonia;
 
 using Serilog.Extensions.Logging;
 
+using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
 
 namespace SpectrumVisualizer.UI;
@@ -25,8 +29,10 @@ public class App : Application
 		AvaloniaScheduler.Instance,
 		new SerilogLoggerFactory().CreateLogger(nameof(UnhandledErrorObserver)));
 
+	private MainWindowViewModel? _mainWindowViewModel;
+
 	/// <summary>The panel of the shown window; null until a window carries one.</summary>
-	internal MessagePanelViewModel? MessagePanel { get; set; }
+	internal MessagePanelViewModel? MessagePanel { get; private set; }
 
 	public override void Initialize()
 	{
@@ -39,15 +45,37 @@ public class App : Application
 	{
 		if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
 		{
-			desktop.MainWindow = new MainWindow.MainWindow();
+			desktop.MainWindow = CreateMainWindow();
 		}
 
 		base.OnFrameworkInitializationCompleted();
 	}
 
-	public static void Run()
+	internal Window CreateMainWindow()
 	{
-		BuildAvaloniaApp().StartWithClassicDesktopLifetime([]);
+		if (_mainWindowViewModel is not { } viewModel)
+		{
+			throw new InvalidOperationException("The main window view model is not set. Call Run() before starting the app.");
+		}
+
+		var mainWindow = new MainWindow.MainWindow { DataContext = viewModel };
+
+		MessagePanel = viewModel.MessagePanel;
+		mainWindow.Closed += (_, _) => MessagePanel = null;
+
+		return mainWindow;
+	}
+
+	public static void Run(IServiceProvider services)
+	{
+		BuildAvaloniaApp()
+			.AfterSetup(builder => ((App)builder.Instance!).Configure(services))
+			.StartWithClassicDesktopLifetime([]);
+	}
+
+	internal void Configure(IServiceProvider services)
+	{
+		_mainWindowViewModel = services.GetRequiredService<MainWindowViewModel>();
 	}
 
 	/// <summary>Semi keys its own strings by specific culture and falls back to zh-CN for any other.</summary>
