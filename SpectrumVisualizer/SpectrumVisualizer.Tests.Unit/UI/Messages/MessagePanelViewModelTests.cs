@@ -83,12 +83,11 @@ public sealed class MessagePanelViewModelTests
 	{
 		using var panel = new MessagePanelViewModel(new SteppingClock());
 
-		panel.IsVisible.Should().BeFalse("a session that never fails is not given the row");
-		panel.HasEntries.Should().BeFalse();
+		panel.HasEntries.Should().BeFalse("a session that never fails is not given the row");
 
 		panel.Report(Failure("archive"));
 
-		panel.IsVisible.Should().BeTrue("the entry would otherwise land off screen");
+		panel.HasEntries.Should().BeTrue("the entry would otherwise land off screen");
 	}
 
 	// The detail carries the exception's own message, so two different failures of one exception type are
@@ -132,7 +131,7 @@ public sealed class MessagePanelViewModelTests
 	}
 
 	[Fact]
-	public void ClearCommandEmptiesTheListAndLeavesThePanelOnScreen()
+	public void ClearCommandEmptiesTheListAndTakesThePanelOffScreen()
 	{
 		using var panel = new MessagePanelViewModel(new SteppingClock());
 		panel.Report(Failure("archive"));
@@ -141,12 +140,11 @@ public sealed class MessagePanelViewModelTests
 
 		panel.Entries.Should().BeEmpty();
 		panel.HasEntries.Should().BeFalse();
-		panel.IsVisible.Should().BeTrue();
 	}
 
 	private static MessageView Failure(string title)
 	{
-		return new MessageView(title, "detail", "remedy", MessageSeverity.Warning);
+		return new MessageView(title, "detail", "remedy");
 	}
 
 	private static MessageView Thrown(string message)

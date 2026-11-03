@@ -7,13 +7,10 @@
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
                 <ResourceInclude Source="avares://SpectrumVisualizer.UI/Styles/Palette.axaml" />
-                <ResourceInclude Source="avares://SpectrumVisualizer.UI/Styles/Icons.axaml" />
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
     <Application.Styles>
         <semi:SemiTheme />
-        <StyleInclude Source="avares://SpectrumVisualizer.UI/Styles/Forms.axaml" />
-        <StyleInclude Source="avares://SpectrumVisualizer.UI/Styles/Buttons.axaml" />
     </Application.Styles>
 </Application>

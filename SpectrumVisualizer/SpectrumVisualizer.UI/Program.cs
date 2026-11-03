@@ -1,9 +1,11 @@
 using Microsoft.Extensions.DependencyInjection;
 
 using Serilog;
+using Serilog.Extensions.Logging;
 
 using SpectrumVisualizer.Core;
 using SpectrumVisualizer.UI.Logging;
+using SpectrumVisualizer.UI.Messages;
 
 namespace SpectrumVisualizer.UI;
 
@@ -38,8 +40,9 @@ public static class Program
 			using var serviceProvider = new ServiceCollection()
 				.AddUi(logging.Value.LevelControl)
 				.BuildServiceProvider();
+			using var loggerFactory = new SerilogLoggerFactory(logging.Value.Logger);
 
-			App.Run(serviceProvider);
+			App.Run(serviceProvider, loggerFactory.CreateLogger(nameof(UnhandledErrorObserver)));
 
 			return 0;
 		}

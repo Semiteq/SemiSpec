@@ -19,16 +19,14 @@ namespace SpectrumVisualizer.Tests.Unit.UI;
 [Trait("Category", "Unit")]
 public sealed class AppResourcesTests
 {
-	// Every key Styles/Forms.axaml and Styles/Buttons.axaml read; the DataGrid and ColorPicker keys of the
-	// palette have no control in this application.
-	private static readonly string[] _styleKeys =
+	// Every App* key the application's own views read.
+	private static readonly string[] _viewKeys =
 	[
+		"AppPanelBackgroundBrush",
+		"AppContentBackgroundBrush",
+		"AppBorderBrush",
+		"AppSecondaryForegroundBrush",
 		"AppSeverityErrorBrush",
-		"AppDestructiveBackgroundBrush",
-		"AppDestructivePointeroverBackgroundBrush",
-		"AppDestructivePressedBackgroundBrush",
-		"AppDestructiveForegroundBrush",
-		"WarningGeometry",
 	];
 
 	[Fact]
@@ -57,11 +55,11 @@ public sealed class AppResourcesTests
 	[AvaloniaTheory]
 	[InlineData("Light")]
 	[InlineData("Dark")]
-	public void EveryKeyTheStylesReadResolvesUnderBothVariants(string variantName)
+	public void EveryKeyTheViewsReadResolvesUnderBothVariants(string variantName)
 	{
 		var variant = variantName == "Dark" ? ThemeVariant.Dark : ThemeVariant.Light;
 
-		foreach (var key in _styleKeys)
+		foreach (var key in _viewKeys)
 		{
 			Application.Current!.TryGetResource(key, variant, out var value)
 				.Should().BeTrue("'{0}' has to resolve under {1}", key, variantName);

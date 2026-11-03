@@ -41,7 +41,7 @@ AXAML reads a key as `{x:Static text:Resources.Key}` with
 | Main window | `WindowTitle`, `ContentPlaceholder` |
 | Menu | `MenuFile`, `MenuFileExit`, `MenuView`, `MenuViewVerboseLogging` |
 | Status bar | `StatusNotConnected` |
-| Message panel | `MessagePanelTitle`, `MessagePanelClear`, `MessagePanelRepeatFormat`, `MessagePanelEmpty` |
+| Message panel | `MessagePanelTitle`, `MessagePanelClear`, `MessagePanelRepeatFormat` |
 | `ErrorMessageMapper` | `FailureThrownTitle`, `FailureThrownDetail`, `FailureThrownRemedy`, `FailureUnknownTitle`, `FailureUnknownRemedy` |
 
 A message has three parts: the title names what failed in one short line, the detail names what the app observed, and

@@ -6,9 +6,6 @@
     <CornerRadius x:Key="TextBoxDefaultCornerRadius">4</CornerRadius>
     <CornerRadius x:Key="CheckBoxBoxCornerRadius">4</CornerRadius>
     <CornerRadius x:Key="ComboBoxSelectorCornerRadius">4</CornerRadius>
-    <CornerRadius x:Key="ColorPickerCornerRadius">4</CornerRadius>
-    <CornerRadius x:Key="DataGridRowCornerRadius">4</CornerRadius>
-    <CornerRadius x:Key="DataGridColumnHeaderCornerRadius">4</CornerRadius>
 
     <ResourceDictionary.ThemeDictionaries>
 
@@ -49,16 +46,11 @@
             <SolidColorBrush x:Key="FlyoutForeground" Color="#000000" />
             <SolidColorBrush x:Key="ComboBoxDisabledForeground" Color="#A8ADBD" />
             <SolidColorBrush x:Key="ComboBoxSelectorPressedBorderBrush" Color="#3574F0" />
-            <SolidColorBrush x:Key="ColorViewTabItemSelectedForeground" Color="#3574F0" />
-            <SolidColorBrush x:Key="ColorViewRadioButtonForeground" Color="#3574F0" />
-            <SolidColorBrush x:Key="ColorViewRadioButtonCheckedBackground" Color="#3574F0" />
             <SolidColorBrush x:Key="ComboBoxItemSelectedBackground" Color="#3574F0" Opacity="0.25" />
             <SolidColorBrush x:Key="ComboBoxPopupBackground" Color="#F7F8FA" />
             <SolidColorBrush x:Key="FlyoutBackground" Color="#F7F8FA" />
-            <SolidColorBrush x:Key="ColorViewRadioButtonBackground" Color="#FFFFFF" />
             <SolidColorBrush x:Key="ComboBoxPopupBorderBrush" Color="#EBECF0" />
             <SolidColorBrush x:Key="FlyoutBorderBrush" Color="#EBECF0" />
-            <SolidColorBrush x:Key="ColorSpectrumBorderBrush" Color="#EBECF0" />
             <SolidColorBrush x:Key="CheckBoxDefaultDisabledBorderBrush" Color="#EBECF0" />
 
             <SolidColorBrush x:Key="CheckBoxCheckedPointeroverBackground" Color="#3574F0" />
@@ -69,31 +61,11 @@
             <SolidColorBrush x:Key="CheckBoxCheckedDisabledBackground" Color="#A8ADBD" />
             <SolidColorBrush x:Key="CheckBoxCheckedDisabledBorderBrush" Color="#A8ADBD" />
 
-            <SolidColorBrush x:Key="DataGridColumnHeaderForeground" Color="#818594" />
-            <SolidColorBrush x:Key="DataGridLineBrush" Color="#EBECF0" />
-            <SolidColorBrush x:Key="DataGridRowSelectedBackground" Color="#3574F0" Opacity="0.25" />
-            <SolidColorBrush x:Key="DataGridRowSelectedPointeroverBackground" Color="#3574F0" Opacity="0.25" />
-
             <SolidColorBrush x:Key="AppPanelBackgroundBrush" Color="#F7F8FA" />
             <SolidColorBrush x:Key="AppContentBackgroundBrush" Color="#FFFFFF" />
             <SolidColorBrush x:Key="AppBorderBrush" Color="#EBECF0" />
-            <SolidColorBrush x:Key="AppSubtleLineBrush" Color="#EBECF0" />
-            <SolidColorBrush x:Key="AppMinorGridLineBrush" Color="#F4F5F7" />
-            <SolidColorBrush x:Key="AppMarkerLineBrush" Color="#6F737A" />
-            <SolidColorBrush x:Key="AppMarkerLabelBrush" Color="#000000" />
-            <SolidColorBrush x:Key="AppRecipeMarkerLineBrush" Color="#834DF0" />
             <SolidColorBrush x:Key="AppSecondaryForegroundBrush" Color="#818594" />
-            <SolidColorBrush x:Key="AppAccentBrush" Color="#3574F0" />
-            <SolidColorBrush x:Key="AppAccentFillBrush" Color="#3574F0" Opacity="0.25" />
             <SolidColorBrush x:Key="AppSeverityErrorBrush" Color="#DB3B4B" />
-            <SolidColorBrush x:Key="AppSeverityWarningBrush" Color="#E3AE4D" />
-            <SolidColorBrush x:Key="AppSeverityInfoBrush" Color="#3574F0" />
-            <SolidColorBrush x:Key="AppConnectionOkBrush" Color="#208A3C" />
-            <SolidColorBrush x:Key="AppConnectionFaultBrush" Color="#DB3B4B" />
-            <SolidColorBrush x:Key="AppDestructiveBackgroundBrush" Color="#C7303F" />
-            <SolidColorBrush x:Key="AppDestructivePointeroverBackgroundBrush" Color="#B02A38" />
-            <SolidColorBrush x:Key="AppDestructivePressedBackgroundBrush" Color="#992431" />
-            <SolidColorBrush x:Key="AppDestructiveForegroundBrush" Color="#FFFFFF" />
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="Dark">
@@ -133,16 +105,11 @@
             <SolidColorBrush x:Key="FlyoutForeground" Color="#DFE1E5" />
             <SolidColorBrush x:Key="ComboBoxDisabledForeground" Color="#5A5D63" />
             <SolidColorBrush x:Key="ComboBoxSelectorPressedBorderBrush" Color="#3574F0" />
-            <SolidColorBrush x:Key="ColorViewTabItemSelectedForeground" Color="#3574F0" />
-            <SolidColorBrush x:Key="ColorViewRadioButtonForeground" Color="#3574F0" />
-            <SolidColorBrush x:Key="ColorViewRadioButtonCheckedBackground" Color="#3574F0" />
             <SolidColorBrush x:Key="ComboBoxItemSelectedBackground" Color="#3574F0" Opacity="0.25" />
             <SolidColorBrush x:Key="ComboBoxPopupBackground" Color="#2B2D30" />
             <SolidColorBrush x:Key="FlyoutBackground" Color="#2B2D30" />
-            <SolidColorBrush x:Key="ColorViewRadioButtonBackground" Color="#1E1F22" />
             <SolidColorBrush x:Key="ComboBoxPopupBorderBrush" Color="#393B40" />
             <SolidColorBrush x:Key="FlyoutBorderBrush" Color="#393B40" />
-            <SolidColorBrush x:Key="ColorSpectrumBorderBrush" Color="#393B40" />
             <SolidColorBrush x:Key="CheckBoxDefaultDisabledBorderBrush" Color="#393B40" />
 
             <SolidColorBrush x:Key="CheckBoxCheckedPointeroverBackground" Color="#3574F0" />
@@ -153,31 +120,11 @@
             <SolidColorBrush x:Key="CheckBoxCheckedDisabledBackground" Color="#5A5D63" />
             <SolidColorBrush x:Key="CheckBoxCheckedDisabledBorderBrush" Color="#5A5D63" />
 
-            <SolidColorBrush x:Key="DataGridColumnHeaderForeground" Color="#6F737A" />
-            <SolidColorBrush x:Key="DataGridLineBrush" Color="#393B40" />
-            <SolidColorBrush x:Key="DataGridRowSelectedBackground" Color="#3574F0" Opacity="0.25" />
-            <SolidColorBrush x:Key="DataGridRowSelectedPointeroverBackground" Color="#3574F0" Opacity="0.25" />
-
             <SolidColorBrush x:Key="AppPanelBackgroundBrush" Color="#2B2D30" />
             <SolidColorBrush x:Key="AppContentBackgroundBrush" Color="#1E1F22" />
             <SolidColorBrush x:Key="AppBorderBrush" Color="#393B40" />
-            <SolidColorBrush x:Key="AppSubtleLineBrush" Color="#393B40" />
-            <SolidColorBrush x:Key="AppMinorGridLineBrush" Color="#2B2D30" />
-            <SolidColorBrush x:Key="AppMarkerLineBrush" Color="#A8ADBD" />
-            <SolidColorBrush x:Key="AppMarkerLabelBrush" Color="#DFE1E5" />
-            <SolidColorBrush x:Key="AppRecipeMarkerLineBrush" Color="#A571E6" />
             <SolidColorBrush x:Key="AppSecondaryForegroundBrush" Color="#6F737A" />
-            <SolidColorBrush x:Key="AppAccentBrush" Color="#3574F0" />
-            <SolidColorBrush x:Key="AppAccentFillBrush" Color="#3574F0" Opacity="0.25" />
             <SolidColorBrush x:Key="AppSeverityErrorBrush" Color="#E55765" />
-            <SolidColorBrush x:Key="AppSeverityWarningBrush" Color="#F2C55C" />
-            <SolidColorBrush x:Key="AppSeverityInfoBrush" Color="#3574F0" />
-            <SolidColorBrush x:Key="AppConnectionOkBrush" Color="#5FAD65" />
-            <SolidColorBrush x:Key="AppConnectionFaultBrush" Color="#E55765" />
-            <SolidColorBrush x:Key="AppDestructiveBackgroundBrush" Color="#C7303F" />
-            <SolidColorBrush x:Key="AppDestructivePointeroverBackgroundBrush" Color="#B02A38" />
-            <SolidColorBrush x:Key="AppDestructivePressedBackgroundBrush" Color="#992431" />
-            <SolidColorBrush x:Key="AppDestructiveForegroundBrush" Color="#FFFFFF" />
         </ResourceDictionary>
 
     </ResourceDictionary.ThemeDictionaries>

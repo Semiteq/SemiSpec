@@ -1,3 +1,5 @@
+using System.Reactive.Linq;
+
 using Avalonia;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
@@ -36,14 +38,15 @@ public sealed class CompositionRootTests
 	}
 
 	[AvaloniaFact]
-	public void TheMainWindowViewModelSharesTheContainersPanelAndLogLevelControl()
+	public async Task TheMainWindowViewModelSharesTheContainersPanelAndLogLevelControl()
 	{
 		using var provider = BuildContainer();
 
 		var viewModel = provider.GetRequiredService<MainWindowViewModel>();
+		await viewModel.ToggleVerboseLoggingCommand.Execute();
 
 		viewModel.MessagePanel.Should().BeSameAs(provider.GetRequiredService<MessagePanelViewModel>());
-		provider.GetRequiredService<LogLevelControl>().Should().BeSameAs(_logLevelControl);
+		_logLevelControl.IsVerbose.Should().BeTrue("the command writes the control the container was given");
 	}
 
 	[AvaloniaFact]
@@ -54,16 +57,28 @@ public sealed class CompositionRootTests
 
 		app.Configure(provider);
 		var window = app.CreateMainWindow();
-		window.Show();
-		Dispatcher.UIThread.RunJobs();
 
-		window.DataContext.Should().BeSameAs(provider.GetRequiredService<MainWindowViewModel>());
-		App.ResolveMessagePanel().Should().BeSameAs(provider.GetRequiredService<MessagePanelViewModel>());
+		try
+		{
+			window.Show();
+			Dispatcher.UIThread.RunJobs();
 
-		window.Close();
-		Dispatcher.UIThread.RunJobs();
+			window.DataContext.Should().BeSameAs(provider.GetRequiredService<MainWindowViewModel>());
+			App.ResolveMessagePanel().Should().BeSameAs(provider.GetRequiredService<MessagePanelViewModel>());
+		}
+		finally
+		{
+			window.Close();
+			Dispatcher.UIThread.RunJobs();
+		}
+	}
 
-		App.ResolveMessagePanel().Should().BeNull("a closed window carries no panel");
+	[AvaloniaFact]
+	public void AnAppThatWasNeverConfiguredRefusesToBuildTheMainWindow()
+	{
+		var createMainWindow = () => new App().CreateMainWindow();
+
+		createMainWindow.Should().Throw<InvalidOperationException>();
 	}
 
 	private ServiceProvider BuildContainer()

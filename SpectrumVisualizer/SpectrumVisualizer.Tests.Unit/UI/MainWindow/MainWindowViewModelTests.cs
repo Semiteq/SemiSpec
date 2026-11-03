@@ -22,7 +22,7 @@ namespace SpectrumVisualizer.Tests.Unit.UI.MainWindow;
 public sealed class MainWindowViewModelTests : IDisposable
 {
 	private readonly LogLevelControl _logLevelControl = new();
-	private readonly MessagePanelViewModel _messagePanel = new();
+	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
 	private readonly MainWindowViewModel _viewModel;
 
 	public MainWindowViewModelTests()
@@ -44,7 +44,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 
 		await _viewModel.ToggleVerboseLoggingCommand.Execute();
 
-		_logLevelControl.Switch.MinimumLevel.Should().Be(LogEventLevel.Debug);
+		_logLevelControl.IsVerbose.Should().BeTrue();
 		_viewModel.IsVerboseLogging.Should().BeTrue();
 		changed.Should().Contain(nameof(MainWindowViewModel.IsVerboseLogging));
 	}
@@ -55,7 +55,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 		await _viewModel.ToggleVerboseLoggingCommand.Execute();
 		await _viewModel.ToggleVerboseLoggingCommand.Execute();
 
-		_logLevelControl.Switch.MinimumLevel.Should().Be(LogEventLevel.Information);
+		_logLevelControl.IsVerbose.Should().BeFalse();
 		_viewModel.IsVerboseLogging.Should().BeFalse();
 	}
 

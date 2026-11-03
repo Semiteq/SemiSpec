@@ -42,9 +42,6 @@
   <data name="MessagePanelRepeatFormat" xml:space="preserve">
     <value>repeated {0} times</value>
   </data>
-  <data name="MessagePanelEmpty" xml:space="preserve">
-    <value>No messages</value>
-  </data>
   <data name="FailureThrownTitle" xml:space="preserve">
     <value>Unexpected failure</value>
   </data>

@@ -3,10 +3,10 @@ using FluentResults;
 namespace SpectrumVisualizer.Core;
 
 /// <summary>Folders the application owns under the per-user local application data root.</summary>
-public sealed record AppDataPaths(string AppFolder, string LogFolder)
+public sealed record AppDataPaths(string LogFolder)
 {
-	public const string AppFolderName = "SpectrumVisualizer";
-	public const string LogFolderName = "Logs";
+	private const string AppFolderName = "SpectrumVisualizer";
+	private const string LogFolderName = "Logs";
 
 	public static Result<AppDataPaths> Under(string localAppDataRoot)
 	{
@@ -16,8 +16,6 @@ public sealed record AppDataPaths(string AppFolder, string LogFolder)
 				$"The local application data folder '{localAppDataRoot}' is not an absolute path");
 		}
 
-		var appFolder = Path.Combine(localAppDataRoot, AppFolderName);
-
-		return new AppDataPaths(appFolder, Path.Combine(appFolder, LogFolderName));
+		return new AppDataPaths(Path.Combine(localAppDataRoot, AppFolderName, LogFolderName));
 	}
 }

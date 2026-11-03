@@ -7,5 +7,4 @@ namespace SpectrumVisualizer.UI.Messages;
 public sealed record MessageView(
 	string Title,
 	string Detail,
-	string Remedy,
-	MessageSeverity Severity);
+	string Remedy);

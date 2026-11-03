@@ -14,14 +14,6 @@ public sealed class AppDataPathsTests
 	private static readonly string _root = Path.Combine(Path.GetTempPath(), "local-app-data");
 
 	[Fact]
-	public void TheAppFolderIsNamedAfterTheApplicationUnderTheRoot()
-	{
-		var paths = AppDataPaths.Under(_root).Value;
-
-		paths.AppFolder.Should().Be(Path.Combine(_root, "SpectrumVisualizer"));
-	}
-
-	[Fact]
 	public void TheLogFolderSitsInsideTheAppFolder()
 	{
 		var paths = AppDataPaths.Under(_root).Value;
@@ -41,6 +33,8 @@ public sealed class AppDataPathsTests
 	[InlineData("")]
 	[InlineData("relative")]
 	[InlineData("relative/nested")]
+	[InlineData(@"\rooted")]
+	[InlineData("C:drive-relative")]
 	public void ARootThatIsNotAbsoluteFails(string root)
 	{
 		var result = AppDataPaths.Under(root);

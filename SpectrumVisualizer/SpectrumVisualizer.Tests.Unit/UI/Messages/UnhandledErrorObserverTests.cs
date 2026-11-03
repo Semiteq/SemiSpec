@@ -24,7 +24,7 @@ public sealed class UnhandledErrorObserverTests
 	public void OnNextReportsTheMappedExceptionThroughTheUiScheduler()
 	{
 		var scheduler = new TestScheduler();
-		using var panel = new MessagePanelViewModel();
+		using var panel = new MessagePanelViewModel(TimeProvider.System);
 		var observer = new UnhandledErrorObserver(() => panel, scheduler, NullLogger.Instance);
 		var failure = new InvalidOperationException("the command body threw");
 
@@ -37,7 +37,6 @@ public sealed class UnhandledErrorObserverTests
 		panel.Entries.Should().ContainSingle();
 		panel.Entries[0].View.Should()
 			.Be(ErrorMessageMapper.Map(new ExceptionalError(failure.Message, failure)));
-		panel.Entries[0].View.Severity.Should().Be(MessageSeverity.Error);
 	}
 
 	[Fact]
@@ -59,7 +58,7 @@ public sealed class UnhandledErrorObserverTests
 	public void OnNextLogsAndReportsWhenThePanelExists()
 	{
 		var scheduler = new TestScheduler();
-		using var panel = new MessagePanelViewModel();
+		using var panel = new MessagePanelViewModel(TimeProvider.System);
 		var logger = new FakeLogger();
 		var observer = new UnhandledErrorObserver(() => panel, scheduler, logger);
 
@@ -76,10 +75,10 @@ public sealed class UnhandledErrorObserverTests
 	public void OnNextWithAPanelThatRefusesTheEntryLogsAndDoesNotEscapeTheScheduledJob()
 	{
 		var scheduler = new TestScheduler();
-		using var panel = new MessagePanelViewModel();
+		using var panel = new MessagePanelViewModel(TimeProvider.System);
 		var logger = new FakeLogger();
 		var observer = new UnhandledErrorObserver(() => panel, scheduler, logger);
-		ReportingTestDoubles.PoisonEntries(panel);
+		using var poison = ReportingTestDoubles.PoisonEntries(panel);
 
 		observer.OnNext(new InvalidOperationException("the command body threw"));
 
@@ -95,7 +94,7 @@ public sealed class UnhandledErrorObserverTests
 	public void OnErrorTakesTheSameRouteAsOnNext()
 	{
 		var scheduler = new TestScheduler();
-		using var panel = new MessagePanelViewModel();
+		using var panel = new MessagePanelViewModel(TimeProvider.System);
 		var observer = new UnhandledErrorObserver(() => panel, scheduler, NullLogger.Instance);
 
 		observer.OnError(new InvalidOperationException("the handler stream failed"));

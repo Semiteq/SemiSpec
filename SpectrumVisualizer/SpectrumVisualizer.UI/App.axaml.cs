@@ -6,12 +6,11 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 using ReactiveUI.Avalonia;
 
 using Semi.Avalonia;
-
-using Serilog.Extensions.Logging;
 
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
@@ -22,17 +21,11 @@ public class App : Application
 {
 	private const string RussianLanguage = "ru";
 
-	// Process lifetime by design: ReactiveUI takes its exception handler once, before any window exists,
-	// so the observer outlives every window and reads the shown window's panel on each exception.
-	private static readonly UnhandledErrorObserver _unhandledErrors = new(
-		ResolveMessagePanel,
-		AvaloniaScheduler.Instance,
-		new SerilogLoggerFactory().CreateLogger(nameof(UnhandledErrorObserver)));
-
 	private MainWindowViewModel? _mainWindowViewModel;
 
-	/// <summary>The panel of the shown window; null until a window carries one.</summary>
-	internal MessagePanelViewModel? MessagePanel { get; private set; }
+	// Written once on the UI thread in Configure; read by UnhandledErrorObserver on whichever thread
+	// ReactiveUI raises the exception, so the write is published with volatile.
+	private volatile MessagePanelViewModel? _messagePanel;
 
 	public override void Initialize()
 	{
@@ -58,17 +51,19 @@ public class App : Application
 			throw new InvalidOperationException("The main window view model is not set. Call Run() before starting the app.");
 		}
 
-		var mainWindow = new MainWindow.MainWindow { DataContext = viewModel };
-
-		MessagePanel = viewModel.MessagePanel;
-		mainWindow.Closed += (_, _) => MessagePanel = null;
-
-		return mainWindow;
+		return new MainWindow.MainWindow { DataContext = viewModel };
 	}
 
-	public static void Run(IServiceProvider services)
+	/// <summary>Runs the app until its window closes; the logger receives what ReactiveUI raises unhandled.</summary>
+	public static void Run(IServiceProvider services, ILogger unhandledErrorLogger)
 	{
-		BuildAvaloniaApp()
+		// Process lifetime by design: ReactiveUI takes its exception handler once, before any window exists.
+		var unhandledErrors = new UnhandledErrorObserver(
+			ResolveMessagePanel,
+			AvaloniaScheduler.Instance,
+			unhandledErrorLogger);
+
+		BuildAvaloniaApp(unhandledErrors)
 			.AfterSetup(builder => ((App)builder.Instance!).Configure(services))
 			.StartWithClassicDesktopLifetime([]);
 	}
@@ -76,6 +71,7 @@ public class App : Application
 	internal void Configure(IServiceProvider services)
 	{
 		_mainWindowViewModel = services.GetRequiredService<MainWindowViewModel>();
+		_messagePanel = services.GetRequiredService<MessagePanelViewModel>();
 	}
 
 	/// <summary>Semi keys its own strings by specific culture and falls back to zh-CN for any other.</summary>
@@ -86,7 +82,7 @@ public class App : Application
 			: CultureInfo.GetCultureInfo("en-US");
 	}
 
-	internal static AppBuilder BuildAvaloniaApp()
+	internal static AppBuilder BuildAvaloniaApp(IObserver<Exception> unhandledErrors)
 	{
 		return AppBuilder.Configure<App>()
 			.UseWin32()
@@ -94,13 +90,13 @@ public class App : Application
 			// Avalonia 12: Skia no longer brings a text shaper with it. Without UseHarfBuzz the desktop
 			// application fails at AppBuilder.Setup with "No text shaping system configured".
 			.UseHarfBuzz()
-			.UseReactiveUI(builder => builder.WithExceptionHandler(_unhandledErrors))
+			.UseReactiveUI(builder => builder.WithExceptionHandler(unhandledErrors))
 			.LogToTrace();
 	}
 
-	/// <summary>The panel of the window shown; with no window a failure is only logged.</summary>
+	/// <summary>The panel of the configured app; before Configure a failure is only logged.</summary>
 	internal static MessagePanelViewModel? ResolveMessagePanel()
 	{
-		return (Current as App)?.MessagePanel;
+		return (Current as App)?._messagePanel;
 	}
 }

@@ -2,9 +2,8 @@
 
 SpectrumVisualizer is the operator's desktop viewer for the spectrometer board: it reads the board's frames over a
 serial port and shows the spectrum. The application under `SpectrumVisualizer/` is a .NET 10 (C# 14) Windows desktop
-app on Avalonia 12, ReactiveUI and Semi.Avalonia; today it is the shell only (window, logging, error route), and its
-content area shows a placeholder. The repo root also holds the old WinForms app (`SpectrumVisualizer.Uart`) and its
-MSTest project (`SpectrumVisualizer.Tests`) on net9.0-windows.
+app on Avalonia 12, ReactiveUI and Semi.Avalonia. The repo root also holds the old WinForms app
+(`SpectrumVisualizer.Uart`) and its MSTest project (`SpectrumVisualizer.Tests`) on net9.0-windows.
 
 Two solution files sit at the root, so every `dotnet` command names one:
 

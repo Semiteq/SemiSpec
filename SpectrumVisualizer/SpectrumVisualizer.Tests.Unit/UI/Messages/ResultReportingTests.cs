@@ -1,3 +1,5 @@
+using System.Reactive.Concurrency;
+
 using AwesomeAssertions;
 
 using FluentResults;
@@ -17,68 +19,36 @@ namespace SpectrumVisualizer.Tests.Unit.UI.Messages;
 [Trait("Component", "UI")]
 [Trait("Area", "Messages")]
 [Trait("Category", "Unit")]
-public sealed class ResultReportingTests
+public sealed class ResultReportingTests : IDisposable
 {
-	[Fact]
-	public void ReportFailureTakesTitleDetailRemedyAndSeverityFromTheMapper()
+	private readonly MessagePanelViewModel _panel = new(TimeProvider.System);
+
+	public void Dispose()
 	{
-		using var panel = new MessagePanelViewModel();
+		_panel.Dispose();
+	}
+
+	[Fact]
+	public void ReportFailureTakesTitleDetailAndRemedyFromTheMapper()
+	{
 		var error = new Error("the port is taken");
 
-		panel.ReportFailure(error, NullLogger.Instance);
+		_panel.ReportFailure(error, NullLogger.Instance);
 
-		panel.Entries.Should().ContainSingle();
-		panel.Entries[0].View.Should().Be(ErrorMessageMapper.Map(error));
-	}
-
-	[Fact]
-	public void ReportFailureOverAResultUsesTheFirstErrorOnly()
-	{
-		using var panel = new MessagePanelViewModel();
-		var first = new Error("first");
-		var second = new Error("second");
-		var result = Result.Fail(first).WithError(second);
-
-		panel.ReportFailure(result, NullLogger.Instance);
-
-		panel.Entries.Should().ContainSingle();
-		panel.Entries[0].View.Should().Be(ErrorMessageMapper.Map(first));
-	}
-
-	[Fact]
-	public void ReportFailureOverAResultLogsTheErrorsTheEntryLeavesOut()
-	{
-		using var panel = new MessagePanelViewModel();
-		var logger = new FakeLogger();
-
-		panel.ReportFailure(Result.Fail("first").WithError("second"), logger);
-
-		logger.Levels().Should().Equal(LogLevel.Error, LogLevel.Warning);
-	}
-
-	[Fact]
-	public void ReportFailureOverASuccessfulResultWritesNothing()
-	{
-		using var panel = new MessagePanelViewModel();
-		var logger = new FakeLogger();
-
-		panel.ReportFailure(Result.Ok(), logger);
-
-		panel.Entries.Should().BeEmpty();
-		logger.Levels().Should().BeEmpty();
+		_panel.Entries.Should().ContainSingle();
+		_panel.Entries[0].View.Should().Be(ErrorMessageMapper.Map(error));
 	}
 
 	[Fact]
 	public void ReportFailureLogsAndShowsTheFailure()
 	{
-		using var panel = new MessagePanelViewModel();
 		var logger = new FakeLogger();
 		var thrown = new InvalidOperationException("the frame was cut short");
 
-		panel.ReportFailure(new ExceptionalError(thrown.Message, thrown), logger);
+		_panel.ReportFailure(new ExceptionalError(thrown.Message, thrown), logger);
 
-		panel.Entries.Should().ContainSingle();
-		panel.IsVisible.Should().BeTrue();
+		_panel.Entries.Should().ContainSingle();
+		_panel.HasEntries.Should().BeTrue();
 		logger.Levels().Should().Equal(LogLevel.Error);
 		logger.Failures().Should().Equal(thrown);
 	}
@@ -86,16 +56,15 @@ public sealed class ResultReportingTests
 	[Fact]
 	public void ReportFailureDropsARepeatOfTheNewestEntryToDebug()
 	{
-		using var panel = new MessagePanelViewModel();
 		var logger = new FakeLogger();
 		var repeated = new Error("the port is taken");
 
-		panel.ReportFailure(repeated, logger);
-		panel.ReportFailure(repeated, logger);
-		panel.ReportFailure(repeated, logger);
-		panel.ReportFailure(new Error("the device stopped answering"), logger);
+		_panel.ReportFailure(repeated, logger);
+		_panel.ReportFailure(repeated, logger);
+		_panel.ReportFailure(repeated, logger);
+		_panel.ReportFailure(new Error("the device stopped answering"), logger);
 
-		panel.Entries.Should().HaveCount(2);
+		_panel.Entries.Should().HaveCount(2);
 		logger.Levels().Should().Equal(LogLevel.Error, LogLevel.Debug, LogLevel.Debug, LogLevel.Error);
 	}
 
@@ -103,26 +72,35 @@ public sealed class ResultReportingTests
 	[Fact]
 	public void ReportFailureWithALogSinkThatThrowsStillShowsTheEntry()
 	{
-		using var panel = new MessagePanelViewModel();
 		var error = new Error("the port is taken");
 
-		var report = () => panel.ReportFailure(error, new ThrowingLogger());
+		var report = () => _panel.ReportFailure(error, new ThrowingLogger());
 
 		report.Should().Throw<InvalidOperationException>();
-		panel.Entries.Should().ContainSingle().Which.View.Should().Be(ErrorMessageMapper.Map(error));
+		_panel.Entries.Should().ContainSingle().Which.View.Should().Be(ErrorMessageMapper.Map(error));
 	}
 
 	// The caller is an Rx onError or a dispatcher job, so the guard swallows what the plain overload throws.
 	[Fact]
 	public void TryReportFailureWithAPanelThatThrowsKeepsTheFailureInTheLog()
 	{
-		using var panel = new MessagePanelViewModel();
 		var logger = new FakeLogger();
-		using var poison = ReportingTestDoubles.PoisonEntries(panel);
+		using var poison = ReportingTestDoubles.PoisonEntries(_panel);
 
-		var report = () => panel.TryReportFailure(new Error("the port is taken"), logger);
+		var report = () => _panel.TryReportFailure(new Error("the port is taken"), logger, ImmediateScheduler.Instance);
 
 		report.Should().NotThrow();
 		logger.Levels().Should().Equal(LogLevel.Error, LogLevel.Error);
+	}
+
+	[Fact]
+	public void TryReportFailureWithALogSinkThatThrowsDoesNotThrow()
+	{
+		var error = new Error("the port is taken");
+
+		var report = () => _panel.TryReportFailure(error, new ThrowingLogger(), ImmediateScheduler.Instance);
+
+		report.Should().NotThrow();
+		_panel.Entries.Should().ContainSingle().Which.View.Should().Be(ErrorMessageMapper.Map(error));
 	}
 }

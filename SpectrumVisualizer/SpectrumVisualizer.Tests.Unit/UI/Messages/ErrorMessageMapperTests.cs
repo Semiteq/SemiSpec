@@ -24,9 +24,8 @@ public sealed class ErrorMessageMapperTests
 		view.Title.Should().Be(Resources.FailureThrownTitle);
 		view.Detail.Should().Be(
 			Resources.FormatFailureThrownDetail(nameof(InvalidOperationException), exception.Message));
-		view.Detail.Should().Contain(exception.Message);
+		view.Detail.Should().Contain(nameof(InvalidOperationException)).And.Contain(exception.Message);
 		view.Remedy.Should().Be(Resources.FailureThrownRemedy);
-		view.Severity.Should().Be(MessageSeverity.Error);
 	}
 
 	[Fact]
@@ -37,7 +36,6 @@ public sealed class ErrorMessageMapperTests
 		view.Title.Should().Be(Resources.FailureUnknownTitle);
 		view.Detail.Should().Be("the port is taken");
 		view.Remedy.Should().Be(Resources.FailureUnknownRemedy);
-		view.Severity.Should().Be(MessageSeverity.Error);
 	}
 
 	[Fact]

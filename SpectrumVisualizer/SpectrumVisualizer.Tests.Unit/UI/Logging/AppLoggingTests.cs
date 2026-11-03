@@ -27,9 +27,9 @@ public sealed class AppLoggingTests : IDisposable
 		var logFolder = Path.Combine(_root, "nested", "Logs");
 
 		var setup = AppLogging.Create(logFolder);
-		setup.Value.Logger.Dispose();
 
 		setup.IsSuccess.Should().BeTrue();
+		setup.Value.Logger.Dispose();
 		Directory.Exists(logFolder).Should().BeTrue();
 	}
 

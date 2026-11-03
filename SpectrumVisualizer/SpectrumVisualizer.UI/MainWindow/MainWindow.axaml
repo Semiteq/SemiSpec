@@ -37,7 +37,7 @@
                 BorderThickness="0,1,0,0"
                 BorderBrush="{DynamicResource AppBorderBrush}"
                 Padding="16"
-                IsVisible="{Binding MessagePanel.IsVisible}">
+                IsVisible="{Binding MessagePanel.HasEntries}">
             <messages:MessagePanelView DataContext="{Binding MessagePanel}" />
         </Border>
 

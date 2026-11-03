@@ -12,7 +12,8 @@
   project; no launch keys, no config files.
 
 ## Context (from discovery)
-- Roadmap: docs/plans/roadmaps/20261104-avalonia-rewrite-roadmap.md — slice avalonia-skeleton
+- Roadmap: docs/plans/roadmaps/20261104-avalonia-rewrite-roadmap.md — slice avalonia-skeleton (a local planning file,
+  kept out of the repository on purpose)
 - Stacking base: `master` at `210ff5c`; work on the local branch `avalonia-skeleton`; local commits only.
 - Old solution `SpectrumVisualizer.sln` lists four projects: `SprctrumVisualizer\SpectrumVisualizer.csproj`
   (SpectrumVisualizer.sln:6), `SpectrumVisualizer.Uart` (:8), `SpectrumVisualizer.Tests` (:10), `ComPortPopulator` (:12).
@@ -320,7 +321,8 @@ Manual smoke checklist:
 ### Task 12: [Final] Update documentation
 - [x] update `readme.md`: remove the old-project section, add the new solution's build and run commands
 - [x] update `CLAUDE.md` if new patterns appeared during implementation (no new patterns; left unchanged)
-- [x] move this plan to `docs/plans/completed/` (left in place: archiving is delivery work)
+- [x] decide where this plan lives: it stays in `docs/plans/`; moving it to `docs/plans/completed/` is delivery work,
+  not part of this run
 
 ## Post-Completion
 **Manual verification:**

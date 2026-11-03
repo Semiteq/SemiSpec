@@ -1,12 +1,9 @@
 using AwesomeAssertions;
 
-using Microsoft.Extensions.DependencyInjection;
-
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
 
-using SpectrumVisualizer.UI;
 using SpectrumVisualizer.UI.Logging;
 
 using Xunit;
@@ -60,15 +57,6 @@ public sealed class LogLevelControlTests
 		logger.Debug("hidden");
 
 		_sink.Levels.Should().BeEmpty();
-	}
-
-	[Fact]
-	public void AddUiRegistersTheGivenControlAsTheSingleInstance()
-	{
-		using var provider = new ServiceCollection().AddUi(_control).BuildServiceProvider();
-
-		provider.GetRequiredService<LogLevelControl>().Should().BeSameAs(_control);
-		provider.GetRequiredService<LogLevelControl>().Should().BeSameAs(_control);
 	}
 
 	private Logger CreateLogger()

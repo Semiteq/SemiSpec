@@ -16,9 +16,9 @@ public sealed class MessagePanelViewModel : ReactiveObject, IDisposable
 	private readonly ObservableCollection<MessageEntry> _entries = [];
 	private readonly TimeProvider _timeProvider;
 
-	public MessagePanelViewModel(TimeProvider? timeProvider = null)
+	public MessagePanelViewModel(TimeProvider timeProvider)
 	{
-		_timeProvider = timeProvider ?? TimeProvider.System;
+		_timeProvider = timeProvider;
 		Entries = new ReadOnlyObservableCollection<MessageEntry>(_entries);
 
 		_entries.CollectionChanged += OnEntriesChanged;
@@ -28,14 +28,8 @@ public sealed class MessagePanelViewModel : ReactiveObject, IDisposable
 
 	public ReadOnlyObservableCollection<MessageEntry> Entries { get; }
 
+	/// <summary>Whether the panel row is on screen: from the first entry until Clear empties the list.</summary>
 	public bool HasEntries => _entries.Count > 0;
-
-	/// <summary>Whether the panel row is on screen; this view model is its only writer.</summary>
-	public bool IsVisible
-	{
-		get;
-		private set => this.RaiseAndSetIfChanged(ref field, value);
-	}
 
 	public ReactiveCommand<Unit, Unit> ClearCommand { get; }
 
@@ -55,8 +49,6 @@ public sealed class MessagePanelViewModel : ReactiveObject, IDisposable
 
 			return true;
 		}
-
-		IsVisible = true;
 
 		_entries.Insert(0, new MessageEntry(view, seenAt));
 
