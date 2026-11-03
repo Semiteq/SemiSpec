@@ -180,10 +180,10 @@ type is decided by `len` only.
 - Create: `SpectrumVisualizer.Core/Protocol/SequenceTracker.cs`
 - Create: `SpectrumVisualizer.Tests.Unit/Core/Protocol/SequenceTrackerTests.cs`
 
-- [ ] write tests first for every `seq` rule in Acceptance Evidence item 1, including the baseline, the
+- [x] write tests first for every `seq` rule in Acceptance Evidence item 1, including the baseline, the
   heartbeat-then-spectrum follow-up and `Reset()`
-- [ ] implement `SequenceTracker`
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] implement `SequenceTracker`
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 5: Wavelength calibration
 **Files:**
