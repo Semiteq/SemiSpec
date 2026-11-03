@@ -225,15 +225,15 @@ Manual smoke checklist:
 - Create: `SpectrumVisualizer.Tests.Unit/UI/Messages/MessagePanelViewModelTests.cs`, `ResultReportingTests.cs`,
   `UnhandledErrorObserverTests.cs`, `ErrorMessageMapperTests.cs`
 
-- [ ] copy the message panel types from SemiPlot `Messages/`, renaming namespaces, `x:Class` and `clr-namespace` values,
+- [x] copy the message panel types from SemiPlot `Messages/`, renaming namespaces, `x:Class` and `clr-namespace` values,
   and `ArchiveFailureView` to `MessageView`
-- [ ] replace the `ArchiveFailureMapper.Map` call in `ResultReporting` (`ResultReporting.cs:43`) with `ErrorMessageMapper`;
+- [x] replace the `ArchiveFailureMapper.Map` call in `ResultReporting` (`ResultReporting.cs:43`) with `ErrorMessageMapper`;
   the mapper keeps the error message in `Detail`
-- [ ] install the process-lifetime `UnhandledErrorObserver` through `WithExceptionHandler` in `BuildAvaloniaApp`
-- [ ] write tests for the panel bound (200 entries, newest first), coalescing of identical entries and separate rows for
+- [x] install the process-lifetime `UnhandledErrorObserver` through `WithExceptionHandler` in `BuildAvaloniaApp`
+- [x] write tests for the panel bound (200 entries, newest first), coalescing of identical entries and separate rows for
   different exception messages, and opening on a new entry
-- [ ] write tests that `ReportFailure` logs and shows, and that `UnhandledErrorObserver` logs only when no panel exists
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] write tests that `ReportFailure` logs and shows, and that `UnhandledErrorObserver` logs only when no panel exists
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 6: Main window with menu, placeholder and status bar
 **Files:**

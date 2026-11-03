@@ -8,11 +8,25 @@ using ReactiveUI.Avalonia;
 
 using Semi.Avalonia;
 
+using Serilog.Extensions.Logging;
+
+using SpectrumVisualizer.UI.Messages;
+
 namespace SpectrumVisualizer.UI;
 
 public class App : Application
 {
 	private const string RussianLanguage = "ru";
+
+	// Process lifetime by design: ReactiveUI takes its exception handler once, before any window exists,
+	// so the observer outlives every window and reads the shown window's panel on each exception.
+	private static readonly UnhandledErrorObserver _unhandledErrors = new(
+		ResolveMessagePanel,
+		AvaloniaScheduler.Instance,
+		new SerilogLoggerFactory().CreateLogger(nameof(UnhandledErrorObserver)));
+
+	/// <summary>The panel of the shown window; null until a window carries one.</summary>
+	internal MessagePanelViewModel? MessagePanel { get; set; }
 
 	public override void Initialize()
 	{
@@ -52,7 +66,13 @@ public class App : Application
 			// Avalonia 12: Skia no longer brings a text shaper with it. Without UseHarfBuzz the desktop
 			// application fails at AppBuilder.Setup with "No text shaping system configured".
 			.UseHarfBuzz()
-			.UseReactiveUI(_ => { })
+			.UseReactiveUI(builder => builder.WithExceptionHandler(_unhandledErrors))
 			.LogToTrace();
+	}
+
+	/// <summary>The panel of the window shown; with no window a failure is only logged.</summary>
+	internal static MessagePanelViewModel? ResolveMessagePanel()
+	{
+		return (Current as App)?.MessagePanel;
 	}
 }
