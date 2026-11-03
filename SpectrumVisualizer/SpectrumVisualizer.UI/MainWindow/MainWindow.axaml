@@ -1,7 +1,55 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:SpectrumVisualizer.UI.MainWindow"
+        xmlns:messages="clr-namespace:SpectrumVisualizer.UI.Messages"
         xmlns:text="clr-namespace:SpectrumVisualizer.UI.Localization"
+        mc:Ignorable="d"
+        d:DesignWidth="1280"
+        d:DesignHeight="800"
         x:Class="SpectrumVisualizer.UI.MainWindow.MainWindow"
+        x:DataType="local:MainWindowViewModel"
         Title="{x:Static text:Resources.WindowTitle}"
+        Width="1280"
+        Height="800"
         WindowStartupLocation="CenterScreen">
+
+    <Grid RowDefinitions="Auto,*,Auto,Auto">
+
+        <local:AppMenuBar Grid.Row="0"
+                          Name="MenuBar" />
+
+        <Border Grid.Row="1"
+                Name="ContentArea"
+                Background="{DynamicResource AppContentBackgroundBrush}"
+                Padding="16">
+            <TextBlock Name="ContentPlaceholder"
+                       Text="{x:Static text:Resources.ContentPlaceholder}"
+                       Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center" />
+        </Border>
+
+        <Border Grid.Row="2"
+                Name="MessagePanel"
+                Background="{DynamicResource AppPanelBackgroundBrush}"
+                BorderThickness="0,1,0,0"
+                BorderBrush="{DynamicResource AppBorderBrush}"
+                Padding="16"
+                IsVisible="{Binding MessagePanel.IsVisible}">
+            <messages:MessagePanelView DataContext="{Binding MessagePanel}" />
+        </Border>
+
+        <Border Grid.Row="3"
+                Name="StatusBar"
+                Background="{DynamicResource AppPanelBackgroundBrush}"
+                BorderThickness="0,1,0,0"
+                BorderBrush="{DynamicResource AppBorderBrush}"
+                Padding="16,8">
+            <local:AppStatusBar DataContext="{Binding StatusBar}" />
+        </Border>
+
+    </Grid>
+
 </Window>

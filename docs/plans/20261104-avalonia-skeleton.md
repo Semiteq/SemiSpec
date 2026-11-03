@@ -242,16 +242,16 @@ Manual smoke checklist:
   `AppStatusBarViewModel.cs`
 - Create: `SpectrumVisualizer.Tests.Unit/UI/MainWindow/MainWindowViewModelTests.cs`, `MainWindowViewTests.cs`
 
-- [ ] load the `dev:desktop-ui` skill before laying out the window; follow its spacing, palette and text rules
-- [ ] build the window rows `Auto,*,Auto,Auto` (menu, content placeholder, message panel, status bar), sizes from the
+- [x] load the `dev:desktop-ui` skill before laying out the window; follow its spacing, palette and text rules
+- [x] build the window rows `Auto,*,Auto,Auto` (menu, content placeholder, message panel, status bar), sizes from the
   skill's window rules
-- [ ] add the menu: File → Exit; View → Verbose logging bound one-way to `LogLevelControl.IsVerbose`, written only
+- [x] add the menu: File → Exit; View → Verbose logging bound one-way to `LogLevelControl.IsVerbose`, written only
   through a command
-- [ ] add the status bar showing the fixed "not connected" text from the resx
-- [ ] write view model tests for the verbose-logging command (switch level changes, checked state follows)
-- [ ] write a headless test that the realised window shows the menu, the placeholder, a hidden message panel and the
+- [x] add the status bar showing the fixed "not connected" text from the resx
+- [x] write view model tests for the verbose-logging command (switch level changes, checked state follows)
+- [x] write a headless test that the realised window shows the menu, the placeholder, a hidden message panel and the
   status bar
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 7: Composition root
 **Files:**
