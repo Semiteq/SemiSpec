@@ -170,13 +170,13 @@ Manual smoke checklist:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/SpectrumVisualizer.Tests.Unit.csproj`,
   `xunit.runner.json`, `Core/AppDataPathsTests.cs`
 
-- [ ] create the Core library with FluentResults; add `AppDataPaths` resolving the app folder and the log folder under a
+- [x] create the Core library with FluentResults; add `AppDataPaths` resolving the app folder and the log folder under a
   given local app data root
-- [ ] create the test project after `SemiPlot.Tests.Unit.csproj:3-24` (`OutputType Exe`, `IsTestProject`, the packages
+- [x] create the test project after `SemiPlot.Tests.Unit.csproj:3-24` (`OutputType Exe`, `IsTestProject`, the packages
   that apply, no Npgsql) with `xunit.runner.json` (`failSkips: true`); `InternalsVisibleTo` from Core
-- [ ] create `SpectrumVisualizer.slnx` listing both projects
-- [ ] write tests for `AppDataPaths` (folder names, root handling)
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] create `SpectrumVisualizer.slnx` listing both projects
+- [x] write tests for `AppDataPaths` (folder names, root handling)
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 3: UI project, logging and the log level control
 **Files:**
