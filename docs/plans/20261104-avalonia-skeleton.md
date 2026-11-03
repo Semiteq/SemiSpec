@@ -204,17 +204,17 @@ Manual smoke checklist:
 - Create: `SpectrumVisualizer.UI/Localization/Resources.resx`, `Resources.ru.resx`
 - Create: `SpectrumVisualizer.Tests.Unit/TestAppBuilder.cs`, `UI/AppResourcesTests.cs`
 
-- [ ] copy the four style files from SemiPlot and the include manifest of `App.axaml:1-21` without the ColorPicker and
+- [x] copy the four style files from SemiPlot and the include manifest of `App.axaml:1-21` without the ColorPicker and
   DataGrid themes
-- [ ] implement `BuildAvaloniaApp` as in `App.axaml.cs:271-281` with plain `UseReactiveUI()` (the exception handler
+- [x] implement `BuildAvaloniaApp` as in `App.axaml.cs:271-281` with plain `UseReactiveUI()` (the exception handler
   arrives in Task 5); `App` shows the empty `MainWindow`
-- [ ] implement `Program.Main`: logging through `AppLogging`, provider through `AddUi`, run the app, fatal log and exit 1
+- [x] implement `Program.Main`: logging through `AppLogging`, provider through `AddUi`, run the app, fatal log and exit 1
   on a start failure
-- [ ] add the resx pair with generated accessor (window title, menu items, placeholder, status text, message panel text)
-- [ ] add the headless `TestAppBuilder` as in `TestAppBuilder.cs:10-21`
-- [ ] write tests that every key in `Resources.resx` exists in `Resources.ru.resx` and is non-empty, and a headless test
+- [x] add the resx pair with generated accessor (window title, menu items, placeholder, status text, message panel text)
+- [x] add the headless `TestAppBuilder` as in `TestAppBuilder.cs:10-21`
+- [x] write tests that every key in `Resources.resx` exists in `Resources.ru.resx` and is non-empty, and a headless test
   that the palette keys used by `Forms.axaml` and `Buttons.axaml` resolve (not the unused DataGrid or ColorPicker keys)
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 5: Message panel and error route
 **Files:**

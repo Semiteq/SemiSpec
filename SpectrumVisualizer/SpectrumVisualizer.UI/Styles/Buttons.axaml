@@ -1,0 +1,21 @@
+<!-- docs/architecture/ui-theme.md#the-applications-own-surfaces -->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Semi paints every state on the presenter; :not(:disabled) leaves Semi's disabled brushes in place -->
+    <Style Selector="Button.destructive:not(:disabled) /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AppDestructiveBackgroundBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppDestructiveForegroundBrush}" />
+    </Style>
+
+    <Style Selector="Button.destructive:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AppDestructivePointeroverBackgroundBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppDestructiveForegroundBrush}" />
+    </Style>
+
+    <Style Selector="Button.destructive:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{DynamicResource AppDestructivePressedBackgroundBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource AppDestructiveForegroundBrush}" />
+    </Style>
+
+</Styles>

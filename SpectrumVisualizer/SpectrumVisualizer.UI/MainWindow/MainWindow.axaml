@@ -1,0 +1,7 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:text="clr-namespace:SpectrumVisualizer.UI.Localization"
+        x:Class="SpectrumVisualizer.UI.MainWindow.MainWindow"
+        Title="{x:Static text:Resources.WindowTitle}"
+        WindowStartupLocation="CenterScreen">
+</Window>
