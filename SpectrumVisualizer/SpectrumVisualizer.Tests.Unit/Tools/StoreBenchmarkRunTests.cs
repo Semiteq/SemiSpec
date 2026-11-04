@@ -22,6 +22,9 @@ public sealed class StoreBenchmarkRunTests : IDisposable
 		"Series 10 min to 1000 columns, SqliteBlob (ms)",
 		"Series 0.28 h to 1000 columns, substr (ms)",
 		"Series 0.28 h to 1000 columns, SqliteBlob (ms)",
+		"Series 10 min to 1000 columns, SpectrumHistory (ms)",
+		"Series 0.28 h to 1000 columns, SpectrumHistory (ms)",
+		"SpectrumAt the end of the range, SpectrumHistory (ms)",
 		"One retention pass, 120 rows (ms)",
 		"WAL after a 0.28 h substr series read beside a writer at 2 spectra/s (MB)",
 	];

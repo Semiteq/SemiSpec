@@ -156,9 +156,9 @@ Automatable (baseline 505 of 505 at `12bef84`):
      `SpectrumAtBeforeTheFirstRowReturnsNone`, `TheStoredSpectrumRebuildsTheMeasurement`;
      `TheSeriesMeansTheWindowPerSpectrum`; `TheSeriesOfAWavelengthOneDeviceDoesNotCoverLeavesItsColumnsUncovered`;
      `ARowWithADifferentWavelengthReadsItsPixels` (the stored window differs from the queried one, the mean comes from
-     the pixels); `AMixedWavelengthRangeMergesBothReads` (rows before a wavelength change come from the pixel read,
-     rows after it from the precomputed read, one series equal to an all-pixel fold; only while the column stays after
-     Task 5); `DarkFramesPullTheColumnMinimumToZero`; `ACancelledSeriesThrowsOperationCanceled`;
+     the pixels); `AMixedWavelengthRangeMergesBothReads` is not written: Task 5 removed the column, so no
+     second read exists to merge; `DarkFramesPullTheColumnMinimumToZero`; `ACancelledSeriesThrowsOperationCanceled` (a token cancelled before the
+     call) and `ASeriesCancelledMidReadThrowsAtTheNextCheck` (cancelled at row 300, thrown at the row-512 check);
      `TheStoredRangeSpansTheFirstAndLastSpectrum`; `TheHistoryReadsWhileTheWriterWrites` (WAL: a series runs between
      two writer batches without a busy error).
    - `SpectrumStoreTests`: `EveryFrameFromTheDistributorIsStored` (spectra and heartbeats, in order);
@@ -218,10 +218,14 @@ Automatable (baseline 505 of 505 at `12bef84`):
    | Series, 10 min (1 200 rows) to 1 000 columns, warm | at most 50 ms for the kept pixel strategy | `substr` F 5.3 (5.2 to 5.8), 10.2; C 5.1 (5.0 to 5.3), 5.2 ms. `SqliteBlob` F 6.3 (6.0 to 6.5), 7.8; C 6.5 (6.2 to 7.3), 6.0 ms | pass (`substr`) |
    | Series, 24 h (172 800 rows) to 1 000 columns, every row at the queried wavelength, warm | at most 10 s for the kept pixel strategy; at most 500 ms for the precomputed read | precomputed F 54.0 (52.9 to 64.6), 66.6; C 64.3 (62.5 to 66.9), 61.9 ms. `substr` F 520.7 (515.9 to 523.7), 554.8; C 647.3 (630.3 to 772.2), 622.7 ms. `SqliteBlob` F 559.9 (558.1 to 564.3), 576.0; C 709.1 (694.1 to 805.4), 703.8 ms | pass (`substr`) |
    | Series, 24 h, wavelength changed 3 h ago, query at the new wavelength, warm | recorded; feeds the decision rule | merged with `substr` F 476.1 (474.8 to 477.5), 475.8; C 585.8 (578.5 to 593.8), 567.8 ms. Merged with `SqliteBlob` F 520.8 (519.1 to 587.7), 526.8; C 647.8 (639.2 to 702.8), 653.6 ms. Pixels only `substr` F 631.4 (623.7 to 634.8), 625.3; C 634.6 (630.8 to 681.9), 635.6 ms. Pixels only `SqliteBlob` F 805.4 (711.8 to 866.2), 958.6; C 715.4 (698.3 to 737.1), 713.0 ms | recorded |
-   | `SpectrumHistory.IntensitySeriesAsync`, 10 min and 24 h, warm | within 10 % of its strategy's row | Task 6 | |
-   | `SpectrumHistory.SpectrumAtAsync`, warm | at most 5 ms | Task 6 | |
+   | `SpectrumHistory.IntensitySeriesAsync`, 10 min and 24 h, warm | within 10 % of its strategy's row | Task 6 run (see below): 10 min C 4.7 (4.6 to 6.0), 5.2 ms against `substr` C 4.5 (4.4 to 4.7), 5.3 ms, +4 %; 24 h C 651.5 (635.8 to 704.9), 776.7 ms against `substr` C 647.6 (638.1 to 765.5), 620.0 ms, +1 %. Fresh rows were noisy (10 min 10.4 (8.9 to 17.4), 19.1 ms; 24 h 1 512.2 (878.5 to 2 740.7), 1 400.2 ms, with `substr` itself at 702.5 (634.2 to 895.9)), because `dotnet format` ran beside the fresh phase | pass (churned) |
+   | `SpectrumHistory.SpectrumAtAsync`, warm | at most 5 ms | at the end of the range: F 0.6 (0.6 to 0.8), 3.0; C 0.5 (0.5 to 0.5), 0.8 ms | pass |
    | One retention pass over a minute of rows (120) | at most 50 ms | F 0.3 (0.3 to 0.8), 2.2; C 0.3 (0.2 to 0.4), 15.7 ms | pass |
    | WAL size after a 24 h series read beside a running writer at 2 spectra/s | at most 16 MB, or the series gains slicing | F 0.035 MB, C 0.035 MB (`substr` pixel read) | pass, no slicing |
+
+   The two `SpectrumHistory` rows were measured 2026-11-04 by the Task 6 tool on top of `0767c5b`, same machine, in
+   one run of `--rows 172800 --change-at 0.875`; that run's churned `substr` and `SqliteBlob` rows (24 h: 647.6 and
+   709.4 ms) repeat the Task 5 numbers above, and every `SpectrumHistory` series matched `substr` column for column.
 
    Decision, applied on the churned numbers by the rules of Solution Overview:
    - Pixel path: `SqliteBlob` 709.1 ms against `substr` 647.3 ms; `SqliteBlob` is slower, so `substr` stays.
@@ -657,18 +661,27 @@ Data flow:
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark/BenchmarkRun.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Store/SpectrumHistoryTests.cs`
 
-- [ ] implement `SpectrumAtAsync`, `IntensitySeriesAsync` (the strategies kept in Task 5, one statement per kept
-  strategy over the whole range, both folded into one `IntensityBuckets` when the precomputed column stays, the token
-  checked every 256 rows) and `StoredRangeAsync` on reader connections with `query_only`
-- [ ] map `SqliteException` to a failed `Result`; let `OperationCanceledException` pass
-- [ ] add `SpectrumHistory.IntensitySeriesAsync` (10 min, 24 h) and `SpectrumAtAsync` rows to the tool's table; run
-  the 172 800-row benchmark again and record those rows in Acceptance Evidence item 8
-- [ ] write the `SpectrumHistoryTests` of Acceptance Evidence item 1 (`Component=Core`, `Area=Store`), including
-  `TheHistoryReadsWhileTheWriterWrites` with a `SpectrumDatabase` writing on a second thread
-- [ ] write `ACancelledSeriesThrowsOperationCanceled` with a token cancelled before the call and one cancelled while
-  the read is past its first 256 rows of a 2 h range; write `AMixedWavelengthRangeMergesBothReads` while the column
-  stays
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] implement `SpectrumAtAsync`, `IntensitySeriesAsync` (the strategies kept in Task 5, one statement per kept
+  strategy over the whole range, ~~both folded into one `IntensityBuckets` when the precomputed column stays~~, the token
+  checked every 256 rows) and `StoredRangeAsync` on reader connections with `query_only`. Task 5 removed the column, so
+  the series is the one `substr` statement. The `substr` read lives once, in the public static
+  `SpectrumHistory.ReadSeries(SqliteConnection, IntensityQuery, CancellationToken)`; the tool's `PixelStrategy.Substr`
+  calls it, and the window and byte helpers both pixel reads share moved from the tool to Core as `QueryWindows`
+  (`Core/Store/QueryWindows.cs`). `StoreConnection.OpenReader` adds `query_only` and replaces the tool's own copy.
+- [x] map `SqliteException` to a failed `Result`; let `OperationCanceledException` pass
+  (`AReadOfAFileWithoutTheSchemaFails`)
+- [x] add `SpectrumHistory.IntensitySeriesAsync` (10 min, 24 h) and `SpectrumAtAsync` rows to the tool's table; run
+  the 172 800-row benchmark again and record those rows in Acceptance Evidence item 8. The history series are compared
+  with the `substr` series column for column, so a mismatch fails the run.
+- [x] write the `SpectrumHistoryTests` of Acceptance Evidence item 1 (`Component=Core`, `Area=Store`), including
+  `TheHistoryReadsWhileTheWriterWrites` with a `SpectrumDatabase` writing on a second thread. Added
+  `AReadOfAFileWithoutTheSchemaFails`.
+- [x] write `ACancelledSeriesThrowsOperationCanceled` with a token cancelled before the call and one cancelled while
+  the read is past its first 256 rows of a 2 h range; ~~write `AMixedWavelengthRangeMergesBothReads` while the column
+  stays~~ (not written: Task 5 removed the column). The mid-read case is its own test,
+  `ASeriesCancelledMidReadThrowsAtTheNextCheck`: 600 rows over 2 h, a per-connection `substr` function that wraps the
+  built-in cancels at row 300, and the read throws at the row-512 check.
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (585 of 585)
 
 ### Task 7: Background writer service
 **Files:**

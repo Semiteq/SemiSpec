@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using System.Globalization;
 
+using FluentResults;
+
 using Microsoft.Data.Sqlite;
 
 using SpectrumVisualizer.Core.Protocol;
@@ -101,6 +103,7 @@ public static class BenchmarkRun
 		var wholeBlob = Time(output, state, $"Series {span} to 1000 columns, SqliteBlob (ms)", file,
 			c => ReadStrategies.Pixels(c, whole, PixelStrategy.Blob, token));
 		Compare(mismatches, $"{state} {span} SqliteBlob against substr", wholeBlob, wholeSubstr);
+		await MeasureHistoryAsync(output, state, span, file, (recent, recentSubstr), (whole, wholeSubstr), mismatches, token);
 
 		WriteTiming(output, state, $"One retention pass, {RetentionRows} rows (ms)",
 			file.TimeRetentionPasses(WarmRuns + 1, RetentionRows));
@@ -111,6 +114,51 @@ public static class BenchmarkRun
 		});
 		WriteValue(output, state, $"WAL after a {span} substr series read beside a writer at 2 spectra/s (MB)",
 			walBytes / BytesPerMegabyte, "0.000");
+	}
+
+	/// <summary>Times SpectrumHistory, connection open included, against the substr reads it runs.</summary>
+	private static async Task MeasureHistoryAsync(
+		TextWriter output,
+		string state,
+		string span,
+		BenchmarkFile file,
+		(IntensityQuery Query, IntensitySeries Substr) recent,
+		(IntensityQuery Query, IntensitySeries Substr) whole,
+		List<string> mismatches,
+		CancellationToken token)
+	{
+		var history = new SpectrumHistory(file.Path);
+		var recentSeries = await TimeAsync(output, state, "Series 10 min to 1000 columns, SpectrumHistory (ms)",
+			() => history.IntensitySeriesAsync(recent.Query, token));
+		Compare(mismatches, $"{state} 10 min SpectrumHistory against substr", recentSeries, recent.Substr);
+		var wholeSeries = await TimeAsync(output, state, $"Series {span} to 1000 columns, SpectrumHistory (ms)",
+			() => history.IntensitySeriesAsync(whole.Query, token));
+		Compare(mismatches, $"{state} {span} SpectrumHistory against substr", wholeSeries, whole.Substr);
+		var last = await TimeAsync(output, state, "SpectrumAt the end of the range, SpectrumHistory (ms)",
+			() => history.SpectrumAtAsync(file.WindowTo, token));
+		if (last is null)
+		{
+			mismatches.Add($"{state} SpectrumAt the end of the range found no spectrum");
+		}
+	}
+
+	private static async Task<T> TimeAsync<T>(TextWriter output, string state, string metric, Func<Task<Result<T>>> read)
+	{
+		var milliseconds = new double[WarmRuns + 1];
+		Result<T>? result = null;
+		for (var run = 0; run < milliseconds.Length; run++)
+		{
+			var stopwatch = Stopwatch.StartNew();
+			result = await read();
+			milliseconds[run] = stopwatch.Elapsed.TotalMilliseconds;
+			if (result.IsFailed)
+			{
+				throw new InvalidOperationException(string.Join("; ", result.Errors.Select(error => error.Message)));
+			}
+		}
+
+		WriteTiming(output, state, metric, milliseconds);
+		return result!.Value;
 	}
 
 	private static IntensitySeries Time(

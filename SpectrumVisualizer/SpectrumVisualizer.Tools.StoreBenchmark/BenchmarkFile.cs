@@ -149,11 +149,7 @@ internal sealed class BenchmarkFile : IDisposable
 
 	public SqliteConnection OpenReader()
 	{
-		var connection = StoreConnection.Open(Path);
-		using var command = connection.CreateCommand();
-		command.CommandText = "PRAGMA query_only=ON";
-		command.ExecuteNonQuery();
-		return connection;
+		return StoreConnection.OpenReader(Path);
 	}
 
 	public void Dispose()

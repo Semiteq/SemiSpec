@@ -37,4 +37,22 @@ public static class StoreConnection
 			throw;
 		}
 	}
+
+	/// <summary>Opens the file like Open and makes the connection refuse writes.</summary>
+	public static SqliteConnection OpenReader(string path)
+	{
+		var connection = Open(path);
+		try
+		{
+			using var command = connection.CreateCommand();
+			command.CommandText = "PRAGMA query_only=ON";
+			command.ExecuteNonQuery();
+			return connection;
+		}
+		catch
+		{
+			connection.Dispose();
+			throw;
+		}
+	}
 }
