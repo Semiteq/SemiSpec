@@ -123,7 +123,7 @@ stopped"), and those lines are not guaranteed to reach the log file. The process
 | --- | --- | --- |
 | Menu | `Auto` | `AppMenuBar`: File, Exit; View, Verbose logging |
 | Connection row | `Auto` | `ConnectionBar`: label "Port", a 240 px port list, Refresh, Connect, Disconnect |
-| Content | `*` | `ContentArea`, columns `*,Auto`: `SpectrumPane` with `SpectrumChartView`, and the 368 px `SignalPane` with `SpectrumPanel` |
+| Content | `*` | `ContentArea`, columns `*,Auto`: `SpectrumPane` with `SpectrumChartView`, and the 392 px `SignalPane` with `SpectrumPanel` |
 | Message panel | `Auto` | `MessagePanelView`; the row is hidden while the list is empty |
 | Status bar | `Auto` | `AppStatusBar`: dot and link text, port, ATP-2000, ATP-8000, lost spectra |
 
@@ -133,11 +133,12 @@ subscribes in `OnLoaded`, unsubscribes in `OnUnloaded`, and closes itself.
 `MainWindow.MinimumWidth` is 1048 px, the window's `MinWidth`. It is the widest of the rows with their longest texts and
 the content row's floor, rounded up to the 8 px grid: the Russian status bar with `COM256`, a six-digit lost count and
 "Порт недоступен, переподключение" measures 1042.4 px (English 900.8 px), the connection row 654.9 px in Russian
-(English 595.4 px), and the signal pane plus a 400 px chart floor 768 px. At 400 px an ATP-8000 spectrum keeps eight
-labelled wavelength ticks, 1000 to 2400 nm. The headless text stub gives no real widths, so `MainWindowTextFitTests`
-adds the realised row chrome to each text measured through SkiaSharp at 14 px in the widest of Inter and every installed
-family of Semi's font chain; on Windows the app resolves that chain to Microsoft YaHei. Both rows stay left-aligned at
-any width above the minimum, and no link state changes the set of rows or a row's height.
+(English 595.4 px), and the signal pane plus a 400 px chart floor 792 px. At 400 px an ATP-8000 spectrum keeps at least
+four labelled wavelength ticks; the measured axis shows eight, 1000 to 2400 nm. The headless text stub gives no real
+widths, so `MainWindowTextFitTests` adds the realised row chrome to each text measured through SkiaSharp at 14 px in the
+widest of Inter and every installed family of Semi's font chain; on Windows the app resolves that chain to Microsoft
+YaHei. Both rows stay left-aligned at any width above the minimum, and no link state changes the set of rows or a row's
+height.
 
 ### Content row
 
@@ -151,11 +152,12 @@ Reset scale and Stick to zero buttons, one per row in the field column with an e
 
 Every text in the pane stays on one line. A pane-scoped style sets `NoWrap` on every `TextBlock`, and each checkbox
 holds a `TextBlock` instead of a string, because Semi's `CheckBox` template wraps string content at template priority,
-where no style reaches. `PaneWidth` is 368 px: the 1 px border, 16 padding, the label column, 12, the field column, 16
-padding and 24 px slack, rounded up to the 8 px grid. Russian sets it: labels 93.0 px, field column 198.9 px for
-"Логарифмическая шкала", 360.9 px in all (English 91.0 and 140.6 px, 300.6 px). The longest values ("-1,23457E-38",
-"65535 nm", "±255 nm", "23:59:59.999") measure at most 92.1 px and fit the 120 px floor. `MainWindowTextFitTests`
-measures them the same way as the status bar.
+where no style reaches. `PaneWidth` is 392 px: the 1 px border, 16 padding, the label column, 12, the field column, 16
+padding and 24 px slack, rounded up to the 8 px grid. Russian sets it: labels 117.5 px for "Окно измерения", field
+column 198.9 px for "Логарифмическая шкала", 385.4 px in all (English 91.0 and 140.6 px, 300.6 px). The longest values
+("-1,23457E-38", "65535 nm", "±255 nm", "23:59:59.999") measure at most 92.1 px and fit the 120 px floor.
+`MainWindowTextFitTests` measures them the same way as the status bar, in the labels' face, which every label and value
+shares.
 
 The message panel row takes its height from the content row: the chart and the pane lose that height and keep their
 width, and the window keeps its size. No spectrum state changes the window size or either pane's bounds.

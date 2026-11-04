@@ -51,6 +51,9 @@ public sealed class MainWindowTextFitTests : MainWindowLayoutTestBase
 	private static readonly string[] _paneLabels =
 		["DeviceLabel", "WavelengthLabel", "WindowLabel", "AmplitudeLabel", "SnrLabel", "QLabel", "UpdatedLabel"];
 
+	private static readonly string[] _paneValues =
+		["DeviceValue", "WavelengthValue", "WindowValue", "AmplitudeValue", "SnrValue", "QValue", "UpdatedValue"];
+
 	private static readonly string[] _paneHeaders = ["SignalHeader", "ChartHeader"];
 
 	private static readonly string[] _paneControls = ["InvertSpectrum", "LogarithmicScale", "ResetScale", "StickToZero"];
@@ -140,6 +143,9 @@ public sealed class MainWindowTextFitTests : MainWindowLayoutTestBase
 			"a label, a value, a checkbox or a button never takes a second line");
 
 		var sample = Named<TextBlock>(pane, "DeviceLabel");
+		_paneLabels.Concat(_paneValues).Select(name => Named<TextBlock>(pane, name)).Should().OnlyContain(
+			text => text.FontFamily == sample.FontFamily && text.FontSize == sample.FontSize,
+			"every label and value is measured in the first label's face");
 		double Measure(string text)
 		{
 			return RenderedText.Width(text, sample.FontFamily, sample.FontSize);

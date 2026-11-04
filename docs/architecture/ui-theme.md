@@ -67,8 +67,8 @@ ScottPlot draws with its own colour values, not with Avalonia brushes, so the pl
 read keys through `DynamicResource`. `ChartPalette.Apply` resolves each key with `TryFindResource` under the
 application's actual variant and paints five surfaces: the figure background, the data area, the major and minor
 gridlines, and each axis's label, tick labels, ticks and frame. `ChartPalette.Colors` resolves the spectrum line, the
-band and the centre line, which `SpectrumChartViewModel.ApplyPalette` paints. Both run inside `lock (Plot.Sync)`, so a
-render never sees half a repaint. A key that does not resolve to a solid brush throws with the key's name.
+band and the centre line, which `SpectrumChartViewModel.ApplyPalette` paints. The view runs both inside one hold of
+`lock (Plot.Sync)`, so a render never sees half a repaint. A key that does not resolve to a solid brush throws with the key's name.
 
 ScottPlot has no brush opacity, so the resolved colour's alpha is the brush colour's alpha times its `Opacity`:
 `AppAccentFillBrush` reaches the plot at alpha 64, and the band stays translucent over the line.

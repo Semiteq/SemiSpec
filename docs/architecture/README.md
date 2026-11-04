@@ -9,7 +9,8 @@ English, present tense, the design as it is. Build and test commands live in the
 - [board-protocol.md](./board-protocol.md): the board-to-PC frame, the decoder, the `seq` rules, the serial link,
   the wavelength calibration and the board emulator.
 - [testing-strategy.md](./testing-strategy.md): the test project, what each kind of test owns, the headless setup.
-- [ui-theme.md](./ui-theme.md): the colours, the palette keys, the include manifest and the inset scale.
+- [ui-theme.md](./ui-theme.md): the colours, the palette keys, the include manifest, the inset scale and the plot's
+  colours.
 - [ui-text.md](./ui-text.md): the English and Russian text sets and how the UI culture picks one.
 
 ## Decision records
