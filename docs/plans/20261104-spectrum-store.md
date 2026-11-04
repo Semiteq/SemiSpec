@@ -721,13 +721,13 @@ Data flow:
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.UI/Link/SerialLink.cs`, `LinkStatus.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Link/SerialLinkDropTests.cs`
 
-- [ ] add `DroppedFrames` to `LinkStatus` as a non-positional `init` member; count in `OnFrameDropped`
+- [x] add `DroppedFrames` to `LinkStatus` as a non-positional `init` member; count in `OnFrameDropped`
   (`SerialLink.cs:133-142`) before the log-once check; stamp it in `Publish` (`:119-128`) before the comparison
-- [ ] write the `SerialLinkDropTests` of Acceptance Evidence item 2 (`Component=UI`, `Area=Link`) on
+- [x] write the `SerialLinkDropTests` of Acceptance Evidence item 2 (`Component=UI`, `Area=Link`) on
   `SerialLinkTestBase`, with no reader on `Frames` so the channel fills
-- [ ] confirm the existing positional `LinkStatus` assertions (`AppLifecycleTests.cs:115`,
+- [x] confirm the existing positional `LinkStatus` assertions (`AppLifecycleTests.cs:115`,
   `SerialLinkStreamTests.cs:36`) still pass with `DroppedFrames` 0
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (603 of 603)
 
 ### Task 9: Dropped-frame segment in the status bar
 **Files:**
