@@ -392,12 +392,12 @@ Repository: OptoskyProj. Commit: `feat(firmware): добавить правил�
 - Modify: `OptoskyEncoder/OptoskyEncoder/pc_link.h`, `pc_link.c`
 - Modify: `OptoskyEncoder/HostTest/pc_link_test.c`
 
-- [ ] write `PcSender` with `PcSenderInit`, `PcSenderQueueSpectrum`, `PcSenderStartNext`, `PcSenderFrame`,
+- [x] write `PcSender` with `PcSenderInit`, `PcSenderQueueSpectrum`, `PcSenderStartNext`, `PcSenderFrame`,
   `PcSenderFinish`, `PcSenderBusy` per Solution Overview
-- [ ] write the sender checks of Technical Details: heartbeat at 3000 ms and not 2999, seq 0 before any spectrum,
+- [x] write the sender checks of Technical Details: heartbeat at 3000 ms and not 2999, seq 0 before any spectrum,
   first spectrum seq 1, heartbeat repeats the last seq, spectrum waits for an active heartbeat and then has priority,
   `PcSenderBusy` while queued, finish result per kind, wrap 255 to 0, `uint32_t` time wrap
-- [ ] run Acceptance Evidence item 1: 0 warnings, `all checks passed`, exit 0
+- [x] run Acceptance Evidence item 1: 0 warnings, `all checks passed`, exit 0
 
 ### Task 3: Golden frames in the app's tests
 Repository: SpectrumVisualizer. Commit: `test(protocol): decode the firmware golden frames`, English.
