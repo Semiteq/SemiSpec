@@ -622,17 +622,17 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Core/Trend/IntensityCache.cs`, `TrendHistoryPlan.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Trend/IntensityCacheTests.cs`, `TrendHistoryPlanTests.cs`
 
-- [ ] write `IntensityCache` as Solution Overview describes: one lock, key and generation, the previous key's block,
+- [x] write `IntensityCache` as Solution Overview describes: one lock, key and generation, the previous key's block,
   recent spectra, breaks and marks kept for the cache's life, retention against a `TimeProvider`, `Add`,
   `Fold(IntensityQuery)` with a binary-searched start, `LandHistory`, `SpectrumAt`, `FirstPointAt`, `NewestAt`,
   `Changed`, `ReReadRequested` (with a no-read request for a return to the previous key), the Debug line per key change
   with its running count through an injected `ILogger`; the mean goes through `QueryWindows.MeanOf` over
   `MemoryMarshal.AsBytes` of the window's pixels
-- [ ] write `TrendHistoryPlan.For(visibleFrom, visibleTo, newest, recentStart)`
-- [ ] write `IntensityCacheTests` of Acceptance Evidence item 1; `TheFoldEqualsTheStoreSeriesOverTheSameFrames` and
+- [x] write `TrendHistoryPlan.For(visibleFrom, visibleTo, newest, recentStart)`
+- [x] write `IntensityCacheTests` of Acceptance Evidence item 1; `TheFoldEqualsTheStoreSeriesOverTheSameFrames` and
   `AReReadAtANewKeyKeepsTheLiveBreaks` over a temporary store file
-- [ ] write `TrendHistoryPlanTests`
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] write `TrendHistoryPlanTests`
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 4: Benchmark rows for the trend
 **Files:**

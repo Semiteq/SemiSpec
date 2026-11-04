@@ -3,6 +3,8 @@
   <ItemGroup>
     <PackageReference Include="FluentResults"/>
     <PackageReference Include="Microsoft.Data.Sqlite"/>
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
+    <PackageReference Include="System.Reactive"/>
   </ItemGroup>
 
 </Project>
