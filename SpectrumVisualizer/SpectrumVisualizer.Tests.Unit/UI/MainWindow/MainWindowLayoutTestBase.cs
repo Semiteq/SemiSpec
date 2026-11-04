@@ -25,7 +25,9 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 {
 	protected const string PortName = "COM3";
 
-	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
+	/// <summary>The narrowest chart whose ATP-8000 wavelength axis still carries four labelled ticks.</summary>
+	protected const int ChartFloorWidth = 400;
+
 	private ConnectionBarViewModel? _connectionBar;
 	private AppStatusBarViewModel? _statusBar;
 	private SpectrumViewModel? _spectrum;
@@ -47,8 +49,14 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 
 	private protected FakeDisplayedSpectrumSource SpectrumSource { get; } = new();
 
+	protected MessagePanelViewModel MessagePanel { get; } = new(TimeProvider.System);
+
 	protected AppStatusBarViewModel StatusBar =>
 		_statusBar ?? throw new InvalidOperationException("Realise the window first.");
+
+	protected SpectrumViewModel Spectrum =>
+		_spectrum ?? throw new InvalidOperationException("Realise the window first.");
+
 
 	public void Dispose()
 	{
@@ -60,7 +68,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 		SpectrumSource.Dispose();
 		SerialLink.Dispose();
 		Port.Dispose();
-		_messagePanel.Dispose();
+		MessagePanel.Dispose();
 		GC.SuppressFinalize(this);
 	}
 
@@ -82,22 +90,22 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 		_connectionBar = new ConnectionBarViewModel(
 			PortProvider,
 			SerialLink,
-			_messagePanel,
+			MessagePanel,
 			AvaloniaScheduler.Instance,
 			NullLogger<ConnectionBarViewModel>.Instance);
 		_statusBar = new AppStatusBarViewModel(
 			SerialLink,
-			_messagePanel,
+			MessagePanel,
 			AvaloniaScheduler.Instance,
 			NullLogger<AppStatusBarViewModel>.Instance);
 		_spectrum = new SpectrumViewModel(
 			SpectrumSource,
-			_messagePanel,
+			MessagePanel,
 			TimeProvider.System,
 			AvaloniaScheduler.Instance,
 			NullLogger<SpectrumViewModel>.Instance);
 		_viewModel = new MainWindowViewModel(
-			_messagePanel,
+			MessagePanel,
 			_connectionBar,
 			_statusBar,
 			_spectrum,

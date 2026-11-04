@@ -97,27 +97,32 @@
                    FontWeight="Bold"
                    Margin="0,8,0,0" />
 
+        <!-- A text block, not string content: Semi's template wraps a string, and the pane style keeps this one NoWrap. -->
         <CheckBox Grid.Row="9"
                   Grid.Column="1"
                   Name="InvertSpectrum"
-                  Content="{x:Static text:Resources.ChartInvert}"
-                  IsChecked="{Binding IsInverted}" />
+                  IsChecked="{Binding IsInverted}">
+            <TextBlock Text="{x:Static text:Resources.ChartInvert}" />
+        </CheckBox>
 
         <CheckBox Grid.Row="10"
                   Grid.Column="1"
                   Name="LogarithmicScale"
-                  Content="{x:Static text:Resources.ChartLogScale}"
-                  IsChecked="{Binding IsLogarithmic}" />
+                  IsChecked="{Binding IsLogarithmic}">
+            <TextBlock Text="{x:Static text:Resources.ChartLogScale}" />
+        </CheckBox>
 
         <Button Grid.Row="11"
                 Grid.Column="1"
                 Name="ResetScale"
+                HorizontalAlignment="Left"
                 Content="{x:Static text:Resources.ChartResetScale}"
                 Command="{Binding ResetScaleCommand}" />
 
         <Button Grid.Row="12"
                 Grid.Column="1"
                 Name="StickToZero"
+                HorizontalAlignment="Left"
                 Content="{x:Static text:Resources.ChartStickToZero}"
                 Command="{Binding StickToZeroCommand}" />
     </Grid>

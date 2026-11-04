@@ -718,22 +718,48 @@ Data flow:
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/MainWindow/MainWindowLayoutTests.cs`,
   `MainWindowTextFitTests.cs`
 
-- [ ] every gap and inset in the signal pane and the content row reads off the spacing table; the `ui-theme.md:67` grep
-  prints nothing (pane padding 16; label to value 12; row spacing 8; section header 16 above, 8 below, the first 0)
-- [ ] every field width reads off the width table or carries a stated reason: the value column 120 (numbers); the
-  field column widens only to the widest checkbox or button, measured; record both measured widths per language
-- [ ] measure through `RenderedText` in English and Russian: the label column (widest label), the field column, the
+- [x] every gap and inset in the signal pane and the content row reads off the spacing table; the `ui-theme.md:67` grep
+  prints nothing (pane padding 16; label to value 12; row spacing 8; section header 16 above, 8 below, the first 0).
+  Measured by `MainWindowLayoutTests.TheSignalPaneInsetsReadOffTheSpacingTable` on the arranged grid cells: form origin
+  (1 + 16, 16), first header cell top 0, every row gap 8, `ChartHeader` 16 below the last signal row, one label edge and
+  one field edge 12 after the label column. It caught a miss: Semi's buttons centre in the field column (Reset scale at
+  +34 px, Stick to zero at +48 px in the headless run); both now carry `HorizontalAlignment="Left"`. Inset grep: no output
+- [x] every field width reads off the width table or carries a stated reason: the value column 120 (numbers); the
+  field column widens only to the widest checkbox or button, measured; record both measured widths per language.
+  Widest value: en 92.0 px, ru 92.1 px, under 120. Controls (Invert / Log / Reset / Stick): en 129.4 / 140.6 / 102.1 /
+  109.4 px, ru 182.7 / 198.9 / 157.9 / 140.5 px, so the field column is en 140.6 px, ru 198.9 px ("Логарифмическая
+  шкала"); the reason for the width above 120 is that checkbox
+- [x] measure through `RenderedText` in English and Russian: the label column (widest label), the field column, the
   longest values ("-1.23457E-38", "±100 nm", "23:59:59.999", "ATP-8000"); set `SpectrumPanel.Width` to 16 + label +
-  12 + field + 16 + 24 rounded up to 8; record the numbers in this checkbox
-- [ ] measure the chart floor: an ATP-8000 spectrum on a 400 px wide `RenderInMemory` keeps at least four labelled
+  12 + field + 16 + 24 rounded up to 8; record the numbers in this checkbox.
+  `MainWindowTextFitTests.TheSignalPaneHoldsItsWidestLabelValueAndControlOnOneLineWithSlack`, faces Inter plus Microsoft
+  YaHei, Segoe UI, Arial at 14 px. Values are the type maxima under the culture: `-1.23457E-38` / `-1,23457E-38`,
+  "65535 nm", "±255 nm" (`Delta` is a byte, so 255 bounds the plan's 100), "23:59:59.999", both device names. Labels:
+  en 91.0 px, ru 93.0 px. Bold headers: en 43.2 px, ru 54.5 px (fit both columns). The formula adds the 1 px left
+  border of `SignalPane`: en 1 + 16 + 91.0 + 12 + 140.6 + 16 + 24 = 300.6, ru 1 + 16 + 93.0 + 12 + 198.9 + 16 + 24 =
+  360.9, rounded 368. `SpectrumPanel.PaneWidth` = 368 (the estimate 352 failed by 16 px in Russian)
+- [x] measure the chart floor: an ATP-8000 spectrum on a 400 px wide `RenderInMemory` keeps at least four labelled
   ticks on `Axes.Bottom`; set `MainWindow.MinimumWidth` to the larger of the status bar's 1042.4 px Russian width and
-  `SpectrumPanel.Width` + 400, rounded up to 8; record the result
-- [ ] at the window's minimum width the pane shows every row and control and the chart keeps at least 400 px; at
-  2560 px the pane keeps its width and left-aligned content, and only the chart grows
-- [ ] every label, value, checkbox and button fits on one line in English and Russian
-- [ ] every state keeps the window size and the pane bounds: no spectrum, ATP-2000, ATP-8000, dark, log on, inverted,
-  frozen scale, the message panel shown; the `ui-theme.md:80` grep prints nothing
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+  `SpectrumPanel.Width` + 400, rounded up to 8; record the result.
+  `AnAtp8000SpectrumOnTheChartFloorKeepsFourLabelledWavelengthTicks`: 8 labelled ticks at 400 px (1 000 to 2 400 by
+  200). max(1042.4, 368 + 400 = 768) = 1042.4, rounded 1048: `MinimumWidth` stays 1048, its summary names both bounds
+- [x] at the window's minimum width the pane shows every row and control and the chart keeps at least 400 px; at
+  2560 px the pane keeps its width and left-aligned content, and only the chart grows.
+  `AtTheMinimumWidthTheSignalPaneShowsEveryRowAndTheChartKeepsItsFloor` (window 1048 x 800 with the message panel
+  shown: pane 368 px, chart 680 px, every part's bottom inside the pane padding) and
+  `AtALargeWidthTheSignalPaneKeepsItsWidthAndContentAndOnlyTheChartGrows` (pane 368 px ending at 2560, the chart
+  grows by exactly 1280 px, every pane part keeps its offset in the pane)
+- [x] every label, value, checkbox and button fits on one line in English and Russian. The NoWrap check caught a
+  miss: Semi's `CheckBox` template wraps string content (`TextWrapping="Wrap"` on its `ContentPresenter`, template
+  priority, so a style cannot override it); both checkboxes now hold a `TextBlock` that the pane's NoWrap style reaches.
+  The widths are the ones recorded above
+- [x] every state keeps the window size and the pane bounds: no spectrum, ATP-2000, ATP-8000, dark, log on, inverted,
+  frozen scale, the message panel shown; the `ui-theme.md:80` grep prints nothing.
+  `EverySpectrumStateKeepsTheWindowAndThePaneBounds`: the seven spectrum states give equal window size and pane and
+  chart bounds. The message panel row cannot keep the pane height literally: it takes its height from the content row,
+  so the test asserts the window size, both panes' width and left unchanged and both heights lower by exactly the
+  message panel's height. Colour grep: no output
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (479 of 479)
 
 ### Task 13: Verify acceptance criteria
 - [ ] run every command of Acceptance Evidence and record each result with its count (per Area, full suite, none

@@ -177,8 +177,8 @@ public sealed class MainWindowViewTests : IDisposable
 
 		var invert = Named<CheckBox>(panel, "InvertSpectrum");
 		var logarithmic = Named<CheckBox>(panel, "LogarithmicScale");
-		invert.Content.Should().Be(Resources.ChartInvert);
-		logarithmic.Content.Should().Be(Resources.ChartLogScale);
+		invert.Content.Should().BeOfType<TextBlock>().Which.Text.Should().Be(Resources.ChartInvert);
+		logarithmic.Content.Should().BeOfType<TextBlock>().Which.Text.Should().Be(Resources.ChartLogScale);
 		new[] { invert, logarithmic }.Should().OnlyContain(box => box.IsEffectivelyVisible && box.IsChecked == false);
 
 		var resetScale = Named<Button>(panel, "ResetScale");

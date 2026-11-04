@@ -5,7 +5,7 @@ namespace SpectrumVisualizer.UI.MainWindow;
 
 public partial class MainWindow : Window
 {
-	/// <summary>The status bar with its longest texts in either language; MainWindowTextFitTests measures it.</summary>
+	/// <summary>The wider of the Russian status bar and the signal pane plus the chart floor; MainWindowTextFitTests measures both.</summary>
 	public const double MinimumWidth = 1048;
 
 	private IDisposable? _exitSubscription;
