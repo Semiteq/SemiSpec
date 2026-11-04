@@ -35,7 +35,6 @@ public abstract class AppStatusBarTestBase : IAsyncDisposable
 	private const int LinkChannelCapacity = 64;
 	private const byte FailingSeq = 99;
 
-	// A held store keeps its writer until StopAsync has closed the file.
 	private static readonly TimeSpan _storeStopLimit = TimeSpan.FromSeconds(10);
 
 	private readonly TestScheduler _linkScheduler = new();

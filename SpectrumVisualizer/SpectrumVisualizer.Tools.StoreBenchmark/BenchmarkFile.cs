@@ -46,7 +46,7 @@ internal sealed class BenchmarkFile : IDisposable
 
 	public string Path { get; }
 
-	/// <summary>The first of the Rows positions the file holds now; the churn moves it forward.</summary>
+	/// <summary>The receive time of the first row the file holds now; the churn moves it forward.</summary>
 	public DateTimeOffset WindowFrom => TimeAt(_windowStart);
 
 	public DateTimeOffset WindowTo => TimeAt(_windowStart + _options.Rows);

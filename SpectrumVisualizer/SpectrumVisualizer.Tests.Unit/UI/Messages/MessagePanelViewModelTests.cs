@@ -168,7 +168,6 @@ public sealed class MessagePanelViewModelTests
 		return ErrorMessageMapper.Map(new ExceptionalError(exception.Message, exception));
 	}
 
-	/// <summary>A clock that returns the origin first and one step later on each read after it.</summary>
 	private static FakeTimeProvider SteppingClock()
 	{
 		return new FakeTimeProvider(_origin) { AutoAdvanceAmount = _step };

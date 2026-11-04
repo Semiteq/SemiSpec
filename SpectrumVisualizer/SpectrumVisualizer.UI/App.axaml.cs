@@ -27,9 +27,7 @@ public class App : Application
 
 	private static readonly TimeSpan _backgroundStopLimit = TimeSpan.FromSeconds(5);
 
-	// A statement running when the store's stop begins keeps up to 2.15 s; one started after it fails after 1.15 s,
-	// so a batch started just before the drain token at 3.5 s ends at about 4.65 s, then the checkpoint, which never
-	// waits: about 0.35 s inside the stop limit. docs/architecture/overview.md, the close section, has the budget.
+	// The store's close budget behind this reserve: docs/architecture/overview.md, close section.
 	private static readonly TimeSpan _storeCloseReserve = TimeSpan.FromSeconds(1.5);
 
 	// Started by the first close of the main window; a later close passes once the stop completes.

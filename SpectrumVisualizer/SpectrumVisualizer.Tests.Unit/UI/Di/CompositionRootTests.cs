@@ -33,7 +33,6 @@ namespace SpectrumVisualizer.Tests.Unit.UI.Di;
 [Trait("Category", "Unit")]
 public sealed class CompositionRootTests : IAsyncDisposable
 {
-	// A store whose writer still runs when the test ends closes its file within this long.
 	private static readonly TimeSpan _storeStopLimit = TimeSpan.FromSeconds(10);
 
 	private readonly LogLevelControl _logLevelControl = new();

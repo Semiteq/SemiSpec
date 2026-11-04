@@ -96,7 +96,7 @@ public sealed class SpectrumStoreWriteTests : SpectrumStoreTestBase
 		clock.Advance(TimeSpan.FromSeconds(59));
 		Feed(StoreSamples.Spectrum(now, seq: 6));
 
-		// A due retention pass runs before the batch the writer takes after it.
+		// A due pass would run before this batch, so once the batch lands the heartbeat count proves none ran.
 		await Waits.UntilAsync(() => Count("spectrum") == 4);
 		Count("heartbeat").Should().Be(1, "no minute has passed");
 

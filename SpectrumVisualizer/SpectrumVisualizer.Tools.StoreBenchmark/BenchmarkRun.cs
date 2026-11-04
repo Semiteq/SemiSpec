@@ -230,9 +230,6 @@ public static class BenchmarkRun
 		return text.ToString(CultureInfo.InvariantCulture);
 	}
 
-	/// <summary>
-	/// What the rows of one file state share: the output, the state's name, the run and its mismatches.
-	/// </summary>
 	private sealed record MeasuredState(
 		TextWriter Output,
 		string State,

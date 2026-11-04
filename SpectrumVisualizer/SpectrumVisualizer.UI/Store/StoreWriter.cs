@@ -267,7 +267,6 @@ internal sealed class StoreWriter(
 		return discarded;
 	}
 
-	/// <summary>Called right before each statement, so a statement started after the stop gives up after 1 s.</summary>
 	private void ShortenBusyTimeoutOnceStopped(SpectrumDatabase database)
 	{
 		if (_stopped)

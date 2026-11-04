@@ -22,7 +22,6 @@ public abstract class AppLifecycleTestBase : IAsyncDisposable
 	protected const string PortName = "COM3";
 	protected const string DistributorStopped = "The frame distributor stopped";
 
-	// A store whose writer still runs when the test ends closes its file within this long.
 	private static readonly TimeSpan _storeStopLimit = TimeSpan.FromSeconds(10);
 
 	private readonly CollectingSink _sink = new();

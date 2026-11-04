@@ -260,8 +260,7 @@ public sealed class MainWindowTextFitTests : MainWindowLayoutTestBase
 	/// </summary>
 	private static double ChromeWidth(Border row, IReadOnlyCollection<TextBlock> texts)
 	{
-		// Avalonia clamps DesiredSize to the space offered, so only an unbounded measure gives the whole chrome. The
-		// stub texts may overflow the opening width here; the real widths are judged against the minimum width.
+		// Avalonia clamps DesiredSize to the space offered, so only an unbounded measure gives the whole chrome.
 		row.Measure(Size.Infinity);
 		var naturalWidth = row.DesiredSize.Width;
 		var textWidths = texts.Sum(text => text.DesiredSize.Width - text.Margin.Left - text.Margin.Right);

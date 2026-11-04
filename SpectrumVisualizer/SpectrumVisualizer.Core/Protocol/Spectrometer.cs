@@ -29,7 +29,7 @@ public static class SpectrometerExtensions
 		};
 
 		/// <summary>
-		/// The wavelength the tools use when none is given: inside the device's firmware table range.
+		/// The wavelength the tools use by default: inside the device's firmware table range.
 		/// </summary>
 		public ushort DefaultWavelengthNm => device switch
 		{
