@@ -788,22 +788,28 @@ Note: Task 9 already added the dropped segment to the status sum and set `Minimu
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.UI/MainWindow/MainWindow.axaml.cs`
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/MainWindow/MainWindowTextFitTests.cs`
 
-- [ ] every gap reads off the spacing table: the new separator reuses `Border.separator` (`AppStatusBar.axaml:22-26`,
-  8 px each side, 1 px line); no new inset; the `ui-theme.md:86` inset grep prints nothing
-- [ ] every width reads off the width table or carries a reason: the segment is text with no fixed width; the widest
+- [x] every gap reads off the spacing table: the new separator reuses `Border.separator` (`AppStatusBar.axaml:22-26`,
+  8 px each side, 1 px line); no new inset; the `ui-theme.md:86` inset grep prints nothing (verified, exit 1)
+- [x] every width reads off the width table or carries a reason: the segment is text with no fixed width; the widest
   value is the six-digit count of `MainWindowTextFitTests.cs:36-37`, which bounds the dropped count of a day too
-- [ ] measure through `RenderedText` in English and Russian: add the dropped segment with `999999` to the status sum
+- [x] measure through `RenderedText` in English and Russian: add the dropped segment with `999999` to the status sum
   (`MainWindowTextFitTests.cs:73-78`); record both widths here. ASSUMPTION: the Russian bar grows from 1042.4 px by
-  about 190 px (one separator, 17 px, plus "Отброшено кадров: 999999")
-- [ ] set `MainWindow.MinimumWidth` (`MainWindow.axaml.cs:12`) to the larger of the measured status bar and the
+  about 190 px (one separator, 17 px, plus "Отброшено кадров: 999999"). Measured: Russian 1252.2 px (+209.8 px, the
+  assumption was 20 px low), English 1085.2 px; connection row Russian 654.9 px, English 595.4 px; faces Microsoft
+  YaHei, Segoe UI, Arial + Inter at 14 px
+- [x] set `MainWindow.MinimumWidth` (`MainWindow.axaml.cs:12`) to the larger of the measured status bar and the
   792 px content floor (`overview.md:139-143`), rounded up to 8; record the value. It must stay at or under the
   1280 px opening width (`MainWindow.axaml:15`); if the Russian bar passes 1272 px, the texts become "Dropped: {0}" /
-  "Отброшено: {0}" and the measurement repeats
-- [ ] the window at its minimum width shows every status segment whole, and at 2560 px the bar stays left-aligned with
+  "Отброшено: {0}" and the measurement repeats. Value: 1256 px (1252.2 rounded up to 8), under 1272, so the texts
+  stay. ➕ The opening width became `MainWindow.OpeningWidth` (1280), bound in `MainWindow.axaml`, and the text-fit
+  test asserts the realised opening width and `MinimumWidth <= OpeningWidth`: the real-font form of the opening-width
+  assertion Task 9 removed (rows fit the minimum, the minimum fits the opening width). A mutation to 1288 fails it.
+  `MainWindowSignalPaneTests` drops its private copy of 1280 for the constant
+- [x] the window at its minimum width shows every status segment whole, and at 2560 px the bar stays left-aligned with
   no growing gap (`MainWindowLayoutTests`); every status text is `NoWrap` and fits in both languages; no store or link
   state changes the set of segments or the window size (the segment shows a number in every state); the
-  `ui-theme.md:99` colour grep prints nothing
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+  `ui-theme.md:99` colour grep prints nothing (verified, exit 1)
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (611 of 611)
 
 ### Task 12: Verify acceptance criteria
 - [ ] run every command of Acceptance Evidence and record each result with its count (per Area, full suite, none

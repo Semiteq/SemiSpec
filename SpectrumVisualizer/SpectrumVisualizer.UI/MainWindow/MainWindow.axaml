@@ -12,7 +12,7 @@
         x:Class="SpectrumVisualizer.UI.MainWindow.MainWindow"
         x:DataType="local:MainWindowViewModel"
         Title="{x:Static text:Resources.WindowTitle}"
-        Width="1280"
+        Width="{x:Static local:MainWindow.OpeningWidth}"
         Height="800"
         MinWidth="{x:Static local:MainWindow.MinimumWidth}"
         WindowStartupLocation="CenterScreen">

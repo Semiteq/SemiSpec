@@ -82,9 +82,13 @@ public sealed class MainWindowTextFitTests : MainWindowLayoutTestBase
 		TestContext.Current.TestOutputHelper?.WriteLine(
 			$"{culture}: faces {string.Join(", ", RenderedText.InstalledFamilies(family))} + Inter at {fontSize} px; "
 			+ $"connection row {connectionWidth:0.#} px, status bar {statusWidth:0.#} px, "
-			+ $"window minimum {MainWindowView.MinimumWidth} px");
+			+ $"window minimum {MainWindowView.MinimumWidth} px, opening {MainWindowView.OpeningWidth} px");
 		var faces = $"measured in {string.Join(", ", RenderedText.InstalledFamilies(family))} and Inter";
 		window.MinWidth.Should().Be(MainWindowView.MinimumWidth);
+		window.Bounds.Width.Should().Be(MainWindowView.OpeningWidth);
+		MainWindowView.MinimumWidth.Should().BeLessThanOrEqualTo(
+			MainWindowView.OpeningWidth,
+			"both rows show whole at the opening width, since they fit the minimum");
 		connectionWidth.Should().BeLessThanOrEqualTo(
 			MainWindowView.MinimumWidth,
 			$"the whole connection row shows, {faces}");

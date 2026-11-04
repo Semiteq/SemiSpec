@@ -31,8 +31,6 @@ namespace SpectrumVisualizer.Tests.Unit.UI.MainWindow;
 [Trait("Category", "Unit")]
 public sealed class MainWindowSignalPaneTests : MainWindowLayoutTestBase
 {
-	private const double OpeningWidth = 1280;
-
 	private static readonly string[] _paneParts =
 		["SignalHeader", .. PaneLabels, .. PaneValues, "ChartHeader", .. PaneControls];
 
@@ -168,7 +166,7 @@ public sealed class MainWindowSignalPaneTests : MainWindowLayoutTestBase
 		(pane.TranslatePoint(default, window)!.Value.X + pane.Bounds.Width)
 			.Should().Be(LargeWidth, "the pane ends at the window's right edge");
 		chart.Bounds.Width.Should().Be(
-			openingChartWidth + LargeWidth - OpeningWidth,
+			openingChartWidth + LargeWidth - MainWindowView.OpeningWidth,
 			"the chart takes every added pixel");
 		PaneOffsets(pane).Should().Equal(openingOffsets, "the pane content stays where it was inside the pane");
 	}

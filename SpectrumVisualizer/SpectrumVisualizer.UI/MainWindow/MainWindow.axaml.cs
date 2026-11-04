@@ -11,6 +11,8 @@ public partial class MainWindow : Window
 	/// </summary>
 	public const double MinimumWidth = 1256;
 
+	public const double OpeningWidth = 1280;
+
 	private IDisposable? _exitSubscription;
 
 	public MainWindow()
