@@ -141,12 +141,16 @@ Automatable (baseline 320 of 320 at `5fca2ab`):
      `ATranslucentKeyKeepsItsOpacityInTheAlpha` (`AppAccentFillBrush` resolves to alpha 64).
 2. `dotnet test SpectrumVisualizer.slnx --filter "Area=Link"` passes, including the existing link tests and
    `FrameDistributorTests`: `EveryFrameReachesEverySubscriberInOrder`, `ALateSubscriberSeesOnlyLaterFrames`,
-   `TheLatestSpectrumSkipsHeartbeats`, `AThrowingSubscriberIsReportedAndTheNextFrameStillArrives`, `StopEndsTheReadLoopAndStartAfterStopDoesNothing`,
+   `TheLatestSpectrumSkipsHeartbeats`, `AThrowingSubscriberDoesNotTakeTheFrameFromTheOthers` (subscriber 1 throws on a
+   frame, subscriber 2 receives that same frame, the panel gets one Error entry),
+   `AnUnsubscribedObserverReceivesNothingMore`, `StopEndsTheReadLoopAndStartAfterStopDoesNothing`,
    `StopBeforeStartCompletesAtOnce`.
 3. `dotnet test SpectrumVisualizer.slnx --filter "Area=Spectrum"` passes, including:
-   - `SpectrumScaleTests`: auto limits pad 5 % of the span; a flat linear range gives `v - 1 .. v + 1`; a flat log
+   - `SpectrumScaleTests`: auto limits pad 5 % of the span; with no earlier non-dark frame a flat linear range gives `v - 1 .. v + 1` and a flat log
      range gives `v - 0.5 .. v + 0.5` decades; stick to zero gives `0 .. max x 1.2` linear and
-     `0 .. log10(max x 1.2)` decades; an all-zero spectrum gives finite limits in every mode.
+     `0 .. log10(max x 1.2)` decades; an all-zero spectrum gives finite limits in every mode;
+     `ADarkFrameWhileFollowingKeepsTheLastNonDarkYLimits` (Y equals the previous spectrum's limits, X is the dark
+     frame's device range); `ADarkFrameWithNoEarlierSpectrumTakesTheFlatRangeLimits`.
    - `SpectrumProjectionTests`: inversion writes `max - value`; the log projection writes `log10(max(value, 1))`, so a
      zero pixel lands on 0 decades; an all-zero spectrum inverted stays all zero; a 65535 pixel gives 4.8165 decades.
    - `LiveSpectrumSourceTests`: `Current` is null before a spectrum; a heartbeat changes neither `Current` nor
@@ -154,10 +158,13 @@ Automatable (baseline 320 of 320 at `5fca2ab`):
    - `SpectrumChartViewModelTests`: the first spectrum sets the X limits to the device's wavelength range
      (`WavelengthOf(0)` to `WavelengthOf(P - 1)`); the window band spans `WavelengthNm - Delta` to
      `WavelengthNm + Delta` and the centre line sits at `WavelengthNm`; an ATP-2000 frame after an ATP-8000 frame
-     shows the ATP-2000 line only and moves the auto X limits; operator input freezes the limits across later frames;
-     Reset scale returns to following; Stick to zero sets the bottom to zero and freezes; toggling log or inversion
+     shows the ATP-2000 line only and moves the auto X limits; a wheel step freezes the limits across later frames,
+     and so does the first pointer move with a button held; `AClickWithoutADragKeepsFollowing`; Reset scale returns
+     to following; `ABandOutsideTheDeviceRangeIsHiddenAndTheXLimitsStayTheDeviceRange` (an ATP-8000 frame at
+     400 nm: band and centre line invisible, X `WavelengthOf(0)..WavelengthOf(511)` of ATP-8000);
+     `AFrameFromTheOtherDeviceWhileFrozenKeepsTheFrozenLimits` (the line may lie outside them; accepted); Stick to zero sets the bottom to zero and freezes; toggling log or inversion
      returns to following; the log axis carries a `LogTickGenerator` and 1 px minor gridlines, the linear axis
-     neither; the frame's pixel array is never written.
+     neither; the frame's pixel array is never written; `ApplyPaletteRunsUnderThePlotLock`.
    - `SpectrumChartViewModelRenderTests.ADarkFrameRendersOnTheLinearAxisWithFiniteLimits` and
      `ADarkFrameRendersOnTheLogAxisAtTheFloorWithFiniteLimits`: `Plot.RenderInMemory(640, 480)` throws nothing and
      every axis limit is finite; `AnInvertedDarkFrameOnTheLogAxisRenders`.
@@ -165,11 +172,15 @@ Automatable (baseline 320 of 320 at `5fca2ab`):
      amplitude, SNR and Q in `G6` under the current culture, a non-finite value as "-", the update time as
      `HH:mm:ss.fff` in the `TimeProvider`'s local zone.
    - `SpectrumViewModelTests`: three `Changed` signals before the UI scheduler runs apply the latest spectrum once;
-     a spectrum present at construction shows at once; Reset scale and Stick to zero are disabled before the first
-     spectrum.
+     `TheSameCachedSpectrumIsAppliedOnceByReference`; a spectrum present at construction shows at once; Stick to zero
+     is enabled once a spectrum is shown; Reset scale is enabled only with a spectrum and a frozen scale
+     (`ResetScaleShowsTheFrozenState`).
    - `SpectrumChartViewTests`: `ThePlotIsCachedThroughItsOnlyAncestor`, `ABurstOfRedrawRequestsJoinsOneFrame`,
      `ARequestOnADetachedViewServesNothing`, `TheEmptyStateShowsUntilTheFirstSpectrum`,
-     `ALoadedViewRepaintsThePlotWhenTheVariantChanges`, `TheDoubleClickAndSingleClickResponsesAreRemoved`.
+     `ALoadedViewRepaintsThePlotWhenTheVariantChanges`, `OnlyPanZoomAndWheelResponsesRemain` (the list holds no
+     `DoubleClickBenchmark`, `SingleClickAutoscale`, `SingleClickContextMenu`, `KeyboardAutoscale` or
+     `KeyboardPanAndZoom`), `AWheelStepFreezesTheScale`, `APressAndReleaseWithoutAMoveKeepsFollowing`,
+     `AMoveWithAButtonHeldFreezesTheScale`.
 4. `dotnet test SpectrumVisualizer.slnx --filter "Area=MainWindow"` passes, including `MainWindowViewTests` (rows top
    to bottom: menu, connection row, content, message panel, status bar; the content row holds the chart pane and the
    signal pane; every signal row and chart control realised; no placeholder), `MainWindowLayoutTests` (the signal
@@ -177,9 +188,10 @@ Automatable (baseline 320 of 320 at `5fca2ab`):
    keeps the window and the pane bounds) and `MainWindowTextFitTests` (every pane label, value and control on one line
    in English and Russian; the minimum width holds the status bar, and the pane plus the chart floor).
 5. `dotnet test SpectrumVisualizer.slnx --filter "Area=Di"` passes, including: the distributor, the live source and the
-   spectrum view model resolve as singletons; opening the window starts the distributor
-   (`AppLifecycleTests.OpeningTheWindowStartsTheFrameDistributor`); closing the window stops the link, then the
-   distributor (`AppLifecycleTests.ClosingTheWindowStopsTheDistributorAfterTheLink`).
+   spectrum view model resolve as singletons; `AppLifecycleTests.OpeningTheWindowStartsTheFrameDistributor` (after
+   `Opened` and Connect over `FakeSerialPortProvider`, frame bytes fed through `FakePortStream` reach a distributor
+   subscriber); `AppLifecycleTests.ClosingTheWindowStopsTheDistributorAfterTheLink` (after the close completes, the
+   distributor's stop line is in the log and no subscriber receives anything more).
 6. `dotnet test SpectrumVisualizer.slnx --filter "Area=Resources"` passes with the four new palette keys under both
    variants and every new resx key in the Russian set.
 7. `dotnet test SpectrumVisualizer.slnx` passes 320 plus every test this slice adds, with none skipped.
@@ -200,20 +212,23 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
 3. Restart the emulator with `--device 2000 --wavelength 400 --delta 25`. The X range moves to about 186 to 1029 nm,
    the peak and the centre line sit at 400 nm, the band spans 375 to 425 nm, the pane reads ATP-2000, 400 nm, ±25 nm.
 4. Restart it with `--device 2000 --wavelength 400 --delta 25 --dark-every 3`. Every third spectrum is a flat line at
-   0 with amplitude 0 and SNR 0; while it is shown the Y axis runs from -1 to 1; the message panel gets no entry and
-   the log no exception.
+   0 with amplitude 0 and SNR 0; the Y axis keeps the limits of the previous spectrum, so the axis does not jump; X
+   stays the ATP-2000 range; the message panel gets no entry and the log no exception.
 5. Tick "Logarithmic scale". The Y axis labels powers of ten with minor gridlines; the floor of 1000 sits at 10^3,
-   the peak near 10^4.5. A dark spectrum draws as a flat line on the 1 gridline in the middle of a range from about
-   0.3 to 3. Untick it:
-   the linear axis returns and the plot follows the data again.
+   the peak near 10^4.5. A dark spectrum keeps those limits; its line lies on the 10^0 floor, below the kept range,
+   so the data area is empty for that frame and the axis does not move. Untick it: the linear axis returns and the
+   plot follows the data again.
 6. Tick "Invert spectrum". The peak turns into a dip to 0 at 400 nm and the floor reads about 30000. With the log scale on
    as well, the dip lands on the 1 gridline. A dark spectrum stays a flat line at 0. Untick both.
-7. Zoom with the mouse wheel over the peak. The next spectra keep the zoomed limits. Press Reset scale: the plot
-   follows the data again. Press Stick to zero: the Y axis starts at 0 and ends at about 37200 (1.2 times the peak), and later spectra keep those
-   limits until Reset scale.
+7. Click the plot without moving the mouse: the plot keeps following the data and Reset scale stays disabled. Zoom
+   with the mouse wheel over the peak: Reset scale turns enabled and the next spectra keep the zoomed limits. Press
+   Reset scale: it turns disabled and the plot follows the data again. Drag the plot with the left button: the limits
+   freeze again. Press Reset scale, then Stick to zero: the Y axis starts at 0 and ends at about 37200 (1.2 times the
+   peak), and later spectra keep those limits until Reset scale.
 8. Restart the emulator with `--device 2000 --wavelength 700 --delta 0`: the band collapses to the centre line at
    700 nm and the pane reads ±0 nm. With the limits frozen by Stick to zero, the limits stay; Reset scale follows
-   again.
+   again. Restart it with `--device 8000 --wavelength 400`: X follows the ATP-8000 range, no band or centre line is
+   drawn, and the pane reads 400 nm.
 9. Restart it with `--device 2000 --rate 2.5`. The update time advances about every 0.4 s; the window stays responsive
    to resize and to the checkboxes.
 10. Press Disconnect. The plot keeps the last spectrum and the update time stops; Connect again resumes the updates.
@@ -240,10 +255,14 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
   that reader through a factory lambda, so tests hand it a real channel without a test-only constructor. `Start()`
   runs one task:
   `await foreach (var frame in reader.ReadAllAsync(token))`. For each frame it publishes `LatestSpectrum` with
-  `Volatile.Write` when the frame carries a measurement, then calls `OnNext` on a private `Subject<ReceivedFrame>`
-  exposed as `IObservable<ReceivedFrame> Frames` through `AsObservable()`. The task is the subject's one writer, so no
-  `Synchronize`. An exception a subscriber throws is caught per frame, logged at Error and reported through
-  `TryReportFailure` with the UI scheduler; the next frame still goes out. The channel never completes, so the loop
+  `Volatile.Write` when the frame carries a measurement, then hands the frame to each subscriber in turn.
+  `IObservable<ReceivedFrame> Frames` is an `Observable.Create` over the distributor's own subscriber list: subscribing
+  adds the observer and the returned disposable removes it. The list is copy-on-write (an `ImmutableArray` replaced
+  under a lock, because subscribers come and go on any thread), and the loop reads one snapshot per frame. Each
+  subscriber's `OnNext` runs inside its own try/catch, so a subscriber that throws takes nothing from the others: the
+  same frame still reaches every later subscriber. The exception is logged at Error and reported once through
+  `TryReportFailure` with the UI scheduler, and the next frame goes out as usual. A `Subject` would stop the frame at the
+  first throwing observer. The channel never completes, so the loop
   lives across link sessions and ends only on cancellation. `StopAsync()` cancels and awaits the task and completes at
   once when nothing runs; `Start()` after a start or a stop does nothing; `Dispose()` cancels without waiting, for the
   container's synchronous dispose. Subscribers own their scheduling and never block the loop: the live source filters
@@ -254,15 +273,19 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
 - **Displayed-spectrum seam.** `DisplayedSpectrum(SpectrumMeasurement Measurement, DateTimeOffset ReceivedAt)` is what
   the chart and the pane show. `IDisplayedSpectrumSource` has `DisplayedSpectrum? Current` and `IObservable<Unit>
   Changed` (emits on any thread; the reader reads `Current` after it). It exists for its two planned implementations:
-  `LiveSpectrumSource` now, a historical source in intensity-trend. `LiveSpectrumSource(FrameDistributor)` maps
+  `LiveSpectrumSource` now, a historical source in intensity-trend. Intensity-trend adds a switching source that
+  implements `IDisplayedSpectrumSource` and replaces the `LiveSpectrumSource` registration, so `SpectrumViewModel`
+  keeps one source. A historical source rebuilds a full `DisplayedSpectrum`, so spectrum-store persists device,
+  wavelength, delta, amplitude, snr, q, pixels and `ReceivedAt`. `LiveSpectrumSource(FrameDistributor)` maps
   `LatestSpectrum` to a `DisplayedSpectrum`, caching the instance per frame so a repeated read returns the same
   object, and `Changed` is `distributor.Frames.Where(frame => frame.Frame.Measurement is not null).Select(_ =>
   Unit.Default)`.
 - **Latest spectrum only.** `SpectrumViewModel` subscribes in its constructor:
   `source.Changed.ObserveOn(uiScheduler).StartWith(Unit.Default).Select(_ => source.Current).Where(not null)
-  .DistinctUntilChanged()`, then applies the spectrum to the chart and the pane. Signals queued while the UI thread is
-  busy each read the same latest `Current`, and `DistinctUntilChanged` drops the repeats, so the chart applies the
-  latest spectrum once. The subscription ends in `Dispose`; the view model is a container singleton, so its
+  .DistinctUntilChanged(ReferenceEqualityComparer.Instance)`, then applies the spectrum to the chart and the pane. Signals queued while the UI thread is
+  busy each read the same latest `Current`, and `DistinctUntilChanged` drops the repeats by reference on the instance
+  the live source caches per frame, so the chart applies the latest spectrum once without comparing pixel arrays
+  (record equality on `SpectrumMeasurement` compares every pixel, `BoardFrame.cs:60-70`). The subscription ends in `Dispose`; the view model is a container singleton, so its
   subscription lives for the process like the status bar's. A pipeline failure goes to `TryReportFailure`.
 - **Chart model.** `SpectrumChartViewModel` owns the ScottPlot `Plot`, as SemiPlot's chart view model does, and the
   view binds it with `PlotControl.Reset(viewModel.Plot)`. It holds one `SignalXY` per device, built once with the
@@ -272,6 +295,14 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
   `lock (Plot.Sync)` it fills the device's `ys` through `SpectrumProjection`, moves the band and the line, toggles the
   line visibility on a device change and, while the scale follows, sets the limits from `SpectrumScale`; then it calls
   `RequestRedraw()`. The frame's pixel array is read, never written; the store reads the same array later.
+  `ApplyPalette(ChartColors)` and `ChartPalette.Apply` also run inside `lock (Plot.Sync)`, so a render never sees half
+  a repaint.
+- **Band outside the device range.** The following X range is always the shown device's own wavelength range. When the
+  band `WavelengthNm - Delta .. WavelengthNm + Delta` does not overlap that range (for example an ATP-8000 frame taken
+  at 400 nm), the band and the centre line are hidden; the pane still shows the wavelength and the window. A band that
+  overlaps the range in part is drawn and clipped by the data area. While the scale is frozen on one device, a frame
+  from the other device keeps the frozen limits, and its line can lie outside them, leaving the plot blank until Reset
+  scale; that is accepted, because the operator froze the view.
 - **Frame-paced redraw.** Copied from SemiPlot: `RequestRedraw()` raises `RedrawRequested` when a view subscribes; the
   view asks `TopLevel.RequestAnimationFrame` once per pending frame and invalidates the plot in the callback, so every
   request before the next display frame joins one redraw. Nothing in the view calls `AvaPlot.Refresh()`. The only
@@ -280,27 +311,37 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
   cache never goes on `AvaPlot` itself, because Avalonia 12 then freezes the plot on its first frame
   (`SemiPlot/docs/architecture/charting.md:307-314`).
 - **Scale.** The scale either follows the data or is frozen. It follows from the start, after Reset scale and after a
-  log or inversion toggle (the old limits are in other units or describe another curve). It freezes when the operator
-  presses, scrolls or presses a key over the plot (a tunnel handler calls `TakeManualScale()`) and after Stick to
-  zero. While it follows, every spectrum sets the limits; while frozen, no spectrum moves them. This is the old
+  log or inversion toggle (the old limits are in other units or describe another curve). It freezes on a wheel step
+  over the plot and on the first pointer move with a button held (a drag), through tunnel handlers for
+  `PointerWheelChanged` and `PointerMoved` that call `TakeManualScale()`, and after Stick to zero. A bare click, a
+  press and release without a move, keeps it following; so does a key press. While it follows, every spectrum sets the
+  limits; while frozen, no spectrum moves them. A dark frame while following keeps the last non-dark Y limits, so the
+  axis does not jump every Nth frame: the dark line draws at its floor inside the kept range (on the log axis the floor
+  of 0 decades lies below a range kept from a spectrum whose minimum is above 1, so the data area is empty for that
+  frame), and X still follows the dark frame's device. With no earlier non-dark frame, the flat-range limits apply. This is the old
   OxyPlot behaviour: its axes rescaled on every update until the operator zoomed, and Reset scale reset them
   (`SpectrumPainter.cs:66-70`, `:82`). The limits come from `SpectrumScale`, never from ScottPlot's autoscale, so a
-  flat range has a defined answer and no limit is NaN.
+  flat range has a defined answer and no limit is NaN. Reset scale is enabled only while a spectrum is shown and the
+  scale is frozen, so the button also shows the frozen state.
 - **Log axis.** ScottPlot has no log axis, and `SignalXY` has no render hook to project at draw time as SemiPlot's own
   plottable does. So the data is projected: with the log scale on, `ys[i] = log10(max(value, 1))` and the axis runs in
   decades with a `LogTickGenerator`; with it off, `ys[i] = value` and the axis takes a fresh `NumericAutomatic`. The
   toggle re-projects the shown spectrum and swaps the generator, the limits and the minor gridline width (1 px on log,
   0 on linear) under one `lock (Plot.Sync)`. The type lives in the tick generator, as in SemiPlot.
 - **Floor for zero pixels.** Pixels are integers, so 1 is the smallest positive reading, and a zero pixel is drawn on
-  the 10^0 line with the ones. The axis then never needs a decade below 0, and a dark frame is a flat line at
-  0 decades with limits -0.5 to 0.5.
+  the 10^0 line with the ones. The axis then never needs a decade below 0, and a dark frame with no earlier spectrum
+  is a flat line at 0 decades with limits -0.5 to 0.5.
 - **Inversion.** `max - value` over the frame's own maximum, as the old app (`SpectrumManager.cs:32-39`); applied
   before the log projection. An all-zero spectrum stays all zero.
 - **Pointer input.** ScottPlot's stock input processor stays on: wheel zoom, drag pan, drag zoom and the zoom
-  rectangle cover the old plot's zoom and pan. The task removes every `DoubleClickResponse` and `SingleClickResponse`
-  from `UserActionResponses`; ASSUMPTION: in 5.1.59 these are the double-click benchmark, the right-click menu and the
-  middle-click autoscale, and the task reads the default list in the package before it relies on that. Reset scale is
-  the one way back to following. `AvaPlot.HandleMouseWheelEvent` stays at its default.
+  rectangle cover the old plot's zoom and pan. The `ScottPlot.dll` 5.1.59 metadata lists the response types
+  `DoubleClickBenchmark`, `SingleClickAutoscale`, `SingleClickContextMenu`, `KeyboardAutoscale`,
+  `KeyboardPanAndZoom`, `LeftClickDragPan`, `RightClickDragZoom`, `MouseDragZoomRectangle` and `MouseWheelZoom`; the
+  XML documentation has no default list, so Task 10 reads the default `UserActionResponses` of a fresh `AvaPlot`
+  through the assembly. The view removes `DoubleClickBenchmark`, `SingleClickAutoscale`, `SingleClickContextMenu`,
+  `KeyboardAutoscale` and `KeyboardPanAndZoom`: the app is a read-only viewer, ScottPlot's autoscaler never sets the
+  limits, and keyboard input never moves them. Pan, drag zoom, the zoom rectangle and wheel zoom remain. Reset scale
+  is the one way back to following. `AvaPlot.HandleMouseWheelEvent` stays at its default.
 - **Signal pane.** `SignalInfoViewModel` holds the shown `DisplayedSpectrum` and computes seven texts from it, each
   notifying from the setter of that property: spectrometer, wavelength, window, amplitude, SNR, Q factor, updated.
   Amplitude, SNR and Q show the board's values in `G6` under the current culture; a NaN or infinite value shows "-".
@@ -308,7 +349,8 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
   zone, `HH:mm:ss.fff`. Before the first spectrum every row reads "-", so every row exists in every state.
 - **Chart controls.** `SpectrumViewModel` exposes `IsInverted` and `IsLogarithmic` (two-way bound; the setter assigns
   and raises, and one `WhenAnyValue` over both re-projects), `ResetScaleCommand` and `StickToZeroCommand`
-  (`ReactiveCommand.Create`, `canExecute` from `HasSpectrum`). It owns `Chart` and `SignalInfo` and builds both.
+  (`ReactiveCommand.Create`; Stick to zero's `canExecute` is `HasSpectrum`, Reset scale's is `HasSpectrum &&
+  !IsFollowing`, both from `WhenAnyValue` on the chart). It owns `Chart` and `SignalInfo` and builds both.
 - **Empty state.** Until the first spectrum, a line over the plot reads "No spectrum yet. Connect to the board in the
   row above." After a Disconnect the last spectrum stays, and its update time tells its age; a new Connect does not
   clear it.
@@ -356,7 +398,7 @@ Old app features and their new home:
 | Logarithmic Y axis | `mainForm.cs:28`, `SpectrumPainter.cs:85-91`, `:112-124` | "Logarithmic scale" checkbox; zero pixels on the 10^0 line |
 | Reset scale | `mainForm.cs:26`, `SpectrumPainter.cs:66-70`, `:82` | Reset scale button: the scale follows the data again |
 | Stick to zero | `mainForm.cs:27`, `SpectrumPainter.cs:72-76`, `:83`, `:137-156` | Stick to zero button: Y from 0 to max x 1.2, X over the device's range, frozen; the old X margin of 5 % of each wavelength value is dropped |
-| Mouse zoom and pan on the plot | ASSUMPTION: OxyPlot's default `PlotView` controller, not configured in the old code | ScottPlot's stock input without the double-click, right-click and middle-click responses |
+| Mouse zoom and pan on the plot | ASSUMPTION: OxyPlot's default `PlotView` controller, not configured in the old code | ScottPlot's stock pan, drag zoom, zoom rectangle and wheel zoom; no click or keyboard responses; a wheel step or a drag freezes the scale |
 | Message log with "Отчистить историю сообщений", 100 entries | `mainForm.cs:22`, `:29`, `mainForm.Designer.cs:112`, `EventHandler.cs:12`, `:26-42` | the existing message panel and its Clear button (`MessagePanelView.axaml:36-38`, `MessagePanelViewModel.cs:14`, `:26`); no change |
 | "Текущее устройство: COMx" group box title | `mainForm.cs:75` | the status bar's port segment (serial-link); no change |
 | Port list, Connect, Disconnect | `mainForm.cs:44-51`, `:137-176` | the connection row (serial-link); no change |
@@ -369,12 +411,14 @@ Scale rules (`SpectrumScale`, pure; `ys` are the projected values of the shown s
 | Case | X | Y, linear | Y, log (decades) |
 | --- | --- | --- | --- |
 | Following | `xs[0] .. xs[P - 1]` | `min - 5 % .. max + 5 %` of the span | `min - 5 % .. max + 5 %` of the span |
-| Following, flat (`min == max`, a dark frame) | same | `v - 1 .. v + 1` | `v - 0.5 .. v + 0.5` |
+| Following, a dark frame after a non-dark one | same | the last non-dark Y limits | the last non-dark Y limits |
+| Following, flat (`min == max`) with no earlier non-dark frame | same | `v - 1 .. v + 1` | `v - 0.5 .. v + 0.5` |
 | Stick to zero | same | `0 .. max x 1.2`; `0 .. 1` when `max == 0` | `0 .. log10(rawMax x 1.2)`; `0 .. 1` when `rawMax <= 1` |
 | Frozen | unchanged | unchanged | unchanged |
 
-`rawMax` is the largest displayed value before the log projection (after inversion). Every input is a finite
-`ushort` or its logarithm, so every limit is finite.
+`rawMax` is the largest displayed value before the log projection (after inversion). A dark frame is one whose raw
+pixels are all zero. The last non-dark Y limits are kept per axis type and cleared by a log or inversion toggle, which
+changes their units or their curve. Every input is a finite `ushort` or its logarithm, so every limit is finite.
 
 Projection (`SpectrumProjection.Fill(ReadOnlySpan<ushort> pixels, bool inverted, bool logarithmic, Span<double>
 ys)`): `value = inverted ? max - pixel : pixel`; `ys[i] = logarithmic ? Math.Log10(Math.Max(value, 1)) : value`.
@@ -421,9 +465,11 @@ and the centre line through `SpectrumChartViewModel.ApplyPalette(ChartColors)`.
 
 Data flow:
 1. The link writes `ReceivedFrame` to its channel (session task).
-2. The distributor reads it, sets `LatestSpectrum` for a spectrum frame, calls `OnNext` (distributor task).
+2. The distributor reads it, sets `LatestSpectrum` for a spectrum frame, calls each subscriber's `OnNext` under its own
+   try/catch (distributor task).
 3. The live source passes spectrum frames on as `Changed` (distributor task).
-4. `SpectrumViewModel` moves the signal to the UI scheduler, reads `Current`, drops a repeat, calls `Chart.Show` and
+4. `SpectrumViewModel` moves the signal to the UI scheduler, reads `Current`, drops a repeat by reference, calls
+   `Chart.Show` and
    sets `SignalInfo.Spectrum` (UI thread).
 5. `Chart.Show` fills the buffer and the limits under `Plot.Sync` and calls `RequestRedraw()`.
 6. The view serves one redraw in the next display frame.
@@ -481,13 +527,17 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Link/FrameDistributorTests.cs`
 
 - [ ] implement `FrameDistributor` of Solution Overview: one public constructor over a `ChannelReader<ReceivedFrame>`;
-  `LatestSpectrum`, `Frames`, `Start()`, `StopAsync()`, `Dispose()`; the loop
-  catches a subscriber's exception per frame, logs it at Error and reports it with `TryReportFailure`
+  `LatestSpectrum`, `Frames` over the distributor's own copy-on-write subscriber list, `Start()`, `StopAsync()`,
+  `Dispose()`; the loop calls each subscriber's `OnNext` inside its own try/catch, logs a throw at Error and reports it
+  once with `TryReportFailure`
 - [ ] the loop logs at Debug when it starts and when it stops; cancellation ends it without a log at Error
 - [ ] write the `FrameDistributorTests` of Acceptance Evidence item 2 (`Component=UI`, `Area=Link`) over a real bounded
   channel with the link's options
-- [ ] write `AThrowingSubscriberIsReportedAndTheNextFrameStillArrives` with a real `MessagePanelViewModel`: one Error
-  entry naming the exception type, the next frame reaches the second subscriber
+- [ ] write `AThrowingSubscriberDoesNotTakeTheFrameFromTheOthers` with a real `MessagePanelViewModel`: subscriber 1
+  throws on frame 1, subscriber 2 receives that same frame 1, the panel holds one Error entry naming the exception
+  type, and frame 2 reaches both subscribers
+- [ ] write `AnUnsubscribedObserverReceivesNothingMore`: dispose the subscription, write a frame, the observer's count
+  stays
 - [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 4: Displayed-spectrum seam and the live source
@@ -521,9 +571,13 @@ Data flow:
 - [ ] stop it in the close path: `StopLinkAsync` (`:105-117`) becomes a stop of the link, then the distributor, both
   inside the one 5 s limit; rename it `StopBackgroundServicesAsync` and its log line names both
 - [ ] write tests: the distributor and the source resolve as one instance each (`CompositionRootTests`);
-  `OpeningTheWindowStartsTheFrameDistributor` (a frame written to the link's channel after `Opened` reaches a
-  subscriber); `ClosingTheWindowStopsTheDistributorAfterTheLink` (after the close completes, a frame written to the
-  channel stays in it)
+  `OpeningTheWindowStartsTheFrameDistributor` and `ClosingTheWindowStopsTheDistributorAfterTheLink` in the shape of the
+  existing `AppLifecycleTests` (`AppLifecycleTests.cs:50-61`: a `FakePortStream` queued on `FakeSerialPortProvider`,
+  then `link.Connect`). The first raises `Opened`, connects, feeds an encoded frame with `FakePortStream.PushBytes`
+  (`FakePortStream.cs:51`) and asserts that a distributor subscriber receives it. The second closes the window, waits
+  for the close to complete, and asserts that the log sink (`CollectingSink`, `AppLifecycleTests.cs:44`) holds the
+  distributor's Debug stop line after the link's "The link on port {Port} stopped" line (`SerialLink.cs:107`). No
+  test-only writer to the link's channel exists
 - [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 6: Scale and projection rules
@@ -535,10 +589,12 @@ Data flow:
 - [ ] implement `SpectrumProjection.Fill` of Technical Details as a single pass to find the maximum and a second to
   write, no LINQ (it runs per frame); it returns the raw maximum for the stick-to-zero rule
 - [ ] implement `SpectrumScale` as static functions returning an `AxisLimits`-like record of four doubles:
-  `Following(xs, ys, logarithmic)` and `StuckToZero(xs, ys, rawMax, logarithmic)`, the rules of the scale table
+  `Following(xs, ys, logarithmic, lastNonDarkY)` and `StuckToZero(xs, ys, rawMax, logarithmic)`, the rules of the
+  scale table; `Following` takes the kept Y limits of the last non-dark frame (null when none) and returns them for a
+  dark frame
 - [ ] write `SpectrumProjectionTests` and `SpectrumScaleTests` of Acceptance Evidence item 3 as table tests
   (`Component=UI`, `Area=Spectrum`), including the all-zero spectrum in each mode with `double.IsFinite` on every
-  limit
+  limit, `ADarkFrameWhileFollowingKeepsTheLastNonDarkYLimits` and `ADarkFrameWithNoEarlierSpectrumTakesTheFlatRangeLimits`
 - [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 7: Spectrum chart view model
@@ -552,11 +608,16 @@ Data flow:
   line, the axis labels from resx with `Plot.Font.Automatic()`, `Show(DisplayedSpectrum)`, `IsFollowing`,
   `TakeManualScale()`, `ResetScale()`, `StickToZero()`, `SetDisplay(bool inverted, bool logarithmic)`,
   `ApplyPalette(ChartColors)`, `RequestRedraw()` and `RedrawRequested`, `HasSpectrum`
-- [ ] every write to the plot (buffers, plottable visibility, limits, tick generator, minor grid width) happens inside
-  `lock (Plot.Sync)`; `RedrawRequested` follows SemiPlot (raises only while a view subscribes; `Dispose` completes it)
+- [ ] every write to the plot (buffers, plottable visibility, limits, tick generator, minor grid width, colours through
+  `ApplyPalette` and `ChartPalette.Apply`) happens inside `lock (Plot.Sync)`; the chart keeps the last non-dark Y
+  limits per axis type and clears them on a log or inversion toggle; the band and the centre line are hidden when
+  `WavelengthNm - Delta .. WavelengthNm + Delta` does not overlap the shown device's range; `RedrawRequested` follows SemiPlot (raises only while a view subscribes; `Dispose` completes it)
 - [ ] write `SpectrumSamples`: an ATP-2000 and an ATP-8000 `DisplayedSpectrum` with a peak, and a dark one per device
 - [ ] write the `SpectrumChartViewModelTests` of Acceptance Evidence item 3 (`[AvaloniaFact]`, `Area=Spectrum`),
-  including `ShowNeverWritesTheFramesPixels` (a copy of the array equals it after `Show` with inversion and log on)
+  including `ShowNeverWritesTheFramesPixels` (a copy of the array equals it after `Show` with inversion and log on),
+  `ABandOutsideTheDeviceRangeIsHiddenAndTheXLimitsStayTheDeviceRange`,
+  `AFrameFromTheOtherDeviceWhileFrozenKeepsTheFrozenLimits` and `ApplyPaletteRunsUnderThePlotLock` (a second thread
+  that holds `Plot.Sync` delays `ApplyPalette` until it releases)
 - [ ] write `SpectrumChartViewModelRenderTests`: a dark frame per axis type, then `Plot.RenderInMemory(640, 480)`
   throws nothing and `Plot.Axes.GetLimits()` (`ScottPlot.xml:272`) is finite on all four sides; the same for an inverted dark frame on log
 - [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
@@ -588,8 +649,10 @@ Data flow:
 - [ ] a failure in the pipeline logs at Error and goes to `TryReportFailure`; it ends that subscription
 - [ ] write `SpectrumViewModelTests` of Acceptance Evidence item 3 over `FakeDisplayedSpectrumSource`: the three
   queued signals apply once (count `Chart.RedrawRequested` emissions with a subscribed observer), the spectrum at
-  construction shows, the commands follow `HasSpectrum`, the checkboxes reach `Chart.SetDisplay`, a throwing `Current`
-  adds one Error entry
+  construction shows, `TheSameCachedSpectrumIsAppliedOnceByReference` (two signals with one `Current` instance apply
+  once; a new instance with equal values applies again), Stick to zero follows `HasSpectrum`,
+  `ResetScaleShowsTheFrozenState` (disabled while following, enabled after `TakeManualScale()`, disabled after Reset),
+  the checkboxes reach `Chart.SetDisplay`, a throwing `Current` adds one Error entry
 - [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 10: Spectrum chart view
@@ -605,12 +668,17 @@ Data flow:
   `OnLoaded` and `ActualThemeVariantChanged` with its removal in `OnUnloaded`, and `ReportFailureOf`
   (`TrendChartView.axaml.cs:94`, `:102-148`, `:289-335`); `OnDataContextChanged` binds `PlotControl.Reset(chart.Plot)`
   and subscribes `RedrawRequested`
-- [ ] read the default `UserActionResponses` of 5.1.59 and remove every `DoubleClickResponse` and
-  `SingleClickResponse`; record the list found in this task's checkbox; add tunnel handlers for `PointerPressed`,
-  `PointerWheelChanged` and `KeyDown` on `PlotControl` that call `Chart.TakeManualScale()` through
-  `DataContext is SpectrumChartViewModel chart`
+- [ ] read the default `UserActionResponses` of a fresh `AvaPlot` through the assembly (the XML documentation has no
+  default list) and record it in this checkbox; remove `DoubleClickBenchmark`, `SingleClickAutoscale`,
+  `SingleClickContextMenu`, `KeyboardAutoscale` and `KeyboardPanAndZoom`, keeping `LeftClickDragPan`,
+  `RightClickDragZoom`, `MouseDragZoomRectangle` and `MouseWheelZoom`
+- [ ] add tunnel handlers on `PlotControl` that call `Chart.TakeManualScale()` through `DataContext is
+  SpectrumChartViewModel chart`: `PointerWheelChanged` always; `PointerMoved` when a pointer button is held
+  (`e.GetCurrentPoint(PlotControl).Properties` has a pressed button), once per drag. `PointerPressed` and `KeyDown`
+  get no handler, so a bare click keeps the scale following
 - [ ] write the `SpectrumChartViewTests` of Acceptance Evidence item 3 (`[AvaloniaFact]`, `Area=Spectrum`), copying
-  the shape of `TrendChartViewTests.cs:171` and `:278`
+  the shape of `TrendChartViewTests.cs:171` and `:278`; the pointer tests raise headless mouse events on the realised
+  view (`MouseDown`, `MouseMove`, `MouseUp`, `MouseWheel` of the headless window) and read `Chart.IsFollowing`
 - [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 11: Main window content: chart pane and signal pane
@@ -668,8 +736,12 @@ Data flow:
 - [ ] verify every Overview item maps to a named passing test: the line over wavelength, the band, the pane values,
   inversion, the log axis and its floor, reset, stick to zero, the distributor as the one reader, the seam, the
   frame-paced redraw and the cache
-- [ ] verify edge cases: a dark frame on both axis types, inverted and not; a device change in both scale modes;
-  `delta` 0; a heartbeat-only stream (the chart keeps the last spectrum); a throwing subscriber
+- [ ] verify edge cases and their expected outcomes: a dark frame while following keeps the last non-dark Y limits
+  and X follows its device, and with no earlier spectrum takes the flat-range limits, on both axis types, inverted and
+  not; a device change while following moves X to the new device's range; a device change while frozen keeps the
+  frozen limits, and the plot may stay blank until Reset scale; a band outside the device range is not drawn while the
+  pane shows the wavelength; `delta` 0 draws the centre line only; a bare click keeps following; a heartbeat-only
+  stream keeps the last spectrum; a throwing subscriber leaves the frame to the others and is reported once
 - [ ] run the full suite: `dotnet test SpectrumVisualizer.slnx`; confirm the old solution builds and passes 13 of 13
 - [ ] start the app with `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI` and confirm the window shows
   the empty-state line and the log gains its start line; leave the port-pair checklist to the owner
