@@ -78,7 +78,8 @@ ScottPlot has no brush opacity, so the resolved colour's alpha is the brush colo
 `AppAccentFillBrush` reaches the plot at alpha 64, and the band stays translucent over the line.
 
 `SpectrumChartView` and `TrendChartView` each repaint their plot when they load and on every
-`ActualThemeVariantChanged` of the application, and remove that handler when they unload.
+`ActualThemeVariantChanged` of the application, and remove that handler when they unload; both do it through their
+`ChartFrames` (`UI/Chart/`).
 
 ## An off-scale inset in AXAML is a defect
 
