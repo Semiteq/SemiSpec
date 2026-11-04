@@ -17,7 +17,7 @@
         </Style>
     </UserControl.Styles>
 
-    <!-- One form grid: label column, 12 px gap, field column of at least 120 px (the number width). -->
+    <!-- 120 px is the number width. -->
     <Grid ColumnSpacing="12"
           RowSpacing="8"
           RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">

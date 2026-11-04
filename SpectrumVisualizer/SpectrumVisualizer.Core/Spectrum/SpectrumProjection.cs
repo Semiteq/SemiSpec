@@ -6,7 +6,8 @@ public readonly record struct ProjectedSpectrum(double RawMax, bool IsDark);
 public static class SpectrumProjection
 {
 	/// <summary>
-	/// Writes each pixel's displayed value into ys: inverted over the frame's maximum, then log10 floored at 1.
+	/// Writes each pixel's displayed value into ys: inverted over the frame's maximum if display asks, then log10
+	/// floored at 1 on the log axis.
 	/// </summary>
 	public static ProjectedSpectrum Fill(ReadOnlySpan<ushort> pixels, SpectrumDisplay display, Span<double> ys)
 	{

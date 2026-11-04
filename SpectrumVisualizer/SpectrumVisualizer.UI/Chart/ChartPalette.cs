@@ -8,7 +8,6 @@ using Color = ScottPlot.Color;
 
 namespace SpectrumVisualizer.UI.Chart;
 
-/// <summary>Colours of the spectrum plottables: the line, the window band fill and the centre line.</summary>
 public readonly record struct ChartColors(Color Line, Color BandFill, Color CentreLine);
 
 /// <summary>

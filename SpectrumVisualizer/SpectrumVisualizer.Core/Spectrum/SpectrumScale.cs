@@ -34,7 +34,7 @@ public static class SpectrumScale
 		return new SpectrumLimits(x, new AxisRange(min - padding, max + padding));
 	}
 
-	/// <summary>Y from zero to 1.2 times rawMax, the largest displayed value before the log step.</summary>
+	/// <summary>Y from zero to 1.2 times rawMax, the largest displayed value before the log step; 0..1 when rawMax gives no range.</summary>
 	public static SpectrumLimits StuckToZero(ReadOnlySpan<double> xs, double rawMax, SpectrumDisplay display)
 	{
 		var x = DeviceRange(xs);

@@ -22,7 +22,7 @@ public partial class SpectrumChartView : UserControl
 		InitializeComponent();
 		DataContextChanged += OnDataContextChanged;
 
-		// A read-only viewer: ScottPlot's autoscale and keyboard responses would move the limits behind the scale.
+		// Only pan and zoom stay: autoscale and keyboard responses would move the limits behind the scale.
 		PlotControl.UserInputProcessor.UserActionResponses.RemoveAll(response => response
 			is DoubleClickBenchmark
 			or SingleClickAutoscale

@@ -31,7 +31,6 @@
             <local:ConnectionBar DataContext="{Binding ConnectionBar}" />
         </Border>
 
-        <!-- The chart is the one element that stretches; the signal pane keeps its width. -->
         <Grid Grid.Row="2"
               Name="ContentArea"
               ColumnDefinitions="*,Auto">

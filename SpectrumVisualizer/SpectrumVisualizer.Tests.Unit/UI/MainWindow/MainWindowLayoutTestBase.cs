@@ -25,7 +25,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 {
 	protected const string PortName = "COM3";
 
-	/// <summary>The narrowest chart whose ATP-8000 wavelength axis still carries four labelled ticks.</summary>
+	/// <summary>A chart width at which the ATP-8000 wavelength axis still carries four labelled ticks.</summary>
 	protected const int ChartFloorWidth = 400;
 
 	protected const double LargeWidth = 2560;

@@ -130,9 +130,6 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		});
 	}
 
-	/// <summary>
-	/// Y from zero to 1.2 times the reference's largest displayed value, X over the device range, then frozen.
-	/// </summary>
 	public void StickToZero()
 	{
 		if (_shown is not { Measurement: var measurement })
@@ -215,8 +212,7 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 	}
 
 	/// <summary>
-	/// The spectrum the Y limits come from, projected in the current mode: the shown one, or while a dark frame is
-	/// shown the last non-dark one of the same device, so the axis does not jump on every dark frame; caller holds
+	/// The shown device's last non-dark measurement, or the shown one, projected in the current mode; caller holds
 	/// Plot.Sync.
 	/// </summary>
 	private ReferenceSpectrum ProjectReference(SpectrumMeasurement shown)

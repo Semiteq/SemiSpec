@@ -6,8 +6,8 @@ namespace SpectrumVisualizer.UI.MainWindow;
 public partial class MainWindow : Window
 {
 	/// <summary>
-	/// The wider of the Russian status bar and the signal pane plus the chart floor; MainWindowTextFitTests
-	/// measures both.
+	/// Holds the connection row, the status bar and the signal pane plus the chart floor; MainWindowTextFitTests
+	/// measures it.
 	/// </summary>
 	public const double MinimumWidth = 1048;
 

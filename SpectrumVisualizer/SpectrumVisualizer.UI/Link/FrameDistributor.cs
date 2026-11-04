@@ -142,10 +142,7 @@ public sealed class FrameDistributor : IDisposable
 		}
 	}
 
-	/// <summary>
-	/// Not Observable.Create: its wrapper unsubscribes an observer whose OnNext throws, and a throwing
-	/// subscriber here keeps receiving the next frames.
-	/// </summary>
+	/// <summary>Not Observable.Create: its wrapper unsubscribes an observer whose OnNext throws.</summary>
 	private sealed class FrameStream(FrameDistributor distributor) : IObservable<ReceivedFrame>
 	{
 		public IDisposable Subscribe(IObserver<ReceivedFrame> observer)
