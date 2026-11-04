@@ -165,8 +165,9 @@ Automatable (baseline 172 of 172 at `2237e5e`):
      `SerialLinkTests.DisconnectDuringTheReopenWaitOpensNothingMore`: disconnect during the wait, advance the scheduler
      1 s, and the open count does not grow.
    - `SerialLinkTests.LostSpectraAccumulateAcrossReopensAndResetOnConnect`.
-   - `SerialLinkTests.AFullChannelDropsTheOldestFrame`: 65 frames with no reader leave frames 2 to 65 and
-     `DroppedFrames` 1.
+   - `SerialLinkTests.AFullChannelDropsTheOldestFrame`: 65 frames with no reader leave frames 2 to 65 in the channel
+     (➕ review: the `DroppedFrames` counter had no production reader and was removed; only the first drop of a
+     session logs at Debug).
    - `SerialLinkTests.EachFaultIsPublishedOnceAndRetriesStayQuiet`: 5 failed reopens publish one `PortLostError`.
    - `SerialLinkTests.AnUnexpectedExceptionEndsTheSessionWithAFault`.
 3. `dotnet test SpectrumVisualizer.slnx --filter "Area=Messages"` passes, including the severity tests: Info, Warning
@@ -200,20 +201,31 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
    "connected".
 4. Restart it with `--rate 0`. The status stays "Receiving data" on heartbeats alone.
 5. Silence: stop the emulator with Ctrl+C. 10 s later the status reads "Board not responding" and the panel shows one
-   Warning entry. Start it again: the status returns to "Receiving data" and one Info entry says data is restored.
-6. Garbage: run `emu --port COM10 --bad-crc-every 1`. 10 s later the status reads "Other device" with one Warning
-   entry. A wrong baud rate needs a real USB-UART pair (ASSUMPTION: com0com delivers bytes whatever the baud setting,
-   so it cannot produce baud garbage); with that pair, set the sender's terminal to 9600 baud and expect the same.
-7. Lost spectra: run `emu --port COM10 --bad-crc-every 5`. The lost count rises by 1 for each corrupted spectrum.
-8. Dark frames: run `emu --port COM10 --dark-every 3`. The status stays "Receiving data"; the lost count stays 0.
+   Warning entry. Start it again: the status returns to "Receiving data" and one Info entry "Receiving data" appears.
+6. Garbage: run `emu --port COM10 --bad-crc-every 1`. 10 s after the last valid frame the status reads "Other device"
+   with one Warning entry, provided more than 4120 bytes arrived since that frame. A slow emulator restart or a few
+   characters typed into a terminal arrive under that count, so the status reads "Board not responding" first and
+   moves to "Other device" once the count passes 4120, with a Warning entry for each. A wrong baud rate needs a real
+   USB-UART pair (ASSUMPTION: com0com delivers bytes whatever the baud setting, so it cannot produce baud garbage);
+   with that pair, set the sender's terminal to 9600 baud and expect the same.
+7. Lost spectra: run `emu --port COM10 --bad-crc-every 5`, then press Disconnect and Connect, so the count starts at
+   0 with the new emulator. The lost count rises by 1 for each corrupted spectrum. Without the reconnect, a restarted
+   emulator begins again at `seq` 1 over a link that stayed open, and the tracker counts that jump as a gap of
+   (1 - last seq) mod 256 - 1 spectra (OptoskyProj#20).
+8. Dark frames: run `emu --port COM10 --dark-every 3`, then press Disconnect and Connect. The status stays "Receiving
+   data"; the lost count stays 0.
 9. Unplug (a real USB-UART pair; com0com cannot emulate a removal): unplug the app-side adapter. Within 1 s the status
    reads "Port unavailable, retrying" and the panel shows one "connection lost" Warning. Plug it back: the status
-   returns to "Receiving data" and an Info "restored" entry appears above it. Unplug again: a new "connection lost"
-   row appears, because the panel coalesces only against the newest entry. The panel then reads, newest first:
-   connection lost, restored, connection lost.
-10. Port busy: open `COM11` in a serial terminal, then Connect in the app. The panel shows one "port is busy" Error and
-    the status reads "Port unavailable, retrying". Close the terminal: the app connects within 1 s.
-11. Disconnect while retrying: the status reads "Not connected" and the log shows no further open attempts.
+   returns to "Receiving data" and an Info "Receiving data" entry appears above it. Unplug again: a new "connection
+   lost" row appears, because the panel coalesces only against the newest entry. The panel then reads, newest first:
+   connection lost, receiving data, connection lost.
+10. Port busy: with the com0com pair, open `COM11` in a serial terminal, then Connect in the app on `COM11`. The panel
+    shows one "Port is busy" Error and the status reads "Port unavailable, retrying"; the app retries every second
+    without a new entry. Close the terminal: the app connects within 1 s, the status reads "Receiving data" and one
+    Info entry "Receiving data" appears.
+11. Disconnect while retrying: switch on View, Verbose logging first, because open attempts log at Debug. Hold the
+    port as in step 10, Connect, then Disconnect: the status reads "Not connected" and the log shows no open attempt
+    after the Disconnect.
 12. Close the window while connected: the process ends within 1 s and the log holds the link's stop line.
 13. With a Russian Windows UI every new text is Russian; with English, English. The connection row and the status bar
     fit at the window's opening width in both languages.
@@ -257,7 +269,7 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
 - **Health.** `LinkHealth.Evaluate(now, openedAt, lastByteAt, lastFrameAt, bytesSinceFrame)` is a pure function. The
   reference time is the last valid frame, or the port open when no frame has come. Under 10 s since the reference:
   Waiting before the first frame, Receiving after it. From 10 s: OtherDevice when a byte arrived in the last 10 s and
-  more than 4120 bytes (`FrameLayout.FrameSize` of the largest frame) arrived since the reference; NotResponding
+  more than 4120 bytes (`Spectrometer.Atp2000.FrameSize`, the largest frame) arrived since the reference; NotResponding
   otherwise. The byte rule keeps a board that stops mid-frame at NotResponding: its tail is smaller than one frame. The
   10 s clock starts at port open, so a dead port shows "board not responding" 10 s after Connect.
 - **Drain.** A drain is due when 10 s have passed since the later of the reference and the previous drain, and a byte
@@ -364,7 +376,7 @@ New resx keys (en and ru): `ConnectionPortLabel`, `ConnectionPortPlaceholder`, `
 literal in both sets.
 
 Timing and size constants, all in `SerialLink` or `LinkHealth`: health window 10 s (OptoskyProj#20), drain interval
-10 s, OtherDevice byte threshold 4120 (`FrameLayout.FrameSize` of `len` 4114), read timeout 1 s, reopen interval 1 s,
+10 s, OtherDevice byte threshold 4120 (`Spectrometer.Atp2000.FrameSize`, `len` 4114), read timeout 1 s, reopen interval 1 s,
 stop limit 5 s in `App`.
 
 Session flow, all in the one session task:
