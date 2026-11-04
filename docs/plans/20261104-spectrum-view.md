@@ -660,26 +660,30 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.UI/Spectrum/SpectrumChartView.axaml`, `SpectrumChartView.axaml.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Spectrum/SpectrumChartViewTests.cs`
 
-- [ ] load the `dev:desktop-ui` skill before writing the AXAML
-- [ ] lay out the view as `TrendChartView.axaml:54-81` without the cursor overlay: a `Panel` with the `PlotLayer`
+- [x] load the `dev:desktop-ui` skill before writing the AXAML
+- [x] lay out the view as `TrendChartView.axaml:54-81` without the cursor overlay: a `Panel` with the `PlotLayer`
   decorator (`BitmapCache`) holding `PlotControl` alone, and the empty-state `TextBlock` bound to `Chart.HasSpectrum`
   in `AppSecondaryForegroundBrush`
-- [ ] in code-behind copy `RequestFrame`, `ServeFrame`, `ClearPendingFrame`, `ServedFrameCount`, the theme repaint on
+- [x] in code-behind copy `RequestFrame`, `ServeFrame`, `ClearPendingFrame`, `ServedFrameCount`, the theme repaint on
   `OnLoaded` and `ActualThemeVariantChanged` with its removal in `OnUnloaded`, and `ReportFailureOf`
   (`TrendChartView.axaml.cs:94`, `:102-148`, `:289-335`); `OnDataContextChanged` binds `PlotControl.Reset(chart.Plot)`
   and subscribes `RedrawRequested`
-- [ ] read the default `UserActionResponses` of a fresh `AvaPlot` through the assembly (the XML documentation has no
+- [x] read the default `UserActionResponses` of a fresh `AvaPlot` through the assembly (the XML documentation has no
   default list) and record it in this checkbox; remove `DoubleClickBenchmark`, `SingleClickAutoscale`,
   `SingleClickContextMenu`, `KeyboardAutoscale` and `KeyboardPanAndZoom`, keeping `LeftClickDragPan`,
-  `RightClickDragZoom`, `MouseDragZoomRectangle` and `MouseWheelZoom`
-- [ ] add tunnel handlers on `PlotControl` that call `Chart.TakeManualScale()` through `DataContext is
+  `RightClickDragZoom`, `MouseDragZoomRectangle` and `MouseWheelZoom`; read through reflection on a fresh `AvaPlot`
+  5.1.59 (processor enabled), in order: `MouseInteractWithPlottables`, `MouseDragZoomRectangle`, `MouseDragPan`,
+  `MouseDragZoom`, `MouseWheelZoom`, `SingleClickAutoscale`, `SingleClickContextMenu`, `DoubleClickBenchmark`,
+  `KeyboardPanAndZoom`, `KeyboardAutoscale`. `LeftClickDragPan` and `RightClickDragZoom` do not exist: the drag
+  responses kept are `MouseDragPan` and `MouseDragZoom`; `MouseInteractWithPlottables` stays (it moves no axis)
+- [x] add tunnel handlers on `PlotControl` that call `Chart.TakeManualScale()` through `DataContext is
   SpectrumChartViewModel chart`: `PointerWheelChanged` always; `PointerMoved` when a pointer button is held
   (`e.GetCurrentPoint(PlotControl).Properties` has a pressed button), once per drag. `PointerPressed` and `KeyDown`
   get no handler, so a bare click keeps the scale following
-- [ ] write the `SpectrumChartViewTests` of Acceptance Evidence item 3 (`[AvaloniaFact]`, `Area=Spectrum`), copying
+- [x] write the `SpectrumChartViewTests` of Acceptance Evidence item 3 (`[AvaloniaFact]`, `Area=Spectrum`), copying
   the shape of `TrendChartViewTests.cs:171` and `:278`; the pointer tests raise headless mouse events on the realised
   view (`MouseDown`, `MouseMove`, `MouseUp`, `MouseWheel` of the headless window) and read `Chart.IsFollowing`
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 11: Main window content: chart pane and signal pane
 **Files:**
