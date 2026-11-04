@@ -164,8 +164,7 @@ state has one writer, and `Status` is published with `Volatile.Write`.
   (`COM2` before `COM10`), then any other name by ordinal.
 - `Open` checks the name against `PortNames()` first, so an unlisted name returns `PortNotFoundError` without
   touching the driver. It opens at 115200 baud, 8N1, with `ReadTimeout` 1000 ms and `ThrowOnReadError` on. The
-  `SerialPortStream` constructor already opens the port briefly to read its settings, so the listing, the constructor
-  and `Open()` all sit inside one `try`.
+  listing and the `SerialPortStream` constructor can throw as well as `Open()`, so all three sit inside one `try`.
 - `Open` never throws: every exception except `OperationCanceledException` becomes a link error, so the session keeps
   retrying. `UnauthorizedAccessException` and an `IOException` with `HResult` 32 (sharing violation) map to
   `PortBusyError`; any other exception maps to `PortNotFoundError` and rides along as its cause (an

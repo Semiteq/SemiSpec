@@ -22,7 +22,7 @@ public sealed class RjcpSerialPortProvider : ISerialPortProvider
 		return SortPortNames(enumerator.GetPortNames());
 	}
 
-	/// <summary>Every failure, the constructor's brief probe open included, is a retryable link error.</summary>
+	/// <summary>Every failure, of the listing and the constructor included, is a retryable link error.</summary>
 	public Result<Stream> Open(string portName)
 	{
 		SerialPortStream? port = null;

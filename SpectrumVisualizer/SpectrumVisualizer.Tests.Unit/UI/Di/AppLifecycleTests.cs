@@ -1,3 +1,5 @@
+using System.Reactive.Disposables;
+
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
@@ -49,6 +51,9 @@ public sealed class AppLifecycleTests : IDisposable
 	{
 		await using var port = new FakePortStream();
 		port.HoldDispose();
+
+		// Disposed before the port, so a failing assertion cannot leave the port's dispose waiting forever.
+		using var release = Disposable.Create(port.ReleaseDispose);
 		_portProvider.QueueOpen(port);
 		using var provider = BuildContainer();
 		var link = provider.GetRequiredService<SerialLink>();

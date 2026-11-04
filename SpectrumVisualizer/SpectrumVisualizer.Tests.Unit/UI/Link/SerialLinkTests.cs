@@ -58,6 +58,7 @@ public sealed class SerialLinkTests : IAsyncLifetime
 
 	public async ValueTask DisposeAsync()
 	{
+		_port.ReleaseDispose();
 		await _link.DisconnectAsync().WaitAsync(_waitLimit);
 		_link.Dispose();
 		await _port.DisposeAsync();
