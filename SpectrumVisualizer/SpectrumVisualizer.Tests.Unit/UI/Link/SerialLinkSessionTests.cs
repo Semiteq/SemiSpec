@@ -21,7 +21,7 @@ public sealed class SerialLinkSessionTests : SerialLinkTestBase
 	[Fact(Timeout = TestTimeoutMs)]
 	public async Task AFullChannelDropsTheOldestFrame()
 	{
-		var frames = Enumerable.Range(1, 65).Select(seq => Spectrum(Spectrometer.Atp8000, (byte)seq)).ToList();
+		var frames = Enumerable.Range(1, 65).Select(seq => SpectrumFrame(Spectrometer.Atp8000, (byte)seq)).ToList();
 		await ConnectAsync();
 
 		await AtAsync(0, port => port.PushBytes(Concat(frames.Select(FrameEncoder.Encode))));
@@ -78,12 +78,12 @@ public sealed class SerialLinkSessionTests : SerialLinkTestBase
 		await using var reopened = new FakePortStream();
 		await using var reconnected = new FakePortStream();
 		await ConnectAsync();
-		await AtAsync(0, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 1))));
-		await AtAsync(1, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 3))));
+		await AtAsync(0, port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 1))));
+		await AtAsync(1, port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 3))));
 		await LoseAsync(Port, 2);
 		await ReopenAsync(reopened, 3);
-		await AtAsync(reopened, 4, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 10))));
-		await AtAsync(reopened, 5, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 12))));
+		await AtAsync(reopened, 4, port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 10))));
+		await AtAsync(reopened, 5, port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 12))));
 		Link.Status.LostSpectra.Should().Be(2);
 
 		await Link.DisconnectAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
@@ -91,7 +91,7 @@ public sealed class SerialLinkSessionTests : SerialLinkTestBase
 		await AtAsync(
 			reconnected,
 			6,
-			port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 30))));
+			port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 30))));
 
 		Link.Status.State.Should().Be(LinkState.Receiving);
 		Statuses().Should().OnlyContain(status => status.LostSpectra == 0);

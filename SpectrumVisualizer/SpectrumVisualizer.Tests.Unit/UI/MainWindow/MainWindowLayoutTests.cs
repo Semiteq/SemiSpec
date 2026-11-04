@@ -83,8 +83,8 @@ public sealed class MainWindowLayoutTests : MainWindowLayoutTestBase
 		await Record();
 		await AtAsync(12, Port.PushTimeout);
 		await Record();
-		await AtAsync(13, () => Port.PushBytes(Corrupted(Spectrum(Spectrometer.Atp2000, 2))));
-		await AtAsync(18, () => Port.PushBytes(Corrupted(Spectrum(Spectrometer.Atp2000, 3))));
+		await AtAsync(13, () => Port.PushBytes(Corrupted(SpectrumFrame(Spectrometer.Atp2000, 2))));
+		await AtAsync(18, () => Port.PushBytes(Corrupted(SpectrumFrame(Spectrometer.Atp2000, 3))));
 		await AtAsync(23, Port.PushTimeout);
 		await Record();
 		await SerialLink.DisconnectAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);

@@ -61,8 +61,8 @@ public sealed class FrameDistributorTests : IAsyncLifetime
 	{
 		var first = Collect();
 		var second = Collect();
-		ReceivedFrame[] frames = [Received(Spectrum(Spectrometer.Atp2000, 1)), Received(Heartbeat(2)),
-			Received(Spectrum(Spectrometer.Atp8000, 3))];
+		ReceivedFrame[] frames = [Received(SpectrumFrame(Spectrometer.Atp2000, 1)), Received(Heartbeat(2)),
+			Received(SpectrumFrame(Spectrometer.Atp8000, 3))];
 		_distributor.Start();
 
 		Write(frames);
@@ -76,8 +76,8 @@ public sealed class FrameDistributorTests : IAsyncLifetime
 	public async Task ALateSubscriberSeesOnlyLaterFrames()
 	{
 		var early = Collect();
-		var before = Received(Spectrum(Spectrometer.Atp2000, 1));
-		var after = Received(Spectrum(Spectrometer.Atp2000, 2));
+		var before = Received(SpectrumFrame(Spectrometer.Atp2000, 1));
+		var after = Received(SpectrumFrame(Spectrometer.Atp2000, 2));
 		_distributor.Start();
 		Write(before);
 		await Waits.UntilAsync(() => early.Count == 1);
@@ -93,7 +93,7 @@ public sealed class FrameDistributorTests : IAsyncLifetime
 	public async Task TheLatestSpectrumSkipsHeartbeats()
 	{
 		var seen = Collect();
-		var spectrum = Received(Spectrum(Spectrometer.Atp8000, 1));
+		var spectrum = Received(SpectrumFrame(Spectrometer.Atp8000, 1));
 		_distributor.LatestSpectrum.Should().BeNull();
 		_distributor.Start();
 
@@ -106,8 +106,8 @@ public sealed class FrameDistributorTests : IAsyncLifetime
 	[Fact(Timeout = TestTimeoutMs)]
 	public async Task AThrowingSubscriberDoesNotTakeTheFrameFromTheOthers()
 	{
-		var frame1 = Received(Spectrum(Spectrometer.Atp2000, 1));
-		var frame2 = Received(Spectrum(Spectrometer.Atp2000, 2));
+		var frame1 = Received(SpectrumFrame(Spectrometer.Atp2000, 1));
+		var frame2 = Received(SpectrumFrame(Spectrometer.Atp2000, 2));
 		var first = new ConcurrentQueue<ReceivedFrame>();
 		using var throwing = _distributor.Frames.Subscribe(received =>
 		{
@@ -138,11 +138,11 @@ public sealed class FrameDistributorTests : IAsyncLifetime
 		var subscription = _distributor.Frames.Subscribe(dropped.Enqueue);
 		var kept = Collect();
 		_distributor.Start();
-		Write(Received(Spectrum(Spectrometer.Atp2000, 1)));
+		Write(Received(SpectrumFrame(Spectrometer.Atp2000, 1)));
 		await Waits.UntilAsync(() => dropped.Count == 1 && kept.Count == 1);
 
 		subscription.Dispose();
-		Write(Received(Spectrum(Spectrometer.Atp2000, 2)));
+		Write(Received(SpectrumFrame(Spectrometer.Atp2000, 2)));
 
 		await Waits.UntilAsync(() => kept.Count == 2);
 		dropped.Should().HaveCount(1);
@@ -153,12 +153,12 @@ public sealed class FrameDistributorTests : IAsyncLifetime
 	{
 		var seen = Collect();
 		_distributor.Start();
-		Write(Received(Spectrum(Spectrometer.Atp2000, 1)));
+		Write(Received(SpectrumFrame(Spectrometer.Atp2000, 1)));
 		await Waits.UntilAsync(() => seen.Count == 1);
 
 		await _distributor.StopAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
 		_distributor.Start();
-		Write(Received(Spectrum(Spectrometer.Atp2000, 2)));
+		Write(Received(SpectrumFrame(Spectrometer.Atp2000, 2)));
 
 		_channel.Reader.Count.Should().Be(1);
 		seen.Should().HaveCount(1);
@@ -174,7 +174,7 @@ public sealed class FrameDistributorTests : IAsyncLifetime
 
 		stop.IsCompletedSuccessfully.Should().BeTrue();
 		_distributor.Start();
-		Write(Received(Spectrum(Spectrometer.Atp2000, 1)));
+		Write(Received(SpectrumFrame(Spectrometer.Atp2000, 1)));
 		_channel.Reader.Count.Should().Be(1);
 	}
 

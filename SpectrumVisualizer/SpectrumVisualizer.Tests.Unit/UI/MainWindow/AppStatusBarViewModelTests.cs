@@ -102,8 +102,8 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 	public async Task BytesWithoutAValidFrameShowOtherDevice()
 	{
 		await ConnectAsync();
-		await AtAsync(1, port => port.PushBytes(Corrupted(Spectrum(Spectrometer.Atp2000, 1))));
-		await AtAsync(4, port => port.PushBytes(Corrupted(Spectrum(Spectrometer.Atp2000, 2))));
+		await AtAsync(1, port => port.PushBytes(Corrupted(SpectrumFrame(Spectrometer.Atp2000, 1))));
+		await AtAsync(4, port => port.PushBytes(Corrupted(SpectrumFrame(Spectrometer.Atp2000, 2))));
 		await AtAsync(10, port => port.PushTimeout());
 
 		_viewModel.LinkText.Should().Be(Resources.StatusOtherDevice);
@@ -127,8 +127,8 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 		_viewModel.LostSpectraText.Should().Be(Resources.FormatStatusLostSpectraFormat(Resources.StatusNoValue));
 
 		await ConnectAsync();
-		await AtAsync(1, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 1))));
-		await AtAsync(2, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 4))));
+		await AtAsync(1, port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 1))));
+		await AtAsync(2, port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 4))));
 
 		_viewModel.PortText.Should().Be(PortName);
 		_viewModel.LostSpectraText.Should().Be(Resources.FormatStatusLostSpectraFormat(2));

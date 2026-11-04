@@ -47,6 +47,8 @@ the board emulator, writes protocol frames to a serial port for manual runs.
 | `LinkState`, `LinkStatus` | UI | What the link publishes: the state, the port, the latest `state` bits, the lost total and the fault on entry |
 | `LinkError` and its five errors | UI | `PortBusyError`, `PortNotFoundError`, `PortLostError`, `BoardNotRespondingError`, `UnrecognisedDataError`, each with the port in its message |
 | `PortListError` | UI | Windows did not return the port list; no port name, the listing failure as its cause |
+| `DisplayedSpectrum`, `IDisplayedSpectrumSource` | UI | The spectrum the chart shows and its receive time; the source's `Current` and the `Changed` signal. The interface exists for two implementations: the live source now, and a historical source that shows a stored moment's spectrum in the intensity-trend slice |
+| `LiveSpectrumSource` | UI | The live `IDisplayedSpectrumSource`: `Current` is the distributor's latest spectrum frame, one instance per frame; `Changed` signals each spectrum frame and skips heartbeats |
 | `AppLogging` | UI | Creates the log folder and the Serilog logger: `spectrum-visualizer.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
 | `AddUi(LoggingSetup)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, the message panel, the connection row, the status bar and the main window view model, all singletons |

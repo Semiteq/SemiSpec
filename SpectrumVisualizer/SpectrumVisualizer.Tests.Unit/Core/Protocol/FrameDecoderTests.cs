@@ -33,7 +33,7 @@ public sealed class FrameDecoderTests
 	[InlineData(Spectrometer.Atp8000)]
 	public void ASpectrumFrameRoundTripsThroughEncoderAndDecoder(Spectrometer device)
 	{
-		var original = Spectrum(device, 7);
+		var original = SpectrumFrame(device, 7);
 		var buffer = new ReadOnlySequence<byte>(FrameEncoder.Encode(original));
 
 		var found = FrameDecoder.TryReadFrame(ref buffer, out var frame, out var discarded);
@@ -49,7 +49,7 @@ public sealed class FrameDecoderTests
 	[InlineData(Spectrometer.Atp8000)]
 	public void AFrameSplitAtEveryByteBoundaryWaitsForTheRestThenDecodes(Spectrometer device)
 	{
-		var bytes = FrameEncoder.Encode(Spectrum(device, 7));
+		var bytes = FrameEncoder.Encode(SpectrumFrame(device, 7));
 		var failedSplits = new List<int>();
 
 		for (var split = 1; split < bytes.Length; split++)
@@ -77,7 +77,7 @@ public sealed class FrameDecoderTests
 	[Fact]
 	public void AFalseSyncInsidePixelsIsPartOfAWholeFrame()
 	{
-		var first = FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 1, PixelsWithFalseSync(0x0002)));
+		var first = FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 1, PixelsWithFalseSync(0x0002)));
 		var second = FrameEncoder.Encode(Heartbeat(1));
 		var buffer = new ReadOnlySequence<byte>(Concat(first, second));
 
@@ -94,8 +94,8 @@ public sealed class FrameDecoderTests
 	[InlineData((ushort)0x1012)]
 	public void AFalseSyncInsideACutFrameNeverHidesTheNextFrame(ushort falseLength)
 	{
-		var cut = FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 1, PixelsWithFalseSync(falseLength)))[1..];
-		var next = Spectrum(Spectrometer.Atp2000, 2);
+		var cut = FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 1, PixelsWithFalseSync(falseLength)))[1..];
+		var next = SpectrumFrame(Spectrometer.Atp2000, 2);
 		var buffer = new ReadOnlySequence<byte>(Concat(cut, FrameEncoder.Encode(next)));
 
 		var found = FrameDecoder.TryReadFrame(ref buffer, out var frame, out var discarded);
@@ -132,7 +132,7 @@ public sealed class FrameDecoderTests
 	[InlineData(Spectrometer.Atp8000)]
 	public void ACorruptedPixelByteDropsTheWholeSpectrumFrameAndTheNextFrameDecodes(Spectrometer device)
 	{
-		var corrupted = FrameEncoder.Encode(Spectrum(device, 3));
+		var corrupted = FrameEncoder.Encode(SpectrumFrame(device, 3));
 		corrupted[100] ^= 0x01;
 
 		AssertDropsThenFindsHeartbeat(corrupted);
@@ -141,7 +141,7 @@ public sealed class FrameDecoderTests
 	[Fact]
 	public void ADeviceThatDisagreesWithTheLengthDropsOneByteAndResynchronises()
 	{
-		var mismatched = FrameEncoder.Encode(Spectrum(Spectrometer.Atp2000, 3));
+		var mismatched = FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp2000, 3));
 		mismatched[6] = (byte)Spectrometer.Atp8000;
 		RecomputeCrc(mismatched);
 

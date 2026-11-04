@@ -24,8 +24,8 @@ public sealed class FrameReaderTests
 		BoardFrame[] frames =
 		[
 			Heartbeat(0),
-			Spectrum(Spectrometer.Atp2000, 1),
-			Spectrum(Spectrometer.Atp8000, 2),
+			SpectrumFrame(Spectrometer.Atp2000, 1),
+			SpectrumFrame(Spectrometer.Atp8000, 2),
 			Heartbeat(2),
 		];
 		var stream = Concat(frames.Select(FrameEncoder.Encode));
@@ -171,8 +171,8 @@ public sealed class FrameReaderTests
 		BoardFrame[] frames =
 		[
 			Heartbeat(0),
-			Spectrum(Spectrometer.Atp2000, 1),
-			Spectrum(Spectrometer.Atp8000, 2),
+			SpectrumFrame(Spectrometer.Atp2000, 1),
+			SpectrumFrame(Spectrometer.Atp8000, 2),
 			Heartbeat(2),
 		];
 		var stream = Concat(frames.Select(FrameEncoder.Encode));

@@ -547,16 +547,16 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Spectrum/LiveSpectrumSourceTests.cs`,
   `FakeDisplayedSpectrumSource.cs`
 
-- [ ] declare `DisplayedSpectrum(SpectrumMeasurement Measurement, DateTimeOffset ReceivedAt)` and
+- [x] declare `DisplayedSpectrum(SpectrumMeasurement Measurement, DateTimeOffset ReceivedAt)` and
   `IDisplayedSpectrumSource` (`Current`, `Changed`) of Solution Overview; the reason for the interface lives in
   `overview.md`, not in a comment naming a class that does not exist yet
-- [ ] implement `LiveSpectrumSource(FrameDistributor)`: `Current` from `LatestSpectrum`, cached per frame instance;
+- [x] implement `LiveSpectrumSource(FrameDistributor)`: `Current` from `LatestSpectrum`, cached per frame instance;
   `Changed` from `Frames` filtered to spectrum frames
-- [ ] write `FakeDisplayedSpectrumSource` (settable `Current`, `Changed` from a private subject with a `Signal()`
+- [x] write `FakeDisplayedSpectrumSource` (settable `Current`, `Changed` from a private subject with a `Signal()`
   method) for the view model tests
-- [ ] write `LiveSpectrumSourceTests` (`Component=UI`, `Area=Spectrum`) of Acceptance Evidence item 3 over a
+- [x] write `LiveSpectrumSourceTests` (`Component=UI`, `Area=Spectrum`) of Acceptance Evidence item 3 over a
   distributor on a test channel; add `TwoReadsOfOneFrameReturnTheSameInstance`
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 5: Distributor and source in the composition root and the window lifecycle
 **Files:**

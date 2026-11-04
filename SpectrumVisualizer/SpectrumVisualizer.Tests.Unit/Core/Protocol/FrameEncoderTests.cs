@@ -30,7 +30,7 @@ public sealed class FrameEncoderTests
 	[InlineData(Spectrometer.Atp8000, 1048, 1042)]
 	public void ASpectrumFrameHasItsFieldsAtTheProtocolOffsets(Spectrometer device, int frameSize, int length)
 	{
-		var frame = Spectrum(device, 200) with
+		var frame = SpectrumFrame(device, 200) with
 		{
 			State = BoardState.Atp8000Connected | BoardState.Atp2000MeasurementFailed,
 		};
