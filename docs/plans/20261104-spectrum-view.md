@@ -526,19 +526,19 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.UI/Link/FrameDistributor.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Link/FrameDistributorTests.cs`
 
-- [ ] implement `FrameDistributor` of Solution Overview: one public constructor over a `ChannelReader<ReceivedFrame>`;
+- [x] implement `FrameDistributor` of Solution Overview: one public constructor over a `ChannelReader<ReceivedFrame>`;
   `LatestSpectrum`, `Frames` over the distributor's own copy-on-write subscriber list, `Start()`, `StopAsync()`,
   `Dispose()`; the loop calls each subscriber's `OnNext` inside its own try/catch, logs a throw at Error and reports it
   once with `TryReportFailure`
-- [ ] the loop logs at Debug when it starts and when it stops; cancellation ends it without a log at Error
-- [ ] write the `FrameDistributorTests` of Acceptance Evidence item 2 (`Component=UI`, `Area=Link`) over a real bounded
+- [x] the loop logs at Debug when it starts and when it stops; cancellation ends it without a log at Error
+- [x] write the `FrameDistributorTests` of Acceptance Evidence item 2 (`Component=UI`, `Area=Link`) over a real bounded
   channel with the link's options
-- [ ] write `AThrowingSubscriberDoesNotTakeTheFrameFromTheOthers` with a real `MessagePanelViewModel`: subscriber 1
+- [x] write `AThrowingSubscriberDoesNotTakeTheFrameFromTheOthers` with a real `MessagePanelViewModel`: subscriber 1
   throws on frame 1, subscriber 2 receives that same frame 1, the panel holds one Error entry naming the exception
   type, and frame 2 reaches both subscribers
-- [ ] write `AnUnsubscribedObserverReceivesNothingMore`: dispose the subscription, write a frame, the observer's count
+- [x] write `AnUnsubscribedObserverReceivesNothingMore`: dispose the subscription, write a frame, the observer's count
   stays
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 4: Displayed-spectrum seam and the live source
 **Files:**
