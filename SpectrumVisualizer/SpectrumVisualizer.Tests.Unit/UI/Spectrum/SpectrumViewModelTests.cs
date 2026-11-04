@@ -317,7 +317,7 @@ public sealed class SpectrumViewModelTests : IDisposable
 			}
 		}
 
-		public IObservable<RxUnit> Changed => _changed.AsObservable();
+		public IObservable<RxUnit> CurrentChanged => _changed.AsObservable();
 
 		public void Signal()
 		{

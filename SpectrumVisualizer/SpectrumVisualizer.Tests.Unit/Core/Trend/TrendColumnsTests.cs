@@ -17,69 +17,14 @@ public sealed class TrendColumnsTests
 	private static readonly TimeSpan _width = TimeSpan.FromSeconds(2);
 
 	[Fact]
-	public void AColumnWithValuesBecomesAnEnvelopeColumnAtItsCentre()
-	{
-		var columns = Map(Column(_start, min: 3, max: 7, count: 2, last: 5));
-
-		columns.Should().Equal(new EnvelopeColumn(Axis(_start + TimeSpan.FromSeconds(1)), 3, 7, 5));
-	}
-
-	[Fact]
-	public void AnEmptyColumnWithoutABreakIsLeftOut()
-	{
-		var columns = Map(
-			Column(_start, min: 1, max: 1, count: 1, last: 1),
-			Empty(_start + _width),
-			Column(_start + (2 * _width), min: 2, max: 2, count: 1, last: 2));
-
-		columns.Select(column => column.Min).Should().Equal(1, 2);
-	}
-
-	[Fact]
-	public void AnUncoveredEmptyColumnBecomesAGap()
-	{
-		var columns = Map(Empty(_start) with { UncoveredCount = 1 });
-
-		columns.Should().ContainSingle();
-		columns[0].X.Should().Be(Axis(_start));
-		double.IsNaN(columns[0].Min).Should().BeTrue();
-		double.IsNaN(columns[0].Max).Should().BeTrue();
-	}
-
-	[Fact]
-	public void AnEmptyColumnWithABreakBecomesAGap()
-	{
-		var columns = Map(Empty(_start) with { BreakCount = 1 });
-
-		columns.Should().ContainSingle();
-		double.IsNaN(columns[0].Min).Should().BeTrue();
-	}
-
-	[Fact]
-	public void ABreakInAColumnWithValuesPutsAGapBeforeIt()
-	{
-		var columns = Map(Column(_start, min: 3, max: 7, count: 2, last: 5) with { BreakCount = 1, LostCount = 2 });
-
-		columns.Should().HaveCount(2);
-		columns[0].X.Should().Be(Axis(_start));
-		double.IsNaN(columns[0].Min).Should().BeTrue();
-		columns[1].Should().Be(new EnvelopeColumn(Axis(_start + TimeSpan.FromSeconds(1)), 3, 7, 5));
-	}
-
-	[Fact]
-	public void AFailureAloneAddsNoColumn()
-	{
-		var columns = Map(Empty(_start) with { Failed = BoardState.Atp8000MeasurementFailed });
-
-		columns.Should().BeEmpty();
-	}
-
-	[Fact]
 	public void FailedColumnsLessThanFiveSecondsApartJoinIntoOneRange()
 	{
 		var failed = BoardState.Atp8000MeasurementFailed;
 		var columns = Enumerable.Range(0, 10)
-			.Select(index => Empty(_start + (index * _width)) with { Failed = index is 0 or 2 or 6 ? failed : BoardState.None })
+			.Select(index => Empty(_start + (index * _width)) with
+			{
+				Failed = index is 0 or 2 or 6 ? failed : BoardState.None,
+			})
 			.ToArray();
 
 		var ranges = TrendColumns.FailureRanges(new IntensitySeries(_start, _start + (10 * _width), _width, columns));
@@ -101,22 +46,6 @@ public sealed class TrendColumnsTests
 
 		width.Should().Be(TimeSpan.FromMilliseconds(expectedMilliseconds));
 		(width.Ticks % TimeSpan.TicksPerMillisecond).Should().Be(0);
-	}
-
-	private static IReadOnlyList<EnvelopeColumn> Map(params IntensityColumn[] columns)
-	{
-		var series = new IntensitySeries(_start, _start + (columns.Length * _width), _width, columns);
-		return TrendColumns.Map(series, Axis);
-	}
-
-	private static double Axis(DateTimeOffset moment)
-	{
-		return moment.ToUnixTimeMilliseconds();
-	}
-
-	private static IntensityColumn Column(DateTimeOffset start, double min, double max, int count, double last)
-	{
-		return new IntensityColumn(start, min, max, count, 0, last, 0, 0, 0, BoardState.None);
 	}
 
 	private static IntensityColumn Empty(DateTimeOffset start)

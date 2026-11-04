@@ -96,17 +96,6 @@ public sealed class CompositionRootTests : IAsyncDisposable
 			.Should().BeSameAs(provider.GetRequiredService<LiveSpectrumSource>());
 		provider.GetRequiredService<SwitchingSpectrumSource>()
 			.Should().BeSameAs(provider.GetRequiredService<SwitchingSpectrumSource>());
-		provider.GetRequiredService<IDisplayedSpectrumSource>()
-			.Should().BeSameAs(provider.GetRequiredService<IDisplayedSpectrumSource>());
-	}
-
-	[AvaloniaFact]
-	public void IDisplayedSpectrumSourceResolvesToTheSwitchingSource()
-	{
-		using var provider = BuildContainer();
-
-		provider.GetRequiredService<IDisplayedSpectrumSource>()
-			.Should().BeSameAs(provider.GetRequiredService<SwitchingSpectrumSource>());
 	}
 
 	[AvaloniaFact]

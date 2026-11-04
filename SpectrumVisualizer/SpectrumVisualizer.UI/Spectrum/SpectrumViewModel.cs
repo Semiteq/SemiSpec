@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Reactive;
 using System.Reactive.Concurrency;
 using System.Reactive.Disposables;
@@ -19,8 +18,6 @@ namespace SpectrumVisualizer.UI.Spectrum;
 /// <summary>The spectrum screen: shows the source's latest spectrum on the chart and in the signal pane.</summary>
 public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 {
-	private const string MomentFormat = "HH:mm:ss";
-
 	private readonly CompositeDisposable _disposables = [];
 	private readonly MessagePanelViewModel _messagePanel;
 	private readonly IScheduler _uiScheduler;
@@ -39,7 +36,7 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 		Chart = new SpectrumChartViewModel();
 		SignalInfo = new SignalInfoViewModel(timeProvider);
 
-		_disposables.Add(source.Changed
+		_disposables.Add(source.CurrentChanged
 			.ObserveOn(uiScheduler)
 			.StartWith(Unit.Default)
 			.Select(_ => ReadCurrent(source))
@@ -103,8 +100,7 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 	private static string HistoricalTextOf(DateTimeOffset? moment)
 	{
 		return moment is { } shown
-			? Resources.FormatSpectrumHistoricalFormat(
-				shown.ToLocalTime().ToString(MomentFormat, CultureInfo.InvariantCulture))
+			? Resources.FormatSpectrumHistoricalFormat(ClockText.TimeOfDay(shown))
 			: string.Empty;
 	}
 

@@ -11,13 +11,10 @@ using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
 using ScottPlot;
-using ScottPlot.Plottables;
-using ScottPlot.TickGenerators;
 
 using SpectrumVisualizer.Core.Store;
 using SpectrumVisualizer.Core.Trend;
 using SpectrumVisualizer.UI.Chart;
-using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Messages;
 using SpectrumVisualizer.UI.Spectrum;
 
@@ -37,9 +34,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	private readonly TimeProvider _timeProvider;
 	private readonly IScheduler _uiScheduler;
 	private readonly ILogger<TrendChartViewModel> _logger;
-	private readonly EnvelopeLine _envelope = new();
-	private readonly TrendMarkerStrip _strip = new();
-	private readonly VerticalLine _momentLine;
+	private readonly TrendPlotLayers _layers;
 	private readonly Subject<Unit> _redrawRequests = new();
 	private readonly CompositeDisposable _disposables = [];
 	private readonly TrendNavigationModel _navigation;
@@ -61,18 +56,9 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		_uiScheduler = uiScheduler;
 		_logger = logger;
 		var now = timeProvider.GetUtcNow();
-		_navigation = new TrendNavigationModel(now - TrendPresets.Default.Width, now, now, isSticky: true);
+		_navigation = new TrendNavigationModel(now - TrendPresets.Default.Width, now, now);
 		Width = _navigation.Width;
-
-		Plot.Add.Plottable(_envelope);
-		Plot.Add.Plottable(_strip);
-		_momentLine = Plot.Add.VerticalLine(0.0);
-		_momentLine.IsVisible = false;
-		Plot.Axes.Bottom.TickGenerator = new DateTimeAutomatic();
-		Plot.Axes.Bottom.Label.Text = Resources.TrendAxisTime;
-		Plot.Axes.Left.Label.Text = Resources.TrendAxisIntensity;
-		Plot.Axes.SetLimitsY(0.0, 1.0);
-		Plot.Font.Automatic();
+		_layers = new TrendPlotLayers(Plot);
 
 		_disposables.Add(cache.Changed
 			.Sample(_changeSample, uiScheduler)
@@ -188,13 +174,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 
 	public void ApplyPalette(ChartColors colors)
 	{
-		lock (Plot.Sync)
-		{
-			_envelope.Recolor(colors.Envelope);
-			_strip.Recolor(colors.FailureStrip);
-			_momentLine.Color = colors.MomentLine;
-		}
-
+		_layers.Recolor(colors);
 		RequestRedraw();
 	}
 
@@ -224,21 +204,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		try
 		{
 			_lastFold = _cache.FoldCurrent(FollowExtent);
-			var columns = _lastFold is { } fold ? TrendColumns.Map(fold.Series, LocalTimeAxis.ToAxis) : [];
-			lock (Plot.Sync)
-			{
-				_envelope.ReplaceColumns(columns);
-				_strip.ReplaceSpans(_lastFold is { } marked ? [.. TrendColumns.FailureRanges(marked.Series).Select(ToStripSpan)] : []);
-				Plot.Axes.SetLimitsX(LocalTimeAxis.ToAxis(_navigation.From), LocalTimeAxis.ToAxis(_navigation.To));
-				if (TrendColumns.VerticalRange(columns) is { } range)
-				{
-					Plot.Axes.SetLimitsY(range.Bottom, range.Top);
-				}
-
-				Plot.Axes.Left.Label.Text = _lastFold?.Extent.Key is { } key
-					? Resources.FormatTrendAxisIntensityFormat(key.WavelengthNm, key.Delta)
-					: Resources.TrendAxisIntensity;
-			}
+			_layers.Draw(_lastFold, _navigation.From, _navigation.To);
 
 			HasPoints = _lastFold is not null;
 			Width = _navigation.Width;
@@ -280,22 +246,9 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		return _navigation.To - drawnTo;
 	}
 
-	private static StripSpan ToStripSpan(TimeRange range)
-	{
-		return new StripSpan(LocalTimeAxis.ToAxis(range.From), LocalTimeAxis.ToAxis(range.To));
-	}
-
 	private void MarkMoment(DateTimeOffset? moment)
 	{
-		lock (Plot.Sync)
-		{
-			_momentLine.IsVisible = moment is not null;
-			if (moment is { } shown)
-			{
-				_momentLine.X = LocalTimeAxis.ToAxis(shown);
-			}
-		}
-
+		_layers.MarkMoment(moment);
 		RequestRedraw();
 	}
 

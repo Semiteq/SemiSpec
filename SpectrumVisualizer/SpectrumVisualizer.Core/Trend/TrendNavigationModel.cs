@@ -1,8 +1,10 @@
 namespace SpectrumVisualizer.Core.Trend;
 
-/// <summary>The trend's visible window in UTC; the live edge and the first point arrive as inputs, never a clock.</summary>
-public sealed class TrendNavigationModel(
-	DateTimeOffset from, DateTimeOffset to, DateTimeOffset firstSample, bool isSticky)
+/// <summary>
+/// The trend's visible window in UTC, sticky to the live edge at the start; the live edge and the first point arrive as
+/// inputs, never a clock.
+/// </summary>
+public sealed class TrendNavigationModel(DateTimeOffset from, DateTimeOffset to, DateTimeOffset firstSample)
 {
 	public static readonly TimeSpan MinimumWidth = TimeSpan.FromSeconds(10);
 	public static readonly TimeSpan MaximumWidth = TimeSpan.FromDays(1);
@@ -17,7 +19,7 @@ public sealed class TrendNavigationModel(
 
 	public TimeSpan Width => To - From;
 
-	public bool IsSticky { get; private set; } = isSticky;
+	public bool IsSticky { get; private set; } = true;
 
 	/// <summary>The pan floor: a pan or a zoom never moves From before it; a later move applies the new floor.</summary>
 	public DateTimeOffset FirstSample { get; set; } = firstSample;

@@ -87,8 +87,8 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 			column.UncoveredCount.Should().Be(0);
 			column.BreakCount.Should().Be(0);
 		});
-		TrendColumns.Map(series, time => time.ToUnixTimeMilliseconds()).Should().HaveCount(20)
-			.And.OnlyContain(column => !double.IsNaN(column.Min), "no gap column breaks the line");
+		series.Columns.Should().HaveCount(20)
+			.And.OnlyContain(column => !TrendColumns.OpensGap(column), "no gap column breaks the line");
 		_requests.Should().BeEmpty("the key stays the same across the device switch");
 	}
 

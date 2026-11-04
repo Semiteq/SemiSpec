@@ -61,11 +61,11 @@ the trend's folds and re-reads.
 | `IntensityQuery`, `IntensityBuckets`, `IntensitySeries` | Core | The validated series request with its epoch-aligned column grid, the fold of window means, breaks and failure marks into columns on that grid (min, max, last value, counts, the OR of the failure bits), and its result (`Core/Store/`) |
 | `SpectrumHistory` | Core | The query service: the stored spectrum at a moment, the intensity series, the intensity points and the stored range, each on its own reader connection (`Core/Store/`) |
 | `FrameContinuity` | Core | Turns spectra and heartbeats, in receive order, into the trend's Loss and NoSpectra breaks and failure marks (`Core/Trend/`) |
-| `IntensityCache` | Core | One intensity point per spectrum at the key of the latest spectrum frame, with the run's breaks and failure marks, for the last 24 h; the recent spectra, the key change and its re-read request, the landing of stored chunks, the completion of a re-read, the fold of the current extent under one lock hold and the moment lookup (`Core/Trend/`) |
+| `IntensityCache` | Core | One intensity point per spectrum at the key of the latest spectrum frame, with the run's breaks and failure marks, for the last 24 h; the recent spectra, the key change and its re-read request, the landing of stored chunks, the completion of a re-read, the fold of the current extent under one lock hold and the moment lookup; `TrendTimeline` holds the key's points, breaks and failure marks in time order and folds them. `TrendKey`, `TrendExtent`, `TrendFold` and `ReReadRequest` are its results (`Core/Trend/`) |
 | `TrendHistoryPlan` | Core | The store ranges a re-read runs, in order: the visible window, then the rest of the day in hour chunks, newest first (`Core/Trend/`) |
-| `IntensityChunk`, `TrendPoint` | Core | The result of the store's points read: its start and one `(UnixMs, Value)` point per spectrum (`Core/Trend/`) |
+| `IntensityChunk`, `TrendPoint` | Core | The result of the store's points read: its start and one `(UnixMs, Value)` point per spectrum; `IntensityBuckets.Add(TrendPoint)` folds a NaN point as uncovered (`Core/Store/`) |
 | `TrendNavigationModel` | Core | The trend's visible window in UTC: width 10 s to 24 h, follow, pan, zoom around an anchor, set width, the pan floor at the first point, and the rule that a pan or a zoom leaving now outside the window stops following (`Core/Trend/`) |
-| `TrendColumns`, `EnvelopeColumn` | Core | The column width for a data area, the fold query that includes its end, the gap rule, the mapping of folded columns to envelope columns and gaps, the Y range and the joined failure ranges (`Core/Trend/`) |
+| `TrendColumns` | Core | The column width for a data area, the fold query that includes its end, the gap rule and the joined failure ranges (`Core/Trend/`) |
 | `OverviewGeometry` | Core | Places the trend window, the pointer and the band along the overview strip, and applies the trend's gap rule to the band (`Core/Trend/`) |
 | `FrameSchedule`, `SpectrumGenerator` | Tools.BoardEmulator | Which frame the emulated board sends at a tick and its `state`, and the synthetic and dark spectra |
 | `EmulatorCommand` | Tools.BoardEmulator | Parses and range-checks the command line into an `EmulatorOptions` record; rejects `--failed` for the other spectrometer without `--both-connected` |
@@ -76,21 +76,25 @@ the trend's folds and re-reads.
 | `ISerialPortProvider`, `RjcpSerialPortProvider` | UI | Lists the COM ports and opens one for the link, mapping open failures to typed errors |
 | `SerialLink` | UI | The link's surface: Connect, Disconnect, the published status and the bounded frame channel |
 | `LinkSession` | UI | One Connect: opens, reads, decodes, judges the health, drains, reopens and publishes every status, in one task |
-| `LinkHealth` | UI | The 10 s health rules and the drain rule, as pure functions of timestamps |
+| `LinkHealth` | UI | The 10 s health rules and the drain rule, as pure functions of timestamps; the 10 s is `LinkTiming.SilenceLimit` (`Core/Protocol/`), which `FrameContinuity` shares |
 | `LinkState`, `LinkStatus` | UI | What the link publishes: the state, the port, the latest `state` bits, the lost total, the fault on entry and the count of frames the channel dropped |
 | `LinkError` and its five errors | UI | `PortBusyError`, `PortNotFoundError`, `PortLostError`, `BoardNotRespondingError`, `UnrecognisedDataError`, each with the port in its message |
 | `PortListError` | UI | Windows did not return the port list; no port name, the listing failure as its cause |
 | `FrameDistributor` | UI | The one reader of `SerialLink.Frames`: keeps the latest frame that carries a spectrum and hands every frame to each subscriber on its read task |
-| `DisplayedSpectrum`, `IDisplayedSpectrumSource` | UI | The spectrum the chart shows, its receive time and whether it is historical; the source's `Current` and the `Changed` signal. `LiveSpectrumSource` and `SwitchingSpectrumSource` implement it |
-| `LiveSpectrumSource` | UI | The live `IDisplayedSpectrumSource`: `Current` wraps the distributor's latest spectrum frame in a new record on each read, around the frame's own measurement; `Changed` signals each spectrum frame and skips heartbeats |
+| `DisplayedSpectrum`, `IDisplayedSpectrumSource` | UI | The spectrum the chart shows, its receive time and whether it is historical; the source's `Current` and the `CurrentChanged` signal. `LiveSpectrumSource` and `SwitchingSpectrumSource` implement it |
+| `LiveSpectrumSource` | UI | The live `IDisplayedSpectrumSource`: `Current` wraps the distributor's latest spectrum frame in a new record on each read, around the frame's own measurement; `CurrentChanged` signals each spectrum frame and skips heartbeats |
 | `SwitchingSpectrumSource` | UI | The `IDisplayedSpectrumSource` the app reads: the live source's spectrum, or the spectrum of a past moment until the operator returns to live; `ShownMoment` is that moment's receive time (`UI/Spectrum/`) |
-| `SpectrumChartViewModel` | UI | Owns the ScottPlot `Plot`: one line per spectrometer, the window band, the centre line, the axis type and the follow or frozen scale; holds the historical line's text; asks the view for a redraw |
+| `SpectrumChartViewModel` | UI | Owns the ScottPlot `Plot`: one line per spectrometer (`DeviceLine`), the window band, the centre line, the axis type and the follow or frozen scale; holds the historical line's text; asks the view for a redraw |
 | `SignalInfoViewModel` | UI | The seven signal pane texts of the shown spectrum |
 | `SpectrumViewModel` | UI | The spectrum screen: applies the source's latest spectrum to the chart and the signal pane, the Invert and Logarithmic checkboxes, Reset scale, Stick to zero and Back to live; writes the chart's historical line from `ShownMoment` |
+| `ChartFrames` | UI | A chart view's redraws: joins redraw requests into one animation frame and repaints the plot and the series on a theme change; both chart views own one (`UI/Chart/`) |
 | `ChartPalette` | UI | Paints ScottPlot's figure, data area, grid and axes from the palette, and resolves the colours of the spectrum line, the band, the centre line, the trend's envelope, the shown-moment line and the failure strip |
 | `LogTickGenerator` | UI | ScottPlot's tick generator over `LogAxis`: the labels under the current culture, and a cache of the last two results keyed on the limits, the length and the culture |
 | `EnvelopeLine`, `EnvelopePath` | UI | The trend's ScottPlot plottable: the min/max envelope path over the envelope columns, broken at each gap column; the chart writes it under `Plot.Sync`, which every ScottPlot render holds (`UI/Trend/`) |
-| `TrendMarkerStrip` | UI | A 4 px bar along the bottom of the trend's data area over each column with a failure mark (`UI/Trend/`) |
+| `EnvelopeColumn` | UI | One envelope column at chart X; maps folded columns to envelope columns and gaps, and the Y range (`UI/Trend/`) |
+| `TrendMarkerStrip` | UI | A 4 px bar along the bottom of the trend's data area over each failure range, converted to axis X in its own buffer (`UI/Trend/`) |
+| `TrendPlotLayers` | UI | The trend's layers on its plot: the envelope, the failure strip, the shown-moment line and the axes, written under `Plot.Sync` (`UI/Trend/`) |
+| `TrendCursorOverlay` | UI | Places the trend's hover line and readout box over the data area (`UI/Trend/`) |
 | `LocalTimeAxis` | UI | Converts a `DateTimeOffset` to the trend's X value, local-time OADate, and back (`UI/Trend/`) |
 | `TrendChartViewModel` | UI | Owns the trend's `Plot`: folds the cache over the navigation window at one column per data-area pixel, the Y limits, the Y label, the failure strip, the shown-moment line, navigation and the hover text (`UI/Trend/`) |
 | `TrendReadout` | UI | The hover text of one folded column: local time, value or gap reason, failures (`UI/Trend/`) |
@@ -103,7 +107,7 @@ the trend's folds and re-reads.
 | `StoreOpenError`, `StoreWriteError`, `StoreStoppedError` | UI | The store file could not be prepared or opened; a batch could not be written; an unexpected failure after the open ended the writer (`UI/Store/`) |
 | `AppLogging` | UI | Creates the log folder and the Serilog logger: `spectrum-visualizer.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
-| `AddUi(LoggingSetup, AppDataPaths)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` of this process under the store folder, `SpectrumStore`, `SpectrumHistory` over the `StoreFile`, `IntensityCache`, `LiveSpectrumSource`, `SwitchingSpectrumSource` over it, which is also the `IDisplayedSpectrumSource`, the message panel, the connection row, the status bar, the spectrum view model, `TrendChartViewModel`, `OverviewViewModel`, `TrendFeed` built over `SpectrumHistory.IntensityPointsAsync` and `SpectrumAtAsync` with `DefaultScheduler.Instance` for its throttle, `TrendViewModel` and the main window view model, all singletons |
+| `AddUi(LoggingSetup, AppDataPaths)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` of this process under the store folder, `SpectrumStore`, `SpectrumHistory` over the `StoreFile`, `IntensityCache`, `LiveSpectrumSource`, `SwitchingSpectrumSource` over it, the message panel, the connection row, the status bar, the spectrum view model, `TrendChartViewModel`, `OverviewViewModel`, `TrendFeed` built over `SpectrumHistory.IntensityPointsAsync` and `SpectrumAtAsync` with `DefaultScheduler.Instance` for its throttle, `TrendViewModel` and the main window view model, all singletons |
 | `Program` | UI | Entry point: paths, logging, container, `App.Run` with the logger for unhandled exceptions |
 | `App` | UI | Builds the Avalonia app with the exception handler, subscribes dispatcher exceptions, sets Semi's control strings to the UI culture, creates the main window from the container, refreshes the port list and starts the spectrum store, the trend feed and then the frame distributor when the window opens, and stops the link, the distributor, the trend feed and the store, in that order, before it closes |
 | `MainWindowViewModel` | UI | Exit request, the verbose-logging command, and the panel, connection row, status bar, spectrum and trend view models; it disposes none of them, the container owns them |
@@ -304,7 +308,7 @@ flag, so the first Receiving after a fault-free Connect adds none. A throw insid
 2. `FrameDistributor` reads it. For a frame that carries a measurement it publishes `LatestSpectrum` with
    `Volatile.Write`; then it calls each subscriber's `OnNext` inside its own try/catch (distributor task). The
    subscribers are `LiveSpectrumSource`, the spectrum store and the trend feed.
-3. `LiveSpectrumSource` passes spectrum frames on as `Changed`, and `SwitchingSpectrumSource` passes them on unchanged
+3. `LiveSpectrumSource` passes spectrum frames on as `CurrentChanged`, and `SwitchingSpectrumSource` passes them on unchanged
    (distributor task).
 4. `SpectrumViewModel` moves the signal to the UI scheduler, reads `Current`, drops a repeat of the same measurement,
    calls `Chart.Show` and sets `SignalInfo.Spectrum` (UI thread).
@@ -325,20 +329,20 @@ so `StopAsync` still completes. `Start` after a start or a stop does nothing; `S
 runs, and disposes the cancellation source once the read task has ended. Subscribers own their scheduling and never
 block the read task.
 
-`SpectrumViewModel` subscribes in its constructor with `Changed.ObserveOn(uiScheduler).StartWith(...)`, then a read of
+`SpectrumViewModel` subscribes in its constructor with `CurrentChanged.ObserveOn(uiScheduler).StartWith(...)`, then a read of
 `source.Current`, `WhereNotNull` and `DistinctUntilChanged` on the measurement by reference, then `Show`. Signals queued
 while the UI thread is busy each read the same latest measurement, so the chart applies the latest spectrum once without
 comparing pixel arrays (record equality on `SpectrumMeasurement` compares every pixel). A spectrum present at
 construction shows at once. A throw from the `Current` read or from `Show` goes to `TryReportFailure` and skips that
-spectrum only; the next signal reads and shows again. Only a failure of `Changed` itself ends the subscription, through
+spectrum only; the next signal reads and shows again. Only a failure of `CurrentChanged` itself ends the subscription, through
 the same report. The Invert and Logarithmic subscription reports a failure the same way. The view model is a container
 singleton, so the subscriptions live for the process.
 
 ### A past moment
 
-`SwitchingSpectrumSource` wraps the live source and is the `IDisplayedSpectrumSource` the container hands out.
+`SwitchingSpectrumSource` wraps the live source and is the source the spectrum and trend view models read.
 `Current` is the historical spectrum while one is shown, the same record on every read, and the live `Current`
-otherwise. `Changed` merges the live `Changed` with a private subject that emits on each mode change.
+otherwise. `CurrentChanged` merges the live `CurrentChanged` with a private subject that emits on each mode change.
 `ShowMoment(measurement, receivedAt)` and `ReturnToLive()` run on the UI thread and set `ShownMoment`, a
 `DateTimeOffset?` that raises its change. `ShowMoment` copies the measurement with `with { }`, so every shown moment
 carries a new `SpectrumMeasurement` around the same immutable pixel array, and `DistinctUntilChanged` by reference
@@ -432,7 +436,8 @@ skips it when the control already holds the chart's plot and leaves the control 
 chart coming back keeps its plottables. A switch to another chart still disposes the previous chart's plot, because
 ScottPlot has no public way to detach a plot; the app builds one chart for the process. Each request asks
 `TopLevel.RequestAnimationFrame` once per pending frame and invalidates the plot in the callback, so every request
-before the next display frame joins one redraw. Nothing calls `AvaPlot.Refresh()`; ScottPlot redraws on its own only
+before the next display frame joins one redraw; `ChartFrames` holds this pacing and the palette repaint for both chart
+views. Nothing calls `AvaPlot.Refresh()`; ScottPlot redraws on its own only
 while the operator drags or zooms. The view repaints the plot from the palette on `OnLoaded` and on the application's
 `ActualThemeVariantChanged`, and removes that handler in `OnUnloaded` (`ui-theme.md`). One hold of `Plot.Sync` paints
 the surfaces and the series colours, so no render sees one without the other.
@@ -504,7 +509,7 @@ points takes about 3 MB.
 ### Continuity
 
 `FrameContinuity` sees every frame in receive order, spectra and heartbeats, and owns a `SequenceTracker`. Two 10 s
-rules use the link's silence limit, and they measure different silences:
+rules use the link's silence limit, `LinkTiming.SilenceLimit`, and they measure different silences:
 
 | Case | Result |
 | --- | --- |
@@ -593,8 +598,8 @@ scheduler and its logger.
 
 ### The chart
 
-`TrendChartViewModel` owns the `Plot`: one `EnvelopeLine`, one `TrendMarkerStrip`, one `VerticalLine` for the shown
-moment, ScottPlot's `DateTimeAutomatic` on the bottom axis over local-time OADate (`LocalTimeAxis`), and a
+`TrendChartViewModel` owns the `Plot`, and `TrendPlotLayers` puts on it one `EnvelopeLine`, one `TrendMarkerStrip`, one
+`VerticalLine` for the shown moment, ScottPlot's `DateTimeAutomatic` on the bottom axis over local-time OADate (`LocalTimeAxis`), and a
 `TrendNavigationModel`. Every member runs on the UI thread. Before the first point the window is the 10 min before the
 `TimeProvider`'s current time, and the Y limits are `0 .. 1`, so an empty chart renders finite axes.
 
@@ -602,7 +607,7 @@ A refresh runs on every sampled cache change, on a 1 s tick while following, and
 following it moves the window's right edge to the `TimeProvider`'s now, so a silence shows as an empty span on the
 right within a second. It folds the cache over `[From, To + 1 ms)` (the window can end exactly at the newest point,
 and the range is half-open) at one column per pixel of the data area; the extent, the window move and the fold run
-under one hold of the cache's lock (`FoldCurrent`). It maps the columns with `TrendColumns` and replaces the envelope's
+under one hold of the cache's lock (`FoldCurrent`). It maps the columns with `EnvelopeColumn.Map` and replaces the envelope's
 columns, the strip's spans, the X limits, the Y limits and the Y label under `lock (Plot.Sync)`; then it requests one
 redraw. A failed refresh is reported and skipped; after the chart's dispose a refresh does nothing. The column width
 is `ceil(span / clamp(dataAreaPixels, 256, 2048))` in whole milliseconds, at least 1 ms. The view reports the data

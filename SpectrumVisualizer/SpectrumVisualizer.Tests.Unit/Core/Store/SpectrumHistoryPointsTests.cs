@@ -1,7 +1,7 @@
 using AwesomeAssertions;
 
 using SpectrumVisualizer.Core.Protocol;
-using SpectrumVisualizer.Core.Trend;
+using SpectrumVisualizer.Core.Store;
 
 using Xunit;
 

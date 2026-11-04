@@ -8,7 +8,6 @@ using ScottPlot;
 using ScottPlot.Plottables;
 using ScottPlot.TickGenerators;
 
-using SpectrumVisualizer.Core.Calibration;
 using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Core.Spectrum;
 using SpectrumVisualizer.UI.Chart;
@@ -43,8 +42,8 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		_band = Plot.Add.HorizontalSpan(0.0, 0.0);
 		_band.IsVisible = false;
 		_band.LineStyle.Width = 0f;
-		_atp2000Line = AddLine(Spectrometer.Atp2000);
-		_atp8000Line = AddLine(Spectrometer.Atp8000);
+		_atp2000Line = DeviceLine.AddTo(Plot, Spectrometer.Atp2000);
+		_atp8000Line = DeviceLine.AddTo(Plot, Spectrometer.Atp8000);
 		_centreLine = Plot.Add.VerticalLine(0.0);
 		_centreLine.IsVisible = false;
 
@@ -184,21 +183,6 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		Plot.Dispose();
 	}
 
-	private DeviceLine AddLine(Spectrometer device)
-	{
-		var calibration = SpectrometerCalibration.For(device);
-		var xs = new double[device.PixelCount];
-		for (var pixel = 0; pixel < xs.Length; pixel++)
-		{
-			xs[pixel] = calibration.WavelengthOf(pixel);
-		}
-
-		var ys = new double[xs.Length];
-		var line = Plot.Add.SignalXY(xs, ys);
-		line.IsVisible = false;
-		return new DeviceLine(line, xs, ys);
-	}
-
 	private DeviceLine LineFor(Spectrometer device)
 	{
 		return device == Spectrometer.Atp2000 ? _atp2000Line : _atp8000Line;
@@ -291,18 +275,6 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		{
 			this.RaisePropertyChanged(nameof(IsFollowing));
 		}
-	}
-
-	private sealed class DeviceLine(SignalXY plottable, double[] xs, double[] ys)
-	{
-		public SignalXY Plottable { get; } = plottable;
-
-		public double[] Xs { get; } = xs;
-
-		public double[] Ys { get; } = ys;
-
-		/// <summary>The device's last non-dark measurement, the Y reference while it shows a dark frame.</summary>
-		public SpectrumMeasurement? LastNonDark { get; set; }
 	}
 
 	private readonly ref struct ReferenceSpectrum(Span<double> ys, ProjectedSpectrum projection)

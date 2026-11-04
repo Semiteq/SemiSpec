@@ -5,7 +5,6 @@ using FluentResults;
 using Microsoft.Data.Sqlite;
 
 using SpectrumVisualizer.Core.Protocol;
-using SpectrumVisualizer.Core.Trend;
 
 namespace SpectrumVisualizer.Core.Store;
 
@@ -95,15 +94,7 @@ public sealed class SpectrumHistory(string path)
 		var windows = new QueryWindows(query.WavelengthNm, query.Delta);
 		foreach (var point in WindowMeans(connection, windows, query.From, query.To, token))
 		{
-			var receivedAt = DateTimeOffset.FromUnixTimeMilliseconds(point.UnixMs);
-			if (double.IsNaN(point.Value))
-			{
-				buckets.AddUncovered(receivedAt);
-			}
-			else
-			{
-				buckets.Add(receivedAt, point.Value);
-			}
+			buckets.Add(point);
 		}
 
 		return buckets.ToSeries();

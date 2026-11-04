@@ -20,5 +20,5 @@ public interface IDisplayedSpectrumSource
 	DisplayedSpectrum? Current { get; }
 
 	/// <summary>Emits on any thread after Current changes; the reader reads Current after the signal.</summary>
-	IObservable<Unit> Changed { get; }
+	IObservable<Unit> CurrentChanged { get; }
 }

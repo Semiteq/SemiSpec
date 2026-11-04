@@ -67,10 +67,10 @@ public sealed class LiveSpectrumSourceTests : IAsyncLifetime
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
-	public async Task AHeartbeatChangesNeitherCurrentNorChanged()
+	public async Task AHeartbeatChangesNeitherCurrentNorCurrentChanged()
 	{
 		var changes = 0;
-		using var changed = _source.Changed.Subscribe(_ => Interlocked.Increment(ref changes));
+		using var changed = _source.CurrentChanged.Subscribe(_ => Interlocked.Increment(ref changes));
 		var delivered = CollectFrames();
 		_distributor.Start();
 		Write(Received(SpectrumFrame(Spectrometer.Atp8000, 1)));
@@ -85,10 +85,10 @@ public sealed class LiveSpectrumSourceTests : IAsyncLifetime
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
-	public async Task ASpectrumFrameUpdatesCurrentAndSignalsChanged()
+	public async Task ASpectrumFrameUpdatesCurrentAndSignalsCurrentChanged()
 	{
 		var changes = 0;
-		using var changed = _source.Changed.Subscribe(_ => Interlocked.Increment(ref changes));
+		using var changed = _source.CurrentChanged.Subscribe(_ => Interlocked.Increment(ref changes));
 		var frame = SpectrumFrame(Spectrometer.Atp2000, 1);
 		var receivedAt = _receivedAt.AddSeconds(3);
 		_distributor.Start();

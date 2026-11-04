@@ -18,14 +18,14 @@ public sealed class SwitchingSpectrumSource : ReactiveObject, IDisplayedSpectrum
 	public SwitchingSpectrumSource(IDisplayedSpectrumSource liveSource)
 	{
 		_liveSource = liveSource;
-		Changed = liveSource.Changed.Merge(_modeChanges.AsObservable());
+		CurrentChanged = liveSource.CurrentChanged.Merge(_modeChanges.AsObservable());
 	}
 
 	/// <summary>The historical spectrum while one is shown, the same record on every read; the live one otherwise.</summary>
 	public DisplayedSpectrum? Current => _historical ?? _liveSource.Current;
 
-	/// <summary>Hides ReactiveObject.Changed; ShownMoment still notifies through INotifyPropertyChanged.</summary>
-	public new IObservable<Unit> Changed { get; }
+	/// <summary>The live source's signal merged with one signal per switch between live and a past moment.</summary>
+	public IObservable<Unit> CurrentChanged { get; }
 
 	/// <summary>The receive time of the shown historical spectrum; null while live.</summary>
 	public DateTimeOffset? ShownMoment
@@ -58,7 +58,6 @@ public sealed class SwitchingSpectrumSource : ReactiveObject, IDisplayedSpectrum
 		_modeChanges.OnNext(Unit.Default);
 	}
 
-	/// <summary>Idempotent: the container disposes this instance once per registration that hands it out.</summary>
 	public void Dispose()
 	{
 		_modeChanges.Dispose();

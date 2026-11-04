@@ -11,7 +11,6 @@ using ScottPlot;
 using SpectrumVisualizer.UI.Chart;
 
 using Cursor = Avalonia.Input.Cursor;
-using PixelRect = ScottPlot.PixelRect;
 
 namespace SpectrumVisualizer.UI.Trend;
 
@@ -30,15 +29,21 @@ public partial class TrendChartView : UserControl
 	private static readonly EventHandler<RenderDetails> _noRenderFinishedHandler = (_, _) => { };
 
 	private readonly CompositeDisposable _subscriptions = [];
+	private readonly ChartFrames _frames;
+	private readonly TrendCursorOverlay _overlay;
 	private TrendViewModel? _viewModel;
 	private ChartDrag? _drag;
 	private DateTimeOffset? _hoverTime;
-	private int _frameSequence;
-	private int? _pendingFrame;
 
 	public TrendChartView()
 	{
 		InitializeComponent();
+		_frames = new ChartFrames(
+			PlotControl,
+			() => _viewModel is not null,
+			colors => _viewModel?.Chart.ApplyPalette(colors),
+			frameServed: RepositionCursorOverlay);
+		_overlay = new TrendCursorOverlay(CursorOverlay, CrosshairLine, ReadoutBox, ReadoutText);
 		DataContextChanged += OnDataContextChanged;
 
 		PlotControl.UserInputProcessor.Disable();
@@ -56,68 +61,26 @@ public partial class TrendChartView : UserControl
 	}
 
 	/// <summary>Animation-frame callbacks that served a redraw request since the view was built.</summary>
-	internal int ServedFrameCount { get; private set; }
+	internal int ServedFrameCount => _frames.ServedFrameCount;
 
 	protected override void OnLoaded(RoutedEventArgs e)
 	{
 		base.OnLoaded(e);
-
-		if (Application.Current is { } application)
-		{
-			application.ActualThemeVariantChanged += OnActualThemeVariantChanged;
-		}
-
-		RepaintChart();
+		_frames.Attach();
 	}
 
 	protected override void OnUnloaded(RoutedEventArgs e)
 	{
-		ClearPendingFrame();
-
-		if (Application.Current is { } application)
-		{
-			application.ActualThemeVariantChanged -= OnActualThemeVariantChanged;
-		}
-
+		_frames.Detach();
 		base.OnUnloaded(e);
-	}
-
-	private void OnActualThemeVariantChanged(object? sender, EventArgs eventArgs)
-	{
-		RepaintChart();
-	}
-
-	private void RepaintChart()
-	{
-		ApplyChartPalette();
-		RequestFrame();
-	}
-
-	private void ApplyChartPalette()
-	{
-		if (Application.Current is not { } application)
-		{
-			return;
-		}
-
-		var variant = application.ActualThemeVariant;
-		var plot = PlotControl.Plot;
-		var colors = ChartPalette.Colors(application, variant);
-
-		// One hold of the lock, so no render sees new surfaces with old series colours; ApplyPalette re-enters it.
-		lock (plot.Sync)
-		{
-			ChartPalette.Apply(plot, application, variant);
-			_viewModel?.Chart.ApplyPalette(colors);
-		}
 	}
 
 	private void OnDataContextChanged(object? sender, EventArgs eventArgs)
 	{
 		_subscriptions.Clear();
-		ClearPendingFrame();
+		_frames.ClearPending();
 		_hoverTime = null;
-		HideCursorOverlay();
+		_overlay.Hide();
 		_viewModel = DataContext as TrendViewModel;
 
 		// A null DataContext leaves the plot in place: AvaPlot.Reset disposes the plot it replaces, and that plot is
@@ -141,8 +104,8 @@ public partial class TrendChartView : UserControl
 		// leaving null behind.
 		_subscriptions.Add(Disposable.Create(() => renderManager.RenderFinished =
 			(renderManager.RenderFinished - reportDataAreaWidth) ?? _noRenderFinishedHandler));
-		_subscriptions.Add(chart.RedrawRequested.Subscribe(_ => RequestFrame(), ClearPendingFrame));
-		RepaintChart();
+		_subscriptions.Add(chart.RedrawRequested.Subscribe(_ => _frames.Request(), _frames.ClearPending));
+		_frames.Repaint();
 	}
 
 	/// <summary>Hands each new data area width of a render to the chart, which folds one column per pixel.</summary>
@@ -161,42 +124,6 @@ public partial class TrendChartView : UserControl
 			lastPostedWidth = dataAreaWidth;
 			Dispatcher.UIThread.Post(() => chart.SetDataAreaWidth(dataAreaWidth));
 		};
-	}
-
-	private void RequestFrame()
-	{
-		if (_pendingFrame is not null || TopLevel.GetTopLevel(this) is not { } topLevel)
-		{
-			return;
-		}
-
-		var frame = ++_frameSequence;
-		topLevel.RequestAnimationFrame(_ => ServeFrame(frame));
-		_pendingFrame = frame;
-	}
-
-	private void ServeFrame(int frame)
-	{
-		if (_pendingFrame != frame)
-		{
-			return;
-		}
-
-		_pendingFrame = null;
-
-		if (_viewModel is null || TopLevel.GetTopLevel(this) is null)
-		{
-			return;
-		}
-
-		PlotControl.InvalidateVisual();
-		RepositionCursorOverlay();
-		ServedFrameCount++;
-	}
-
-	private void ClearPendingFrame()
-	{
-		_pendingFrame = null;
 	}
 
 	private void OnPointerWheelChanged(object? sender, PointerWheelEventArgs eventArgs)
@@ -240,7 +167,7 @@ public partial class TrendChartView : UserControl
 		_drag = new ChartDrag(viewModel, eventArgs.Pointer, eventArgs.GetPosition(PlotControl), IsStarted: false);
 		PlotControl.Cursor = _grabbingCursor;
 		eventArgs.Pointer.Capture(PlotControl);
-		HideCursorOverlay();
+		_overlay.Hide();
 	}
 
 	private void OnPointerMoved(object? sender, PointerEventArgs eventArgs)
@@ -311,59 +238,18 @@ public partial class TrendChartView : UserControl
 	private void OnPointerExited(object? sender, PointerEventArgs eventArgs)
 	{
 		_hoverTime = null;
-		HideCursorOverlay();
+		_overlay.Hide();
 	}
 
 	private void RepositionCursorOverlay()
 	{
 		if (_viewModel is null || _drag is not null || _hoverTime is not { } hoverTime || !HasDataArea())
 		{
-			HideCursorOverlay();
-
+			_overlay.Hide();
 			return;
 		}
 
-		var plot = PlotControl.Plot;
-		var dataRect = plot.LastRender.DataRect;
-		var cursorPixelX = plot.GetPixel(new Coordinates(LocalTimeAxis.ToAxis(hoverTime), 0.0)).X;
-		var placement = ProjectOverlay(cursorPixelX, dataRect, plot.ScaleFactor);
-		var readout = _viewModel.Chart.ReadoutAt(hoverTime);
-		if (placement is not { } line || readout is null)
-		{
-			HideCursorOverlay();
-
-			return;
-		}
-
-		CrosshairLine.StartPoint = new Point(line.X, line.Top);
-		CrosshairLine.EndPoint = new Point(line.X, line.Bottom);
-		CrosshairLine.IsVisible = true;
-
-		// A hidden control measures as empty, so the box shows before it measures its new text.
-		ReadoutBox.IsVisible = true;
-		ReadoutText.Text = readout;
-		ReadoutBox.Measure(Size.Infinity);
-		var readoutWidth = ReadoutBox.DesiredSize.Width;
-		var fitsRightOfLine = line.X + readoutWidth <= Bounds.Width;
-		Canvas.SetLeft(ReadoutBox, fitsRightOfLine ? line.X : Math.Max(0.0, line.X - readoutWidth));
-		Canvas.SetTop(ReadoutBox, line.Top);
-	}
-
-	/// <summary>The hover line in device-independent pixels; null when the cursor is outside the data area.</summary>
-	private static OverlayLine? ProjectOverlay(double cursorPixelX, PixelRect dataRect, double renderScale)
-	{
-		if (renderScale <= 0.0 || cursorPixelX < dataRect.Left || cursorPixelX > dataRect.Right)
-		{
-			return null;
-		}
-
-		return new OverlayLine(cursorPixelX / renderScale, dataRect.Top / renderScale, dataRect.Bottom / renderScale);
-	}
-
-	private void HideCursorOverlay()
-	{
-		CrosshairLine.IsVisible = false;
-		ReadoutBox.IsVisible = false;
+		_overlay.ShowAt(PlotControl.Plot, hoverTime, _viewModel.Chart.ReadoutAt(hoverTime));
 	}
 
 	private bool HasDataArea()
@@ -379,6 +265,4 @@ public partial class TrendChartView : UserControl
 	}
 
 	private readonly record struct ChartDrag(TrendViewModel ViewModel, IPointer Pointer, Point Origin, bool IsStarted);
-
-	private readonly record struct OverlayLine(double X, double Top, double Bottom);
 }

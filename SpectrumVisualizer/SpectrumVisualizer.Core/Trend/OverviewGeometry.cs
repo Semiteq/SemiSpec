@@ -63,21 +63,28 @@ public static class OverviewGeometry
 	/// </summary>
 	public static IntensitySeries Connected(IntensitySeries band)
 	{
-		var columns = new List<IntensityColumn>(band.Columns.Length);
+		var count = 0;
 		foreach (var column in band.Columns)
 		{
-			if (TrendColumns.OpensGap(column) && column.Count > 0)
+			count += (PutsGapBeforeValues(column) ? 1 : 0) + (TrendColumns.HasContent(column) ? 1 : 0);
+		}
+
+		var columns = new IntensityColumn[count];
+		var next = 0;
+		foreach (var column in band.Columns)
+		{
+			if (PutsGapBeforeValues(column))
 			{
-				columns.Add(column with { Min = double.NaN, Max = double.NaN, Last = double.NaN, Count = 0 });
+				columns[next++] = column with { Min = double.NaN, Max = double.NaN, Last = double.NaN, Count = 0 };
 			}
 
 			if (TrendColumns.HasContent(column))
 			{
-				columns.Add(column);
+				columns[next++] = column;
 			}
 		}
 
-		return band with { Columns = [.. columns] };
+		return band with { Columns = columns };
 	}
 
 	/// <summary>The unbroken runs of drawable columns between first and last, scaled to the band's pixels.</summary>
@@ -178,6 +185,12 @@ public static class OverviewGeometry
 		}
 
 		return new BandFigure(outline, centerLine);
+	}
+
+	/// <summary>A break in a column with values: an empty column goes before the values.</summary>
+	private static bool PutsGapBeforeValues(IntensityColumn column)
+	{
+		return TrendColumns.OpensGap(column) && column.Count > 0;
 	}
 
 	private static BandFigure LoneColumn(IntensityColumn column, BandScale scale)

@@ -46,6 +46,20 @@ public sealed class IntensityBuckets(IntensityQuery query)
 		_count[column]++;
 	}
 
+	/// <summary>Adds the point's value, or counts the point as uncovered when its value is NaN.</summary>
+	public void Add(TrendPoint point)
+	{
+		var receivedAt = DateTimeOffset.FromUnixTimeMilliseconds(point.UnixMs);
+		if (double.IsNaN(point.Value))
+		{
+			AddUncovered(receivedAt);
+		}
+		else
+		{
+			Add(receivedAt, point.Value);
+		}
+	}
+
 	/// <summary>Counts a spectrum the series cannot read: its device misses the wavelength, or the row is corrupt.</summary>
 	public void AddUncovered(DateTimeOffset receivedAt)
 	{

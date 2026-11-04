@@ -22,7 +22,7 @@ public sealed class SwitchingSpectrumSourceTests : IDisposable
 	public SwitchingSpectrumSourceTests()
 	{
 		_source = new SwitchingSpectrumSource(_live);
-		_source.Changed.Subscribe(_ => _signals++);
+		_source.CurrentChanged.Subscribe(_ => _signals++);
 	}
 
 	[Fact]

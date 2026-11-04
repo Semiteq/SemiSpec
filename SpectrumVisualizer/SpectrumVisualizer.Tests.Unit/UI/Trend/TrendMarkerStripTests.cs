@@ -2,6 +2,7 @@ using AwesomeAssertions;
 
 using ScottPlot;
 
+using SpectrumVisualizer.Core.Trend;
 using SpectrumVisualizer.UI.Trend;
 
 using Xunit;
@@ -24,7 +25,7 @@ public sealed class TrendMarkerStripTests
 	public void TheStripNeverSteersTheLimits()
 	{
 		var strip = new TrendMarkerStrip();
-		strip.ReplaceSpans([new StripSpan(10.0, 20.0)]);
+		strip.ReplaceSpans([Span(10.0, 20.0)]);
 
 		strip.GetAxisLimits().Should().Be(AxisLimits.NoLimits);
 	}
@@ -32,7 +33,7 @@ public sealed class TrendMarkerStripTests
 	[Fact]
 	public void ASpanFillsTheBottomOfTheDataAreaOverItsColumnsOnly()
 	{
-		var (rendered, pixels, dataRect) = Render([new StripSpan(40.0, 60.0)]);
+		var (rendered, pixels, dataRect) = Render([Span(40.0, 60.0)]);
 		using var plot = rendered;
 		var bottom = (int)Math.Floor(dataRect.Bottom);
 		var inside = PixelColumnAt(plot, 50.0);
@@ -46,7 +47,7 @@ public sealed class TrendMarkerStripTests
 	[Fact]
 	public void ASpanNarrowerThanAPixelStillMarksOne()
 	{
-		var (rendered, pixels, dataRect) = Render([new StripSpan(50.0, 50.0001)]);
+		var (rendered, pixels, dataRect) = Render([Span(50.0, 50.0001)]);
 		using var plot = rendered;
 		var bottom = (int)Math.Floor(dataRect.Bottom);
 		var column = PixelColumnAt(plot, 50.0);
@@ -57,7 +58,7 @@ public sealed class TrendMarkerStripTests
 		marked.Should().BeTrue("one failed spectrum in a 24 h window still shows");
 	}
 
-	private static (Plot Plot, byte[,,] Pixels, PixelRect DataRect) Render(IReadOnlyList<StripSpan> spans)
+	private static (Plot Plot, byte[,,] Pixels, PixelRect DataRect) Render(IReadOnlyList<TimeRange> spans)
 	{
 		var strip = new TrendMarkerStrip();
 		strip.Recolor(Colors.Red);
@@ -69,6 +70,11 @@ public sealed class TrendMarkerStripTests
 		using var image = plot.GetImage(PlotWidth, PlotHeight);
 
 		return (plot, image.GetArrayRGB(), plot.RenderManager.LastRender.Layout.DataRect);
+	}
+
+	private static TimeRange Span(double fromX, double toX)
+	{
+		return new TimeRange(LocalTimeAxis.FromAxis(fromX), LocalTimeAxis.FromAxis(toX));
 	}
 
 	private static int PixelColumnAt(Plot plot, double x)

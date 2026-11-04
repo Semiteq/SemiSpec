@@ -1,5 +1,3 @@
-using SpectrumVisualizer.Core.Trend;
-
 namespace SpectrumVisualizer.UI.Trend;
 
 /// <summary>One vertex of the polyline the envelope columns are drawn as.</summary>
@@ -26,10 +24,7 @@ public static class EnvelopePath
 	}
 
 	public static void Build(
-		IReadOnlyList<EnvelopeColumn> columns,
-		int first,
-		int lastExclusive,
-		List<EnvelopePoint> destination)
+		IReadOnlyList<EnvelopeColumn> columns, int first, int lastExclusive, List<EnvelopePoint> destination)
 	{
 		destination.Clear();
 
@@ -51,7 +46,6 @@ public static class EnvelopePath
 			{
 				AddVertex(column.X, column.Min);
 				previousY = column.Min;
-
 				continue;
 			}
 

@@ -2,13 +2,13 @@ using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.Core.Trend;
 
-/// <summary>Turns spectra and heartbeats, in receive order, into the trend's breaks and failure marks.</summary>
+/// <summary>
+/// Turns spectra and heartbeats, in receive order, into the trend's breaks and failure marks; a pause over the link's
+/// silence limit ends the seq session and breaks the line.
+/// </summary>
 public sealed class FrameContinuity
 {
 	private const BoardState FailureBits = BoardState.Atp2000MeasurementFailed | BoardState.Atp8000MeasurementFailed;
-
-	/// <summary>The link's silence limit: a longer pause ends the seq session and breaks the line.</summary>
-	private static readonly TimeSpan _silenceLimit = TimeSpan.FromSeconds(10);
 
 	private readonly SequenceTracker _tracker = new();
 	private DateTimeOffset? _lastFrameAt;
@@ -19,7 +19,7 @@ public sealed class FrameContinuity
 		var (frame, receivedAt) = received;
 		var unixMs = receivedAt.ToUnixTimeMilliseconds();
 
-		if (receivedAt - _lastFrameAt > _silenceLimit)
+		if (receivedAt - _lastFrameAt > LinkTiming.SilenceLimit)
 		{
 			_tracker.Reset();
 		}
@@ -31,7 +31,7 @@ public sealed class FrameContinuity
 		TrendBreak? noSpectra = null;
 		if (frame.Measurement is not null)
 		{
-			if (receivedAt - _lastSpectrumAt > _silenceLimit)
+			if (receivedAt - _lastSpectrumAt > LinkTiming.SilenceLimit)
 			{
 				noSpectra = new TrendBreak(unixMs, 0);
 			}

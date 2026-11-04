@@ -46,8 +46,6 @@ public static class UiServiceCollectionExtensions
 		services.AddSingleton<LiveSpectrumSource>();
 		services.AddSingleton(provider =>
 			new SwitchingSpectrumSource(provider.GetRequiredService<LiveSpectrumSource>()));
-		services.AddSingleton<IDisplayedSpectrumSource>(provider =>
-			provider.GetRequiredService<SwitchingSpectrumSource>());
 		services.AddSingleton<MessagePanelViewModel>();
 		services.AddSingleton<ConnectionBarViewModel>();
 		services.AddSingleton<AppStatusBarViewModel>();

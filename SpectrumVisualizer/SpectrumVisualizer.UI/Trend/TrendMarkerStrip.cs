@@ -1,15 +1,13 @@
 using ScottPlot;
 
-namespace SpectrumVisualizer.UI.Trend;
+using SpectrumVisualizer.Core.Trend;
 
-/// <summary>The X range of one marked column of the trend, in axis units.</summary>
-public readonly record struct StripSpan(double FromX, double ToX);
+namespace SpectrumVisualizer.UI.Trend;
 
 /// <summary>A 4 px bar along the bottom of the data area over each marked column; it never steers the axis limits.</summary>
 public sealed class TrendMarkerStrip : IPlottable
 {
-	public const float Height = 4f;
-
+	private const float Height = 4f;
 	private const float MinimumWidth = 1f;
 
 	private readonly FillStyle _fill = new() { Color = Colors.Red };
@@ -53,10 +51,16 @@ public sealed class TrendMarkerStrip : IPlottable
 		_fill.Color = color;
 	}
 
-	/// <summary>Replaces every span with the given ones; called under Plot.Sync.</summary>
-	public void ReplaceSpans(IReadOnlyList<StripSpan> spans)
+	/// <summary>Replaces every span with the given time ranges on the axis; called under Plot.Sync.</summary>
+	public void ReplaceSpans(IReadOnlyList<TimeRange> ranges)
 	{
 		_spans.Clear();
-		_spans.AddRange(spans);
+		foreach (var range in ranges)
+		{
+			_spans.Add(new StripSpan(LocalTimeAxis.ToAxis(range.From), LocalTimeAxis.ToAxis(range.To)));
+		}
 	}
+
+	/// <summary>The X range of one marked column of the trend, in axis units.</summary>
+	private readonly record struct StripSpan(double FromX, double ToX);
 }

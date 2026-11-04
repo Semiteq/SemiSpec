@@ -10,7 +10,6 @@ namespace SpectrumVisualizer.UI.Trend;
 /// <summary>The hover text of one column of the last fold: its local time, its value or gap reason, its failures.</summary>
 public static class TrendReadout
 {
-	private const string TimeFormat = "HH:mm:ss";
 	private const string ValueFormat = "G6";
 
 	private static readonly Spectrometer[] _devices = [Spectrometer.Atp2000, Spectrometer.Atp8000];
@@ -22,10 +21,7 @@ public static class TrendReadout
 	public static string For(IntensitySeries series, int index, TrendKey key)
 	{
 		var columns = series.Columns;
-		var lines = new List<string>
-		{
-			columns[index].Start.ToLocalTime().ToString(TimeFormat, CultureInfo.InvariantCulture),
-		};
+		var lines = new List<string> { ClockText.TimeOfDay(columns[index].Start) };
 
 		if (TrendColumns.HasContent(columns[index]))
 		{
@@ -41,12 +37,12 @@ public static class TrendReadout
 		}
 
 		var last = index;
-		var failed = BoardState.None;
 		while (last + 1 < columns.Length && !TrendColumns.HasContent(columns[last + 1]))
 		{
 			last++;
 		}
 
+		var failed = BoardState.None;
 		for (var i = first; i <= last; i++)
 		{
 			failed |= columns[i].Failed;

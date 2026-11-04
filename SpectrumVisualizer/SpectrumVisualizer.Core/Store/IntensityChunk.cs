@@ -1,4 +1,4 @@
-namespace SpectrumVisualizer.Core.Trend;
+namespace SpectrumVisualizer.Core.Store;
 
 /// <summary>The stored intensity points of a range that starts at From, in receive order.</summary>
 public sealed record IntensityChunk(DateTimeOffset From, TrendPoint[] Points);

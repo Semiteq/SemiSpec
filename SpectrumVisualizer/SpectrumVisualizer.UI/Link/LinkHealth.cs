@@ -7,8 +7,6 @@ namespace SpectrumVisualizer.UI.Link;
 /// </summary>
 internal static class LinkHealth
 {
-	private static readonly TimeSpan _window = TimeSpan.FromSeconds(10);
-
 	/// <summary>
 	/// The ATP-2000 spectrum frame, the largest the board sends; a tail shorter than this is a stopped frame.
 	/// </summary>
@@ -22,12 +20,12 @@ internal static class LinkHealth
 		long bytesSinceFrame)
 	{
 		var reference = lastFrameAt ?? openedAt;
-		if (now - reference < _window)
+		if (now - reference < LinkTiming.SilenceLimit)
 		{
 			return lastFrameAt is null ? LinkState.Waiting : LinkState.Receiving;
 		}
 
-		var byteInWindow = lastByteAt is { } byteAt && now - byteAt < _window;
+		var byteInWindow = lastByteAt is { } byteAt && now - byteAt < LinkTiming.SilenceLimit;
 		return byteInWindow && bytesSinceFrame > _largestFrameBytes ? LinkState.OtherDevice : LinkState.NotResponding;
 	}
 
@@ -39,6 +37,6 @@ internal static class LinkHealth
 	{
 		var since = lastDrainAt is { } drainAt && drainAt > reference ? drainAt : reference;
 		var byteSinceReference = lastByteAt is { } byteAt && byteAt > reference;
-		return byteSinceReference && now - since >= _window;
+		return byteSinceReference && now - since >= LinkTiming.SilenceLimit;
 	}
 }

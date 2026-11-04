@@ -2,8 +2,6 @@ using ScottPlot;
 
 using SkiaSharp;
 
-using SpectrumVisualizer.Core.Trend;
-
 namespace SpectrumVisualizer.UI.Trend;
 
 /// <summary>The trend drawn as one stroked polyline through each visible column's min and max; no fill, no markers.</summary>

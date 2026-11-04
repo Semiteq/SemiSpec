@@ -2,6 +2,7 @@ using Avalonia.Headless.XUnit;
 
 using AwesomeAssertions;
 
+using SpectrumVisualizer.Core.Store;
 using SpectrumVisualizer.Core.Trend;
 using SpectrumVisualizer.UI.Trend;
 

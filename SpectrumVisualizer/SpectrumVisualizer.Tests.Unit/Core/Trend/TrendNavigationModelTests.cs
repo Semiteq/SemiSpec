@@ -46,7 +46,7 @@ public sealed class TrendNavigationModelTests
 	public void OnLiveEdgeLeavesAnEmptySpanBeforeTheFirstSample()
 	{
 		var firstSample = _origin.AddMinutes(-2);
-		var model = new TrendNavigationModel(_origin.AddMinutes(-10), _origin, firstSample, isSticky: true);
+		var model = new TrendNavigationModel(_origin.AddMinutes(-10), _origin, firstSample);
 		var now = _origin.AddMinutes(1);
 
 		model.OnLiveEdge(now);
@@ -214,7 +214,7 @@ public sealed class TrendNavigationModelTests
 		var from = _firstSample;
 		var to = from.AddDays(2);
 
-		var model = new TrendNavigationModel(from, to, _firstSample, isSticky: false);
+		var model = new TrendNavigationModel(from, to, _firstSample);
 
 		model.Width.Should().Be(TimeSpan.FromDays(1));
 		model.From.Should().Be(from);
@@ -316,6 +316,12 @@ public sealed class TrendNavigationModelTests
 
 	private static TrendNavigationModel Model(bool isSticky, TimeSpan windowWidth)
 	{
-		return new TrendNavigationModel(_origin - windowWidth, _origin, _firstSample, isSticky);
+		var model = new TrendNavigationModel(_origin - windowWidth, _origin, _firstSample);
+		if (!isSticky)
+		{
+			model.DetachSticky();
+		}
+
+		return model;
 	}
 }
