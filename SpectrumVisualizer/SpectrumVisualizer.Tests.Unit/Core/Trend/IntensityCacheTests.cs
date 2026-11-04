@@ -1,7 +1,5 @@
 using AwesomeAssertions;
 
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Time.Testing;
 
 using SpectrumVisualizer.Core.Protocol;
@@ -26,13 +24,12 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 	private static readonly TimeSpan _second = TimeSpan.FromSeconds(1);
 
 	private readonly FakeTimeProvider _time = new(Start);
-	private readonly FakeLogger<IntensityCache> _logger = new();
 	private readonly IntensityCache _cache;
 	private readonly List<ReReadRequest> _requests = [];
 
 	public IntensityCacheTests()
 	{
-		_cache = new IntensityCache(_time, _logger);
+		_cache = new IntensityCache(_time);
 		_cache.ReReadRequested.Subscribe(_requests.Add);
 	}
 
@@ -240,20 +237,6 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 	}
 
 	[Fact]
-	public void EveryKeyChangeLogsAtDebugWithItsRunningCount()
-	{
-		_cache.Add(StoreSamples.Spectrum(At(0), seq: 0));
-		_cache.Add(StoreSamples.Spectrum(At(1), nm: OtherNm, seq: 1));
-		_cache.Add(StoreSamples.Spectrum(At(2), nm: OtherNm, delta: 10, seq: 2));
-
-		var records = _logger.Collector.GetSnapshot();
-		records.Should().AllSatisfy(record => record.Level.Should().Be(LogLevel.Debug));
-		records.Select(record => record.Message).Should().Equal(
-			"The trend key changed to 1400 nm, delta 5, key change 1",
-			"The trend key changed to 1400 nm, delta 10, key change 2");
-	}
-
-	[Fact]
 	public void PointsBreaksAndMarksOlderThanADayBeforeNowAreDropped()
 	{
 		_cache.Add(StoreSamples.Spectrum(At(0), seq: 1));
@@ -369,7 +352,7 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 	[Fact]
 	public void AfterTheDisposeFramesAndChunksAreIgnored()
 	{
-		var cache = new IntensityCache(_time, _logger);
+		var cache = new IntensityCache(_time);
 		cache.Add(StoreSamples.Spectrum(At(0), seq: 0));
 		cache.Add(StoreSamples.Spectrum(At(1), nm: OtherNm, seq: 1));
 		cache.Dispose();
@@ -396,19 +379,6 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 		_cache.SpectrumAt(At(500))!.ReceivedAt.Should().Be(At(199));
 	}
 
-	[Fact]
-	public void AMomentFromTheRecentSpectraIsANewMeasurementAroundTheSamePixels()
-	{
-		var frame = StoreSamples.Spectrum(Start);
-		_cache.Add(frame);
-
-		var found = _cache.SpectrumAt(Start)!.Measurement;
-
-		found.Should().NotBeSameAs(frame.Frame.Measurement);
-		found.Pixels.Should().BeSameAs(frame.Frame.Measurement!.Pixels);
-		found.Should().Be(frame.Frame.Measurement);
-	}
-
 	private static DateTimeOffset At(double seconds)
 	{
 		return Start + TimeSpan.FromSeconds(seconds);
@@ -431,7 +401,7 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 		var points = Enumerable.Range(fromSecond, toSecond - fromSecond)
 			.Select(second => new TrendPoint(At(second).ToUnixTimeMilliseconds(), value ?? second))
 			.ToArray();
-		return new IntensityChunk(At(fromSecond), At(toSecond), points);
+		return new IntensityChunk(At(fromSecond), points);
 	}
 
 	/// <summary>

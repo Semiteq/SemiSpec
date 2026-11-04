@@ -26,14 +26,14 @@ public sealed class FrameContinuity
 
 		_lastFrameAt = receivedAt;
 		var lost = _tracker.Observe(frame);
-		TrendBreak? loss = lost > 0 ? new TrendBreak(unixMs, BreakKind.Loss, lost) : null;
+		TrendBreak? loss = lost > 0 ? new TrendBreak(unixMs, lost) : null;
 
 		TrendBreak? noSpectra = null;
 		if (frame.Measurement is not null)
 		{
 			if (receivedAt - _lastSpectrumAt > _silenceLimit)
 			{
-				noSpectra = new TrendBreak(unixMs, BreakKind.NoSpectra, 0);
+				noSpectra = new TrendBreak(unixMs, 0);
 			}
 
 			_lastSpectrumAt = receivedAt;
@@ -49,14 +49,8 @@ public sealed class FrameContinuity
 /// <summary>What one frame adds to the trend: a Loss break, a NoSpectra break, a failure mark, each optional.</summary>
 public readonly record struct Continuity(TrendBreak? Loss, TrendBreak? NoSpectra, TrendFailure? Failure);
 
-/// <summary>A cut in the trend line at a frame; Lost counts the spectra lost before it, 0 for NoSpectra.</summary>
-public readonly record struct TrendBreak(long UnixMs, BreakKind Kind, int Lost);
-
-public enum BreakKind
-{
-	Loss,
-	NoSpectra,
-}
+/// <summary>A cut in the trend line at a frame; Lost counts the spectra lost before it, 0 ends a stretch without spectra.</summary>
+public readonly record struct TrendBreak(long UnixMs, int Lost);
 
 /// <summary>A frame whose state carried measurement-failed bits; State holds only those bits.</summary>
 public readonly record struct TrendFailure(long UnixMs, BoardState State);

@@ -136,7 +136,7 @@ public sealed class TrendNavigationModelTests
 	{
 		var model = Model(isSticky: false, windowWidth: TimeSpan.FromHours(10));
 
-		model.Zoom(factor: 10, anchor: model.To);
+		model.Zoom(factor: 10, anchor: model.To, now: _origin);
 
 		model.Width.Should().Be(TimeSpan.FromDays(1));
 	}
@@ -146,7 +146,7 @@ public sealed class TrendNavigationModelTests
 	{
 		var model = Model(isSticky: false, windowWidth: TimeSpan.FromSeconds(20));
 
-		model.Zoom(factor: 0.1, anchor: model.From);
+		model.Zoom(factor: 0.1, anchor: model.From, now: _origin);
 
 		model.Width.Should().Be(TimeSpan.FromSeconds(10));
 	}
@@ -158,7 +158,7 @@ public sealed class TrendNavigationModelTests
 		var anchor = model.From + TimeSpan.FromMinutes(2);
 		var anchorFractionBefore = (anchor - model.From) / model.Width;
 
-		model.Zoom(factor: 0.5, anchor: anchor);
+		model.Zoom(factor: 0.5, anchor: anchor, now: _origin);
 
 		// The width snaps onto the zoom ladder, near the requested half-width; the anchor keeps its relative position.
 		var anchorFractionAfter = (anchor - model.From) / model.Width;
@@ -173,20 +173,20 @@ public sealed class TrendNavigationModelTests
 		var anchor = model.From + (model.Width / 2);
 
 		// The origin is taken after one zoom snaps onto the ladder; 1 h itself is not a ladder point.
-		model.Zoom(factor: 0.8, anchor: anchor);
-		model.Zoom(factor: 1.25, anchor: anchor);
+		model.Zoom(factor: 0.8, anchor: anchor, now: _origin);
+		model.Zoom(factor: 1.25, anchor: anchor, now: _origin);
 		var fromOrigin = model.From;
 		var toOrigin = model.To;
 		var widthOrigin = model.Width;
 
 		for (var notch = 0; notch < 8; notch++)
 		{
-			model.Zoom(factor: 0.8, anchor: anchor);
+			model.Zoom(factor: 0.8, anchor: anchor, now: _origin);
 		}
 
 		for (var notch = 0; notch < 8; notch++)
 		{
-			model.Zoom(factor: 1.25, anchor: anchor);
+			model.Zoom(factor: 1.25, anchor: anchor, now: _origin);
 		}
 
 		model.Width.Should().BeCloseTo(widthOrigin, TimeSpan.FromMilliseconds(1));
@@ -202,7 +202,7 @@ public sealed class TrendNavigationModelTests
 
 		for (var notch = 0; notch < 40; notch++)
 		{
-			model.Zoom(factor: 1.25, anchor: anchor);
+			model.Zoom(factor: 1.25, anchor: anchor, now: _origin);
 		}
 
 		model.From.Should().BeOnOrAfter(_firstSample);
@@ -280,6 +280,27 @@ public sealed class TrendNavigationModelTests
 		model.From.Should().Be(to - TimeSpan.FromHours(20));
 	}
 
+	[Fact]
+	public void AZoomThatLeavesNowOutsideStopsFollowing()
+	{
+		var model = Model(isSticky: true, windowWidth: TimeSpan.FromMinutes(10));
+
+		model.Zoom(factor: 0.8, anchor: model.From, now: _origin);
+
+		model.IsSticky.Should().BeFalse();
+	}
+
+	[Fact]
+	public void AZoomThatKeepsNowInsideKeepsFollowing()
+	{
+		var model = Model(isSticky: true, windowWidth: TimeSpan.FromMinutes(10));
+
+		model.Zoom(factor: 0.8, anchor: model.To, now: _origin);
+
+		model.IsSticky.Should().BeTrue();
+		model.To.Should().Be(_origin);
+	}
+
 	// 5 min x 0.8 is 240 s; the nearest rung is 10 s x 1.25^14, about 227.4 s.
 	[Fact]
 	public void SetWidthThenOneWheelNotchLandsOnTheLadder()
@@ -287,7 +308,7 @@ public sealed class TrendNavigationModelTests
 		var model = Model(isSticky: false, windowWidth: TimeSpan.FromHours(1));
 		model.SetWidth(TimeSpan.FromMinutes(5));
 
-		model.Zoom(factor: 0.8, anchor: model.To);
+		model.Zoom(factor: 0.8, anchor: model.To, now: _origin);
 
 		model.Width.Should().BeCloseTo(
 			TimeSpan.FromSeconds(10 * Math.Pow(1.25, 14)), TimeSpan.FromMilliseconds(1));

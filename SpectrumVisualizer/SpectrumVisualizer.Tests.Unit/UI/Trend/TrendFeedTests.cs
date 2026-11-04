@@ -6,6 +6,8 @@ using AwesomeAssertions;
 
 using FluentResults;
 
+using Microsoft.Extensions.Logging;
+
 using SpectrumVisualizer.Core.Store;
 using SpectrumVisualizer.Core.Trend;
 using SpectrumVisualizer.Tests.Unit.Core.Store;
@@ -36,6 +38,23 @@ public sealed class TrendFeedTests : TrendFeedTestBase
 		await Waits.UntilAsync(() => Cache.Extent?.Newest == At(2));
 		Cache.Extent!.Value.First.Should().Be(At(0));
 		Cache.Extent!.Value.Key.Should().Be(new TrendKey(SampleNm, SampleDelta));
+	}
+
+	[AvaloniaFact]
+	public void EveryKeyChangeLogsAtDebugWithItsRunningCount()
+	{
+		Feed.Start();
+		AddAt(0, SampleNm);
+		AddAt(1, OtherNm);
+		Add(StoreSamples.Spectrum(At(2), nm: OtherNm, delta: 10, seq: NextSeq()));
+
+		var records = FeedLogger.Collector.GetSnapshot()
+			.Where(record => record.Message.StartsWith("The trend key changed", StringComparison.Ordinal))
+			.ToList();
+		records.Should().AllSatisfy(record => record.Level.Should().Be(LogLevel.Debug));
+		records.Select(record => record.Message).Should().Equal(
+			$"The trend key changed to {OtherNm} nm, delta {SampleDelta}, key change 1",
+			$"The trend key changed to {OtherNm} nm, delta 10, key change 2");
 	}
 
 	[AvaloniaFact]

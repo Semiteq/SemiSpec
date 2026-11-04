@@ -130,7 +130,7 @@ public sealed class OverviewViewModelTests : TrendChartTestBase
 		TrendPoint[] olderPoints = [.. Enumerable.Range(0, 600).Select(second =>
 			new TrendPoint(At(second).ToUnixTimeMilliseconds(), 7.0))];
 
-		Cache.LandHistory(0, new IntensityChunk(olderFrom, olderTo, olderPoints));
+		Cache.LandHistory(0, new IntensityChunk(olderFrom, olderPoints));
 		Scheduler.AdvanceBy(1);
 
 		_overview.Band.Should().NotBeSameAs(band, "a landed chunk refolds without waiting for the cadence");

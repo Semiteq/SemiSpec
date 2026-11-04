@@ -19,19 +19,16 @@ public sealed class TrendNavigationModel(
 
 	public bool IsSticky { get; private set; } = isSticky;
 
-	public DateTimeOffset FirstSample { get; } = firstSample;
+	/// <summary>The pan floor: a pan or a zoom never moves From before it; a later move applies the new floor.</summary>
+	public DateTimeOffset FirstSample { get; set; } = firstSample;
 
 	public void Pan(TimeSpan delta, DateTimeOffset now)
 	{
 		PlaceFrom(From + delta, Width);
-
-		if (now > To || now < From)
-		{
-			IsSticky = false;
-		}
+		DetachUnlessHolding(now);
 	}
 
-	public void Zoom(double factor, DateTimeOffset anchor)
+	public void Zoom(double factor, DateTimeOffset anchor, DateTimeOffset now)
 	{
 		var currentWidth = Width;
 		var targetWidth = ClampWidthSpan(QuantizeWidth(currentWidth * factor));
@@ -39,6 +36,7 @@ public sealed class TrendNavigationModel(
 		var anchorFraction = (anchor - From) / currentWidth;
 		// Clamped rather than anchor-pinned: pinning would render the empty left span as data.
 		PlaceFrom(anchor - (targetWidth * anchorFraction), targetWidth);
+		DetachUnlessHolding(now);
 	}
 
 	/// <summary>Sets the width exactly, off the zoom ladder, keeping the right edge and sticky.</summary>
@@ -77,6 +75,15 @@ public sealed class TrendNavigationModel(
 		var width = Width;
 		To = now;
 		From = now - width;
+	}
+
+	/// <summary>A window that no longer holds now stops following.</summary>
+	private void DetachUnlessHolding(DateTimeOffset now)
+	{
+		if (now > To || now < From)
+		{
+			IsSticky = false;
+		}
 	}
 
 	private void PlaceFrom(DateTimeOffset from, TimeSpan width)

@@ -40,7 +40,7 @@ public static class EnvelopePath
 		for (var index = first; index < lastExclusive; index++)
 		{
 			var column = columns[index];
-			if (IsGap(column))
+			if (column.IsGap)
 			{
 				previousY = double.NaN;
 				segmentIsOpen = false;
@@ -60,7 +60,7 @@ public static class EnvelopePath
 				|| Math.Abs(column.Min - previousY) <= Math.Abs(column.Max - previousY);
 			var entry = entersAtMin ? column.Min : column.Max;
 			var farExtreme = entersAtMin ? column.Max : column.Min;
-			var heldY = double.IsNaN(column.Center) ? farExtreme : column.Center;
+			var heldY = column.Center;
 
 			AddVertex(column.X, entry);
 			AddVertex(column.X, farExtreme);
@@ -77,11 +77,6 @@ public static class EnvelopePath
 			destination.Add(new EnvelopePoint(x, y, !segmentIsOpen));
 			segmentIsOpen = true;
 		}
-	}
-
-	internal static bool IsGap(EnvelopeColumn column)
-	{
-		return double.IsNaN(column.Min) || double.IsNaN(column.Max);
 	}
 
 	private static int FirstAtOrAfter(IReadOnlyList<EnvelopeColumn> columns, double x)

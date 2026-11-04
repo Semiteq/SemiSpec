@@ -47,10 +47,7 @@ internal sealed class RecentSpectra
 		return points;
 	}
 
-	/// <summary>
-	/// The latest held frame at or before the moment as a new measurement around the same pixels, ties to the later
-	/// frame; null when the moment is before the oldest held frame.
-	/// </summary>
+	/// <summary>The latest held frame at or before the moment, ties to the later frame; null before the oldest one.</summary>
 	public StoredSpectrum? At(long unixMs)
 	{
 		if (StartMs is not { } startMs || unixMs < startMs)
@@ -59,7 +56,7 @@ internal sealed class RecentSpectra
 		}
 
 		var (frame, receivedAt) = _frames[TimeOrdered.UpperBound(_frames, unixMs, UnixMs) - 1];
-		return new StoredSpectrum(frame.Measurement! with { }, receivedAt, frame.Seq, frame.State);
+		return new StoredSpectrum(frame.Measurement!, receivedAt, frame.Seq, frame.State);
 	}
 
 	private static long UnixMs(ReceivedFrame frame)

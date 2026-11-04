@@ -24,7 +24,7 @@ public abstract class TrendChartTestBase : IDisposable
 
 	protected TrendChartTestBase()
 	{
-		Cache = new IntensityCache(Time, new FakeLogger<IntensityCache>());
+		Cache = new IntensityCache(Time);
 		Switching = new SwitchingSpectrumSource(_live);
 		Chart = new TrendChartViewModel(
 			Cache,

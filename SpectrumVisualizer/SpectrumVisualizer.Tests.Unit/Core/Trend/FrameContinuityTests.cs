@@ -41,7 +41,7 @@ public sealed class FrameContinuityTests
 
 		var result = _continuity.Observe(Spectrum(seq: 13, atSeconds: 1));
 
-		result.Loss.Should().Be(new TrendBreak(UnixMs(1), BreakKind.Loss, 2));
+		result.Loss.Should().Be(new TrendBreak(UnixMs(1), 2));
 		result.NoSpectra.Should().BeNull();
 	}
 
@@ -60,7 +60,7 @@ public sealed class FrameContinuityTests
 
 		var result = _continuity.Observe(HeartbeatAt(seq: 12, atSeconds: 3));
 
-		result.Loss.Should().Be(new TrendBreak(UnixMs(3), BreakKind.Loss, 2));
+		result.Loss.Should().Be(new TrendBreak(UnixMs(3), 2));
 		result.NoSpectra.Should().BeNull();
 	}
 
@@ -72,7 +72,7 @@ public sealed class FrameContinuityTests
 		var result = _continuity.Observe(Spectrum(seq: 1, atSeconds: 10.001));
 
 		result.Loss.Should().BeNull("the pause ends the seq session");
-		result.NoSpectra.Should().Be(new TrendBreak(UnixMs(10.001), BreakKind.NoSpectra, 0));
+		result.NoSpectra.Should().Be(new TrendBreak(UnixMs(10.001), 0));
 	}
 
 	[Fact]
@@ -86,9 +86,9 @@ public sealed class FrameContinuityTests
 		var lossAfterHeartbeats = _continuity.Observe(Spectrum(seq: 22, atSeconds: 16));
 
 		heartbeats.Should().AllBeEquivalentTo(default(Continuity));
-		lossAfterHeartbeats.NoSpectra.Should().Be(new TrendBreak(UnixMs(16), BreakKind.NoSpectra, 0));
+		lossAfterHeartbeats.NoSpectra.Should().Be(new TrendBreak(UnixMs(16), 0));
 		lossAfterHeartbeats.Loss.Should().Be(
-			new TrendBreak(UnixMs(16), BreakKind.Loss, 1),
+			new TrendBreak(UnixMs(16), 1),
 			"the heartbeats kept the seq session, so the skipped seq 21 counts");
 	}
 
@@ -123,7 +123,7 @@ public sealed class FrameContinuityTests
 
 		var result = _continuity.Observe(Spectrum(seq: 1, atSeconds: 5));
 
-		result.Loss.Should().Be(new TrendBreak(UnixMs(5), BreakKind.Loss, 201));
+		result.Loss.Should().Be(new TrendBreak(UnixMs(5), 201));
 		result.NoSpectra.Should().BeNull();
 	}
 

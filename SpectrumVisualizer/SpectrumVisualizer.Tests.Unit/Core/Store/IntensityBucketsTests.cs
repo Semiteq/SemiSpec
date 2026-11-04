@@ -96,12 +96,11 @@ public sealed class IntensityBucketsTests
 	}
 
 	[Fact]
-	public void FailuresMergeTheirFailedBitsOnly()
+	public void FailuresInOneColumnMergeTheirBits()
 	{
 		var buckets = new IntensityBuckets(Query(_from, _from.AddSeconds(2), TimeSpan.FromSeconds(1)));
 
-		var connectedAndFailed = BoardState.Atp2000Connected | BoardState.Atp2000MeasurementFailed;
-		buckets.AddFailure(_from.AddMilliseconds(100), connectedAndFailed);
+		buckets.AddFailure(_from.AddMilliseconds(100), BoardState.Atp2000MeasurementFailed);
 		buckets.AddFailure(_from.AddMilliseconds(200), BoardState.Atp8000MeasurementFailed);
 
 		buckets.ToSeries().Columns.Select(c => c.Failed).Should().Equal(

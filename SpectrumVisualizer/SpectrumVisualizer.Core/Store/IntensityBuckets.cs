@@ -7,8 +7,6 @@ namespace SpectrumVisualizer.Core.Store;
 /// <summary>Folds window intensities, breaks and failure marks into columns on the time grid of the query.</summary>
 public sealed class IntensityBuckets(IntensityQuery query)
 {
-	private const BoardState FailureBits = BoardState.Atp2000MeasurementFailed | BoardState.Atp8000MeasurementFailed;
-
 	private readonly double[] _min = new double[query.ColumnCount];
 	private readonly double[] _max = new double[query.ColumnCount];
 	private readonly int[] _count = new int[query.ColumnCount];
@@ -75,13 +73,13 @@ public sealed class IntensityBuckets(IntensityQuery query)
 		}
 	}
 
-	/// <summary>Merges the measurement-failed bits of a frame's state into its column, dropping other bits.</summary>
+	/// <summary>Merges a frame's measurement-failed bits into its column; the continuity rule passes only those bits.</summary>
 	public void AddFailure(DateTimeOffset moment, BoardState state)
 	{
 		var column = query.ColumnOf(moment);
 		if (column >= 0)
 		{
-			_failed[column] |= state & FailureBits;
+			_failed[column] |= state;
 		}
 	}
 

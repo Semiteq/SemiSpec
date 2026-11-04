@@ -62,36 +62,12 @@ public sealed class EnvelopeLineTests
 	}
 
 	[Fact]
-	public void AnEmptyLineHasNoLimits()
-	{
-		new EnvelopeLine().GetAxisLimits().Should().Be(AxisLimits.NoLimits);
-	}
-
-	[Fact]
-	public void TheLimitsSpanTheColumnsAndSkipTheGaps()
+	public void TheLineNeverSteersTheLimits()
 	{
 		var line = new EnvelopeLine();
-		line.ReplaceColumns(
-		[
-			new EnvelopeColumn(1.0, 2.0, 5.0, 3.0),
-			new EnvelopeColumn(2.0, double.NaN, double.NaN, double.NaN),
-			new EnvelopeColumn(3.0, -1.0, 4.0, 0.0)
-		]);
+		line.ReplaceColumns([new EnvelopeColumn(1.0, 2.0, 5.0, 3.0), new EnvelopeColumn(3.0, -1.0, 4.0, 0.0)]);
 
-		line.GetAxisLimits().Should().Be(new AxisLimits(1.0, 3.0, -1.0, 5.0));
-	}
-
-	[Fact]
-	public void AnAllGapLineLimitsOnlyTheHorizontal()
-	{
-		var line = new EnvelopeLine();
-		line.ReplaceColumns(
-		[
-			new EnvelopeColumn(1.0, double.NaN, double.NaN, double.NaN),
-			new EnvelopeColumn(4.0, double.NaN, double.NaN, double.NaN)
-		]);
-
-		line.GetAxisLimits().Should().Be(AxisLimits.HorizontalOnly(1.0, 4.0));
+		line.GetAxisLimits().Should().Be(AxisLimits.NoLimits);
 	}
 
 	// The trend's own gap shape: the gap column stands at the start of the broken stretch and its empty columns are

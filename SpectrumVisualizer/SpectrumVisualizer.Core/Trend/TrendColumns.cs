@@ -9,6 +9,8 @@ public static class TrendColumns
 	public const int MinimumColumns = 256;
 	public const int MaximumColumns = 2048;
 
+	private const double VerticalPadding = 0.05;
+
 	private static readonly TimeSpan _failureJoin = TimeSpan.FromSeconds(5);
 
 	// The fold's range is half-open, so a window ending exactly at the newest point would leave it out.
@@ -38,7 +40,7 @@ public static class TrendColumns
 		var columns = new List<EnvelopeColumn>(series.Columns.Length);
 		foreach (var column in series.Columns)
 		{
-			if (column.BreakCount > 0 || (column.Count == 0 && column.UncoveredCount > 0))
+			if (OpensGap(column))
 			{
 				columns.Add(new EnvelopeColumn(toAxis(column.Start), double.NaN, double.NaN, double.NaN));
 			}
@@ -50,6 +52,46 @@ public static class TrendColumns
 		}
 
 		return columns;
+	}
+
+	/// <summary>The gap rule: a column without a break, a value or an uncovered spectrum is left out, so the line connects across it.</summary>
+	public static bool HasContent(IntensityColumn column)
+	{
+		return column.Count > 0 || column.BreakCount > 0 || column.UncoveredCount > 0;
+	}
+
+	/// <summary>A break, or an uncovered spectrum with no value, cuts the line at the column's start.</summary>
+	public static bool OpensGap(IntensityColumn column)
+	{
+		return column.BreakCount > 0 || (column.Count == 0 && column.UncoveredCount > 0);
+	}
+
+	/// <summary>The drawn values padded by 5 % of their span, plus or minus 1 when flat; null when none is drawn.</summary>
+	public static (double Bottom, double Top)? VerticalRange(IReadOnlyList<EnvelopeColumn> columns)
+	{
+		var bottom = double.PositiveInfinity;
+		var top = double.NegativeInfinity;
+		foreach (var column in columns)
+		{
+			if (!column.IsGap)
+			{
+				bottom = Math.Min(bottom, column.Min);
+				top = Math.Max(top, column.Max);
+			}
+		}
+
+		if (double.IsInfinity(bottom))
+		{
+			return null;
+		}
+
+		if (bottom.Equals(top))
+		{
+			return (bottom - 1.0, top + 1.0);
+		}
+
+		var margin = (top - bottom) * VerticalPadding;
+		return (bottom - margin, top + margin);
 	}
 
 	/// <summary>The failed columns as time ranges; failed columns less than 5 s apart join into one range.</summary>

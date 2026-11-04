@@ -21,33 +21,10 @@ public sealed class EnvelopeLine : IPlottable
 
 	public IEnumerable<LegendItem> LegendItems => [];
 
+	/// <summary>The chart sets both axes on every refresh, so ScottPlot never autoscales to this line.</summary>
 	public AxisLimits GetAxisLimits()
 	{
-		if (_columns.Count == 0)
-		{
-			return AxisLimits.NoLimits;
-		}
-
-		var bottom = double.PositiveInfinity;
-		var top = double.NegativeInfinity;
-
-		foreach (var column in _columns)
-		{
-			if (EnvelopePath.IsGap(column))
-			{
-				continue;
-			}
-
-			bottom = Math.Min(bottom, column.Min);
-			top = Math.Max(top, column.Max);
-		}
-
-		var left = _columns[0].X;
-		var right = _columns[^1].X;
-
-		return double.IsInfinity(bottom)
-			? AxisLimits.HorizontalOnly(left, right)
-			: new AxisLimits(left, right, bottom, top);
+		return AxisLimits.NoLimits;
 	}
 
 	public void Render(RenderPack rp)

@@ -297,29 +297,6 @@ public sealed class OverviewGeometryTests
 		time.Should().BeOnOrBefore(_last);
 	}
 
-	[Theory]
-	[InlineData(0.0, 0.0)]
-	[InlineData(2.5, 0.25)]
-	[InlineData(10.0, 1.0)]
-	public void FractionAtPlacesATimeInsideTheExtentAlongIt(double daysAfterFirst, double expected)
-	{
-		OverviewGeometry.FractionAt(_first, _last, _first.AddDays(daysAfterFirst)).Should().Be(expected);
-	}
-
-	[Theory]
-	[InlineData(-0.5)]
-	[InlineData(10.5)]
-	public void FractionAtOutsideTheExtentIsNull(double daysAfterFirst)
-	{
-		OverviewGeometry.FractionAt(_first, _last, _first.AddDays(daysAfterFirst)).Should().BeNull();
-	}
-
-	[Fact]
-	public void FractionAtOverAnEmptyExtentIsNull()
-	{
-		OverviewGeometry.FractionAt(_first, _first, _first).Should().BeNull();
-	}
-
 	private static IntensitySeries Band(params (double Days, double Min, double Max, double Last)[] columns)
 	{
 		IntensityColumn[] bandColumns =

@@ -82,7 +82,7 @@ public sealed class SpectrumHistory(string path)
 			{
 				var windows = new QueryWindows(wavelengthNm, delta);
 				var points = WindowMeans(connection, windows, from, to, token).ToArray();
-				return Result.Ok(new IntensityChunk(from, to, points));
+				return Result.Ok(new IntensityChunk(from, points));
 			},
 			"The intensity points could not be read",
 			token);

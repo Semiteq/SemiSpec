@@ -32,7 +32,7 @@ public sealed class TrendStand : IDisposable
 	public TrendStand(SwitchingSpectrumSource source, MessagePanelViewModel messagePanel)
 	{
 		var uiScheduler = _uiScheduler;
-		_cache = new IntensityCache(TimeProvider.System, NullLogger<IntensityCache>.Instance);
+		_cache = new IntensityCache(TimeProvider.System);
 		_chart = new TrendChartViewModel(
 			_cache, source, messagePanel, TimeProvider.System, uiScheduler, NullLogger<TrendChartViewModel>.Instance);
 		_overview = new OverviewViewModel(
@@ -47,7 +47,7 @@ public sealed class TrendStand : IDisposable
 			_cache,
 			_chart,
 			source,
-			(_, _, from, to, _) => Task.FromResult(Result.Ok(new IntensityChunk(from, to, []))),
+			(_, _, from, _, _) => Task.FromResult(Result.Ok(new IntensityChunk(from, []))),
 			(_, _) => Task.FromResult(Result.Ok<StoredSpectrum?>(null)),
 			messagePanel,
 			uiScheduler,

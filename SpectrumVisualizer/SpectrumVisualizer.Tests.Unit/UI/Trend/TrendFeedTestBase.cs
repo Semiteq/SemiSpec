@@ -71,7 +71,7 @@ public abstract class TrendFeedTestBase : TrendChartTestBase
 
 	/// <summary>The result of every points read; an empty chunk of the asked range by default.</summary>
 	protected Func<PointsCall, Result<IntensityChunk>> PointsResult { get; set; } =
-		call => Result.Ok(new IntensityChunk(call.From, call.To, []));
+		call => Result.Ok(new IntensityChunk(call.From, []));
 
 	/// <summary>The result of every spectrum read; no stored spectrum by default.</summary>
 	protected Func<SpectrumCall, Result<StoredSpectrum?>> SpectrumResult { get; set; } =

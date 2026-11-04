@@ -27,7 +27,7 @@ public static class TrendReadout
 			columns[index].Start.ToLocalTime().ToString(TimeFormat, CultureInfo.InvariantCulture),
 		};
 
-		if (HasContent(columns[index]))
+		if (TrendColumns.HasContent(columns[index]))
 		{
 			Describe(columns[index], key, lines);
 			AddFailures(columns[index].Failed, lines);
@@ -35,14 +35,14 @@ public static class TrendReadout
 		}
 
 		var first = index;
-		while (first > 0 && !HasContent(columns[first - 1]))
+		while (first > 0 && !TrendColumns.HasContent(columns[first - 1]))
 		{
 			first--;
 		}
 
 		var last = index;
 		var failed = BoardState.None;
-		while (last + 1 < columns.Length && !HasContent(columns[last + 1]))
+		while (last + 1 < columns.Length && !TrendColumns.HasContent(columns[last + 1]))
 		{
 			last++;
 		}
@@ -52,7 +52,7 @@ public static class TrendReadout
 			failed |= columns[i].Failed;
 		}
 
-		if (last + 1 < columns.Length && OpensAGap(columns[last + 1]))
+		if (last + 1 < columns.Length && TrendColumns.OpensGap(columns[last + 1]))
 		{
 			AddGapReason(columns[last + 1], key, lines);
 		}
@@ -67,16 +67,6 @@ public static class TrendReadout
 
 		AddFailures(failed, lines);
 		return string.Join('\n', lines);
-	}
-
-	private static bool HasContent(IntensityColumn column)
-	{
-		return column.Count > 0 || column.BreakCount > 0 || column.UncoveredCount > 0;
-	}
-
-	private static bool OpensAGap(IntensityColumn column)
-	{
-		return column.BreakCount > 0 || column.Count == 0;
 	}
 
 	private static void Describe(IntensityColumn column, TrendKey key, List<string> lines)

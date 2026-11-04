@@ -4,7 +4,6 @@ using System.Globalization;
 using FluentResults;
 
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Logging.Abstractions;
 
 using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Core.Store;
@@ -122,7 +121,7 @@ public static class BenchmarkRun
 	private static async Task MeasureTrendAsync(MeasuredState measured, string span)
 	{
 		var (options, file) = (measured.Options, measured.File);
-		using var cache = new IntensityCache(new FixedTimeProvider(file.WindowTo), NullLogger<IntensityCache>.Instance);
+		using var cache = new IntensityCache(new FixedTimeProvider(file.WindowTo));
 		foreach (var frame in file.WindowFrames())
 		{
 			cache.Add(frame);

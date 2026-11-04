@@ -26,7 +26,6 @@ public sealed class SpectrumHistoryPointsTests : SpectrumHistoryTestBase
 		var chunk = await PointsAsync(StoreSamples.SampleNm, StoreSamples.SampleDelta);
 
 		chunk.From.Should().Be(Start);
-		chunk.To.Should().Be(Start.AddSeconds(10));
 		chunk.Points.Should().Equal(Point(Start.AddSeconds(1), mean), Point(Start.AddSeconds(3), mean + 10));
 	}
 

@@ -29,8 +29,6 @@ namespace SpectrumVisualizer.UI.Trend;
 /// </summary>
 public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 {
-	private const double YPadding = 0.05;
-
 	private static readonly TimeSpan _changeSample = TimeSpan.FromMilliseconds(100);
 	private static readonly TimeSpan _liveTick = TimeSpan.FromSeconds(1);
 
@@ -44,7 +42,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	private readonly VerticalLine _momentLine;
 	private readonly Subject<Unit> _redrawRequests = new();
 	private readonly CompositeDisposable _disposables = [];
-	private TrendNavigationModel _navigation;
+	private readonly TrendNavigationModel _navigation;
 	private double _dataAreaPixels = TrendColumns.MaximumColumns;
 	private TrendFold? _lastFold;
 	private bool _disposed;
@@ -78,9 +76,10 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 
 		_disposables.Add(cache.Changed
 			.Sample(_changeSample, uiScheduler)
-			.Merge(LiveTicks(uiScheduler))
+			// While following, the right edge is now, so a silence shows as an empty span within a second.
+			.Merge(Observable.Interval(_liveTick, uiScheduler).Where(_ => IsFollowing).Select(_ => Unit.Default))
 			.StartWith(Unit.Default)
-			.Subscribe(_ => RefreshReporting(), ReportPipelineFailure));
+			.Subscribe(_ => Refresh(), ReportPipelineFailure));
 		_disposables.Add(source
 			.WhenAnyValue(switching => switching.ShownMoment)
 			.Subscribe(MarkMoment, ReportPipelineFailure));
@@ -122,13 +121,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 			return;
 		}
 
-		var now = _timeProvider.GetUtcNow();
-		_navigation.Zoom(factor, anchor);
-		if (now > _navigation.To || now < _navigation.From)
-		{
-			_navigation.DetachSticky();
-		}
-
+		_navigation.Zoom(factor, anchor, _timeProvider.GetUtcNow());
 		Refresh();
 	}
 
@@ -185,15 +178,8 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	/// <summary>The hover text of the last fold's column at the moment; null outside the window or before a point.</summary>
 	public string? ReadoutAt(DateTimeOffset moment)
 	{
-		if (_lastFold is not { } fold)
-		{
-			return null;
-		}
-
-		var index = fold.Query.ColumnOf(moment);
-		return index < 0 || index >= fold.Series.Columns.Length
-			? null
-			: TrendReadout.For(fold.Series, index, fold.Extent.Key);
+		var index = _lastFold?.Query.ColumnOf(moment) ?? -1;
+		return index < 0 ? null : TrendReadout.For(_lastFold!.Series, index, _lastFold.Extent.Key);
 	}
 
 	public void ApplyPalette(ChartColors colors)
@@ -223,19 +209,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		Plot.Dispose();
 	}
 
-	/// <summary>A failed refresh is reported and skipped, so the next cache change refreshes again.</summary>
-	private void RefreshReporting()
-	{
-		try
-		{
-			Refresh();
-		}
-		catch (Exception exception)
-		{
-			ReportPipelineFailure(exception);
-		}
-	}
-
+	/// <summary>A failed refresh is reported and skipped, so the next trigger refreshes again.</summary>
 	private void Refresh()
 	{
 		if (_disposed)
@@ -243,98 +217,57 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 			return;
 		}
 
-		_lastFold = _cache.FoldCurrent(FollowExtent);
-		var key = _lastFold?.Extent.Key;
-		var columns = _lastFold is { } fold ? TrendColumns.Map(fold.Series, LocalTimeAxis.ToAxis) : [];
-		lock (Plot.Sync)
+		try
 		{
-			_envelope.ReplaceColumns(columns);
-			_strip.ReplaceSpans(_lastFold is { } marked ? FailureSpans(marked.Series) : []);
-			Plot.Axes.SetLimitsX(LocalTimeAxis.ToAxis(_navigation.From), LocalTimeAxis.ToAxis(_navigation.To));
-			if (VerticalRange(columns) is { } range)
+			_lastFold = _cache.FoldCurrent(FollowExtent);
+			var columns = _lastFold is { } fold ? TrendColumns.Map(fold.Series, LocalTimeAxis.ToAxis) : [];
+			lock (Plot.Sync)
 			{
-				Plot.Axes.SetLimitsY(range.Bottom, range.Top);
+				_envelope.ReplaceColumns(columns);
+				_strip.ReplaceSpans(_lastFold is { } marked ? [.. TrendColumns.FailureRanges(marked.Series).Select(ToStripSpan)] : []);
+				Plot.Axes.SetLimitsX(LocalTimeAxis.ToAxis(_navigation.From), LocalTimeAxis.ToAxis(_navigation.To));
+				if (TrendColumns.VerticalRange(columns) is { } range)
+				{
+					Plot.Axes.SetLimitsY(range.Bottom, range.Top);
+				}
+
+				Plot.Axes.Left.Label.Text = _lastFold?.Extent.Key is { } key
+					? Resources.FormatTrendAxisIntensityFormat(key.WavelengthNm, key.Delta)
+					: Resources.TrendAxisIntensity;
 			}
 
-			Plot.Axes.Left.Label.Text = key is { } shownKey
-				? Resources.FormatTrendAxisIntensityFormat(shownKey.WavelengthNm, shownKey.Delta)
-				: Resources.TrendAxisIntensity;
+			HasPoints = _lastFold is not null;
+			Width = _navigation.Width;
+			IsFollowing = _navigation.IsSticky;
+			RequestRedraw();
 		}
-
-		HasPoints = _lastFold is not null;
-		Width = _navigation.Width;
-		IsFollowing = _navigation.IsSticky;
-		RequestRedraw();
-	}
-
-	/// <summary>The first point opens the window at now; a moved first point moves only the pan floor.</summary>
-	private void TrackExtent(DateTimeOffset first, DateTimeOffset now)
-	{
-		if (!HasPoints)
+		catch (Exception exception)
 		{
-			_navigation = new TrendNavigationModel(now - _navigation.Width, now, first, isSticky: true);
-		}
-		else if (first != _navigation.FirstSample)
-		{
-			_navigation = new TrendNavigationModel(_navigation.From, _navigation.To, first, _navigation.IsSticky);
+			ReportPipelineFailure(exception);
 		}
 	}
 
-	/// <summary>Runs under the cache's lock: moves the window with the extent and the clock, then folds over it.</summary>
+	/// <summary>
+	/// Runs under the cache's lock: the first point opens the window at now, a moved first point moves the pan floor,
+	/// the live edge follows the clock; then one column per pixel over the window.
+	/// </summary>
 	private IntensityQuery FollowExtent(TrendExtent extent)
 	{
 		var now = _timeProvider.GetUtcNow();
-		TrackExtent(extent.First, now);
+		_navigation.FirstSample = extent.First;
+		if (!HasPoints)
+		{
+			_navigation.JumpToNow(now);
+		}
+
 		_navigation.OnLiveEdge(now);
 		var columnWidth = TrendColumns.ColumnWidth(_navigation.Width, _dataAreaPixels);
 		return TrendColumns.QueryThrough(extent.Key, _navigation.From, _navigation.To, columnWidth);
 	}
 
-	/// <summary>While following, the window's right edge is now, so a silence shows as an empty span within a second.</summary>
-	private IObservable<Unit> LiveTicks(IScheduler uiScheduler)
+	private static StripSpan ToStripSpan(TimeRange range)
 	{
-		return Observable.Interval(_liveTick, uiScheduler)
-			.Where(_ => IsFollowing)
-			.Select(_ => Unit.Default);
-	}
-
-	private static List<StripSpan> FailureSpans(IntensitySeries series)
-	{
-		return
-		[
-			.. TrendColumns.FailureRanges(series)
-				.Select(range => new StripSpan(LocalTimeAxis.ToAxis(range.From), LocalTimeAxis.ToAxis(range.To))),
-		];
-	}
-
-	/// <summary>The drawn values padded by 5 % of their span, plus or minus 1 when flat; null when none is drawn.</summary>
-	private static (double Bottom, double Top)? VerticalRange(IReadOnlyList<EnvelopeColumn> columns)
-	{
-		var bottom = double.PositiveInfinity;
-		var top = double.NegativeInfinity;
-		foreach (var column in columns)
-		{
-			if (EnvelopePath.IsGap(column))
-			{
-				continue;
-			}
-
-			bottom = Math.Min(bottom, column.Min);
-			top = Math.Max(top, column.Max);
-		}
-
-		if (double.IsInfinity(bottom))
-		{
-			return null;
-		}
-
-		if (bottom.Equals(top))
-		{
-			return (bottom - 1.0, top + 1.0);
-		}
-
-		var padding = (top - bottom) * YPadding;
-		return (bottom - padding, top + padding);
+		return new StripSpan(LocalTimeAxis.ToAxis(range.From), LocalTimeAxis.ToAxis(range.To));
 	}
 
 	private void MarkMoment(DateTimeOffset? moment)

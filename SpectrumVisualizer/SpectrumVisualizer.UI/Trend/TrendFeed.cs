@@ -59,6 +59,7 @@ public sealed class TrendFeed(
 		}
 
 		_started = true;
+		_subscriptions.Add(cache.ReReadRequested.Subscribe(LogKeyChange, ReportPipelineFailure));
 		_subscriptions.Add(SubscribeToHistoryReads());
 		_subscriptions.Add(SubscribeToMomentReads());
 		_subscriptions.Add(source
@@ -103,12 +104,21 @@ public sealed class TrendFeed(
 		_momentRequests.Dispose();
 	}
 
+	private void LogKeyChange(ReReadRequest request)
+	{
+		logger.LogDebug(
+			"The trend key changed to {WavelengthNm} nm, delta {Delta}, key change {KeyChangeCount}",
+			request.Key.WavelengthNm,
+			request.Key.Delta,
+			request.Generation);
+	}
+
 	private IDisposable SubscribeToHistoryReads()
 	{
 		return cache.ReReadRequested
 			.Throttle(_reReadThrottle, throttleScheduler)
 			.ObserveOn(uiScheduler)
-			.Select(request => new HistoryRead(request, new TrendWindow(chart.From, chart.To)))
+			.Select(request => new HistoryRead(request, new TimeRange(chart.From, chart.To)))
 			.Select(ReadHistory)
 			.Switch()
 			.Subscribe(_ => { }, ReportPipelineFailure);
@@ -265,10 +275,8 @@ public sealed class TrendFeed(
 		messagePanel.TryReportFailure(new ExceptionalError(exception.Message, exception), logger, uiScheduler);
 	}
 
-	/// <summary>The visible window at the trigger, taken on the UI thread; the read on the pool sees only this value.</summary>
-	private readonly record struct TrendWindow(DateTimeOffset From, DateTimeOffset To);
-
-	private sealed record HistoryRead(ReReadRequest Request, TrendWindow Window);
+	/// <summary>Window is the visible window at the UI dispatch; the read on the pool sees only this value.</summary>
+	private sealed record HistoryRead(ReReadRequest Request, TimeRange Window);
 
 	private sealed record MomentRead(DateTimeOffset Moment, Result<StoredSpectrum?> Result);
 }

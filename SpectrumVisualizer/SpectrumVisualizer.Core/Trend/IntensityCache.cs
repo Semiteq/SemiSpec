@@ -2,8 +2,6 @@ using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 
-using Microsoft.Extensions.Logging;
-
 using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Core.Store;
 
@@ -24,7 +22,6 @@ public sealed class IntensityCache : IDisposable
 	private static readonly long _retentionMs = (long)TimeSpan.FromDays(1).TotalMilliseconds;
 
 	private readonly TimeProvider _timeProvider;
-	private readonly ILogger<IntensityCache> _logger;
 
 	// Add runs on the distributor task, LandHistory on a pool thread of the re-read, Fold and the lookups on the UI
 	// thread; every field from here to _disposed is read and written under _gate only.
@@ -42,7 +39,6 @@ public sealed class IntensityCache : IDisposable
 	private bool _historyComplete;
 
 	private KeyBlock? _previous;
-	private int _keyChanges;
 	private bool _disposed;
 
 	// All emit after _gate is released: _changed from the distributor task and a re-read pool thread, through the
@@ -54,10 +50,9 @@ public sealed class IntensityCache : IDisposable
 	private readonly ISubject<Unit> _historyLandedGate;
 	private readonly Subject<ReReadRequest> _reReadRequests = new();
 
-	public IntensityCache(TimeProvider timeProvider, ILogger<IntensityCache> logger)
+	public IntensityCache(TimeProvider timeProvider)
 	{
 		_timeProvider = timeProvider;
-		_logger = logger;
 		_changedGate = Subject.Synchronize(_changed);
 		_historyLandedGate = Subject.Synchronize(_historyLanded);
 		Changed = _changed.AsObservable();
@@ -89,7 +84,6 @@ public sealed class IntensityCache : IDisposable
 	public void Add(ReceivedFrame received)
 	{
 		ReReadRequest? request;
-		int keyChanges;
 		lock (_gate)
 		{
 			if (_disposed)
@@ -100,16 +94,10 @@ public sealed class IntensityCache : IDisposable
 			AddContinuity(_continuity.Observe(received));
 			request = received.Frame.Measurement is { } measurement ? AddSpectrum(received, measurement) : null;
 			DropExpired();
-			keyChanges = _keyChanges;
 		}
 
 		if (request is { } changed)
 		{
-			_logger.LogDebug(
-				"The trend key changed to {WavelengthNm} nm, delta {Delta}, key change {KeyChangeCount}",
-				changed.Key.WavelengthNm,
-				changed.Key.Delta,
-				keyChanges);
 			_reReadRequests.OnNext(changed);
 		}
 
@@ -174,7 +162,7 @@ public sealed class IntensityCache : IDisposable
 		}
 	}
 
-	/// <summary>The recent spectrum at or before the moment; null before the recent spectra.</summary>
+	/// <summary>The recent spectrum at or before the moment, its measurement shared; null before the recent spectra.</summary>
 	public StoredSpectrum? SpectrumAt(DateTimeOffset moment)
 	{
 		lock (_gate)
@@ -329,7 +317,6 @@ public sealed class IntensityCache : IDisposable
 	private ReReadRequest NextRequest(TrendKey key, long recentStartMs, bool readsHistory)
 	{
 		_generation++;
-		_keyChanges++;
 		return new ReReadRequest(
 			_generation, key, DateTimeOffset.FromUnixTimeMilliseconds(recentStartMs), readsHistory);
 	}
@@ -375,7 +362,7 @@ public sealed record TrendFold(TrendExtent Extent, IntensityQuery Query, Intensi
 public readonly record struct TrendKey(ushort WavelengthNm, byte Delta);
 
 /// <summary>
-/// A key change: the store points before RecentStart are to be read at Key and landed under Generation; with
-/// ReadsHistory false the cache already holds them and the pending read is only cancelled.
+/// A key change: the store points before RecentStart are to be read at Key and landed under Generation, which also
+/// counts the key changes; with ReadsHistory false the cache already holds them and the pending read is only cancelled.
 /// </summary>
 public sealed record ReReadRequest(int Generation, TrendKey Key, DateTimeOffset RecentStart, bool ReadsHistory);

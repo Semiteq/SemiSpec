@@ -50,18 +50,6 @@ public static class OverviewGeometry
 		return Math.Max(0.0, Math.Min(left, limit - width));
 	}
 
-	/// <summary>Where the time sits along the extent, or null outside it or over an empty one.</summary>
-	public static double? FractionAt(DateTimeOffset extentFirst, DateTimeOffset extentLast, DateTimeOffset time)
-	{
-		var span = (extentLast - extentFirst).TotalSeconds;
-		if (span <= 0.0 || time < extentFirst || time > extentLast)
-		{
-			return null;
-		}
-
-		return (time - extentFirst).TotalSeconds / span;
-	}
-
 	public static DateTimeOffset TimeAtFraction(DateTimeOffset extentFirst, DateTimeOffset extentLast, double fraction)
 	{
 		var span = extentLast - extentFirst;
@@ -78,12 +66,12 @@ public static class OverviewGeometry
 		var columns = new List<IntensityColumn>(band.Columns.Length);
 		foreach (var column in band.Columns)
 		{
-			if (column.BreakCount > 0 && column.Count > 0)
+			if (TrendColumns.OpensGap(column) && column.Count > 0)
 			{
 				columns.Add(column with { Min = double.NaN, Max = double.NaN, Last = double.NaN, Count = 0 });
 			}
 
-			if (column.Count > 0 || column.BreakCount > 0 || column.UncoveredCount > 0)
+			if (TrendColumns.HasContent(column))
 			{
 				columns.Add(column);
 			}
