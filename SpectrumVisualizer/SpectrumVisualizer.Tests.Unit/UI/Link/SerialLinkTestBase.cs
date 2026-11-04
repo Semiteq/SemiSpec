@@ -4,7 +4,7 @@ using AwesomeAssertions;
 
 using FluentResults;
 
-using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Reactive.Testing;
 
 using SpectrumVisualizer.Core.Protocol;
@@ -25,7 +25,7 @@ public abstract class SerialLinkTestBase : IAsyncLifetime
 
 	protected SerialLinkTestBase()
 	{
-		Link = new SerialLink(Provider, Scheduler, NullLogger<SerialLink>.Instance);
+		Link = new SerialLink(Provider, Scheduler, Logger);
 		Link.StatusChanged += (_, status) =>
 		{
 			lock (_gate)
@@ -40,6 +40,8 @@ public abstract class SerialLinkTestBase : IAsyncLifetime
 	private protected FakeSerialPortProvider Provider { get; } = new(PortName);
 
 	private protected FakePortStream Port { get; } = new();
+
+	protected FakeLogger<SerialLink> Logger { get; } = new();
 
 	protected SerialLink Link { get; }
 
@@ -60,6 +62,12 @@ public abstract class SerialLinkTestBase : IAsyncLifetime
 	protected static long Ticks(double seconds)
 	{
 		return TimeSpan.FromSeconds(seconds).Ticks;
+	}
+
+	/// <summary>The wall-clock time the test scheduler reports at the given virtual second.</summary>
+	protected static DateTimeOffset WallClockAt(double seconds)
+	{
+		return new DateTimeOffset(Ticks(seconds), TimeSpan.Zero);
 	}
 
 	private protected async Task ConnectAsync(FakePortStream? port = null)
@@ -133,10 +141,15 @@ public abstract class SerialLinkTestBase : IAsyncLifetime
 
 	protected List<BoardFrame> TakeFrames()
 	{
-		var frames = new List<BoardFrame>();
-		while (Link.Frames.TryRead(out var frame))
+		return [.. TakeReceivedFrames().Select(received => received.Frame)];
+	}
+
+	protected List<ReceivedFrame> TakeReceivedFrames()
+	{
+		var frames = new List<ReceivedFrame>();
+		while (Link.Frames.TryRead(out var received))
 		{
-			frames.Add(frame);
+			frames.Add(received);
 		}
 
 		return frames;

@@ -3,7 +3,7 @@
 ## Overview
 - Carry the board's bytes from a COM port to decoded frames in the running app: a serial link on
   `RJCP.SerialPortStream` 3.0.5 with one cancellable read loop, a `System.IO.Pipelines` pipe into `FrameReader`, and a
-  bounded `Channel<BoardFrame>` that the later views and store read.
+  bounded `Channel<ReceivedFrame>` (each frame with its wall-clock receive time) that the later views and store read.
 - The operator picks a port, connects and disconnects in a new connection row. After an unplug the link reopens the
   selected port every second until the operator disconnects.
 - The status bar shows the link state (OptoskyProj#20: "board not responding" after 10 s with no valid frame and no
@@ -154,8 +154,14 @@ Automatable (baseline 172 of 172 at `2237e5e`):
      and the frame's second half, arriving on the fresh pipe, is discarded as garbage.
    - `SerialLinkPortLossTests.AZeroByteReadReportsPortLost`, `SerialLinkPortLossTests.AClosedPortReportsPortLost` (an
      `InvalidOperationException` from the read), `SerialLinkPortLossTests.AnIOExceptionReportsPortLost`,
-     `SerialLinkPortLossTests.APortThatVanishesFromThePortListReportsPortLost` (read timeouts keep coming while
-     `PortNames()` no longer lists the port).
+     `SerialLinkPortLossTests.APortThatVanishesFromThePortListReportsPortLostOnTheThirdSilentTick` (read timeouts keep
+     coming while `PortNames()` no longer lists the port; the list is read on the third timeout in a row only) and
+     `SerialLinkPortLossTests.AByteRestartsTheCountOfSilentTicks`.
+   - `SerialLinkPortLossTests.APortWhoseCloseHangsIsAbandonedAfterTwoSecondsAndTheLinkReopens`: a held dispose logs one
+     Warning with the port name at 2 s and the next open follows.
+   - `SerialLinkStreamTests.FramesOfOneReadCarryTheSchedulerTimeOfThatRead` and
+     `SerialLinkStreamTests.FramesReleasedByADrainCarryTheDrainTime`: `ReceivedAt` is the scheduler time of the read or
+     the drain.
    - `SerialLinkPortLossTests.ALostPortReopensAfterOneSecond` and `SerialLinkPortLossTests.ReopeningResetsTheSequenceBaseline` (a frame
      with `seq` 57 after a reopen reports no loss).
    - `SerialLinkPortLossTests.APortHeldByAnotherProgramReportsPortBusyAndRetries` (both `UnauthorizedAccessException` and an
@@ -185,7 +191,7 @@ Automatable (baseline 172 of 172 at `2237e5e`):
 6. `dotnet test SpectrumVisualizer.slnx --filter "Area=Emulator"` passes, including the dark spectrum every N spectra,
    the failed bit of the emulated device in heartbeats only, the both-connected state, and the rejected
    `--failed 2000 --device 8000` without `--both-connected`.
-7. `dotnet test SpectrumVisualizer.slnx` passes 172 plus every test this slice adds, with none skipped (316 at the
+7. `dotnet test SpectrumVisualizer.slnx` passes 172 plus every test this slice adds, with none skipped (320 at the
    end of the slice).
 8. `dotnet build SpectrumVisualizer.slnx -c Release` 0 warnings; `dotnet format SpectrumVisualizer.slnx
    --verify-no-changes` and `dotnet terse SpectrumVisualizer` exit 0; `dotnet build SpectrumVisualizer.sln` and
@@ -221,11 +227,17 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
    data"; the lost count stays 0.
 9. Unplug (a real USB-UART pair; com0com cannot emulate a removal): press Disconnect, run `emu --port <board-side
    adapter's port>`, press Refresh, select the app-side adapter's port, Connect, and wait for "Receiving data". Unplug
-   the app-side adapter. Within 1 s the status reads "Port unavailable, retrying" and the panel shows one "connection
-   lost" Warning with no "repeated N times" marker. Plug it back: the status
+   the app-side adapter. Within 1 s the status reads "Port unavailable, retrying" (within about 3 s with a driver that
+   shows the removal only in the port list) and the panel shows one "connection lost" Warning with no "repeated N
+   times" marker. Plug it back: the status
    returns to "Receiving data" and an Info "Receiving data" entry appears above it. Unplug again: a new "connection
    lost" row appears, because the panel coalesces only against the newest entry. The panel then reads, newest first:
-   connection lost, receiving data, connection lost.
+   connection lost, receiving data, connection lost. Observe: with View, Verbose logging on, after "connection lost"
+   a Debug line "Opening port <port>" appears every second while the adapter is out (every 2 s when the port's close
+   hangs; that hang logs one Warning "Closing port <port> took longer than 00:00:02"). Observe: plug the adapter into
+   another USB socket so that Windows gives it another COM number; the status stays "Port unavailable, retrying",
+   because the link retries the port it was given; the "connection lost" remedy tells the operator to press
+   Disconnect, Refresh and choose the new port, and doing so returns the status to "Receiving data".
 10. Port busy: press Disconnect, so the app releases `COM11`. Keep the step-8 emulator running on `COM10`; without it,
     closing the terminal leads to "Waiting" and then "Board not responding" instead of "Receiving data". Open `COM11`
     in a serial terminal, then Connect in the app on `COM11`. The panel shows one "Port is busy" Error and the status
@@ -256,8 +268,8 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
   the one production implementation: `SerialPortStream.GetPortNames()` sorted by the number after `COM`, a port at
   115200 baud, 8N1, `ReadTimeout = 1000` ms, `ThrowOnReadError = true`. `Open` maps `UnauthorizedAccessException` and
   an `IOException` with `HResult` 32 (sharing violation) to `PortBusyError`, and any other exception (carried as the
-  cause) or a name missing from a `GetPortNames()` that worked to `PortNotFoundError`; a failed listing logs a Warning
-  and `Open` tries the port anyway. The connection row reports a failed listing to the panel as `PortListError`
+  cause) to `PortNotFoundError`; `Open` does not list the ports first, because RJCP maps a missing port itself and a
+  listing is a full SetupAPI enumeration. A failed listing logs a Warning. The connection row reports a failed listing to the panel as `PortListError`
   (Warning; no port name, so it derives from `Error` and sits outside the `LinkError` family).
 - **Synchronous decode step in Core.** `FrameReader` gains `void DecodeBuffered(PipeReader reader,
   ICollection<BoardFrame> frames)`: it calls `TryRead`, decodes every whole frame with the existing `DecodeAll`, and
@@ -276,9 +288,12 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
   gives a status at least once a second with no timer.
 - **Port lost.** The session treats four signals as a lost port: a read that returns 0 bytes (RJCP's wake on a dead
   monitor thread), an `InvalidOperationException` from the read (RJCP's closed-port check with `ThrowOnReadError`),
-  an `IOException` from the read, and a tick with no bytes while `PortNames()` no longer lists the port. The last one
-  covers drivers whose aborted read RJCP treats as benign, where only read timeouts keep coming. A failed listing on a
-  tick counts as listed, so it never ends a session.
+  an `IOException` from the read, and the third tick in a row with no bytes while `PortNames()` no longer lists the
+  port. The last one covers drivers whose aborted read RJCP treats as benign, where only read timeouts keep coming; the
+  list is read on every third consecutive tick only, any byte restarts the count, so a removal shows within about
+  3 s. A failed listing on a tick counts as listed, so it never ends a session.
+- **Port close.** The stream's dispose runs on the thread pool with a 2 s limit on the link's scheduler; a dispose
+  that outlasts it logs a Warning with the port name, and the session abandons that stream and keeps reopening.
 - **Pipe.** `new PipeOptions(pauseWriterThreshold: 65536, resumeWriterThreshold: 32768,
   useSynchronizationContext: false)`: the pause threshold is above 2 x 4120 bytes. The loop decodes after every flush,
   so the pipe holds at most one stalled candidate plus the bytes behind it. Every pipe teardown (drain, port loss,
@@ -320,7 +335,9 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
   BoundedChannelOptions(64) { FullMode = DropOldest, SingleWriter = true, SingleReader = true }, itemDropped)`. 64
   frames are about 50 s of ATP-8000 spectra at 1.3 per second and at most 64 x 4120 bytes of frame data. `Wait` is
   ruled out: a reader that falls behind would block the read loop, stop the reads and trip the 10 s status on a
-  healthy board. `itemDropped` logs the first drop of a session at Debug. The channel has one reader; the
+  healthy board. `itemDropped` logs the first drop of a session at Debug. The item is
+  `ReceivedFrame(BoardFrame Frame, DateTimeOffset ReceivedAt)`, stamped with `scheduler.Now` when frames leave the
+  decoder; the frames of one decode pass or drain share the stamp. The channel has one reader; the
   spectrum-view slice adds it and hands each frame to every later consumer, the store included. Until then the channel
   fills and drops the oldest frame, which is expected.
 - **Lost spectra.** The status bar shows the total since the operator's Connect, kept across automatic reopens. Each
@@ -409,7 +426,8 @@ Session flow, all in the one session task:
 1. Publish Connecting; reset the lost total.
 2. Open. On failure: publish PortUnavailable (fault on the first failure of the run), wait 1 s (cancellable), go to 2.
 3. Reset the tracker, create the pipe, `openedAt = now`, publish Waiting.
-4. Read or tick; on bytes write, flush and decode; on a tick check the port list; evaluate, drain when due, publish.
+4. Read or tick; on bytes write, flush and decode; on every third tick in a row check the port list; evaluate, drain
+   when due, publish.
    On port loss: publish PortUnavailable (fault on the first loss of the run), tear down the pipe, dispose the stream,
    wait 1 s (cancellable), go to 2.
 5. On cancellation or an unexpected exception: tear down the pipe, dispose the stream, publish Disconnected (with an
@@ -495,7 +513,8 @@ the same run do not.
   `FakeSerialPortProvider` hands out queued open results, counts opens and has an editable port list
 - [x] write `RjcpSerialPortProviderTests` for the name ordering (`COM2` before `COM10`), the exception mapping through
   an internal static mapping function (an `IOException` with `HResult` 32 is busy), and for opening a name that
-  `GetPortNames()` does not list, which returns `PortNotFoundError` without touching hardware
+  `GetPortNames()` does not list, which returns `PortNotFoundError` without touching hardware (➕ the review fix
+  dropped the listing from `Open`; the test now opens a name this machine does not have through RJCP)
 - [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 4: Synchronous decode step on FrameReader
@@ -551,6 +570,9 @@ the same run do not.
   to the last one is not raised again
 - [x] ➕ silence after a frame never drains: a partial frame in flight survives 30 s of read timeouts
   (`SilenceAfterAFrameNeverDrainsThePartialFrameInFlight`)
+- [x] ➕ review fix: the channel carries `ReceivedFrame` with `ReceivedAt` from `scheduler.Now`; the port list is read
+  on every third silent tick only; the port dispose has a 2 s limit and a hung one is abandoned; the "connection lost"
+  remedy names Disconnect, Refresh and a new port (en and ru)
 - [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 7: Reopen, disconnect and link errors in the panel
@@ -695,8 +717,8 @@ the same run do not.
 - [x] run `dotnet test SpectrumVisualizer.slnx` and the emulator `--help` - must pass before next task
 
 ### Task 13: Verify acceptance criteria
-- [x] run every command of Acceptance Evidence and record each result with its count (Protocol 56, Link 64,
-  Messages 32, MainWindow 54, Di 16, Emulator 56, full 316, none skipped; Release build 0 warnings; format and
+- [x] run every command of Acceptance Evidence and record each result with its count (Protocol 56, Link 68,
+  Messages 32, MainWindow 54, Di 16, Emulator 56, full 320, none skipped; Release build 0 warnings; format and
   `dotnet terse SpectrumVisualizer` exit 0; old solution builds with 0 errors and its 15 existing warnings, no diff
   since `2237e5e`, 13 of 13 pass; both `ui-theme.md` greps print nothing)
 - [x] verify every Overview item: the link reads frames, the status bar shows every state, faults reach the panel
@@ -707,7 +729,7 @@ the same run do not.
   wait, a window close during a reopen wait (➕ two had no test: `SerialLinkPortLossTests.APortLostMidFrameDropsTheHalfFrameAndTheReopenedPortStartsClean`
   and `AppLifecycleTests.ClosingTheWindowDuringTheReopenWaitStopsTheLink`)
 - [x] run the full suite: `dotnet test SpectrumVisualizer.slnx`; confirm the old solution builds and passes 13 of 13
-  (316 of 316; old solution 13 of 13)
+  (320 of 320; old solution 13 of 13)
 - [x] start the app with `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI` and confirm the log gains its
   start line; leave the port-pair checklist to the owner (run under `timeout 15`; the log gained one "SpectrumVisualizer
   starting" line; the manual smoke checklist is not automatable here, it needs com0com or real USB-UART adapters, and
@@ -760,7 +782,10 @@ code clean and 5 defects in the manual smoke checklist, corrected in `a58bf45`. 
 findings in `454fcc6` and `c272e8d`. Phase 3 (codex) was skipped because codex is not installed. Phase 3b (comments)
 fixed 1 major and 16 minor comment findings in `453e95c`. Phase 4 (critical) found one major: a failed port listing
 reached no one, and `RjcpSerialPortProvider.Open` treated it as a missing port while the read loop counted it as
-listed; `7880290` added `PortListError` and made both paths agree. Final state: 316/316 tests in
+listed; `7880290` added `PortListError` and made both paths agree. A post-slice check found 1 high, 2 medium and 1 low
+finding, fixed in one "fix(link): address review findings" commit: the channel item gained a receive time, the port
+list is read on every third silent tick only and no longer before an open, the "connection lost" remedy covers a
+replug under another COM number, and a hung port dispose is abandoned after 2 s. Final state: 320/320 tests in
 `SpectrumVisualizer.slnx`, 13/13 in `SpectrumVisualizer.sln`, Release build 0 warnings, format and terse clean.
 
 **Decisions made autonomously:**
@@ -774,7 +799,8 @@ listed; `7880290` added `PortListError` and made both paths agree. Final state: 
   silence after a frame never drains (`SilenceAfterAFrameNeverDrainsThePartialFrameInFlight`).
 - `bytesSinceFrame` resets when a read decodes a frame; a drain that releases nothing keeps the count, so OtherDevice
   stays reachable after a drain.
-- "Released frames stamped with the drain time" means `lastFrameAt` = drain time; `BoardFrame` has no time field.
+- "Released frames stamped with the drain time" means `lastFrameAt` = drain time and `ReceivedAt` = drain time;
+  `BoardFrame` has no time field, the channel's `ReceivedFrame` carries it.
 - The 4120-byte threshold reads the new public `Spectrometer.Atp2000.FrameSize` extension in Core, so the number lives
   in `FrameLayout` only.
 - `DecodeBuffered` returns `void` and skips `AdvanceTo` when `TryRead` finds nothing.
@@ -788,8 +814,8 @@ listed; `7880290` added `PortListError` and made both paths agree. Final state: 
 - `PortNames()` returns `Result<IReadOnlyList<string>>` and never throws; the provider logs a failed listing at
   Warning. A persistently failing listing logs a Warning every 1 s; accepted, no rate limit.
 - `PortListError` derives from `Error`, not `LinkError`, because `LinkError` names one port; the connection row wraps
-  the provider failure as `PortListError.CausedBy(errors)`. The failed-listing branch of `Open` has no test: it needs
-  hardware or a wider seam.
+  the provider failure as `PortListError.CausedBy(errors)`. `Open` no longer lists the ports, so it has no
+  failed-listing branch.
 - The dropped-frame counter had no production reader and was removed; only the first drop of a session logs at Debug.
 - `LinkError` is an abstract base in `LinkErrors.cs`; the port sits in the message only.
 - No `SeverityMatchConverter`: the dot classes bind with `ObjectConverters.Equal` and `x:Static` enum values, as the
@@ -816,13 +842,21 @@ listed; `7880290` added `PortListError` and made both paths agree. Final state: 
   before option values convert. Dark spectra use their own counter, because `seq` wraps at 255.
 - The link state table lives once, in `board-protocol.md`; `overview.md` holds the status bar texts and points there.
 - The manual smoke checklist was not run: this machine has no com0com pair or USB-UART adapters.
+- `ReceivedAt` comes from `scheduler.Now` in `Deliver`, so tests see virtual time and production the UTC wall clock;
+  the health rules keep the monotonic stopwatch.
+- The port list is read when the count of consecutive silent ticks reaches a multiple of 3; any byte and every open
+  reset the count. `Open` dropped its listing pre-check; `MapOpenFailure` already maps RJCP's "Port not found".
+- A replug under another COM number is not followed automatically; the remedy text tells the operator what to press.
+- The dispose limit is a timer on the link's scheduler raced against a thread-pool dispose, not tied to the session
+  token: a Disconnect still waits up to 2 s for the port to close. The timer is armed before the dispose starts. An
+  abandoned dispose that later fails logs at Debug.
 
 ## Verify it yourself
 
 Automated, from the repo root on branch `serial-link`:
 
 1. `dotnet build SpectrumVisualizer.slnx -c Release` gives 0 warnings, 0 errors.
-2. `dotnet test SpectrumVisualizer.slnx` passes 316 of 316. Per area with `--filter "Area=X"`: Protocol 56, Link 64,
+2. `dotnet test SpectrumVisualizer.slnx` passes 320 of 320. Per area with `--filter "Area=X"`: Protocol 56, Link 68,
    Messages 32, MainWindow 54, Di 16, Emulator 56, Calibration 15, Logging 7, Paths 7, Resources 9.
 3. `dotnet format SpectrumVisualizer.slnx --verify-no-changes`, then `dotnet tool restore` and
    `dotnet terse SpectrumVisualizer`; both gates exit 0.
@@ -832,9 +866,11 @@ Automated, from the repo root on branch `serial-link`:
    and `--failed <2000|8000>`. The section headings follow the Windows UI language.
 6. The link behaviour is pinned by these test classes:
    - `LinkHealthTests`: the 10 s window, the 4120-byte rule, the mid-frame stop, when a drain is due.
-   - `SerialLinkStreamTests`: frames in random chunks, NotResponding, OtherDevice, the drain and its side effects.
-   - `SerialLinkPortLossTests`: the four port-lost signals, reopen after 1 s, busy and missing ports, one fault per
-     incident, a port lost mid-frame.
+   - `SerialLinkStreamTests`: frames in random chunks, NotResponding, OtherDevice, the drain and its side effects, the
+     receive time of each frame.
+   - `SerialLinkPortLossTests`: the four port-lost signals, the port list read on every third silent tick, reopen
+     after 1 s, a hung close abandoned after 2 s, busy and missing ports, one fault per incident, a port lost
+     mid-frame.
    - `SerialLinkSessionTests`: disconnect during a read and during the reopen wait, lost spectra across reopens, the
      full channel, an unexpected exception.
    - `RjcpSerialPortProviderTests`: port name order and the open-failure mapping.
@@ -849,7 +885,8 @@ By hand: run the manual smoke checklist in Acceptance Evidence. The highest-valu
 because com0com cannot produce them:
 
 1. Step 9, unplug and replug the app-side adapter: one "connection lost" Warning, reopen within 1 s, one Info
-   "Receiving data" entry.
+   "Receiving data" entry; "Opening port" Debug lines every second while it is out; a replug under another COM number
+   needs Disconnect, Refresh and the new port.
 2. Step 10, a port held by another program: one "Port is busy" Error, quiet retries, connect within 1 s once the
    terminal closes. com0com can run this step too, but a real driver gives the real sharing-violation error.
 3. Step 6, wrong baud: the sender at 9600 baud gives "Other device".

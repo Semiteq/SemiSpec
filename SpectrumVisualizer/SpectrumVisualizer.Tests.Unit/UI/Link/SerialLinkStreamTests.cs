@@ -113,6 +113,32 @@ public sealed class SerialLinkStreamTests : SerialLinkTestBase
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
+	public async Task FramesOfOneReadCarryTheSchedulerTimeOfThatRead()
+	{
+		var twoFrames = Concat(FrameEncoder.Encode(Heartbeat(1)), FrameEncoder.Encode(Heartbeat(2)));
+		await ConnectAsync();
+
+		await AtAsync(2, port => port.PushBytes(twoFrames));
+
+		TakeReceivedFrames().Should().Equal(
+			new ReceivedFrame(Heartbeat(1), WallClockAt(2)),
+			new ReceivedFrame(Heartbeat(2), WallClockAt(2)));
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task FramesReleasedByADrainCarryTheDrainTime()
+	{
+		byte[] falseCandidate = [0xAA, 0x55, 0x12, 0x10, 0x00, 0x00];
+		await ConnectAsync();
+
+		await AtAsync(1, port => port.PushBytes(falseCandidate));
+		await AtAsync(3, port => port.PushBytes(FrameEncoder.Encode(Heartbeat(2))));
+		await AtAsync(10, port => port.PushTimeout());
+
+		TakeReceivedFrames().Should().Equal(new ReceivedFrame(Heartbeat(2), WallClockAt(10)));
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
 	public async Task ADrainDiscardsThePartialFrameInFlight()
 	{
 		var spectrum = FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 2));

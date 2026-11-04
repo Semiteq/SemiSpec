@@ -2,6 +2,8 @@ using AwesomeAssertions;
 
 using FluentResults;
 
+using Microsoft.Extensions.Logging;
+
 using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.UI.Link;
 
@@ -53,16 +55,34 @@ public sealed class SerialLinkPortLossTests : SerialLinkTestBase
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
-	public async Task APortThatVanishesFromThePortListReportsPortLost()
+	public async Task APortThatVanishesFromThePortListReportsPortLostOnTheThirdSilentTick()
 	{
 		await ConnectAsync();
-		await AtAsync(1, port => port.PushTimeout());
-		Link.Status.State.Should().Be(LinkState.Waiting);
-
 		Provider.SetPorts("COM4");
+
+		await AtAsync(1, port => port.PushTimeout());
+		await AtAsync(2, port => port.PushTimeout());
+		Link.Status.State.Should().Be(LinkState.Waiting);
+		Provider.PortListReads.Should().Be(0);
 		Port.PushTimeout();
 
 		await ShouldReportPortLostAsync();
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task AByteRestartsTheCountOfSilentTicks()
+	{
+		await ConnectAsync();
+		Provider.SetPorts("COM4");
+
+		await AtAsync(1, port => port.PushTimeout());
+		await AtAsync(2, port => port.PushTimeout());
+		await AtAsync(3, port => port.PushBytes(0x00));
+		await AtAsync(4, port => port.PushTimeout());
+		await AtAsync(5, port => port.PushTimeout());
+
+		Link.Status.State.Should().Be(LinkState.Waiting);
+		Provider.PortListReads.Should().Be(0);
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
@@ -72,7 +92,10 @@ public sealed class SerialLinkPortLossTests : SerialLinkTestBase
 		Provider.FailPortNames(new Error("the port registry key is gone"));
 
 		await AtAsync(1, port => port.PushTimeout());
+		await AtAsync(2, port => port.PushTimeout());
+		await AtAsync(3, port => port.PushTimeout());
 
+		Provider.PortListReads.Should().Be(1);
 		Link.Status.State.Should().Be(LinkState.Waiting);
 		Statuses().Should().NotContain(status => status.State == LinkState.PortUnavailable);
 		Port.IsDisposed.Should().BeFalse();
@@ -91,6 +114,30 @@ public sealed class SerialLinkPortLossTests : SerialLinkTestBase
 		Port.IsDisposed.Should().BeFalse();
 		Port.ReleaseDispose();
 		await Waits.UntilAsync(() => Port.IsDisposed);
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task APortWhoseCloseHangsIsAbandonedAfterTwoSecondsAndTheLinkReopens()
+	{
+		await using var reopened = new FakePortStream();
+		await ConnectAsync();
+		Port.HoldDispose();
+		var timers = Scheduler.TimerCount;
+
+		Scheduler.AdvanceTo(Ticks(1));
+		Port.PushZeroRead();
+		await WaitForStateAsync(LinkState.PortUnavailable);
+		await Waits.UntilAsync(() => Scheduler.TimerCount == timers + 2);
+		Provider.QueueOpen(reopened);
+		Scheduler.AdvanceTo(Ticks(2.9));
+		Provider.OpenCount.Should().Be(1, "the reopen waits for the close or its limit");
+		Scheduler.AdvanceTo(Ticks(3));
+		await reopened.WaitForPendingReadAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
+
+		Provider.OpenCount.Should().Be(2);
+		Port.IsDisposed.Should().BeFalse();
+		Logger.Collector.GetSnapshot().Should().ContainSingle(record => record.Level == LogLevel.Warning)
+			.Which.Message.Should().Contain(PortName);
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]

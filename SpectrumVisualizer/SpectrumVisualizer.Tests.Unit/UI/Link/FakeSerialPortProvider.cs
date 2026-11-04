@@ -11,6 +11,7 @@ internal sealed class FakeSerialPortProvider : ISerialPortProvider
 	private readonly Queue<Result<Stream>> _openResults = new();
 	private readonly List<string> _portNames = [];
 	private int _openCount;
+	private int _portListReads;
 	private IError? _portNamesFailure;
 
 	public FakeSerialPortProvider(params string[] portNames)
@@ -25,6 +26,17 @@ internal sealed class FakeSerialPortProvider : ISerialPortProvider
 			lock (_gate)
 			{
 				return _openCount;
+			}
+		}
+	}
+
+	public int PortListReads
+	{
+		get
+		{
+			lock (_gate)
+			{
+				return _portListReads;
 			}
 		}
 	}
@@ -60,6 +72,8 @@ internal sealed class FakeSerialPortProvider : ISerialPortProvider
 	{
 		lock (_gate)
 		{
+			_portListReads++;
+
 			return _portNamesFailure is { } failure
 				? Result.Fail<IReadOnlyList<string>>(failure)
 				: Result.Ok<IReadOnlyList<string>>([.. _portNames]);

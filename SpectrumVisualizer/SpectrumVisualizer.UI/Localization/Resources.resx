@@ -91,7 +91,7 @@
     <value>The port stopped answering or left the port list.</value>
   </data>
   <data name="PortLostRemedy" xml:space="preserve">
-    <value>Check the cable and the adapter. The application reopens the port every second.</value>
+    <value>Check the cable and the adapter. The application reopens the port every second. If the adapter came back under another port, press Disconnect, Refresh and choose it.</value>
   </data>
   <data name="BoardNotRespondingTitle" xml:space="preserve">
     <value>Board not responding</value>

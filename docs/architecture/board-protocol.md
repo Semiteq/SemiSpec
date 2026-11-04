@@ -164,9 +164,8 @@ state has one writer, and `Status` is published with `Volatile.Write`.
 - `PortNames()` asks an unopened `SerialPortStream` for the names and sorts them by the number after `COM`
   (`COM2` before `COM10`), then any other name by ordinal. A listing that throws is logged at Warning and returned as
   a failed result. The connection row then shows an empty list and reports a `PortListError` to the message panel.
-- `Open` checks the name against `PortNames()` first, so a name missing from a listing that worked returns
-  `PortNotFoundError` without touching the driver. A failed listing is no proof that the port is gone, the same rule
-  the read loop applies, so `Open` goes ahead and tries the port. It opens at 115200
+- `Open` does not list the ports first: a SetupAPI listing costs a full enumeration, and RJCP maps a missing port
+  itself (`IOException` "Port not found"), which `MapOpenFailure` turns into `PortNotFoundError`. It opens at 115200
   baud, 8N1, with `ReadTimeout` 1000 ms and `ThrowOnReadError` on. The `SerialPortStream` constructor can throw as
   well as `Open()`, so both sit inside one `try`.
 - `Open` never throws: every exception except `OperationCanceledException` becomes a link error, so the session keeps
@@ -185,7 +184,10 @@ created: `DefaultScheduler` gives a monotonic `Stopwatch`, and a `TestScheduler`
 therefore neither fakes a silence nor hides one, and the health rules compare elapsed times only.
 
 Each decoded frame is observed by the tracker, written to the channel and sets the last-frame time; the count of bytes
-since the last frame resets to 0, so bytes that trail a frame in the same read are not counted.
+since the last frame resets to 0, so bytes that trail a frame in the same read are not counted. The channel item is a
+`ReceivedFrame(Frame, ReceivedAt)`: `ReceivedAt` is `scheduler.Now` when the frames leave the decoder, the wall clock
+in UTC on `DefaultScheduler` and virtual time on a `TestScheduler`. The frames of one decode pass or one drain share
+that stamp. Only the store reads `ReceivedAt`; the health rules keep the monotonic stopwatch.
 
 The pipe uses `pauseWriterThreshold` 65536, `resumeWriterThreshold` 32768 and no synchronization context. The loop
 decodes after every flush and the decoder accepts only the three valid lengths, so the pipe holds at most one stalled
@@ -223,7 +225,8 @@ A drain has three side effects:
 
 - The partial frame in flight is discarded.
 - The fresh pipe starts mid-frame, so the decoder discards the rest of that frame as garbage.
-- The frames a drain releases are stamped with the drain time, not their arrival time.
+- The frames a drain releases are stamped with the drain time, not their arrival time: both the last-frame time and
+  `ReceivedAt`.
 
 ### Port loss and reopen
 
@@ -232,9 +235,12 @@ Four signals mean the open port is lost:
 - A read returns 0 bytes: RJCP wakes a pending read this way when its monitor thread dies.
 - A read throws `InvalidOperationException`: RJCP's closed-port check under `ThrowOnReadError`.
 - A read throws `IOException`.
-- A read timeout comes while `PortNames()` no longer lists the port. Some drivers abort the pending read in a way RJCP
-  treats as benign, and only read timeouts keep coming. A failed `PortNames()` result counts as "still listed": a port
-  list that cannot be read is no proof of a loss.
+- The third read timeout in a row comes while `PortNames()` no longer lists the port. Some drivers abort the pending
+  read in a way RJCP treats as benign, and only read timeouts keep coming. The session reads the port list only on
+  every third consecutive timeout, and any byte restarts the count: each listing is a full SetupAPI enumeration on the
+  session thread, and removal normally shows as the 0-byte read, so this check is insurance and detects a removal
+  within about 3 s. A failed `PortNames()` result counts as "still listed": a port list that cannot be read is no
+  proof of a loss.
 
 On a loss the session arms the 1 s reopen timer, publishes PortUnavailable, then tears the pipe down and disposes the
 stream, so a driver that blocks in dispose cannot hold the status bar at its last state. A failed open arms the timer
@@ -242,7 +248,10 @@ and publishes the same way. After 1 s on the link's `IScheduler` the session ope
 a `TaskCompletionSource` with `RunContinuationsAsynchronously`, completed by `scheduler.Schedule(1 s, ...)` and
 cancelled through the session token; it checks the token before it publishes, so a Disconnect that races a loss
 publishes no PortUnavailable. The pipe teardown and the dispose are nested `try`/`finally`, so a pipe failure cannot
-leak the port. Every open logs at Debug with the port name, resets `SequenceTracker` and starts a fresh pipe and
+leak the port. The dispose runs on the thread pool with a 2 s limit on the link's scheduler, because RJCP's dispose
+joins its I/O thread with no timeout. A dispose that outlasts the limit logs a Warning naming the port; the session
+abandons that stream object and goes on reopening, so a hung close stretches the 1 s cadence to 2 s instead of
+stopping it. A failure of the abandoned dispose logs at Debug. Every open logs at Debug with the port name, resets `SequenceTracker` and starts a fresh pipe and
 `FrameReader`, so the gap of an unplug does not count as lost spectra.
 
 ### Status
@@ -273,7 +282,7 @@ out, so a repeat on another port coalesces into one row.
 
 ### Frames out
 
-`Frames` is a `ChannelReader<BoardFrame>` over a bounded channel of 64 frames with `DropOldest`, one writer and one
+`Frames` is a `ChannelReader<ReceivedFrame>` over a bounded channel of 64 frames with `DropOldest`, one writer and one
 reader. 64 frames are about 50 s of ATP-8000 spectra at 1.3 per second. `Wait` would let a slow reader block the read
 loop and trip the 10 s status on a healthy board. A reader that falls behind drops many frames in a row, so only the
 first drop of a session logs at Debug. No code reads the channel, so it fills and drops the oldest frame.

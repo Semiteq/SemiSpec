@@ -15,14 +15,16 @@ internal sealed class LinkSession(
 	string portName,
 	ISerialPortProvider serialPortProvider,
 	IScheduler scheduler,
-	ChannelWriter<BoardFrame> frames,
+	ChannelWriter<ReceivedFrame> frames,
 	Action<LinkStatus> publish,
 	ILogger logger)
 {
 	private const int ReadSize = 4096;
 	private const int EndOfStream = 0;
+	private const int SilentTicksPerPortListCheck = 3;
 
 	private static readonly TimeSpan _reopenInterval = TimeSpan.FromSeconds(1);
+	private static readonly TimeSpan _disposeLimit = TimeSpan.FromSeconds(2);
 
 	private static readonly PipeOptions _pipeOptions = new(
 		pauseWriterThreshold: 65536,
@@ -45,6 +47,7 @@ internal sealed class LinkSession(
 	private TimeSpan? _lastFrameAt;
 	private TimeSpan? _lastDrainAt;
 	private long _bytesSinceFrame;
+	private int _silentTicks;
 	private BoardState? _board;
 	private LinkState _state;
 
@@ -135,9 +138,10 @@ internal sealed class LinkSession(
 			var now = _stopwatch.Elapsed;
 			if (read.Outcome == ReadOutcome.Bytes)
 			{
+				_silentTicks = 0;
 				await AcceptBytesAsync(read.ByteCount, now, cancellationToken).ConfigureAwait(false);
 			}
-			else if (!IsPortStillListed())
+			else if (++_silentTicks % SilentTicksPerPortListCheck == 0 && !IsPortStillListed())
 			{
 				logger.LogDebug("Port {Port} left the port list", portName);
 				return;
@@ -157,6 +161,7 @@ internal sealed class LinkSession(
 		_lastFrameAt = null;
 		_lastDrainAt = null;
 		_bytesSinceFrame = 0;
+		_silentTicks = 0;
 		_board = null;
 		_state = LinkState.Waiting;
 		publish(StatusOf(_state));
@@ -233,7 +238,9 @@ internal sealed class LinkSession(
 		Deliver(now);
 	}
 
-	/// <summary>_lastFrameAt is when frames leave the decoder; for a drain, the drain time.</summary>
+	/// <summary>
+	/// The frames of one decode pass or drain share one stamp: the monotonic _lastFrameAt and the wall-clock ReceivedAt.
+	/// </summary>
 	private void Deliver(TimeSpan now)
 	{
 		if (_decoded.Count == 0)
@@ -241,6 +248,7 @@ internal sealed class LinkSession(
 			return;
 		}
 
+		var receivedAt = scheduler.Now;
 		foreach (var frame in _decoded)
 		{
 			var lost = _sequenceTracker.Observe(frame);
@@ -255,7 +263,7 @@ internal sealed class LinkSession(
 			}
 
 			_board = frame.State;
-			frames.TryWrite(frame);
+			frames.TryWrite(new ReceivedFrame(frame, receivedAt));
 		}
 
 		_decoded.Clear();
@@ -272,8 +280,33 @@ internal sealed class LinkSession(
 		}
 		finally
 		{
-			await port.DisposeAsync().ConfigureAwait(false);
+			await DisposePortAsync(port).ConfigureAwait(false);
 		}
+	}
+
+	/// <summary>Abandons a dispose that outlasts the limit, so a driver that hangs in it cannot stop the reopens.</summary>
+	private async Task DisposePortAsync(Stream port)
+	{
+		var limit = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+		using var timer = scheduler.Schedule(_disposeLimit, () => limit.TrySetResult());
+
+		// RJCP keeps Stream's DisposeAsync, which runs the blocking Dispose on the calling thread.
+		var dispose = Task.Run(() => port.DisposeAsync().AsTask());
+		if (await Task.WhenAny(dispose, limit.Task).ConfigureAwait(false) == dispose)
+		{
+			await dispose.ConfigureAwait(false);
+			return;
+		}
+
+		logger.LogWarning(
+			"Closing port {Port} took longer than {Limit}; the port is abandoned",
+			portName,
+			_disposeLimit);
+		_ = dispose.ContinueWith(
+			task => logger.LogDebug(task.Exception, "The abandoned port {Port} failed to close", portName),
+			CancellationToken.None,
+			TaskContinuationOptions.OnlyOnFaulted,
+			TaskScheduler.Default);
 	}
 
 	private LinkError? FaultOnEntry(LinkState state)

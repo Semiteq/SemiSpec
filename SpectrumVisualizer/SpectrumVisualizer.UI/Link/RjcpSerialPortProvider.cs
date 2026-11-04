@@ -32,18 +32,9 @@ public sealed class RjcpSerialPortProvider(ILogger<RjcpSerialPortProvider> logge
 		}
 	}
 
-	/// <summary>
-	/// Every failure, of the constructor included, is a retryable link error. A failed listing is no proof that
-	/// the port is gone, so the open goes ahead.
-	/// </summary>
+	/// <summary>Every failure, of the constructor included, is a retryable link error.</summary>
 	public Result<Stream> Open(string portName)
 	{
-		var listed = PortNames();
-		if (listed.IsSuccess && !listed.Value.Contains(portName, StringComparer.OrdinalIgnoreCase))
-		{
-			return Result.Fail<Stream>(new PortNotFoundError(portName));
-		}
-
 		SerialPortStream? port = null;
 		try
 		{

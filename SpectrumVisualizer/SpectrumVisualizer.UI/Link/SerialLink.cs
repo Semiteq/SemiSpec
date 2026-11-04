@@ -4,8 +4,6 @@ using System.Threading.Channels;
 
 using Microsoft.Extensions.Logging;
 
-using SpectrumVisualizer.Core.Protocol;
-
 namespace SpectrumVisualizer.UI.Link;
 
 /// <summary>
@@ -20,7 +18,7 @@ public sealed class SerialLink : IDisposable
 	private readonly ISerialPortProvider _serialPortProvider;
 	private readonly IScheduler _scheduler;
 	private readonly ILogger<SerialLink> _logger;
-	private readonly Channel<BoardFrame> _frames;
+	private readonly Channel<ReceivedFrame> _frames;
 
 	// Connect, DisconnectAsync and Dispose run on the UI thread; the session task never touches these two.
 	private CancellationTokenSource? _sessionCancellation;
@@ -43,13 +41,13 @@ public sealed class SerialLink : IDisposable
 			SingleWriter = true,
 			SingleReader = true
 		};
-		_frames = Channel.CreateBounded<BoardFrame>(options, OnFrameDropped);
+		_frames = Channel.CreateBounded<ReceivedFrame>(options, OnFrameDropped);
 	}
 
 	/// <summary>Raised on a thread-pool thread of the session task, never inside Connect or DisconnectAsync.</summary>
 	public event EventHandler<LinkStatus>? StatusChanged;
 
-	public ChannelReader<BoardFrame> Frames => _frames.Reader;
+	public ChannelReader<ReceivedFrame> Frames => _frames.Reader;
 
 	public LinkStatus Status => Volatile.Read(ref _status);
 
@@ -132,7 +130,7 @@ public sealed class SerialLink : IDisposable
 	/// <summary>
 	/// A reader that falls behind drops many frames in a row, so only the first drop of a session is logged.
 	/// </summary>
-	private void OnFrameDropped(BoardFrame frame)
+	private void OnFrameDropped(ReceivedFrame dropped)
 	{
 		if (_frameDropLogged)
 		{
@@ -140,6 +138,6 @@ public sealed class SerialLink : IDisposable
 		}
 
 		_frameDropLogged = true;
-		_logger.LogDebug("The frame channel is full; dropping the oldest frames from seq {Seq} on", frame.Seq);
+		_logger.LogDebug("The frame channel is full; dropping the oldest frames from seq {Seq} on", dropped.Frame.Seq);
 	}
 }
