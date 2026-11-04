@@ -584,14 +584,20 @@ Data flow:
   `IntensityColumn`, `IntensityQuery`)
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Store/IntensityBucketsTests.cs`
 
-- [ ] declare `IntensityQuery`, `IntensitySeries`, `IntensityColumn` of Solution Overview; the query rejects
-  `Columns < 1` and `To <= From` with a failed `Result` from a factory, since the trend passes view geometry
-- [ ] implement `IntensityBuckets` (`ColumnWidth`, `Add(t, value)`, `AddUncovered(t)`, `ToSeries()`) as single-pass
+- [x] declare `IntensityQuery`, `IntensitySeries`, `IntensityColumn` of Solution Overview; the query rejects
+  `Columns < 1` and `To <= From` with a failed `Result` from a factory, since the trend passes view geometry.
+  `IntensityQuery.Create` is the only way to build one (private constructor, get-only members, so `with` cannot skip
+  the checks); `IntensityColumn` is a `readonly record struct`.
+- [x] implement `IntensityBuckets` (`ColumnWidth`, `Add(t, value)`, `AddUncovered(t)`, `ToSeries()`) as single-pass
   arithmetic with no allocation per row; the column index is the `Int128` product form of Technical Details, never a
-  division by the truncated width
-- [ ] write the `IntensityBucketsTests` of Acceptance Evidence item 1 as table tests (`Component=Core`, `Area=Store`),
-  including `ARowNearToStaysInTheLastColumn` (10 ms range, 3 columns, a row at 9 ms: column 2)
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+  division by the truncated width. The constructor takes the validated `IntensityQuery`. `ColumnWidth` truncates to
+  whole milliseconds (the 3.333 ms to 3 ms example of Technical Details, the stored time resolution), not to
+  microseconds as SemiPlot's `BucketFor` does.
+- [x] write the `IntensityBucketsTests` of Acceptance Evidence item 1 as table tests (`Component=Core`, `Area=Store`),
+  including `ARowNearToStaysInTheLastColumn` (10 ms range, 3 columns, a row at 9 ms: column 2). Added
+  `AnUncoveringRowOutsideTheRangeIsSkipped`, `TheLastRowOfADayLandsInTheLastColumn`,
+  `TheQueryRejectsAnEmptyRangeOrNoColumns` and `TheSeriesStartsAtTheQueryStart`.
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (563 of 563)
 
 ### Task 5: Storage benchmark tool and the read decision
 **Files:**
