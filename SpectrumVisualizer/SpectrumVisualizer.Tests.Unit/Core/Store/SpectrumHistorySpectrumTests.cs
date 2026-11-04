@@ -77,6 +77,22 @@ public sealed class SpectrumHistorySpectrumTests : SpectrumHistoryTestBase
 		float.IsNaN(stored.Measurement.Q).Should().BeTrue();
 	}
 
+	[Theory]
+	[InlineData("device = 7")]
+	[InlineData("pixels = zeroblob(100)")]
+	public async Task SpectrumAtACorruptRowFailsNamingTheRow(string corruption)
+	{
+		Store(StoreSamples.Spectrum(Start, seq: 1), StoreSamples.Spectrum(Start.AddSeconds(1), seq: 2));
+		Corrupt($"UPDATE spectrum SET {corruption} WHERE id = 2");
+
+		var corrupt = await History.SpectrumAtAsync(Start.AddSeconds(1), Token);
+		var intact = await SeqAtAsync(Start);
+
+		corrupt.IsFailed.Should().BeTrue();
+		corrupt.Errors.Should().ContainSingle().Which.Message.Should().Contain("row 2");
+		intact.Should().Be(1, "only the corrupt row fails");
+	}
+
 	[Fact]
 	public async Task TheStoredRangeSpansTheFirstAndLastSpectrum()
 	{

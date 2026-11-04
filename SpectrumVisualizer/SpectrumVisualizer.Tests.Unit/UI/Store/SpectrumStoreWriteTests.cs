@@ -132,4 +132,23 @@ public sealed class SpectrumStoreWriteTests : SpectrumStoreTestBase
 		Count("heartbeat").Should().Be(1);
 		Scalar("SELECT group_concat(seq) FROM (SELECT seq FROM spectrum ORDER BY id)").Should().Be("0,1,2,0,1,2");
 	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task TheRetentionPathSweepsTheFilesOfOtherInstancesOnceAnHour()
+	{
+		var clock = new RetentionClock(StoreSamples.Start);
+		await StartOpenedAsync(clock);
+		var leftover = Folder.FileIn("spectra-2.db");
+		await File.WriteAllBytesAsync(leftover, [], TestContext.Current.CancellationToken);
+
+		await RetentionPassAsync(clock, TimeSpan.FromSeconds(61), expectedSpectra: 1);
+		await RetentionPassAsync(clock, TimeSpan.FromMinutes(59), expectedSpectra: 2);
+		var keptBeforeTheHour = File.Exists(leftover);
+		await RetentionPassAsync(clock, TimeSpan.FromMinutes(1), expectedSpectra: 3);
+
+		keptBeforeTheHour.Should().BeTrue("59 min passed since the first pass");
+		File.Exists(leftover).Should().BeFalse("an hour passed since the first pass");
+		File.Exists(StorePath).Should().BeTrue("the sweep keeps the own file");
+		LogTimes("The spectrum store sweep deleted").Should().HaveCount(2, "the open sweeps once, then the hour");
+	}
 }

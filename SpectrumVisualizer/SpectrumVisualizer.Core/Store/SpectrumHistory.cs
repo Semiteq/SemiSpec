@@ -15,13 +15,10 @@ namespace SpectrumVisualizer.Core.Store;
 public sealed class SpectrumHistory(string path)
 {
 	/// <summary>How many rows a series read takes between two checks of its token.</summary>
-	public const int RowsPerCancellationCheck = 256;
-
-	/// <summary>The rows of a series: received inside [$from, $to) of an <see cref="IntensityQuery"/>.</summary>
-	public const string InQueryRange = "received_at >= $from AND received_at < $to";
+	private const int RowsPerCancellationCheck = 256;
 
 	private const string NearestAtOrBefore = """
-		SELECT received_at, device, wavelength_nm, delta, amplitude, snr, q, seq, state, pixels
+		SELECT id, received_at, device, wavelength_nm, delta, amplitude, snr, q, seq, state, pixels
 		FROM spectrum WHERE received_at <= $moment
 		ORDER BY received_at DESC, id DESC LIMIT 1
 		""";
@@ -29,7 +26,8 @@ public sealed class SpectrumHistory(string path)
 	private const string Range = "SELECT min(received_at), max(received_at) FROM spectrum";
 
 	/// <summary>
-	/// The spectrum with the latest receive time at or before the moment, ties to the later row; null before the first.
+	/// The spectrum with the latest receive time at or before the moment, ties to the later row; null before the first,
+	/// and a failure naming the row when that row is corrupt.
 	/// </summary>
 	public Task<Result<StoredSpectrum?>> SpectrumAtAsync(DateTimeOffset moment, CancellationToken token)
 	{
@@ -40,7 +38,7 @@ public sealed class SpectrumHistory(string path)
 				command.CommandText = NearestAtOrBefore;
 				command.Parameters.AddWithValue("$moment", moment.ToUnixTimeMilliseconds());
 				using var reader = command.ExecuteReader();
-				return reader.Read() ? ToStoredSpectrum(reader) : null;
+				return reader.Read() ? ToStoredSpectrum(reader) : Result.Ok<StoredSpectrum?>(null);
 			},
 			"The stored spectrum could not be read",
 			token);
@@ -49,7 +47,7 @@ public sealed class SpectrumHistory(string path)
 	public Task<Result<IntensitySeries>> IntensitySeriesAsync(IntensityQuery query, CancellationToken token)
 	{
 		return ReadAsync(
-			connection => ReadSeries(connection, query, token),
+			connection => Result.Ok(ReadSeries(connection, query, token)),
 			"The intensity series could not be read",
 			token);
 	}
@@ -64,37 +62,28 @@ public sealed class SpectrumHistory(string path)
 				command.CommandText = Range;
 				using var reader = command.ExecuteReader();
 				reader.Read();
-				return reader.IsDBNull(0)
+				return Result.Ok(reader.IsDBNull(0)
 					? null
 					: new StoredRange(
 						DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(0)),
-						DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(1)));
+						DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(1))));
 			},
 			"The stored range could not be read",
 			token);
 	}
 
 	/// <summary>
-	/// The series in one statement over the range: every row's window cut from its pixels with substr.
+	/// The series in one statement over the range: every row's window cut from its pixels with substr; a corrupt row
+	/// counts as uncovered.
 	/// </summary>
 	public static IntensitySeries ReadSeries(SqliteConnection connection, IntensityQuery query, CancellationToken token)
 	{
 		var buckets = new IntensityBuckets(query);
 		var windows = new QueryWindows(query.WavelengthNm, query.Delta);
-		var atp2000 = windows.For(Spectrometer.Atp2000);
-		var atp8000 = windows.For(Spectrometer.Atp8000);
-		var (atp2000Start, atp2000Count) = (QueryWindows.ByteStart(atp2000), QueryWindows.ByteCount(atp2000));
-		var (atp8000Start, atp8000Count) = (QueryWindows.ByteStart(atp8000), QueryWindows.ByteCount(atp8000));
 		using var command = connection.CreateCommand();
-		command.CommandText = $"""
-			SELECT received_at, device, CASE device
-				WHEN {(byte)Spectrometer.Atp2000} THEN substr(pixels, {atp2000Start}, {atp2000Count})
-				WHEN {(byte)Spectrometer.Atp8000} THEN substr(pixels, {atp8000Start}, {atp8000Count})
-				END
-			FROM spectrum WHERE {InQueryRange}
-			""";
-		command.Parameters.AddWithValue("$from", query.FromMilliseconds);
-		command.Parameters.AddWithValue("$to", query.ToMilliseconds);
+		command.CommandText = SeriesStatement(windows);
+		command.Parameters.AddWithValue("$from", query.From.ToUnixTimeMilliseconds());
+		command.Parameters.AddWithValue("$to", query.To.ToUnixTimeMilliseconds());
 		using var reader = command.ExecuteReader();
 		var buffer = new byte[windows.LargestByteCount];
 		var rows = 0;
@@ -106,7 +95,7 @@ public sealed class SpectrumHistory(string path)
 			}
 
 			var receivedAt = DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(0));
-			if (!windows.Covers((Spectrometer)reader.GetByte(1)))
+			if (reader.IsDBNull(2) || !windows.Covers((Spectrometer)reader.GetInt64(1)))
 			{
 				buckets.AddUncovered(receivedAt);
 				continue;
@@ -119,7 +108,33 @@ public sealed class SpectrumHistory(string path)
 		return buckets.ToSeries();
 	}
 
-	private Task<Result<T>> ReadAsync<T>(Func<SqliteConnection, T> read, string failure, CancellationToken token)
+	/// <summary>
+	/// Selects each row's time, device and window bytes, NULL for a corrupt row: an unknown device or a pixel blob of
+	/// the wrong length.
+	/// </summary>
+	private static string SeriesStatement(QueryWindows windows)
+	{
+		// The length check stays inside the CASE: Microsoft.Data.Sqlite's GetBytes on an expression column crashes the
+		// process in sqlite3_table_column_metadata when the result holds a second expression column.
+		return $"""
+			SELECT received_at, device, CASE
+				{WindowWhen(windows, Spectrometer.Atp2000)}
+				{WindowWhen(windows, Spectrometer.Atp8000)}
+				END
+			FROM spectrum WHERE received_at >= $from AND received_at < $to
+			ORDER BY received_at, id
+			""";
+	}
+
+	private static string WindowWhen(QueryWindows windows, Spectrometer device)
+	{
+		var window = windows.For(device);
+		return $"WHEN device = {(byte)device} AND length(pixels) = {PixelBytes(device)} "
+			+ $"THEN substr(pixels, {QueryWindows.ByteStart(window)}, {QueryWindows.ByteCount(window)})";
+	}
+
+	private Task<Result<T>> ReadAsync<T>(
+		Func<SqliteConnection, Result<T>> read, string failure, CancellationToken token)
 	{
 		return Task.Run(
 			() =>
@@ -127,7 +142,7 @@ public sealed class SpectrumHistory(string path)
 				try
 				{
 					using var connection = StoreConnection.OpenReader(path);
-					return Result.Ok(read(connection));
+					return read(connection);
 				}
 				catch (SqliteException ex)
 				{
@@ -137,22 +152,47 @@ public sealed class SpectrumHistory(string path)
 			token);
 	}
 
-	private static StoredSpectrum ToStoredSpectrum(SqliteDataReader reader)
+	private static Result<StoredSpectrum?> ToStoredSpectrum(SqliteDataReader reader)
 	{
-		var pixels = MemoryMarshal.Cast<byte, ushort>((byte[])reader.GetValue(9)).ToArray();
+		var storedDevice = reader.GetInt64(2);
+		var pixelBytes = (byte[])reader.GetValue(10);
+		if (IntactDevice(storedDevice, pixelBytes.Length) is not { } device)
+		{
+			return Result.Fail(
+				$"The stored spectrum row {reader.GetInt64(0)} is corrupt: device {storedDevice}, "
+				+ $"{pixelBytes.Length} pixel bytes");
+		}
+
 		var measurement = new SpectrumMeasurement(
-			(Spectrometer)reader.GetByte(1),
-			(ushort)reader.GetInt32(2),
-			reader.GetByte(3),
-			FloatOrNaN(reader, 4),
+			device,
+			(ushort)reader.GetInt32(3),
+			reader.GetByte(4),
 			FloatOrNaN(reader, 5),
 			FloatOrNaN(reader, 6),
-			pixels);
+			FloatOrNaN(reader, 7),
+			MemoryMarshal.Cast<byte, ushort>(pixelBytes).ToArray());
 		return new StoredSpectrum(
 			measurement,
-			DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(0)),
-			reader.GetByte(7),
-			(BoardState)reader.GetByte(8));
+			DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(1)),
+			reader.GetByte(8),
+			(BoardState)reader.GetByte(9));
+	}
+
+	/// <summary>A row's device when it is a known spectrometer and the pixel blob has its length; null otherwise.</summary>
+	private static Spectrometer? IntactDevice(long device, long pixelBytes)
+	{
+		if (device is not ((long)Spectrometer.Atp2000 or (long)Spectrometer.Atp8000))
+		{
+			return null;
+		}
+
+		var spectrometer = (Spectrometer)device;
+		return pixelBytes == PixelBytes(spectrometer) ? spectrometer : null;
+	}
+
+	private static int PixelBytes(Spectrometer device)
+	{
+		return sizeof(ushort) * device.PixelCount;
 	}
 
 	private static float FloatOrNaN(SqliteDataReader reader, int ordinal)

@@ -149,4 +149,45 @@ public sealed class SpectrumStoreFailureTests : SpectrumStoreTestBase
 		var delete = () => File.Delete(StorePath);
 		delete.Should().NotThrow("the writer closed the file after the failure");
 	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task FailedRetentionPassesLogOneWarningThenDebugRepeatsThenOneRecoveryLine()
+	{
+		var clock = new RetentionClock(StoreSamples.Start.AddHours(25));
+		await StartOpenedAsync(clock);
+		await FeedAsync(StoreSamples.Spectrum(StoreSamples.Start, seq: 1));
+		await Waits.UntilAsync(() => Count("spectrum") == 1);
+		Execute("CREATE TRIGGER fail_delete BEFORE DELETE ON spectrum BEGIN SELECT RAISE(ABORT, 'test'); END");
+
+		await RetentionPassAsync(clock, TimeSpan.FromSeconds(61), expectedSpectra: 2);
+		await RetentionPassAsync(clock, TimeSpan.FromSeconds(61), expectedSpectra: 3);
+		await RetentionPassAsync(clock, TimeSpan.FromSeconds(61), expectedSpectra: 4);
+		Execute("DROP TRIGGER fail_delete");
+		clock.Advance(TimeSpan.FromSeconds(61));
+		await Waits.UntilAsync(() => Count("spectrum") == 0);
+		await StopAsync();
+
+		var failedPasses = Logger.Collector.GetSnapshot()
+			.Where(record => record.Message.StartsWith("The spectrum store rows", StringComparison.Ordinal))
+			.ToList();
+		failedPasses.Select(record => record.Level).Should().Equal(
+			[LogLevel.Warning, LogLevel.Debug, LogLevel.Debug],
+			"the first failed pass logs its stack and the repeats log at Debug");
+		failedPasses[0].Exception.Should().BeOfType<SqliteException>();
+		failedPasses.Skip(1).Should().OnlyContain(record => record.Exception == null);
+		var recovered = Logger.Collector.GetSnapshot()
+			.Where(record => record.Message.StartsWith("Spectrum store retention recovered", StringComparison.Ordinal))
+			.Should().ContainSingle().Subject;
+		recovered.Level.Should().Be(LogLevel.Information);
+		recovered.Message.Should().Be("Spectrum store retention recovered after 3 failed passes");
+		Panel.Entries.Should().BeEmpty("a failed retention pass loses no data");
+	}
+
+	private void Execute(string sql)
+	{
+		using var connection = OpenPlain();
+		using var command = connection.CreateCommand();
+		command.CommandText = sql;
+		command.ExecuteNonQuery();
+	}
 }

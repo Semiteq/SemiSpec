@@ -2,36 +2,17 @@ using FluentResults;
 
 namespace SpectrumVisualizer.Core.Store;
 
-/// <summary>Folds window intensities into min/max columns of equal time spans over the query range.</summary>
-public sealed class IntensityBuckets
+/// <summary>Folds window intensities into min/max columns on the time grid of the query.</summary>
+public sealed class IntensityBuckets(IntensityQuery query)
 {
-	private readonly DateTimeOffset _from;
-	private readonly long _rangeTicks;
-	private readonly double[] _min;
-	private readonly double[] _max;
-	private readonly int[] _count;
-	private readonly int[] _uncoveredCount;
-
-	public IntensityBuckets(IntensityQuery query)
-	{
-		_from = query.From;
-		_rangeTicks = (query.To - query.From).Ticks;
-		_min = new double[query.Columns];
-		_max = new double[query.Columns];
-		_count = new int[query.Columns];
-		_uncoveredCount = new int[query.Columns];
-		var wholeMilliseconds = Math.Max(_rangeTicks / query.Columns / TimeSpan.TicksPerMillisecond, 1);
-		ColumnWidth = TimeSpan.FromMilliseconds(wholeMilliseconds);
-	}
-
-	/// <summary>
-	/// The span of one column truncated to whole milliseconds, for drawing; the fold never divides by it.
-	/// </summary>
-	public TimeSpan ColumnWidth { get; }
+	private readonly double[] _min = new double[query.ColumnCount];
+	private readonly double[] _max = new double[query.ColumnCount];
+	private readonly int[] _count = new int[query.ColumnCount];
+	private readonly int[] _uncoveredCount = new int[query.ColumnCount];
 
 	public void Add(DateTimeOffset receivedAt, double value)
 	{
-		var column = ColumnOf(receivedAt);
+		var column = query.ColumnOf(receivedAt);
 		if (column < 0)
 		{
 			return;
@@ -51,10 +32,10 @@ public sealed class IntensityBuckets
 		_count[column]++;
 	}
 
-	/// <summary>Counts a spectrum whose device does not cover the queried wavelength.</summary>
+	/// <summary>Counts a spectrum the series cannot read: its device misses the wavelength, or the row is corrupt.</summary>
 	public void AddUncovered(DateTimeOffset receivedAt)
 	{
-		var column = ColumnOf(receivedAt);
+		var column = query.ColumnOf(receivedAt);
 		if (column >= 0)
 		{
 			_uncoveredCount[column]++;
@@ -66,39 +47,44 @@ public sealed class IntensityBuckets
 		var columns = new IntensityColumn[_count.Length];
 		for (var i = 0; i < columns.Length; i++)
 		{
+			var start = query.ColumnStart(i);
 			columns[i] = _count[i] == 0
-				? new IntensityColumn(double.NaN, double.NaN, 0, _uncoveredCount[i])
-				: new IntensityColumn(_min[i], _max[i], _count[i], _uncoveredCount[i]);
+				? new IntensityColumn(start, double.NaN, double.NaN, 0, _uncoveredCount[i])
+				: new IntensityColumn(start, _min[i], _max[i], _count[i], _uncoveredCount[i]);
 		}
 
-		return new IntensitySeries(_from, ColumnWidth, columns);
-	}
-
-	/// <summary>The column of a time inside [From, To), or -1 outside it.</summary>
-	private int ColumnOf(DateTimeOffset receivedAt)
-	{
-		var offsetTicks = (receivedAt - _from).Ticks;
-		if (offsetTicks < 0 || offsetTicks >= _rangeTicks)
-		{
-			return -1;
-		}
-
-		return (int)((Int128)offsetTicks * _count.Length / _rangeTicks);
+		return new IntensitySeries(query.From, query.To, query.ColumnWidth, columns);
 	}
 }
 
 /// <summary>
-/// A request for the intensity series at a wavelength and delta over [From, To) in a number of columns.
+/// A request for the intensity series at a wavelength and delta over [From, To), both in whole milliseconds, in columns
+/// of ColumnWidth on a grid anchored at the Unix epoch.
 /// </summary>
 public sealed record IntensityQuery
 {
-	private IntensityQuery(ushort wavelengthNm, byte delta, DateTimeOffset from, DateTimeOffset to, int columns)
+	/// <summary>The most columns a series holds, about ten times the pixels across a 4K screen.</summary>
+	public const int MaxColumns = 40_000;
+
+	private readonly long _widthMilliseconds;
+	private readonly long _firstGridColumn;
+
+	private IntensityQuery(
+		ushort wavelengthNm,
+		byte delta,
+		DateTimeOffset from,
+		DateTimeOffset to,
+		long widthMilliseconds,
+		long firstGridColumn,
+		int columnCount)
 	{
 		WavelengthNm = wavelengthNm;
 		Delta = delta;
 		From = from;
 		To = to;
-		Columns = columns;
+		_widthMilliseconds = widthMilliseconds;
+		_firstGridColumn = firstGridColumn;
+		ColumnCount = columnCount;
 	}
 
 	public ushort WavelengthNm { get; }
@@ -109,58 +95,88 @@ public sealed record IntensityQuery
 
 	public DateTimeOffset To { get; }
 
-	public int Columns { get; }
+	public TimeSpan ColumnWidth => TimeSpan.FromMilliseconds(_widthMilliseconds);
+
+	/// <summary>The grid columns that intersect [From, To); the first and the last may stick out of the range.</summary>
+	public int ColumnCount { get; }
 
 	/// <summary>
-	/// From in the stored Unix milliseconds, rounded down, so the SQL range keeps every row the fold keeps.
+	/// Builds the query with From and To truncated to whole milliseconds, or fails for an empty range, a width that is
+	/// not a whole number of milliseconds of at least 1, or more than <see cref="MaxColumns"/> columns.
 	/// </summary>
-	public long FromMilliseconds
-	{
-		get
-		{
-			var milliseconds = From.ToUnixTimeMilliseconds();
-			return DateTimeOffset.FromUnixTimeMilliseconds(milliseconds) > From ? milliseconds - 1 : milliseconds;
-		}
-	}
-
-	/// <summary>
-	/// To in the stored Unix milliseconds, rounded up, so a row stamped in the millisecond To falls inside stays in.
-	/// </summary>
-	public long ToMilliseconds
-	{
-		get
-		{
-			var milliseconds = To.ToUnixTimeMilliseconds();
-			return DateTimeOffset.FromUnixTimeMilliseconds(milliseconds) < To ? milliseconds + 1 : milliseconds;
-		}
-	}
-
-	/// <summary>Builds the query, or fails for an empty range or fewer than one column.</summary>
 	public static Result<IntensityQuery> Create(
-		ushort wavelengthNm, byte delta, DateTimeOffset from, DateTimeOffset to, int columns)
+		ushort wavelengthNm, byte delta, DateTimeOffset from, DateTimeOffset to, TimeSpan columnWidth)
 	{
-		if (columns < 1)
+		if (columnWidth < TimeSpan.FromMilliseconds(1) || columnWidth.Ticks % TimeSpan.TicksPerMillisecond != 0)
 		{
-			return Result.Fail($"The intensity series needs at least one column, got {columns}");
+			return Result.Fail(
+				$"The intensity series needs a column width of whole milliseconds, at least 1 ms, got {columnWidth}");
 		}
 
+		from = WholeMilliseconds(from);
+		to = WholeMilliseconds(to);
 		if (to <= from)
 		{
 			return Result.Fail($"The intensity series range ends at {to:O}, not after its start {from:O}");
 		}
 
-		return new IntensityQuery(wavelengthNm, delta, from, to, columns);
+		var widthMilliseconds = columnWidth.Ticks / TimeSpan.TicksPerMillisecond;
+		var firstGridColumn = FloorDivide(from.ToUnixTimeMilliseconds(), widthMilliseconds);
+		var columns = FloorDivide(to.ToUnixTimeMilliseconds() - 1, widthMilliseconds) - firstGridColumn + 1;
+		if (columns > MaxColumns)
+		{
+			return Result.Fail(
+				$"The intensity series from {from:O} to {to:O} in columns of {columnWidth} needs {columns} columns, "
+				+ $"more than {MaxColumns}");
+		}
+
+		return new IntensityQuery(wavelengthNm, delta, from, to, widthMilliseconds, firstGridColumn, (int)columns);
+	}
+
+	/// <summary>The column of a time inside [From, To), or -1 outside it.</summary>
+	public int ColumnOf(DateTimeOffset moment)
+	{
+		if (moment < From || moment >= To)
+		{
+			return -1;
+		}
+
+		return (int)(GridColumn(moment.ToUnixTimeMilliseconds()) - _firstGridColumn);
+	}
+
+	/// <summary>The start of a column: a multiple of the column width from the Unix epoch.</summary>
+	public DateTimeOffset ColumnStart(int column)
+	{
+		return DateTimeOffset.FromUnixTimeMilliseconds((_firstGridColumn + column) * _widthMilliseconds);
+	}
+
+	private long GridColumn(long unixMilliseconds)
+	{
+		return FloorDivide(unixMilliseconds, _widthMilliseconds);
+	}
+
+	private static DateTimeOffset WholeMilliseconds(DateTimeOffset moment)
+	{
+		return moment.AddTicks(-(moment.UtcTicks % TimeSpan.TicksPerMillisecond));
+	}
+
+	private static long FloorDivide(long value, long divisor)
+	{
+		var quotient = Math.DivRem(value, divisor, out var remainder);
+		return remainder < 0 ? quotient - 1 : quotient;
 	}
 }
 
 /// <summary>
-/// Column i holds the i-th of the equal spans of the query range; ColumnWidth is that span in whole milliseconds, at
-/// least 1.
+/// The series over [From, To): column i spans ColumnWidth from its Start, on a grid anchored at the Unix epoch, so two
+/// series of one width share the boundaries of every column they both hold in full.
 /// </summary>
-public sealed record IntensitySeries(DateTimeOffset From, TimeSpan ColumnWidth, IntensityColumn[] Columns);
+public sealed record IntensitySeries(
+	DateTimeOffset From, DateTimeOffset To, TimeSpan ColumnWidth, IntensityColumn[] Columns);
 
 /// <summary>
-/// Min and max of the column's covered spectra, NaN when Count is 0; UncoveredCount counts spectra of a device that
-/// does not cover the wavelength.
+/// Min and max of the column's covered spectra, NaN when Count is 0; UncoveredCount counts the spectra of a device that
+/// does not cover the wavelength and the corrupt rows the series skipped.
 /// </summary>
-public readonly record struct IntensityColumn(double Min, double Max, int Count, int UncoveredCount);
+public readonly record struct IntensityColumn(
+	DateTimeOffset Start, double Min, double Max, int Count, int UncoveredCount);

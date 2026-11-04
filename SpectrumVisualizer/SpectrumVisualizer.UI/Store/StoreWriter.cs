@@ -12,8 +12,8 @@ using SpectrumVisualizer.UI.Messages;
 namespace SpectrumVisualizer.UI.Store;
 
 /// <summary>
-/// The writer task of the spectrum store: drains the queue into the store file in batches, deletes rows older than a
-/// day once a minute and closes the file with a checkpoint; every frame it loses goes to countDropped.
+/// The writer task of the spectrum store: drains the queue into the store file in batches, runs the retention pass
+/// once a minute and closes the file with a checkpoint; every frame it loses goes to countDropped.
 /// </summary>
 internal sealed class StoreWriter(
 	StoreFile storeFile,
@@ -27,7 +27,8 @@ internal sealed class StoreWriter(
 	private const int BatchSize = 256;
 
 	private static readonly TimeSpan _retentionInterval = TimeSpan.FromMinutes(1);
-	private static readonly TimeSpan _retentionAge = TimeSpan.FromHours(24);
+
+	private readonly StoreRetention _retention = new(storeFile, timeProvider, logger);
 
 	// Set by Stop on the UI thread, read by the writer task.
 	private volatile bool _stopped;
@@ -126,25 +127,9 @@ internal sealed class StoreWriter(
 		var path = storeFile.Path;
 		return StoreFiles.Prepare(path).Bind(sweep =>
 		{
-			LogSweep(sweep);
+			_retention.LogSweep(sweep);
 			return SpectrumDatabase.Open(path);
 		});
-	}
-
-	private void LogSweep(StoreSweep sweep)
-	{
-		if (sweep.Failure is { } failure)
-		{
-			logger.LogWarning(
-				failure.Exception,
-				"The spectrum store sweep could not list the store folder; it deleted nothing");
-			return;
-		}
-
-		logger.LogDebug(
-			"The spectrum store sweep deleted {Deleted} files and kept {Kept} files of live instances",
-			sweep.DeletedFiles,
-			sweep.KeptFiles);
 	}
 
 	private void ReportOpenFailure(IEnumerable<IError> causes)
@@ -171,7 +156,7 @@ internal sealed class StoreWriter(
 					await retentionDue.ConfigureAwait(false);
 					if (!_stopped)
 					{
-						DeleteExpired(database);
+						_retention.Run(database);
 					}
 
 					retentionDue = Task.Delay(_retentionInterval, timeProvider, retentionCancellation.Token);
@@ -259,19 +244,6 @@ internal sealed class StoreWriter(
 			_failedFrames);
 		_failedBatches = 0;
 		_failedFrames = 0;
-	}
-
-	private void DeleteExpired(SpectrumDatabase database)
-	{
-		var cutoff = timeProvider.GetUtcNow() - _retentionAge;
-		var deleted = database.DeleteBefore(cutoff);
-		if (deleted.IsFailed)
-		{
-			logger.LogWarning(
-				ResultReporting.CauseOf(deleted.Errors),
-				"The spectrum store rows received before {Cutoff:O} could not be deleted",
-				cutoff);
-		}
 	}
 
 	private long DiscardQueued()

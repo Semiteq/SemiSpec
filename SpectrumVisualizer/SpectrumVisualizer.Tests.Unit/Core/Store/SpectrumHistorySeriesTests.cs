@@ -7,7 +7,7 @@ using Xunit;
 
 namespace SpectrumVisualizer.Tests.Unit.Core.Store;
 
-/// <summary>The intensity series: window means, coverage, the range edges and cancellation.</summary>
+/// <summary>The intensity series: window means, coverage, corrupt rows, the range edges and cancellation.</summary>
 [Trait("Component", "Core")]
 [Trait("Area", "Store")]
 [Trait("Category", "Unit")]
@@ -25,24 +25,11 @@ public sealed class SpectrumHistorySeriesTests : SpectrumHistoryTestBase
 
 		var series = await SeriesAsync(StoreSamples.SampleNm, StoreSamples.SampleDelta, columns: 5);
 
-		series.Columns[0].Should().Be(new IntensityColumn(mean, mean, 1, 0));
-		series.Columns[1].Should().Be(new IntensityColumn(mean + 10, mean + 20, 2, 0));
+		series.Columns[0].Should().Be(new IntensityColumn(Start, mean, mean, 1, 0));
+		series.Columns[1].Should().Be(new IntensityColumn(Start.AddSeconds(2), mean + 10, mean + 20, 2, 0));
 		series.Columns[2].Count.Should().Be(0);
 		double.IsNaN(series.Columns[2].Min).Should().BeTrue();
 		series.Columns.Sum(column => column.Count).Should().Be(3, "a row at To lies outside the range");
-	}
-
-	[Fact]
-	public async Task ARowInsideTheLastMillisecondBeforeToIsInTheSeries()
-	{
-		var stamp = Start.AddSeconds(5);
-		Store(StoreSamples.Spectrum(stamp));
-		var to = stamp.AddTicks(TimeSpan.TicksPerMillisecond / 2);
-		var query = Query(StoreSamples.SampleNm, StoreSamples.SampleDelta, Start, to, 1);
-
-		var series = (await History.IntensitySeriesAsync(query, Token)).Value;
-
-		series.Columns[0].Count.Should().Be(1, "the row's stamp lies before To");
 	}
 
 	[Fact]
@@ -58,7 +45,24 @@ public sealed class SpectrumHistorySeriesTests : SpectrumHistoryTestBase
 		series.Columns[0].Count.Should().Be(0);
 		series.Columns[0].UncoveredCount.Should().Be(1);
 		double.IsNaN(series.Columns[0].Max).Should().BeTrue();
-		series.Columns[1].Should().Be(new IntensityColumn(mean, mean, 1, 0));
+		series.Columns[1].Should().Be(new IntensityColumn(Start.AddSeconds(5), mean, mean, 1, 0));
+	}
+
+	[Theory]
+	[InlineData("device = 7")]
+	[InlineData("pixels = zeroblob(100)")]
+	public async Task ACorruptRowCountsAsUncovered(string corruption)
+	{
+		Store(
+			StoreSamples.Spectrum(Start.AddSeconds(1)),
+			StoreSamples.Spectrum(Start.AddSeconds(2)),
+			StoreSamples.Spectrum(Start.AddSeconds(3)));
+		Corrupt($"UPDATE spectrum SET {corruption} WHERE id = 2");
+		var mean = RampMean(Spectrometer.Atp8000, StoreSamples.SampleNm, StoreSamples.SampleDelta);
+
+		var series = await SeriesAsync(StoreSamples.SampleNm, StoreSamples.SampleDelta, columns: 1);
+
+		series.Columns.Should().Equal(new IntensityColumn(Start, mean, mean, 2, 1));
 	}
 
 	[Fact]
@@ -105,7 +109,7 @@ public sealed class SpectrumHistorySeriesTests : SpectrumHistoryTestBase
 		var series = await SeriesAsync(700, 3, columns: 1);
 
 		queriedMean.Should().NotBe(RampMean(Spectrometer.Atp2000, 650, 10));
-		series.Columns[0].Should().Be(new IntensityColumn(queriedMean, queriedMean, 1, 0));
+		series.Columns[0].Should().Be(new IntensityColumn(Start, queriedMean, queriedMean, 1, 0));
 	}
 
 	[Fact]
@@ -116,14 +120,15 @@ public sealed class SpectrumHistorySeriesTests : SpectrumHistoryTestBase
 
 		var series = await SeriesAsync(StoreSamples.SampleNm, StoreSamples.SampleDelta, columns: 1);
 
-		series.Columns[0].Should().Be(new IntensityColumn(0, mean, 2, 0));
+		series.Columns[0].Should().Be(new IntensityColumn(Start, 0, mean, 2, 0));
 	}
 
 	[Fact]
 	public async Task ACancelledSeriesThrowsOperationCanceled()
 	{
 		Store(StoreSamples.Spectrum(Start.AddSeconds(1)));
-		var query = Query(StoreSamples.SampleNm, StoreSamples.SampleDelta, Start, Start.AddSeconds(10), 1);
+		var query = Query(
+			StoreSamples.SampleNm, StoreSamples.SampleDelta, Start, Start.AddSeconds(10), TimeSpan.FromSeconds(10));
 
 		var read = () => History.IntensitySeriesAsync(query, new CancellationToken(canceled: true));
 
@@ -136,7 +141,8 @@ public sealed class SpectrumHistorySeriesTests : SpectrumHistoryTestBase
 		const int Rows = 600;
 		var interval = TimeSpan.FromHours(2) / Rows;
 		Store([.. Enumerable.Range(0, Rows).Select(i => StoreSamples.Spectrum(Start + (interval * i)))]);
-		var query = Query(StoreSamples.SampleNm, StoreSamples.SampleDelta, Start, Start.AddHours(2), 100);
+		var query = Query(
+			StoreSamples.SampleNm, StoreSamples.SampleDelta, Start, Start.AddHours(2), TimeSpan.FromSeconds(72));
 		using var cancellation = new CancellationTokenSource();
 		using var connection = StoreConnection.OpenReader(StorePath);
 		var substrCalls = 0;

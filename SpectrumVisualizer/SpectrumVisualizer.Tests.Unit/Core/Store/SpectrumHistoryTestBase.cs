@@ -58,16 +58,26 @@ public abstract class SpectrumHistoryTestBase : IDisposable
 		return result.Value?.Seq;
 	}
 
+	/// <summary>The series over the 10 s from Start in columns of an equal share of it; Start sits on every grid.</summary>
 	protected async Task<IntensitySeries> SeriesAsync(ushort nm, byte delta, int columns)
 	{
-		var result = await History.IntensitySeriesAsync(Query(nm, delta, Start, Start.AddSeconds(10), columns), Token);
+		var width = TimeSpan.FromSeconds(10) / columns;
+		var result = await History.IntensitySeriesAsync(Query(nm, delta, Start, Start.AddSeconds(10), width), Token);
 		result.IsSuccess.Should().BeTrue();
 		return result.Value;
 	}
 
-	protected static IntensityQuery Query(ushort nm, byte delta, DateTimeOffset from, DateTimeOffset to, int columns)
+	protected static IntensityQuery Query(
+		ushort nm, byte delta, DateTimeOffset from, DateTimeOffset to, TimeSpan columnWidth)
 	{
-		return IntensityQuery.Create(nm, delta, from, to, columns).Value;
+		return IntensityQuery.Create(nm, delta, from, to, columnWidth).Value;
+	}
+
+	/// <summary>Runs a statement against the store file from a connection of its own.</summary>
+	protected void Corrupt(string sql)
+	{
+		using var connection = StoreConnection.Open(StorePath);
+		Execute(connection, sql);
 	}
 
 	/// <summary>An ATP-8000 sample spectrum whose every pixel is the ramp plus the offset.</summary>

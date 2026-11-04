@@ -23,7 +23,7 @@ public sealed class IntensityBucketsTests
 	[InlineData(-1, -1)]
 	public void ARowLandsInTheColumnOfItsTime(int offsetMs, int expectedColumn)
 	{
-		var buckets = new IntensityBuckets(Query(TimeSpan.FromSeconds(1), columns: 10));
+		var buckets = new IntensityBuckets(Query(_from, _from.AddSeconds(1), TimeSpan.FromMilliseconds(100)));
 
 		buckets.Add(_from.AddMilliseconds(offsetMs), 5.0);
 
@@ -37,37 +37,27 @@ public sealed class IntensityBucketsTests
 		counts.Should().Equal(expected);
 	}
 
-	[Fact]
-	public void ARowNearToStaysInTheLastColumn()
-	{
-		var buckets = new IntensityBuckets(Query(TimeSpan.FromMilliseconds(10), columns: 3));
-
-		buckets.Add(_from.AddMilliseconds(9), 5.0);
-
-		buckets.ColumnWidth.Should().Be(TimeSpan.FromMilliseconds(3));
-		buckets.ToSeries().Columns.Select(c => c.Count).Should().Equal(0, 0, 1);
-	}
-
 	[Theory]
 	[InlineData(new[] { 4.0 }, 4.0, 4.0)]
 	[InlineData(new[] { 4.0, 1.0, 7.0 }, 1.0, 7.0)]
 	[InlineData(new[] { 0.0, 3.5, 2.0, 3.5 }, 0.0, 3.5)]
 	public void AColumnKeepsMinMaxAndCount(double[] values, double expectedMin, double expectedMax)
 	{
-		var buckets = new IntensityBuckets(Query(TimeSpan.FromSeconds(1), columns: 1));
+		var buckets = new IntensityBuckets(Query(_from, _from.AddSeconds(1), TimeSpan.FromSeconds(1)));
 
 		foreach (var value in values)
 		{
 			buckets.Add(_from.AddMilliseconds(500), value);
 		}
 
-		buckets.ToSeries().Columns.Should().Equal(new IntensityColumn(expectedMin, expectedMax, values.Length, 0));
+		buckets.ToSeries().Columns.Should().Equal(
+			new IntensityColumn(_from, expectedMin, expectedMax, values.Length, 0));
 	}
 
 	[Fact]
 	public void AnEmptyColumnIsNaNWithCountZero()
 	{
-		var buckets = new IntensityBuckets(Query(TimeSpan.FromSeconds(1), columns: 2));
+		var buckets = new IntensityBuckets(Query(_from, _from.AddSeconds(1), TimeSpan.FromMilliseconds(500)));
 
 		buckets.Add(_from, 5.0);
 
@@ -84,7 +74,7 @@ public sealed class IntensityBucketsTests
 	[InlineData(1, true)]
 	public void AnUncoveringRowCountsAsUncoveredOnly(int uncoveredRows, bool withCoveredRow)
 	{
-		var buckets = new IntensityBuckets(Query(TimeSpan.FromSeconds(1), columns: 1));
+		var buckets = new IntensityBuckets(Query(_from, _from.AddSeconds(1), TimeSpan.FromSeconds(1)));
 
 		for (var i = 0; i < uncoveredRows; i++)
 		{
@@ -105,7 +95,7 @@ public sealed class IntensityBucketsTests
 	[Fact]
 	public void AnUncoveringRowOutsideTheRangeIsSkipped()
 	{
-		var buckets = new IntensityBuckets(Query(TimeSpan.FromSeconds(1), columns: 1));
+		var buckets = new IntensityBuckets(Query(_from, _from.AddSeconds(1), TimeSpan.FromSeconds(1)));
 
 		buckets.AddUncovered(_from.AddSeconds(1));
 		buckets.AddUncovered(_from.AddTicks(-1));
@@ -113,53 +103,137 @@ public sealed class IntensityBucketsTests
 		buckets.ToSeries().Columns.Single().UncoveredCount.Should().Be(0);
 	}
 
-	[Theory]
-	[InlineData(1000, 10, 100)]
-	[InlineData(10, 3, 3)]
-	[InlineData(2, 5, 1)]
-	[InlineData(1999, 1000, 1)]
-	[InlineData(86_400_000, 1000, 86_400)]
-	public void TheColumnWidthIsTheRangeOverTheColumnsFlooredAtOneMillisecond(int rangeMs, int columns, int expectedMs)
+	[Fact]
+	public void TheColumnsSitOnTheEpochGridAndCoverEveryGridColumnTheRangeTouches()
 	{
-		var buckets = new IntensityBuckets(Query(TimeSpan.FromMilliseconds(rangeMs), columns));
+		var from = _from.AddMilliseconds(250);
+		var query = Query(from, from.AddMilliseconds(1000), TimeSpan.FromMilliseconds(100));
+		var buckets = new IntensityBuckets(query);
 
-		buckets.ColumnWidth.Should().Be(TimeSpan.FromMilliseconds(expectedMs));
-		buckets.ToSeries().ColumnWidth.Should().Be(TimeSpan.FromMilliseconds(expectedMs));
+		buckets.Add(from, 1.0);
+		buckets.Add(from.AddMilliseconds(999), 2.0);
+
+		var series = buckets.ToSeries();
+		series.From.Should().Be(from);
+		series.To.Should().Be(from.AddMilliseconds(1000));
+		series.ColumnWidth.Should().Be(TimeSpan.FromMilliseconds(100));
+		series.Columns.Select(c => c.Start).Should().Equal(
+			Enumerable.Range(0, 11).Select(i => _from.AddMilliseconds(200 + (100 * i))));
+		series.Columns[0].Count.Should().Be(1, "the first column starts before From and holds From");
+		series.Columns[^1].Count.Should().Be(1, "the last column ends after To and holds the last millisecond");
+	}
+
+	[Fact]
+	public void ARangeEndingOnAColumnBoundaryAddsNoEmptyColumn()
+	{
+		var query = Query(_from, _from.AddSeconds(2), TimeSpan.FromSeconds(1));
+
+		query.ColumnCount.Should().Be(2);
 	}
 
 	[Fact]
 	public void TheLastRowOfADayLandsInTheLastColumn()
 	{
-		var buckets = new IntensityBuckets(Query(TimeSpan.FromHours(24), columns: 1000));
+		var buckets = new IntensityBuckets(Query(_from, _from.AddHours(24), TimeSpan.FromMilliseconds(86_400)));
 
 		buckets.Add(_from.AddHours(24).AddTicks(-1), 1.0);
 
-		buckets.ToSeries().Columns[^1].Count.Should().Be(1);
+		var columns = buckets.ToSeries().Columns;
+		columns.Should().HaveCount(1000);
+		columns[^1].Count.Should().Be(1);
+	}
+
+	[Fact]
+	public void TwoQueriesThatOverlapProduceEqualColumnsWhereBothHoldThemInFull()
+	{
+		var width = TimeSpan.FromMilliseconds(250);
+		var first = Fold(Query(_from.AddMilliseconds(123), _from.AddMilliseconds(7456), width));
+		var second = Fold(Query(_from.AddMilliseconds(3789), _from.AddSeconds(10), width));
+
+		var shared = FullColumns(first).Intersect(FullColumns(second)).ToArray();
+
+		shared.Should().HaveCount(13, "the full columns starting from 4 000 ms to 7 000 ms lie in both ranges");
+	}
+
+	[Fact]
+	public void ALiveWindowShiftedByLessThanOneWidthKeepsTheBoundariesOfEveryFullColumn()
+	{
+		var width = TimeSpan.FromSeconds(1);
+		var to = _from.AddMilliseconds(9300);
+		var before = Fold(Query(to.AddSeconds(-10), to, width));
+		var after = Fold(Query(to.AddSeconds(-10).AddMilliseconds(400), to.AddMilliseconds(400), width));
+
+		after.Columns.Should().AllSatisfy(c => (c.Start.ToUnixTimeMilliseconds() % 1000).Should().Be(0));
+		FullColumns(after).Should().HaveCount(9).And.Equal(FullColumns(before));
+	}
+
+	[Fact]
+	public void TheQueryTruncatesFromAndToToWholeMilliseconds()
+	{
+		var to = _from.AddMilliseconds(10).AddTicks(3_000);
+
+		var query = Query(_from.AddTicks(7_000), to, TimeSpan.FromMilliseconds(5));
+
+		query.From.Should().Be(_from);
+		query.To.Should().Be(_from.AddMilliseconds(10));
+		query.ColumnCount.Should().Be(2);
 	}
 
 	[Theory]
-	[InlineData(0, 1000)]
-	[InlineData(-1, 1000)]
-	[InlineData(10, 0)]
-	[InlineData(10, -5)]
-	public void TheQueryRejectsAnEmptyRangeOrNoColumns(int columns, int rangeMs)
+	[InlineData(0L, 1000)]
+	[InlineData(10_000L, -1)]
+	[InlineData(15_000L, 1000)]
+	[InlineData(10_000L, 0)]
+	[InlineData(10_000L, -5)]
+	public void TheQueryRejectsAWidthOutsideWholeMillisecondsOrAnEmptyRange(long widthTicks, int rangeMs)
 	{
-		var result = IntensityQuery.Create(650, 10, _from, _from.AddMilliseconds(rangeMs), columns);
+		var to = _from.AddMilliseconds(rangeMs);
+
+		var result = IntensityQuery.Create(650, 10, _from, to, TimeSpan.FromTicks(widthTicks));
 
 		result.IsFailed.Should().BeTrue();
 	}
 
 	[Fact]
-	public void TheSeriesStartsAtTheQueryStart()
+	public void TheQueryRejectsARangeThatTruncatesToNothing()
 	{
-		var series = new IntensityBuckets(Query(TimeSpan.FromSeconds(1), columns: 4)).ToSeries();
+		var result = IntensityQuery.Create(
+			650, 10, _from.AddTicks(2_000), _from.AddTicks(8_000), TimeSpan.FromMilliseconds(1));
 
-		series.From.Should().Be(_from);
-		series.Columns.Should().HaveCount(4);
+		result.IsFailed.Should().BeTrue();
 	}
 
-	private static IntensityQuery Query(TimeSpan range, int columns)
+	[Fact]
+	public void TheQueryRejectsMoreThanTheMaximumColumns()
 	{
-		return IntensityQuery.Create(650, 10, _from, _from + range, columns).Value;
+		var oneMillisecond = TimeSpan.FromMilliseconds(1);
+
+		var tooMany = IntensityQuery.Create(650, 10, _from, _from.AddHours(24), oneMillisecond);
+		var most = IntensityQuery.Create(650, 10, _from, _from.AddMilliseconds(IntensityQuery.MaxColumns), oneMillisecond);
+
+		tooMany.IsFailed.Should().BeTrue();
+		most.IsSuccess.Should().BeTrue();
+	}
+
+	private static IntensityQuery Query(DateTimeOffset from, DateTimeOffset to, TimeSpan width)
+	{
+		return IntensityQuery.Create(650, 10, from, to, width).Value;
+	}
+
+	/// <summary>Folds one row every 37 ms of the 10 s from _from, valued by its offset, into the query's columns.</summary>
+	private static IntensitySeries Fold(IntensityQuery query)
+	{
+		var buckets = new IntensityBuckets(query);
+		for (var offsetMs = 0; offsetMs < 10_000; offsetMs += 37)
+		{
+			buckets.Add(_from.AddMilliseconds(offsetMs), offsetMs);
+		}
+
+		return buckets.ToSeries();
+	}
+
+	private static IEnumerable<IntensityColumn> FullColumns(IntensitySeries series)
+	{
+		return series.Columns.Where(c => c.Start >= series.From && c.Start + series.ColumnWidth <= series.To);
 	}
 }

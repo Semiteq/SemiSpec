@@ -53,7 +53,7 @@ and reads.
 | `StoreConnection` | Core | Opens the writer's connection to a store file, creating it, with the store's connection string and pragmas; `OpenReader` opens an existing file only, with `query_only` (`Core/Store/`) |
 | `SpectrumDatabase` | Core | The writer connection: the schema, a batch of frames in one transaction, the deletion of rows older than a cutoff, and the closing checkpoint (`Core/Store/`) |
 | `QueryWindows` | Core | The queried window of each device as byte offsets in the stored pixels, whether the device covers the wavelength, and the mean of a window's pixels (`Core/Store/`) |
-| `IntensityQuery`, `IntensityBuckets`, `IntensitySeries` | Core | The validated series request, the fold of window means into min/max columns of equal time spans, and its result (`Core/Store/`) |
+| `IntensityQuery`, `IntensityBuckets`, `IntensitySeries` | Core | The validated series request with its epoch-aligned column grid, the fold of window means into min/max columns on that grid, and its result (`Core/Store/`) |
 | `SpectrumHistory` | Core | The query service: the stored spectrum at a moment, the intensity series and the stored range, each on its own reader connection (`Core/Store/`) |
 | `FrameSchedule`, `SpectrumGenerator` | Tools.BoardEmulator | Which frame the emulated board sends at a tick and its `state`, and the synthetic and dark spectra |
 | `EmulatorCommand` | Tools.BoardEmulator | Parses and range-checks the command line into an `EmulatorOptions` record; rejects `--failed` for the other spectrometer without `--both-connected` |
@@ -61,7 +61,6 @@ and reads.
 | `BenchmarkCommand` | Tools.StoreBenchmark | Parses and range-checks the command line into a `BenchmarkOptions` record |
 | `ToolCommandLine` | both tools | The model numbers of `--device` and `--failed` and the whole-number option parser; one source file under `SpectrumVisualizer/Shared/` that each tool project compiles as its own internal copy, since the two tools share no project but Core |
 | `BenchmarkRun`, `BenchmarkFile` | Tools.StoreBenchmark | Fills a store file through `SpectrumDatabase`, churns it, measures inserts, size, series reads, `SpectrumHistory`, retention and WAL growth, and prints one table |
-| `BlobSeries` | Tools.StoreBenchmark | The per-row `SqliteBlob` partial read it compares with the `substr` read of `SpectrumHistory.ReadSeries` |
 | `ISerialPortProvider`, `RjcpSerialPortProvider` | UI | Lists the COM ports and opens one for the link, mapping open failures to typed errors |
 | `SerialLink` | UI | The link's surface: Connect, Disconnect, the published status and the bounded frame channel |
 | `LinkSession` | UI | One Connect: opens, reads, decodes, judges the health, drains, reopens and publishes every status, in one task |
@@ -77,7 +76,7 @@ and reads.
 | `SpectrumViewModel` | UI | The spectrum screen: applies the source's latest spectrum to the chart and the signal pane, the Invert and Logarithmic checkboxes, Reset scale and Stick to zero |
 | `ChartPalette` | UI | Paints ScottPlot's figure, data area, grid and axes from the palette, and resolves the colours of the line, the band and the centre line |
 | `LogTickGenerator` | UI | ScottPlot's tick generator over `LogAxis`: the labels under the current culture, and a cache of the last two results keyed on the limits, the length and the culture |
-| `SpectrumStore`, `StoreWriter`, `StoreFile` | UI | The background writer: `SpectrumStore` enqueues every distributor frame, runs one `StoreWriter` task and counts the frames lost; `StoreWriter` writes the queue to the instance file in batches and deletes rows older than 24 h once a minute; `StoreFile` is the instance file's path (`UI/Store/`) |
+| `SpectrumStore`, `StoreWriter`, `StoreRetention`, `StoreFile` | UI | The background writer: `SpectrumStore` enqueues every distributor frame, runs one `StoreWriter` task and counts the frames lost; `StoreWriter` writes the queue to the instance file in batches and runs `StoreRetention` once a minute, which deletes rows older than 24 h and sweeps other instances' files once an hour; `StoreFile` is the instance file's path (`UI/Store/`) |
 | `StoreOpenError`, `StoreWriteError`, `StoreStoppedError` | UI | The store file could not be prepared or opened; a batch could not be written; an unexpected failure after the open ended the writer (`UI/Store/`) |
 | `AppLogging` | UI | Creates the log folder and the Serilog logger: `spectrum-visualizer.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
@@ -382,11 +381,17 @@ process with the same id), then tries to delete every other `spectra-<digits>.db
 so the delete of a live instance's file fails, and that file stays; a delete that succeeds also deletes the file's
 sidecars. Sidecars whose `.db` is gone are deleted too. A failure on the folder or the own file fails `Prepare`; a
 failure on any other file only keeps that file, and a folder that cannot be listed skips the sweep. The result carries
-the counts of deleted and kept files, which the store logs at Debug, or the listing failure, which it logs as a
-Warning. No process-id probing exists, so a reused id cannot keep a dead file alive.
+the counts of deleted and kept files, which the store logs at Debug, or the listing failure. No process-id probing
+exists, so a reused id cannot keep a dead file alive.
 
-A clean exit checkpoints and closes the file and leaves it; the next start's sweep deletes it. A crash leaves the same
-state, so one cleanup path covers both, and a closed run's file can still be copied for diagnosis until the next start.
+`StoreFiles.Sweep` runs the same sweep without touching the own file. The retention path runs it once an hour while the
+store is not stopped, so a copy that runs for days still deletes the files of copies that exited meanwhile. A listing
+failure follows the incident rule of retention (The writer service): the first logs a Warning with the stack, repeats
+log at Debug, and the next sweep that lists the folder logs one Information line.
+
+A clean exit checkpoints and closes the file and leaves it; the next sweep of a running copy, or the next start's
+sweep, deletes it. A crash leaves the same state, so one cleanup path covers both, and a closed run's file can still be
+copied for diagnosis until then.
 
 ### Schema and connections
 
@@ -465,10 +470,14 @@ returns a FluentResults `Result`, with a `SqliteException` or `IOException` as a
   The report writes the failure's one log line, at Error, with the original exception. The writer closes the file without a checkpoint, keeps the subscription, and from
   then on counts every frame still queued and every later frame as dropped, so "Dropped frames" keeps growing while
   nothing is stored.
-- Retention runs once a minute, also while no frame arrives: `DeleteBefore(now - 24 h)`, where the wait is
-  `Task.Delay` on the `TimeProvider`, raced with `WaitToReadAsync`, and `now` is `TimeProvider.GetUtcNow()`, the same
-  UTC wall clock as `ReceivedAt`. No `VACUUM` runs: the freed pages are reused, so the file stays at about one day of
-  data. A failed retention pass or checkpoint logs a Warning and reaches no panel, because no data is lost.
+- Retention runs once a minute, also while no frame arrives: `StoreRetention` reads `now` once and runs
+  `DeleteBefore(now - 24 h)`, where the wait is `Task.Delay` on the `TimeProvider`, raced with `WaitToReadAsync`, and
+  `now` is `TimeProvider.GetUtcNow()`, the same UTC wall clock as `ReceivedAt`. No `VACUUM` runs: the freed pages are
+  reused, so the file stays at about one day of data. The first pass records `now`; a later pass whose `now` is an hour
+  or more past the last record runs `StoreFiles.Sweep` and records it again. A failed retention pass reaches no panel,
+  because no data is lost; it follows the batch incident rule: the first failure of a run logs a Warning with the
+  stack, each repeat one Debug line without it, and the next successful pass one Information line "Spectrum store
+  retention recovered after N failed passes". A failed checkpoint logs a Warning.
 - `DroppedFrames` is a count written by the distributor task and the writer task. `DroppedFramesChanged` is a private
   subject exposed with `AsObservable()` that carries the new count; the add and the emission share one lock, so the
   counts of the two threads arrive in order.
@@ -496,26 +505,38 @@ The link's channel drops are the other half of the dropped count (`board-protoco
 
 - `SpectrumAtAsync(moment)` returns the spectrum with the latest `received_at` at or before the moment, ties to the
   larger `id`, as a `StoredSpectrum` that rebuilds a new `SpectrumMeasurement` with `ReceivedAt`, `seq` and `state`;
-  null before the first row.
-- `IntensitySeriesAsync(query)` takes an `IntensityQuery` (wavelength, `delta`, `[From, To)`, columns), which
-  `IntensityQuery.Create` builds only for a non-empty range and at least one column. For each spectrum in the range it
-  takes the mean of the pixels in `SpectrometerCalibration.Window(nm, delta)` of the row's device, dark frames
-  included, and folds it into the column of its time. A row whose device does not cover the wavelength (the firmware
-  table range `FirstNm..LastNm`) adds to the column's `UncoveredCount` only. The series checks the token every 256
-  rows.
+  null before the first row. A corrupt row (a `device` that is neither ATP-2000 nor ATP-8000, or a `pixels` blob that
+  is not `2 x P` bytes of its device) returns a failed `Result` that names the row's `id`.
+- `IntensitySeriesAsync(query)` takes an `IntensityQuery` (wavelength, `delta`, `[From, To)`, column width). For each
+  spectrum in the range it takes the mean of the pixels in `SpectrometerCalibration.Window(nm, delta)` of the row's
+  device, dark frames included, and folds it into the column of its time. A row whose device does not cover the
+  wavelength (the firmware table range `FirstNm..LastNm`) adds to the column's `UncoveredCount` only, and so does a
+  corrupt row, which the series skips instead of failing. The series checks the token every 256 rows.
 - `StoredRangeAsync()` returns the receive times of the first and last spectrum, or null when none is stored.
 
-The series is one statement over the range: a `CASE device` cuts each row's window out of its pixels with
-`substr(pixels, 2 x First + 1, 2 x count)`, whatever wavelength the row was stored at. Column `i` covers the `i`-th of
-`Columns` equal spans; a row's column is `(t - From).Ticks x Columns / (To - From).Ticks` in `Int128` arithmetic, so a
-row before `To` never lands past the last column. `ColumnWidth` is the span truncated to whole milliseconds and
-floored at 1 ms, for drawing only. A column with no covered row has NaN `Min` and `Max`, the gap a chart draws;
-`UncoveredCount > 0` there says the gap comes from the other spectrometer.
+`IntensityQuery.Create` truncates `From` and `To` to whole milliseconds, the unit of `received_at`, and fails for an
+empty range, a column width that is not a whole number of milliseconds of at least 1, or more than 40 000 columns. The
+columns sit on a grid anchored at the Unix epoch: a column starts at a multiple of the width, so the column of a time
+`t` starts at `floor(t / width) x width`. The series holds every grid column that intersects `[From, To)`, so the first
+and last column may start before `From` or end after `To`, and carries `From`, `To`, `ColumnWidth` and each column's
+`Start`. Two queries of one width share the boundaries and the content of every column both hold in full, so a live
+window that moves forward, or a pan, keeps its full columns and recomputes only the edges. A column with no covered
+row has NaN `Min` and `Max`, the gap a chart draws; `UncoveredCount > 0` there says the gap comes from the other
+spectrometer or from corrupt rows.
 
-`substr` is the kept read. A per-row `SqliteBlob` read of only the window's bytes is no faster on a day-long churned
-file, and a precomputed per-row intensity column does not halve the read once the wavelength changed inside the range,
-so the schema holds no such column. A 24 h read beside the running writer grows the WAL far below its 64 MB limit, so
-the series is not sliced by time. The store benchmark measures these reads again:
+The series is one statement over the range in `received_at, id` order, which the `spectrum_time` index gives without a
+sort: a `CASE` cuts each row's window out of its pixels with `substr(pixels, 2 x First + 1, 2 x count)`, whatever
+wavelength the row was stored at, and yields NULL for a corrupt row. The length check sits inside the `CASE`, because
+`GetBytes` of Microsoft.Data.Sqlite on an expression column crashes the process when the result holds a second
+expression column. Every series read loads the pixel page of every row in the range: the cost scales with the rows on
+disk, so a 24 h read touches about a day of pages, and a cold 24 h read, with the OS file cache empty, runs at the
+speed of the disk.
+
+`substr` is the kept read. A per-row `SqliteBlob` read of only the window's bytes was no faster on a day-long churned
+file, so the tool keeps `substr` only, and a precomputed per-row intensity column does not halve the read once the
+wavelength changed inside the range, so the schema holds no such column. A 24 h read beside the running writer grows
+the WAL far below its 64 MB limit, so the series is not sliced by time. The store benchmark measures the production
+read again; run on the operator PC, it measures the read against that PC's disk and memory:
 
 ```powershell
 dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark
@@ -524,7 +545,9 @@ dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.Stor
 With the defaults it fills a day of ATP-2000 spectra at 2 per second, every row at 650 nm, churns the file through
 24 rounds of retention and refill, and prints one table of inserts, file size, series reads, `SpectrumHistory` calls,
 retention and WAL growth, fresh and churned. Every series reads the rows' pixels, so the stored wavelength changes no
-read the benchmark measures. A run deletes its file and its temp folder unless `--keep` is given.
+read the benchmark measures. A series runs in columns of the range over 1 000 truncated to whole milliseconds, so it
+has 1 000 columns or one more. The tool does not drop the OS file cache, which needs administrator rights, so a
+first run can be warm too. A run deletes its file and its temp folder unless `--keep` is given.
 
 | Option | Default | Range | Effect |
 | --- | --- | --- | --- |

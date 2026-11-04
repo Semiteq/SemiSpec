@@ -20,9 +20,7 @@ public sealed class StoreBenchmarkRunTests : IDisposable
 		"File size per 1000 spectra, after checkpoint (MB)",
 		"File size, 0.28 h (MB)",
 		"Series 10 min to 1000 columns, substr (ms)",
-		"Series 10 min to 1000 columns, SqliteBlob (ms)",
 		"Series 0.28 h to 1000 columns, substr (ms)",
-		"Series 0.28 h to 1000 columns, SqliteBlob (ms)",
 		"Series 10 min to 1000 columns, SpectrumHistory (ms)",
 		"Series 0.28 h to 1000 columns, SpectrumHistory (ms)",
 		"SpectrumAt the end of the range, SpectrumHistory (ms)",
@@ -33,7 +31,7 @@ public sealed class StoreBenchmarkRunTests : IDisposable
 	private readonly TempFolder _folder = new();
 
 	[Fact]
-	public async Task ASmallRunPrintsEveryMeasurementAndTheStrategiesAgree()
+	public async Task ASmallRunPrintsEveryMeasurementAndDeletesItsFile()
 	{
 		var output = new StringWriter();
 		var options = new BenchmarkOptions(2000, Spectrometer.Atp2000, 2, _folder.Root, Keep: false);
@@ -50,7 +48,6 @@ public sealed class StoreBenchmarkRunTests : IDisposable
 			}
 		}
 
-		text.Should().Contain("Strategies agree").And.NotContain("MISMATCH");
 		Directory.EnumerateFiles(_folder.Root).Should().BeEmpty();
 	}
 

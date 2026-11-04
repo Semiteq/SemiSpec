@@ -36,11 +36,16 @@ public static class StoreFiles
 				new ExceptionalError($"The spectrum store file '{instanceFile}' could not be prepared", ex));
 		}
 
-		return Sweep(folder, instanceFile);
+		return Sweep(instanceFile);
 	}
 
-	private static StoreSweep Sweep(string folder, string instanceFile)
+	/// <summary>
+	/// Deletes every store file in the folder of the own file that no live instance holds open, and the sidecars whose
+	/// store file is gone; the own file stays.
+	/// </summary>
+	public static StoreSweep Sweep(string instanceFile)
 	{
+		var folder = Path.GetDirectoryName(instanceFile)!;
 		string[] names;
 		try
 		{

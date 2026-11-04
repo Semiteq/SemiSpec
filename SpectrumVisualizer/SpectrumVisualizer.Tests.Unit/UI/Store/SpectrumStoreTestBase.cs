@@ -209,6 +209,17 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 	}
 
 	/// <summary>
+	/// Advances the clock past the next retention time, then feeds one spectrum and waits until the file holds
+	/// expectedSpectra: the writer runs a due pass before the next batch, so the pass has ended once the row landed.
+	/// </summary>
+	protected async Task RetentionPassAsync(RetentionClock clock, TimeSpan advance, long expectedSpectra)
+	{
+		clock.Advance(advance);
+		Feed(StoreSamples.Spectrum(StoreSamples.Start, seq: 1));
+		await Waits.UntilAsync(() => Count("spectrum") == expectedSpectra);
+	}
+
+	/// <summary>
 	/// A second connection inside BEGIN IMMEDIATE: the writer's batches wait out the busy timeout and fail.
 	/// </summary>
 	protected SqliteConnection HoldWriteLock()
