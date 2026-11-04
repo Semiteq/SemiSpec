@@ -109,7 +109,9 @@
   check prints its name on failure and the program exits 1; on success it prints `all checks passed`, writes the golden
   frames file named by `argv[1]` and exits 0.
 - **unit tests** (SpectrumVisualizer): `FirmwareFrameTests` in `SpectrumVisualizer.Tests.Unit/Core/Protocol`, traits
-  `Component=Core`, `Area=Protocol`, `Category=Unit`.
+  `Component=Core`, `Area=Protocol`, `Category=Unit`. One fact and two theories over `MemberData(nameof(FrameNames))`,
+  the names of the expected frames: 9 tests. `FirmwareRamp` builds the ramp in C#, and the heartbeat is
+  `ProtocolSamples.Heartbeat(42)`.
 - **board**: the owner's manual checklist in Acceptance Evidence. It covers what the host check leaves unverified,
   listed by name at the start of that checklist.
 
@@ -242,11 +244,11 @@ ATP-8000 connected (`Ready_8000`), bit 2 ATP-2000 fault, bit 3 ATP-8000 fault. D
   - The sender `PcSender`: the send rules of #20. It holds the queued spectrum's values, the active frame, `seq` and
     the time the last frame finished. `PcSenderStartNext(now, state)` starts the queued spectrum first (incrementing
     `seq`), else a heartbeat when 3000 ms passed since the last frame finished (or since init), else nothing.
-    `PcSenderFinish(now)` ends the active frame and says whether it was a spectrum. `PcSenderBusy()` is true while a
-    frame is active or a spectrum is queued.
+    `PcSenderFinish(now)` ends the active frame and says whether it was a spectrum. `PcSenderActive()` is true while a
+    frame is active; `PcSenderBusy()` is true while a frame is active or a spectrum is queued.
 - `main.c` glue: `StartSend2Aplication(d)` queues the spectrum with `ProcWave`, `ProcDelta` and the three PLC values
-  as floats; `Send2Aplication()` starts the next frame when idle, pumps bytes into `USARTC0.DATA` with the same 32-byte
-  `DREIF` budget, finishes on `TXCIF` or after 1000 ms without progress, and resets `SEQ` only when a spectrum frame
+  as floats; `Send2Aplication()` starts the next frame through `StartPcFrame` when idle, returns while
+  `PcSenderActive()` is false, pumps bytes into `USARTC0.DATA` with the same 32-byte `DREIF` budget, finishes on `TXCIF` or after 1000 ms without progress, and resets `SEQ` only when a spectrum frame
   finishes. The pixel hook reads `__far_mem_read(DataBase(device) + index)`. `RequstAtp()` waits on
   `PcSenderBusy()` instead of `PcActive`. `PcWord()` and its state are deleted.
 - Host check: `OptoskyEncoder/HostTest/pc_link_test.c` (outside the cproj) runs the rule checks and writes golden
@@ -366,19 +368,23 @@ static uint8_t ReadPcPixelByte(uint8_t device, uint16_t byteIndex)
 }
 static uint8_t PcStateByte(void)
 {
-    return (Ready_2000 ? 1 : 0) | (Ready_8000 ? 2 : 0) | (SpectrumFault[0] ? 4 : 0) | (SpectrumFault[1] ? 8 : 0);
+    return (uint8_t)((Ready_2000 ? 1 : 0) | (Ready_8000 ? 2 : 0) | (SpectrumFault[0] ? 4 : 0) |
+                     (SpectrumFault[1] ? 8 : 0));
 }
 ```
 
-- `StartSend2Aplication(uint8_t d)` builds a `PcMeasurement {d, ProcWave, ProcDelta, (float)Amplitude,
-  (float)NoizSNR, (float)Q_fact}` and calls `PcSenderQueueSpectrum`. `Q_factor()` calls it without `now`.
-- `Send2Aplication()`, per pass: when no frame is active, `PcSenderStartNext(&PcLink, now, PcStateByte())`; on a start,
-  clear `TXCIF` and set `PcLastProgressMs = now`. While the frame is not done and `DREIF` is set, up to 32 bytes:
+- `StartSend2Aplication(uint8_t d)` builds a `PcMeasurement` with a designated initializer (`.device = d`,
+  `.wavelength = ProcWave`, `.delta = ProcDelta`, `.amplitude = (float)Amplitude`, `.snr = (float)NoizSNR`,
+  `.q = (float)Q_fact`) and calls `PcSenderQueueSpectrum`. `Q_factor()` calls it without `now`.
+- `StartPcFrame(now)` calls `PcSenderStartNext(&PcLink, now, PcStateByte())`; on a start it clears `TXCIF` and sets
+  `PcLastProgressMs = now`.
+- `Send2Aplication()`, per pass: `StartPcFrame(now)`, then return while `PcSenderActive(&PcLink)` is false. While the
+  frame is not done and `DREIF` is set, up to 32 bytes:
   `USARTC0.DATA = PcFrameNextByte(PcSenderFrame(&PcLink), ReadPcPixelByte)`; every byte written sets
   `PcLastProgressMs = now`, as `main.c:952` does at df5201f. When the frame is done and `TXCIF` is set,
   or 1000 ms pass without progress, `PcSenderFinish`; if it returns true and `SEQ == SendToAplication_50`, set
-  `SEQ = Beginning`. After a finish, try `PcSenderStartNext` once more in the same pass, so a queued spectrum goes
-  out before `RequstAtp()` runs.
+  `SEQ = Beginning`. The finish check runs in the same pass as the last byte write. After a finish, `StartPcFrame`
+  runs once more in the same pass, so a queued spectrum goes out before `RequstAtp()` runs.
 - `main()` calls `PcSenderInit(&PcLink, GetMilliseconds())` after `sei()` (`main.c:1679` at df5201f).
 - `RequstAtp()`: `if (PcActive) return;` (`main.c:1494-1495` at df5201f) becomes `if (PcSenderBusy(&PcLink)) return;`.
 
@@ -450,7 +456,7 @@ Repository: OptoskyProj. Commit: `feat(firmware): добавить правил�
 - Modify: `OptoskyEncoder/HostTest/pc_link_test.c`
 
 - [x] write `PcSender` with `PcSenderInit`, `PcSenderQueueSpectrum`, `PcSenderStartNext`, `PcSenderFrame`,
-  `PcSenderFinish`, `PcSenderBusy` per Solution Overview
+  `PcSenderFinish`, `PcSenderActive`, `PcSenderBusy` per Solution Overview
 - [x] write the sender checks of Technical Details: heartbeat at 3000 ms and not 2999, seq 0 before any spectrum,
   first spectrum seq 1, heartbeat repeats the last seq, spectrum waits for an active heartbeat and then has priority,
   `PcSenderBusy` while queued, finish result per kind, wrap 255 to 0, `uint32_t` time wrap
@@ -467,9 +473,9 @@ Repository: SpectrumVisualizer. Commit: `test(protocol): decode the firmware gol
   to the output, as `xunit.runner.json` at `:27`)
 
 - [x] copy `out/firmware-frames.txt` to `FirmwareFrames.txt`; Acceptance Evidence item 2 exits 0
-- [x] build the four expected `BoardFrame`s in C# from the table in Technical Details (ramp computed in C#, not read
-  from the file)
-- [x] write a theory over the four names: the line decodes through `FrameDecoder.TryReadFrame` to one frame, 0
+- [x] build the four expected `BoardFrame`s in C# from the table in Technical Details (ramp computed in C# by
+  `FirmwareRamp`, not read from the file; heartbeat from `ProtocolSamples.Heartbeat(42)`)
+- [x] write a theory over the four names (`MemberData(nameof(FrameNames))`): the line decodes through `FrameDecoder.TryReadFrame` to one frame, 0
   discarded bytes, equal to the expected frame (`BeEquivalentTo`)
 - [x] write a theory over the four names: the line equals `FrameEncoder.Encode(expected)` byte for byte
 - [x] write a fact that the file holds exactly the four names, so a frame missing from the C output fails
@@ -483,7 +489,7 @@ Repository: OptoskyProj. Commit: `feat(firmware): отправлять ПК ка
 - Modify: `OptoskyEncoder/OptoskyEncoder/main.c`
 
 - [x] `#include "pc_link.h"`; replace the PC send state at `main.c:234-237` with `PcLink` and `PcLastProgressMs`
-- [x] add `ReadPcPixelByte` and `PcStateByte`; rewrite `StartSend2Aplication(uint8_t d)` and `Send2Aplication()` per
+- [x] add `ReadPcPixelByte`, `PcStateByte` and `StartPcFrame`; rewrite `StartSend2Aplication(uint8_t d)` and `Send2Aplication()` per
   Technical Details; delete `PcWord()`
 - [x] change the call in `Q_factor()` (`main.c:1068`) and the guard in `RequstAtp()` (`main.c:1494-1495`); call
   `PcSenderInit` in `main()` after `sei()`
@@ -523,8 +529,20 @@ Results, 2026-11-05:
   SpectrumVisualizer.Tests` 13 passed.
 - Overview mapping: frame bytes are covered by items 1-3 and the item 4 bite; the send rules (`seq`, 3 s heartbeat,
   spectrum priority, wraps) by the sender checks of item 1; the `main.c` glue by item 6 and board checklist steps 1-9.
-- OptoskyProj `origin/master..HEAD`: `001254f`, `bc9e6ca`, `1440c90`; `--stat` touches only `.gitignore`,
-  `HostTest/pc_link_test.c`, `OptoskyEncoder.cproj`, `pc_link.c`, `pc_link.h` and `main.c`; no planning files.
+- OptoskyProj `origin/master..HEAD` before the docs task and the review fixes: `001254f`, `bc9e6ca`, `1440c90`;
+  `--stat` touches only `.gitignore`, `HostTest/pc_link_test.c`, `OptoskyEncoder.cproj`, `pc_link.c`, `pc_link.h` and
+  `main.c`; no planning files. The final list of 7 commits is in Post-Completion.
+
+Results after the review fixes, 2026-11-05, at OptoskyProj `47788bd` and SpectrumVisualizer `06d1c4f`:
+- Item 1: `cl -W4 -WX -std:c11` exit 0 with no warning lines; `all checks passed`, exit 0. The host program now also
+  recomputes the CRC of every spectrum frame, pins the trailers `AE 43` and `B0 2A`, records the device the pixel hook
+  gets, and checks the abandon path and the time wrap at finish + 100 ms and + 68000 ms.
+- Item 2: drift check exit 0; no golden byte changed in the review fixes.
+- Items 3 and 5: `FirmwareFrameTests` 9 passed; `dotnet test SpectrumVisualizer.slnx` 932 passed, 0 failed;
+  `dotnet format SpectrumVisualizer.slnx --verify-no-changes` exit 0.
+- Item 6: the grep on `main.c` prints nothing; `main.c` calls `PcSenderActive` (`main.c:917`), which the `PcActive`
+  pattern does not match.
+- `pc_link.c`, `pc_link.h` and `pc_link_test.c` are UTF-8 with BOM and CRLF on every line, ASCII after the BOM.
 
 ### Task 6: [Final] Update documentation
 Repositories: OptoskyProj (commit `docs(readme): описать протокол плата → ПК (#20)`, Russian) and SpectrumVisualizer
@@ -566,6 +584,13 @@ Repositories: OptoskyProj (commit `docs(readme): описать протокол
 
 **PR notes:**
 - The OptoskyProj PR body carries `Closes Semiteq/OptoskyProj#20`. No PR is created in this run.
+- Reword some Russian commit messages in OptoskyProj before the PR:
+  - "лесенка слов" (`001254f`) and "лестница слов" (`1440c90`) name the old frame differently from #20, which calls
+    it "кадр с заголовком 01 FF…1E"; use the wording of #20.
+  - "хук" (`001254f`, `f629773`, `47788bd`) becomes "функция".
+  - "heartbeat" (`001254f`, `bc9e6ca`, `31d254b`) becomes "пульс", the word `f629773` already uses.
+  - Passive forms ("считается", "читаются", "собирается", "добавлены", "убрано", "переведены" in `001254f`,
+    `1440c90`, `505ee8a`, `f629773`) get an active verb with the actor named.
 - The SpectrumVisualizer branch carries only the golden frames, their test and the doc paragraph; it ships with the
   app's stacked PRs.
 - Merge: no PRs are open in OptoskyProj. A revived `fix/watchdog` or `fix/dma-fault-reset` branch conflicts in two
@@ -582,3 +607,80 @@ Repositories: OptoskyProj (commit `docs(readme): описать протокол
   headers. When #17 splits `main.c`, one pure module should own the pixel count and both callers should use it.
 
 **Remaining slices:** release-3-0.
+
+**Executed by exec:**
+- branch: firmware-frame-sender
+
+Run note: SpectrumVisualizer has 11 commits on `firmware-frame-sender` (`4e1d432`..`06d1c4f`) before this record,
+stacked on `intensity-trend` at `2a4fc14`; every one of them touches this plan, and 8 touch nothing else. The others
+add the golden frames and `FirmwareFrameTests` (`68e758e`), the `board-protocol.md` paragraph (`e606ec1`) and the
+review fixes to both (`06d1c4f`). OptoskyProj has 7 local commits on `firmware-frame-sender` from `origin/master` at
+`df5201f`, none pushed: `001254f` (frame generator and host program), `bc9e6ca` (send rules), `1440c90` (`main.c`
+glue), `505ee8a` (README), `f629773` (review fixes to `pc_link` and the host check), `31d254b` (README fixes) and
+`47788bd` (named `pc_link` constants). Review phase 1 (5 agents) found 0 critical, 6 major and about 21 minor
+findings, fixed in OptoskyProj `f629773` and `31d254b` and SpectrumVisualizer `14e2996`. Its critical re-check found
+the quality side clean and 5 major findings in the board checklist: unread state bits 2 and 3, the dark edge at boot,
+the live PLC compare race, step 4 without an analyser, and step 9's stall bound. All 5 were fixed in `08ee148`.
+Phase 2 (smells) found 10 minor findings and phase 3b (comments) 3 minor findings, fixed in OptoskyProj `47788bd`
+and SpectrumVisualizer `06d1c4f`. Phase 3 (codex) was skipped because codex is not installed. Phase 4 (critical)
+found quality and implementation clean. Final validation, 2026-11-05: the MSVC host build gives 0 warnings and
+`all checks passed`, the drift check exits 0, the item 6 grep prints nothing, `dotnet test SpectrumVisualizer.slnx`
+passes 932 of 932, `dotnet format --verify-no-changes` exits 0 and the Release build gives 0 warnings. The board
+checklist was not run: this machine has no board and no AVR toolchain.
+
+**Decisions made autonomously:**
+- `pc_link.c` names its static frame start `BeginFrame`, because `main.c` already has the `Begin()` of the scope guard.
+- OptoskyProj commits carry the `Co-Authored-By` trailer, against the caller's request: `a0e96bb` ends with it, and
+  Context names it as the repo style.
+- `PcSenderQueueSpectrum` overwrites a queued spectrum. `RequstAtp()` waits on `PcSenderBusy()`, so a second queue
+  before the start does not happen.
+- `PcSenderFinish` on an idle sender returns false and keeps the timer; `PcFrameNextByte` past the end returns 0. The
+  glue reaches neither guard; both stay as safety nets.
+- `Send2Aplication()` asks `PcSenderActive()`, because `PcSenderBusy()` is also true for a queued spectrum.
+- `StartPcFrame` holds the frame start, because `Send2Aplication()` starts a frame twice per pass.
+- The finish check runs in the pass of the last byte write; the old code checked `TXCIF` one pass later. All pixel
+  bytes are read before the finish, so an early `TXCIF` cannot let a new spectrum overwrite SRAM under an unsent frame.
+- `StartSend2Aplication` uses a designated initializer, so amplitude, SNR and Q cannot swap places.
+- `main.c` keeps its CRLF line ends, its BOM and its missing final newline.
+- The host check pins the trailers as wire bytes `AE 43` and `B0 2A`, the order `FirmwareFrames.txt` shows; the CRC
+  values are `0x43AE` and `0x2AB0`.
+- Acceptance Evidence item 4 took its swapped output from a scratch copy of `pc_link_test.c` without the `Failures`
+  exit, because the committed program fails its own low-byte checks and writes no file. Nothing of it was committed.
+- `FirmwareFrameTests` reads the golden file once into a static readonly dictionary. `FrameNames` is a collection
+  expression, because `new(keys)` tripped IDE0028.
+- The README puts "Протокол плата → ПК" under "Протокол связи", not under "Отладка", and does not call USARTC0 one-way,
+  because the legacy receive path (`OnLegacyByte` channel 1) stays.
+- The `board-protocol.md` paragraph follows the CRC definition, so the heartbeat example and its CRC stay together.
+- Board checklist step 4 needs a logic analyser or an oscilloscope; without one the step is recorded as not checkable.
+- The review fixes split OptoskyProj work into `fix(firmware)` and `docs(readme)` commits and type plan fixes
+  `docs(plans)`. The old `SpectrumVisualizer.sln` was not rebuilt after them: no file it builds changed.
+- The plan cites `main.c` by its line at HEAD, or marks the line "at df5201f".
+
+## Verify it yourself
+
+Automated, on branch `firmware-frame-sender` in both repositories:
+
+1. In OptoskyProj, build and run the host check from Git Bash with the MSVC command of Acceptance Evidence item 1
+   (`cl.exe -nologo -W4 -WX -std:c11 -I../OptoskyEncoder -Foout/ -Feout/pc_link_test.exe pc_link_test.c
+   ../OptoskyEncoder/pc_link.c` from `OptoskyEncoder/HostTest`, with `INCLUDE` and `LIB` set), then
+   `./out/pc_link_test.exe out/firmware-frames.txt`. It compiles with 0 warnings, prints `all checks passed` and
+   exits 0.
+2. The drift check of item 2:
+   `git diff --no-index --exit-code --ignore-cr-at-eol C:/Users/admin/projects/OptoskyProj/OptoskyEncoder/HostTest/out/firmware-frames.txt
+   C:/Users/admin/projects/SpectrumVisualizer/SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Protocol/FirmwareFrames.txt`
+   exits 0.
+3. In SpectrumVisualizer, `dotnet test SpectrumVisualizer.slnx --filter "FullyQualifiedName~FirmwareFrameTests"`
+   passes 9 of 9; `dotnet test SpectrumVisualizer.slnx` passes 932 of 932.
+4. In OptoskyProj, `grep -n "PcWord\|PcLowByte\|PcAmp\|PcActive" OptoskyEncoder/OptoskyEncoder/main.c` prints
+   nothing, and `grep -n "pc_link" OptoskyEncoder/OptoskyEncoder/OptoskyEncoder.cproj` prints lines 142 and 145.
+
+By hand: run the manual board checklist in Acceptance Evidence after Post-Completion's build and flash. The
+highest-value steps:
+
+1. Step 7: unplug the measuring spectrometer. Only its fault bit sets, then only its connected bit clears; this is
+   the one check of the state bit order.
+2. Steps 3 and 8: the store query shows `seq` rising by 1 per spectrum and wrapping 255 to 0, with the lost total at 0.
+3. Step 3: after pulse mode stops, heartbeats arrive every 3 s and repeat the last non-zero `seq`.
+4. Step 4: a logic analyser or an oscilloscope on USARTC0 TX shows an ATP-2000 frame in about 358 ms and an ATP-8000
+   frame in about 91 ms.
+5. Step 5: a dark request gives one spectrum with the next `seq`, `amplitude` and `snr` 0, and all pixels at 0.
