@@ -96,7 +96,9 @@ Manual smoke checklist (owner, with a port pair):
     completes, no more bytes will come, so a pending candidate is invalid: the reader drops one byte at each pending
     candidate and decodes again until the buffer is empty, yields the frames this finds, and ends. Cancellation
     surfaces as `OperationCanceledException`. `DiscardedBytes` is a running count of every dropped byte, including the
-    bytes dropped at completion, for the link status of the next slice.
+    bytes dropped at completion, during resync. It does not measure traffic: while a false candidate waits at the
+    buffer head, it stays flat as bytes arrive. The link status ("bytes arrive but no valid frame") counts arriving
+    bytes in the port read loop of the serial-link slice.
   - `FrameEncoder`: builds a frame's bytes from a `BoardFrame`; used by the emulator and the tests.
     `SpectrumMeasurement`'s constructor rejects a pixel count that does not match its device, so the encoder needs no
     failure path.

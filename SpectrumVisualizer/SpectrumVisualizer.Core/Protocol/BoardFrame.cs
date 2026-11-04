@@ -46,7 +46,7 @@ public sealed record SpectrumMeasurement
 
 	public ushort WavelengthNm { get; }
 
-	/// <summary>Half-width of the measurement window, in nm.</summary>
+	/// <summary>Half-width of the averaging window; the app reads it as nm, the board currently as pixels (OptoskyProj#7).</summary>
 	public byte Delta { get; }
 
 	public float Amplitude { get; }
