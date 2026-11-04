@@ -439,13 +439,35 @@ Repository: OptoskyProj. Commit: `feat(firmware): отправлять ПК ка
 Repository: SpectrumVisualizer, this plan file only. Commit: `docs(plans): record firmware-frame-sender checks`,
 English.
 
-- [ ] run Acceptance Evidence items 1, 2, 3, 5 and 6 and record the results here
-- [ ] run item 4 (pixel byte swap makes `FirmwareFrameTests` fail), then revert the swap; `git status` in OptoskyProj
+- [x] run Acceptance Evidence items 1, 2, 3, 5 and 6 and record the results here
+- [x] run item 4 (pixel byte swap makes `FirmwareFrameTests` fail), then revert the swap; `git status` in OptoskyProj
   shows no change after the revert
-- [ ] confirm every requirement of Overview maps to a check: frame bytes (items 1-3), send rules (item 1), glue
+- [x] confirm every requirement of Overview maps to a check: frame bytes (items 1-3), send rules (item 1), glue
   (item 6 and the board checklist)
-- [ ] `git log --oneline origin/master..HEAD` in OptoskyProj lists only this slice's commits and no planning files
-- [ ] `dotnet test SpectrumVisualizer.slnx` passes in full
+- [x] `git log --oneline origin/master..HEAD` in OptoskyProj lists only this slice's commits and no planning files
+- [x] `dotnet test SpectrumVisualizer.slnx` passes in full
+- [x] manual board checklist steps 1-9 (skipped - not automatable: no board, no AVR toolchain)
+
+Results, 2026-11-05:
+- Item 1: `cl -W4 -WX -std:c11` exit 0 with no warning lines; `pc_link_test.exe` prints `all checks passed`, exit 0.
+- Item 2: the drift check `git diff --no-index --exit-code --ignore-cr-at-eol` exits 0.
+- Item 3: `FirmwareFrameTests` 9 passed, 0 failed.
+- Item 4: `PcFrameNextByte` reading pixel byte `k ^ 1` (high byte first). The real host program then fails its own
+  checks (`first pixel 0x1234 goes low byte first`, `second pixel 0x1335 goes low byte first`), exits 1 and writes no
+  file. A scratch copy of `pc_link_test.c` without the `Failures` exit wrote the swapped frames; copied over
+  `FirmwareFrames.txt`, they make `FirmwareFrameTests` fail 4 of 9 (`atp2000` and `atp8000` in both theories; the
+  all-zero `atp8000-dark` and the heartbeat carry no byte order to swap). After both `git checkout --` restores,
+  `git status --short` in OptoskyProj prints nothing, and item 1, item 2 and `FirmwareFrameTests` (9 passed) pass again.
+- Item 5: `dotnet build SpectrumVisualizer.slnx -c Release` 0 warnings, 0 errors; `dotnet test SpectrumVisualizer.slnx`
+  932 passed, 0 failed; `dotnet format --verify-no-changes` exit 0; `dotnet terse FirmwareFrameTests.cs` exit 0.
+- Item 6: the `PcWord|PcLowByte|PcAmp|PcActive` grep on `main.c` prints nothing (exit 1); the cproj grep prints
+  `142: <Compile Include="pc_link.c">` and `145: <Compile Include="pc_link.h">`.
+- Old solution: `dotnet build SpectrumVisualizer.sln` 0 errors (15 warnings, the old app's own); `dotnet test
+  SpectrumVisualizer.Tests` 13 passed.
+- Overview mapping: frame bytes are covered by items 1-3 and the item 4 bite; the send rules (`seq`, 3 s heartbeat,
+  spectrum priority, wraps) by the sender checks of item 1; the `main.c` glue by item 6 and board checklist steps 1-9.
+- OptoskyProj `origin/master..HEAD`: `001254f`, `bc9e6ca`, `1440c90`; `--stat` touches only `.gitignore`,
+  `HostTest/pc_link_test.c`, `OptoskyEncoder.cproj`, `pc_link.c`, `pc_link.h` and `main.c`; no planning files.
 
 ### Task 6: [Final] Update documentation
 Repositories: OptoskyProj (commit `docs(readme): описать протокол плата → ПК (#20)`, Russian) and SpectrumVisualizer
