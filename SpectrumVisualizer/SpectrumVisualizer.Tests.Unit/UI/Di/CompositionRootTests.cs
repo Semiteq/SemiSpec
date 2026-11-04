@@ -1,3 +1,4 @@
+using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 
 using Avalonia.Headless.XUnit;
@@ -6,6 +7,8 @@ using Avalonia.Threading;
 using AwesomeAssertions;
 
 using Microsoft.Extensions.DependencyInjection;
+
+using ReactiveUI.Avalonia;
 
 using Serilog;
 using Serilog.Events;
@@ -50,6 +53,14 @@ public sealed class CompositionRootTests : IDisposable
 		{
 			provider.GetRequiredService(descriptor.ServiceType).Should().NotBeNull(descriptor.ServiceType.Name);
 		}
+	}
+
+	[AvaloniaFact]
+	public void TheSchedulerIsTheUiScheduler()
+	{
+		using var provider = BuildContainer();
+
+		provider.GetRequiredService<IScheduler>().Should().BeSameAs(AvaloniaScheduler.Instance);
 	}
 
 	[AvaloniaFact]

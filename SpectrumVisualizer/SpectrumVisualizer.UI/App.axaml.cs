@@ -1,9 +1,11 @@
 using System.Globalization;
+using System.Reactive.Concurrency;
 
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -63,17 +65,23 @@ public class App : Application
 		return new MainWindow.MainWindow { DataContext = viewModel };
 	}
 
-	/// <summary>Runs the app until its window closes; the logger receives what ReactiveUI raises unhandled.</summary>
+	/// <summary>Runs the app until its window closes; the logger receives what ReactiveUI or a dispatcher job raises unhandled.</summary>
 	public static void Run(IServiceProvider services, ILogger unhandledErrorLogger)
 	{
-		// Process lifetime by design: ReactiveUI takes its exception handler once, before any window exists.
+		// Process lifetime by design: ReactiveUI takes its exception handler once, before any window exists,
+		// and the dispatcher subscription below is made once and never removed.
 		var unhandledErrors = new UnhandledErrorObserver(
 			ResolveMessagePanel,
-			AvaloniaScheduler.Instance,
+			services.GetRequiredService<IScheduler>(),
 			unhandledErrorLogger);
 
 		BuildAvaloniaApp(unhandledErrors)
-			.AfterSetup(builder => ((App)builder.Instance!).Configure(services))
+			.AfterSetup(builder =>
+			{
+				// Dispatcher.UIThread exists only once the platform is set up.
+				Dispatcher.UIThread.UnhandledException += unhandledErrors.OnDispatcherUnhandledException;
+				((App)builder.Instance!).Configure(services);
+			})
 			.StartWithClassicDesktopLifetime([]);
 	}
 

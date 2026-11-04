@@ -1,4 +1,8 @@
+using System.Reactive.Concurrency;
+
 using Microsoft.Extensions.DependencyInjection;
+
+using ReactiveUI.Avalonia;
 
 using Serilog;
 
@@ -16,6 +20,7 @@ public static class UiServiceCollectionExtensions
 		services.AddLogging(builder => builder.AddSerilog(logging.Logger, dispose: false));
 		services.AddSingleton(logging.LevelControl);
 		services.AddSingleton(TimeProvider.System);
+		services.AddSingleton<IScheduler>(AvaloniaScheduler.Instance);
 		services.AddSingleton<MessagePanelViewModel>();
 		services.AddSingleton<AppStatusBarViewModel>();
 		services.AddSingleton<MainWindowViewModel>();

@@ -418,18 +418,18 @@ the same run do not.
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Di/CompositionRootTests.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Di/DispatcherExceptionTests.cs`
 
-- [ ] register `AvaloniaScheduler.Instance` as the unkeyed `IScheduler` in `AddUi` (`UiServiceCollectionExtensions.cs:13-24`)
-- [ ] build the `UnhandledErrorObserver` in `App.Run` with the container's `IScheduler` instead of
+- [x] register `AvaloniaScheduler.Instance` as the unkeyed `IScheduler` in `AddUi` (`UiServiceCollectionExtensions.cs:13-24`)
+- [x] build the `UnhandledErrorObserver` in `App.Run` with the container's `IScheduler` instead of
   `AvaloniaScheduler.Instance` (`App.axaml.cs:70-72`)
-- [ ] subscribe `Dispatcher.UIThread.UnhandledException` once per process in `App.Run` (`App.axaml.cs:67-78`) with a
+- [x] subscribe `Dispatcher.UIThread.UnhandledException` once per process in `App.Run` (`App.axaml.cs:67-78`) with a
   handler that reads the panel through `ResolveMessagePanel` (`:98-102`): with a panel, report through
   `TryReportFailure` with the UI scheduler and set `Handled = true`; without one, leave `Handled` false; the handler
   catches its own failure and logs it
-- [ ] write tests: `IScheduler` resolves to `AvaloniaScheduler.Instance` from the production container; a headless
+- [x] write tests: `IScheduler` resolves to `AvaloniaScheduler.Instance` from the production container; a headless
   `Dispatcher.UIThread.Post` of a throwing action adds one Error entry naming the exception type, and the dispatcher
   keeps running the next job; `DispatcherExceptionTests` joins `[Collection(ProcessGlobalStateCollection.Name)]`,
   because `Dispatcher.UIThread` is process-global (`testing-strategy.md:25-27`)
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 3: Serial port seam
 **Files:**
