@@ -211,7 +211,7 @@ any width above the minimum, and no link state changes the set of rows or a row'
 `MainWindow.MinimumHeight` is 688 px, the window's `MinHeight`: a maximised window on a 1366 x 768 screen gives a
 client height of 689 px, and every row fits there with the message panel shown. The row floors are
 `SpectrumRowMinHeight` 192 px and `TrendRowMinHeight` 208 px, each a 120 px data area under the plot's axis margins;
-the data floor is 120 px because two 200 px floors would need 705 px of client height before the message panel. Above
+the data floor is 120 px because two 200 px floors would need 703 px of client height before the message panel. Above
 their floors the spectrum and trend rows split the content row 3 : 2; the spectrum takes the larger share because it
 is the primary live view. The measured row heights are in the table of `docs/plans/20261104-intensity-trend.md`,
 Solution Overview, Layout; `MainWindowChartHeightTests` measures them at 1280 x 800, 1366 x 768 and 1280 x 1024, with and
@@ -232,7 +232,8 @@ carry a 1 px top border in `AppBorderBrush`; the overview is a 36 px strip, so i
 `SignalPane` is a `Border` with a 1 px left border and `Padding="16"`, `SpectrumPanel.PaneWidth` wide, across the three
 rows. Inside it a `ScrollViewer` (`SidePaneScroll`) scrolls vertically only, so the pane scrolls instead of clipping
 when the shown message panel takes its height, and no row ever disappears; at default fonts a short window alone
-leaves the pane room. Its scrollbar overlays the pane's 24 px slack. The `ScrollViewer` holds `SpectrumPanel` and `TrendPanel` in one `StackPanel` with `Grid.IsSharedSizeScope`.
+leaves the pane room. Its scrollbar overlays the pane's 24 px slack. The `ScrollViewer` holds `SpectrumPanel` and
+`TrendPanel` in one `StackPanel` with `Grid.IsSharedSizeScope`.
 Each panel is one form grid: a label column in the shared size group `SidePaneLabel`, so both forms keep one field
 edge, a 12 px gap and a field column of at least 120 px, the number width, with 8 px between rows.
 
@@ -495,7 +496,8 @@ full columns. `FoldCurrent(queryFor)` reads the extent (the key, the oldest and 
 from it and folds, all under one hold of the lock, so a fold never pairs with the extent of another frame; the chart
 and the overview fold this way, and `Extent` alone serves the overview's window placement. `SpectrumAt(moment)` answers
 from the recent spectra: the spectrum at or before the moment, its measurement shared with the frame, or null before
-the oldest recent spectrum; `SwitchingSpectrumSource.ShowMoment` makes the new measurement. At 2 spectra per second a day of
+the oldest recent spectrum; `SwitchingSpectrumSource.ShowMoment` makes the new measurement. At 2 spectra per second a
+day of
 points takes about 3 MB.
 
 ### Continuity
@@ -566,7 +568,8 @@ cancel land within one chunk.
 scheduler and its logger.
 
 - `Start()` subscribes the key change log, the two read pipelines and Back to live, then `FrameDistributor.Frames`
-  with `IntensityCache.Add`, and logs a Debug line. `Add` takes a mean over at most 2048 pixels; it never touches SQLite and never blocks the distributor.
+  with `IntensityCache.Add`, and logs a Debug line. `Add` takes a mean over at most 2048 pixels; it never touches
+  SQLite and never blocks the distributor.
   `Start` after a start or a stop does nothing.
 - The re-read pipeline is `ReReadRequested.Throttle(500 ms)` on the throttle scheduler, `ObserveOn(uiScheduler)`,
   where it snapshots the chart's `From` and `To` into an immutable window, then `Select(ReadHistory).Switch()`.
@@ -599,8 +602,9 @@ right within a second. It folds the cache over `[From, To + 1 ms)` (the window c
 and the range is half-open) at one column per pixel of the data area; the extent, the window move and the fold run
 under one hold of the cache's lock (`FoldCurrent`). It maps the columns with `TrendColumns` and replaces the envelope's
 columns, the strip's spans, the X limits, the Y limits and the Y label under `lock (Plot.Sync)`; then it requests one
-redraw. A failed refresh is reported and skipped, and after its dispose the chart ignores every call. The column width is `ceil(span / clamp(dataAreaPixels, 256, 2048))` in whole milliseconds, at
-least 1 ms. The view reports the data area's width after each ScottPlot render, posted to the UI thread; before the
+redraw. A failed refresh is reported and skipped; after the chart's dispose a refresh does nothing. The column width
+is `ceil(span / clamp(dataAreaPixels, 256, 2048))` in whole milliseconds, at least 1 ms. The view reports the data
+area's width after each ScottPlot render that changed it, posted to the UI thread; before the
 first report the chart folds to 2048 columns. The first point opens the window at now; a later change of the first
 point (retention, a landed chunk) moves only the pan floor.
 
@@ -637,7 +641,7 @@ The window's width runs from 10 s to 24 h, the history the cache keeps, and open
   rule.
 - Zoom widths snap to the ladder `10 s x 1.25^n`. The preset box shows the preset of the current width, and is empty
   after a zoom off every preset; picking a preset, also from the empty box, sets its width exactly, keeps the right
-  edge and keeps following as it was.
+  edge (while not following, the first-point clamp can move it) and keeps following as it was.
 - Follow live jumps to now and follows again; it is enabled only while not following.
 
 `TrendChartView` turns ScottPlot's input off (`UserInputProcessor.Disable()`, `HandleMouseWheelEvent = false`) and
@@ -691,8 +695,9 @@ so it needs no store read and no cancellation of its own. The window's place alo
 
 The trend's parts are container singletons. `Opened` starts the store, the trend feed, then the distributor, so both
 subscriptions exist before the first frame; the close chain stops the feed after the distributor and before the store
-(Startup). The chart and overview subscriptions to the cache live for the process. The cache and the chart ignore
-every call after their dispose, so a read or a posted width that outlives the close changes nothing.
+(Startup). The chart and overview subscriptions to the cache live for the process. After its dispose the cache ignores
+frames and chunks, and the chart ignores a refresh and a posted data area width, so a read or a width that outlives
+the close changes nothing.
 
 ## Spectrum store
 

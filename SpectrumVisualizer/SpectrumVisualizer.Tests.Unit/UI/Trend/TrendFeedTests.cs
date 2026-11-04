@@ -77,10 +77,10 @@ public sealed class TrendFeedTests : TrendFeedTestBase
 		RangesOf(PointsCalls).Should().Equal(plan);
 	}
 
-	// The pool side of the read starts at once after the UI dispatch, so no test can pan between the two; this one pins
-	// the dispatch as the moment the window is taken and shows that a pan during the read changes no range.
+	// The pool side of the read starts at once after the UI dispatch, so no test can pan between the two: a pan before
+	// the dispatch moves the read's window, and a pan after its first range started changes no range.
 	[AvaloniaFact]
-	public async Task TheReadTakesTheVisibleWindowAtTheUiDispatch()
+	public async Task AReadUsesTheWindowFromBeforeItsFirstRangeNotALaterPan()
 	{
 		var uiHop = new TestScheduler();
 		using var feed = new TrendFeed(

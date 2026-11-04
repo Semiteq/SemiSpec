@@ -213,8 +213,8 @@ Automatable (baseline: verified 2026-11-04, `dotnet test SpectrumVisualizer.slnx
    - `TrendFeedTests`: `TheFeedFillsTheCacheFromTheDistributor`; `AKeyChangeReadsTheVisibleRangeFirst`;
      `ASecondKeyChangeCancelsTheReadInFlight`; `KeyChangesInsideTheThrottleReadOnce`;
      `AReturnToThePreviousKeyCancelsThePendingReadAndStartsNone`; `AFailedReadReportsOnceAndKeepsTheLivePart`;
-     `TheReadTakesTheVisibleWindowAtTheUiDispatch` (a pan before the UI dispatch moves the read's window, a pan during
-     the read changes no range); `EveryKeyChangeLogsAtDebugWithItsRunningCount`;
+     `AReadUsesTheWindowFromBeforeItsFirstRangeNotALaterPan` (a pan before the UI dispatch moves the read's window, a
+     pan during the read changes no range); `EveryKeyChangeLogsAtDebugWithItsRunningCount`;
      `AReadThatLandsEveryRangeLetsAReturnRestoreTheKeyWithoutARead`; `BackToLiveCancelsTheMomentReadInFlight`;
      `AReadThatFailsAfterTheStopReportsNothing`; `StopCancelsTheReadsAndAwaitsThem` (a re-read and a click read both
      held at a gate). The feed tests run the feed's UI hops on the headless dispatcher.
@@ -314,7 +314,7 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
 11. Restart with `--device 2000 --dark-every 3`: every third point drops to 0.
 12. Restart with `--device 2000 --both-connected --failed 8000`: the failure strip shows under the line while the
     heartbeats carry the bit; the strip is one bar, not dashes; the readout names "Measurement failed: ATP-8000".
-    (`--failed` of the emulated device shows only in heartbeats, `board-protocol.md:358`.) Then run
+    (`--failed` of the emulated device shows only in heartbeats, `board-protocol.md:360`.) Then run
     `--device 2000 --rate 0 --failed 2000` for 15 s and back to `--device 2000`: the strip covers the heartbeat-only
     stretch, and hovering its gap reads "No spectra" with "Measurement failed: ATP-2000" under it.
 13. Pick the 24 h preset after several minutes: the whole history shows without delay. Pick the 1 min or 10 min preset
@@ -371,7 +371,7 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   - otherwise it adds one point: `QueryWindows.MeanOf` over the frame's window bytes when the device covers the
     wavelength, NaN otherwise.
   After each add it drops points, breaks and marks older than 24 h before `TimeProvider.GetUtcNow()`, the store's
-  retention rule (`overview.md:473-476`). `Changed` signals after every change. `Fold(IntensityQuery)` finds the first
+  retention rule (`overview.md`, The writer service). `Changed` signals after every change. `Fold(IntensityQuery)` finds the first
   point at or after `From` by binary search over the time-ordered points, breaks and marks, and feeds the range into
   `IntensityBuckets`, so the cache and the store fold one way and a 10 min fold costs the points of 10 min.
   `FoldCurrent(queryFor)` reads the extent, builds the query and folds under one lock hold. `LandHistory(generation,
@@ -380,7 +380,7 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   `SpectrumAt(moment)` answers from the recent spectra when the moment is inside them, null otherwise. After `Dispose`
   the cache ignores frames and chunks.
   Memory: 172 800 points of 16 bytes plus the breaks, about 3 MB for a day at 2 spectra per second.
-- **Why recent spectra.** The store writes in batches behind its queue (`overview.md:461-462`), so the newest rows may
+- **Why recent spectra.** The store writes in batches behind its queue (`overview.md`, Writes), so the newest rows may
   not be in the file when a re-read starts. The cache recomputes the last 120 s from frames it already holds and asks
   the store only for older rows; 120 s covers the writer's normal lag, and the boundary holds no double point.
   `recentStart` is truncated to whole ms, and the recent spectra are evicted on their ms-truncated stamps, so the
@@ -391,7 +391,7 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   rows of the range through the same `CASE ... substr` statement and the same row loop as `ReadSeries`, and returns an
   `IntensityChunk` of `(UnixMs, Value)` points, NaN for an uncovered device or a corrupt row. `ReadSeries` becomes the
   bucket fold over that loop, so both reads share one statement and one row loop. The statement gains no column, so
-  the `GetBytes` constraint of `SpectrumHistory.cs:117-118` stays met.
+  the `GetBytes` constraint of `SpectrumHistory.cs:155` stays met.
 - **History plan** (`TrendHistoryPlan`, Core). For a key change it returns ranges in order: the visible window clipped
   to `[newest - 24 h, recentStart)` first, then the rest of that day in 1 h chunks, newest first. SemiPlot reads the
   visible window, then one expanded request (`ChartHistoryPlanner.cs:47-85`); the hour chunks here let the trend fill
@@ -399,7 +399,8 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
 - **Feed** (`TrendFeed`, UI). `Start()` subscribes `FrameDistributor.Frames` with an observer that calls
   `IntensityCache.Add` (a mean over at most 2048 pixels; it never touches SQLite and never blocks), the same way the
   store only enqueues. The re-read pipeline copies the shape of `MinimapBandFeed.cs:112-119`:
-  `ReReadRequested.Throttle(500 ms, taskPoolScheduler).Select(Read).Switch()`, where `Read` is `Observable.Create`
+  `ReReadRequested.Throttle(500 ms, throttleScheduler).ObserveOn(uiScheduler)`, the window snapshot, then
+  `Select(Read).Switch()`, where `Read` is `Observable.Create`
   with a `CancellationToken` that runs the plan's ranges one after another and lands each chunk. A newer key change
   disposes the old read, which cancels its token; `IntensityPointsAsync` checks it every 256 rows. A request with no
   read maps to an empty observable, so it only cancels. At trigger time the feed moves to the UI scheduler and
@@ -412,12 +413,13 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
 - **Trend chart model** (`TrendChartViewModel`, UI). Owns the `Plot`, one `EnvelopeLine`, one `TrendMarkerStrip`
   for failure columns, one `VerticalLine` for the shown moment, the bottom axis with `DateTimeAutomatic` over local
   OADate (`LocalTimeAxis`), and a `TrendNavigationModel`. `Refresh()` on the UI thread builds an `IntensityQuery` for
-  the window at one column per pixel of the data area (256 to 2048, `HistoryColumnTarget`) through
+  the window at one column per pixel of the data area (`TrendColumns.MinimumColumns` to `MaximumColumns`) through
   `cache.FoldCurrent`, maps the columns with `TrendColumns`, and replaces the envelope's columns under
   `lock (Plot.Sync)`, the lock every ScottPlot render holds; the plottables take no lock of their own. It sets the Y limits
   from the envelope: `min - 5 % .. max + 5 %`, `v - 1 .. v + 1` for a flat range, unchanged when nothing is visible.
-  Cache changes reach it through `cache.Changed.Sample(100 ms).ObserveOn(uiScheduler)`, a 1 s tick refreshes it while
-  following, and navigation changes refresh at once. Every refresh requests one redraw; the view serves it in the next display frame as the spectrum chart does.
+  Cache changes reach it through `cache.Changed.Sample(100 ms, uiScheduler)`, a 1 s tick refreshes it while
+  following, and navigation changes refresh at once. Every refresh requests one redraw; the view serves it in the next
+  display frame as the spectrum chart does.
 - **Gaps** (`TrendColumns`, Core). A column with values becomes `EnvelopeColumn(centre time, Min, Max, Last)`. An
   empty column with no break and no uncovered spectrum is left out, so the path connects across columns narrower than
   the frame period, and a stretch of more than 10 s without spectra breaks only through its NoSpectra break. An
@@ -433,16 +435,17 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
 - **Navigation.** `TrendNavigationModel` is copied with its widths changed to 10 s .. 24 h, the history the store keeps.
   The window opens at 10 min, sticky. `OnLiveEdge(now)` sets `From = now - width` while sticky, with no clamp, so
   a run shorter than the window leaves an empty span on the left, as in SemiPlot (`TrendNavigationModel.cs:113-123`),
-  and a silence shows as an empty span on the right. A `Pan` or a `Zoom` that leaves now outside the window detaches; `Pan` and `Zoom` place the window through `PlaceFrom`, the only clamp, which keeps
+  and a silence shows as an empty span on the right. A `Pan` or a `Zoom` that leaves now outside the window detaches.
+  `Pan`, `Zoom` and a `SetWidth` while not sticky place the window through `PlaceFrom`, the only clamp, which keeps
   `From` at or after the cache's first point (`:94-98`). The view copies SemiPlot's input: `UserInputProcessor.Disable()`,
   `HandleMouseWheelEvent = false`, wheel zoom 0.8 / 1.25 around the cursor time, Shift + wheel pans 10 %, a left drag
   past 4 px pans and detaches, a release inside 4 px is a click. Presets are 1 min, 10 min, 1 h, 6 h and 24 h; the box
   shows the preset of the current width, empty after a zoom off every preset, and a picked preset sets the width and
-  keeps the right edge and sticky. Follow live jumps to now and turns sticky; it is enabled only while not following.
+  keeps the right edge (unless the first-point clamp moves it while not following) and sticky. Follow live jumps to now and turns sticky; it is enabled only while not following.
   AvaPlot 5.1.59 works in DIPs on a canvas Avalonia already scaled, so the hover, the zoom anchor and the click moment
   hold at 125 % (decompiled, no fix needed).
 - **Hover readout.** The overlay is SemiPlot's: a `Canvas` over the cached plot with a vertical line and a readout
-  `Border`, placed by `ChartCursorOverlay.Project`, hidden while dragging and on pointer exit. It moves without a plot
+  `Border`, placed by `TrendChartView.ProjectOverlay` (a copy of SemiPlot's `ChartCursorOverlay.Project`), hidden while dragging and on pointer exit. It moves without a plot
   redraw. Its text comes from the column under the pointer in the last fold: the local time `HH:mm:ss` of the column,
   then one value or "min – max" in `G6` under the current culture and the spectrum count, or the gap reason ("No
   data", "{0} spectra lost", "No spectra", "Spectrometer does not cover {0} nm"), then "Measurement failed: {device}"
@@ -457,7 +460,7 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
 - **Switching source** (`SwitchingSpectrumSource`, UI, `ReactiveObject`). It wraps the live source and replaces the
   `LiveSpectrumSource` registration as the `IDisplayedSpectrumSource`. `Current` is the historical spectrum while one is
   shown, the live `Current` otherwise. `Changed` merges the live `Changed` with a private subject that emits on each
-  mode change. `ShowMoment(spectrum)` and `ReturnToLive()` run on the UI thread and set `ShownMoment`
+  mode change. `ShowMoment(measurement, receivedAt)` and `ReturnToLive()` run on the UI thread and set `ShownMoment`
   (`DateTimeOffset?`). Every shown moment carries a new `SpectrumMeasurement` built around the row's pixels:
   `ShowMoment` copies the measurement it gets into a new instance that shares the immutable pixel array, so
   `DistinctUntilChanged` by reference shows every click. While a moment is shown, live signals read the same
@@ -468,11 +471,11 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   or the flat range without one. A frozen scale records the device it was frozen on. A historical spectrum, and the
   first live spectrum after Back to live, keep the frozen limits when their device is that device and return the scale
   to following otherwise, so a moment from the other device never leaves the plot blank, and the operator can compare
-  moments of one device at one zoom. Live frames keep today's rule (`overview.md:335-336`).
+  moments of one device at one zoom. Live frames keep today's rule (`overview.md`, The scale).
 - **Linked charts.** While a moment is shown, the trend draws `AppMarkerLineBrush` at that moment, and a line over the
   spectrum chart reads "Spectrum from HH:mm:ss" (local time) in `AppSecondaryForegroundBrush`. The Updated row of the
   signal pane already shows the shown spectrum's time.
-- **Overview.** SemiPlot's minimap without markers: a 36 px band (`MinimapBand`, fill at 0.35 of `AppAccentBrush`'s
+- **Overview.** SemiPlot's minimap without markers: a 36 px band (`OverviewBand`, after SemiPlot's `MinimapBand`, fill at 0.35 of `AppAccentBrush`'s
   colour) of the cache folded to 250 columns over the cache's extent, with the window highlight (at least 6 px) and a
   hover line. A press or drag in the band moves the trend window there and stops following. The band refolds on the
   SemiPlot cadence clamp(span / 1000, 2 s, 60 s) and after each landed history chunk. It reads the cache, so it needs
@@ -489,8 +492,8 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
     border. The rows carry `MinHeight` 192 (spectrum) and 208 (trend), so each data area keeps at least 120 px; the
     window's `MinHeight` is 688 (`MainWindow.MinimumHeight`), and the message panel's list scrolls past 64 px (one
     three-line entry), so the panel stands at most 133 px.
-  - A 200 px data floor in both charts does not fit 1366 x 768: 200 + 66.2 and 200 + 83.2 make 551 px, the fixed rows
-    (menu 32, connection row 49, overview 37, status bar 35.6) make 154 px, so the window needs 705 px of client height
+  - A 200 px data floor in both charts does not fit 1366 x 768: 200 + 66.2 and 200 + 83.2 make 549.4 px, the fixed rows
+    (menu 32, connection row 49, overview 37, status bar 35.6) make 153.6 px, so the window needs 703 px of client height
     before the message panel; a maximised 1366 x 768 window gives 689. The floor is 120 px instead, and nothing is cut
     with the message panel shown.
   - Heights measured in Task 14 (`MainWindowChartHeightTests`; headless rows, the status bar corrected to the tallest
@@ -570,11 +573,11 @@ New resx keys (en / ru):
 | `TrendReadoutNoData` | No data | Нет данных |
 | `TrendReadoutLostFormat` | {0} spectra lost | Потеряно спектров: {0} |
 | `TrendReadoutNoSpectra` | No spectra | Нет спектров |
-| `TrendReadoutUncoveredFormat` | Spectrometer does not cover {0} nm | Спектрометр не покрывает {0} нм |
+| `TrendReadoutUncoveredFormat` | Spectrometer does not cover {0} nm | {0} нм вне диапазона спектрометра |
 | `TrendReadoutFailedFormat` | Measurement failed: {0} | Ошибка измерения: {0} |
 | `ChartBackToLive` | Back to live | Вернуться к текущему |
 | `SpectrumHistoricalFormat` | Spectrum from {0} | Спектр в {0} |
-| `TrendHistoryTitle`, `TrendHistoryDetail`, `TrendHistoryRemedy` | The trend history could not be read / The stored spectra at the new wavelength or window could not be read; the trend shows only the data since the change. / (empty) | Не удалось прочитать историю тренда / Сохранённые спектры на новой длине волны или ширине окна не прочитаны; тренд показывает только данные после смены. / (пусто) |
+| `TrendHistoryTitle`, `TrendHistoryDetail` (no remedy key; the mapper passes an empty remedy) | The trend history could not be read / The stored spectra at the new wavelength or window could not be read; the trend shows only the data since the change. / (empty) | Не удалось прочитать историю тренда / Сохранённые спектры на новой длине волны или ширине окна не прочитаны; тренд показывает только данные после смены. / (пусто) |
 | `TrendMomentTitle`, `TrendMomentDetail`, `TrendMomentRemedy` | The spectrum of that moment could not be read / The stored spectrum at the clicked time could not be read. / Click another moment. | Не удалось прочитать спектр этого момента / Сохранённый спектр на выбранное время не прочитан. / Выберите другой момент. |
 
 Palette: no new key. Consumers added: `AppAccentBrush` (the envelope line, the overview band at 0.35, the overview
@@ -627,7 +630,7 @@ Data flow:
   frozen on, and returns the scale to following otherwise.
 - Every shown moment carries a new `SpectrumMeasurement`; `ShowMoment` copies it around the same pixel array.
 - Live follow ends the window at now, refreshed at least once a second, and sets `From = now - width` with no clamp;
-  only `PlaceFrom` (pan, zoom) clamps at the first point. A pan or a zoom that leaves now outside stops following.
+  only `PlaceFrom` (pan, zoom, a preset while not following) clamps at the first point. A pan or a zoom that leaves now outside stops following.
 - The preset box mirrors the chart's width: the matching preset, or empty after a zoom off every preset.
 - Failed columns less than 5 s apart draw one strip span.
 - The window opens inside the screen's work area, never below its minimum size.
