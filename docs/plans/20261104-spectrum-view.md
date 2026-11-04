@@ -507,19 +507,19 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.UI/Chart/LogAxis.cs`, `LogTickGenerator.cs`, `TickCache.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Chart/LogAxisTests.cs`, `LogTickGeneratorTests.cs`
 
-- [ ] copy `LogTick`, `LogAxis.Project` and `LogAxis.Ticks` with their private helpers from
+- [x] copy `LogTick`, `LogAxis.Project` and `LogAxis.Ticks` with their private helpers from
   `SemiPlot/SemiPlot.Core/Trends/LogAxis.cs` (drop `AdmitsMinimum`), renaming the namespace
-- [ ] copy `TickCache` (`SemiPlot/SemiPlot.UI/Chart/TickCache.cs:8-39`)
-- [ ] write `LogTickGenerator : ITickGenerator` from `SemiPlot/SemiPlot.UI/Chart/LogTickGenerator.cs:10-93` without
+- [x] copy `TickCache` (`SemiPlot/SemiPlot.UI/Chart/TickCache.cs:8-39`)
+- [x] write `LogTickGenerator : ITickGenerator` from `SemiPlot/SemiPlot.UI/Chart/LogTickGenerator.cs:10-93` without
   `Mask`, `IsDrawn`, the zero-label and the read-back rules: a major reads `10^position` as `"0.###"` under the current
   culture, a repeated label turns minor, results cached in a `TickCache` keyed on the limits and the length;
   `IsLogarithmic(IYAxis?)` stays
-- [ ] copy `SemiPlot/SemiPlot.Tests.Unit/Core/Trends/LogAxisTests.cs` for the copied members (`Component=UI`,
+- [x] copy `SemiPlot/SemiPlot.Tests.Unit/Core/Trends/LogAxisTests.cs` for the copied members (`Component=UI`,
   `Area=Chart`)
-- [ ] write `LogTickGeneratorTests`: `MajorsCarryTheValueAsAnIntegerCount` (0..5 decades at 400 px labels "1", "10",
+- [x] write `LogTickGeneratorTests`: `MajorsCarryTheValueAsAnIntegerCount` (0..5 decades at 400 px labels "1", "10",
   ... "100000" under `CultureScope("en")` and `CultureScope("ru")`), `ARepeatedLabelTurnsMinor`,
   `TheSecondLengthOfAFrameReusesTheCachedTicks` (same array instance), `NothingForANonFiniteRange`
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 3: Frame distributor
 **Files:**
