@@ -7,6 +7,7 @@ using FluentResults;
 
 using Microsoft.Extensions.Logging;
 
+using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.UI.Messages;
 
 namespace SpectrumVisualizer.UI.Link;

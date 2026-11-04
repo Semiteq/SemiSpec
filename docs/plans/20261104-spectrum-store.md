@@ -523,15 +523,15 @@ Data flow:
 - Modify: the eight files that use `ReceivedFrame` (usings only)
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/AppDataPathsTests.cs`
 
-- [ ] pin `Microsoft.Data.Sqlite` 10.0.14 in `Directory.Packages.props` (alphabetical, after
+- [x] pin `Microsoft.Data.Sqlite` 10.0.14 in `Directory.Packages.props` (alphabetical, after
   `Microsoft.CodeAnalysis.ResxSourceGenerator`, `:17`) and reference it from Core; `dotnet restore
   SpectrumVisualizer.slnx` needs nuget.org, because the package is not in the local cache
-- [ ] add `StoreFolder` to `AppDataPaths` (`AppDataPaths.cs:6-20`): `SpectrumVisualizer\Spectra` beside `Logs`
-- [ ] move `ReceivedFrame` to `SpectrumVisualizer.Core.Protocol` unchanged; fix the usings in `FrameDistributor.cs`,
+- [x] add `StoreFolder` to `AppDataPaths` (`AppDataPaths.cs:6-20`): `SpectrumVisualizer\Spectra` beside `Logs`
+- [x] move `ReceivedFrame` to `SpectrumVisualizer.Core.Protocol` unchanged; fix the usings in `FrameDistributor.cs`,
   `LinkSession.cs`, `SerialLink.cs` and the five test files `git grep -l ReceivedFrame` lists
-- [ ] write `AppDataPathsTests.TheStoreFolderSitsInsideTheAppFolder`; the trailing-separator test covers the new member
+- [x] write `AppDataPathsTests.TheStoreFolderSitsInsideTheAppFolder`; the trailing-separator test covers the new member
   through record equality (`AppDataPathsTests.cs:24-30`)
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 2: Instance file and the sweep
 **Files:**

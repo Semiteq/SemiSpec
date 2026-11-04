@@ -4,6 +4,8 @@ using System.Threading.Channels;
 
 using Microsoft.Extensions.Logging;
 
+using SpectrumVisualizer.Core.Protocol;
+
 namespace SpectrumVisualizer.UI.Link;
 
 /// <summary>
