@@ -410,6 +410,8 @@ the same run do not.
 
 - [x] copy `MessageSeverity` and `SeverityMatchConverter` from SemiPlot
   (`SemiPlot/SemiPlot.UI/Messages/MessageSeverity.cs:6-16`, `SeverityMatchConverter.cs:12-24`), renaming the namespace
+- [x] ➕ review: `SeverityMatchConverter` deleted; the dot classes bind with `ObjectConverters.Equal` and
+  `x:Static` severity values, as the status bar dot does
 - [x] add `Severity` as the fourth member of `MessageView` (`MessageView.cs:7-10`); both existing mapper arms
   (`ErrorMessageMapper.cs:22-36`) return `Error`
 - [x] log at the severity's level in `ReportFailure` (`ResultReporting.cs:24-31`), Debug for a coalesced repeat, as in
@@ -628,6 +630,9 @@ the same run do not.
   (➕ the window had no `MinWidth`; `MainWindow.MinimumWidth` = 968. Measured with the longest texts, widest of
   Microsoft YaHei, Segoe UI, Arial and Inter at 14 px: status bar 900.8 px en, 962.3 px ru; connection row 595.4 px en,
   654.9 px ru; `MainWindowLayoutTests`)
+- [x] ➕ review: the Russian "Порт недоступен, переподключение" widens the status bar to 1042.4 px, so
+  `MainWindow.MinimumWidth` is 1048; the layout test now measures each row unbounded, because a clamped `DesiredSize`
+  never showed an overflow
 - [x] at a large width no gap grows between related items: the connection row and the status bar stay left-aligned
   (every part keeps its left edge from 1280 to 2560 px)
 - [x] every label, button and status text fits on one line in English and Russian, measured in the realised headless
