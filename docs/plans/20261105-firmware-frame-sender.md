@@ -376,14 +376,14 @@ Repository: OptoskyProj. Commit: `feat(firmware): добавить генера�
   `cproj:139`)
 - Modify: `.gitignore` (`OptoskyEncoder/HostTest/out/`)
 
-- [ ] write `PcMeasurement`, `PcFrame`, `PcCrc16Update`, `PcFrameBeginHeartbeat`, `PcFrameBeginSpectrum`,
+- [x] write `PcMeasurement`, `PcFrame`, `PcCrc16Update`, `PcFrameBeginHeartbeat`, `PcFrameBeginSpectrum`,
   `PcFrameDone`, `PcFrameNextByte` per Technical Details, with `_Static_assert(sizeof(float) == 4, ...)`
-- [ ] add `pc_link.c` and `pc_link.h` to the cproj; the `HostTest` folder stays out of it
-- [ ] write the frame checks in `pc_link_test.c`: CRC check value, heartbeat example bytes, frame sizes and `len`
+- [x] add `pc_link.c` and `pc_link.h` to the cproj; the `HostTest` folder stays out of it
+- [x] write the frame checks in `pc_link_test.c`: CRC check value, heartbeat example bytes, frame sizes and `len`
   bytes, field bytes at their positions for the `atp2000` golden frame (`8A 02` wavelength, `00 A0 91 45` amplitude
   4660.0f), pixel bytes low first
-- [ ] make `pc_link_test.exe <path>` write the four golden frames of Technical Details to `<path>` in binary mode
-- [ ] run Acceptance Evidence item 1: 0 warnings, `all checks passed`, exit 0
+- [x] make `pc_link_test.exe <path>` write the four golden frames of Technical Details to `<path>` in binary mode
+- [x] run Acceptance Evidence item 1: 0 warnings, `all checks passed`, exit 0
 
 ### Task 2: Send rules
 Repository: OptoskyProj. Commit: `feat(firmware): добавить правила отправки кадров ПК (#20)`, body in Russian.
