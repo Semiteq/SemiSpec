@@ -176,8 +176,9 @@ Automatable (baseline 505 of 505 at `12bef84`):
      lock is released and `StopAsync` has drained, stored rows + `DroppedFrames` = frames fed, `DroppedFrames` > 0
      and `DroppedFramesChanged` signalled; no exact drop count, because it depends on when the writer's batches fail);
      `DisposeOnlyCancelsAndTheWriterClosesTheConnection` (after `Dispose`, the writer task ends and the file can be
-     deleted; no exception reaches the log from a closed connection); `AFailedBatchCountsItsFramesAndReportsOnce` (two
-     failed batches, one Warning entry in a real panel); `AWriteAfterAFailureRunReportsAgainOnlyAfterASuccess`;
+     deleted; no exception reaches the log from a closed connection); `AFailedBatchCountsItsFramesAndReportsOnce` (three
+     failed batches, one Warning entry in a real panel, one Warning log line and two Debug lines without a stack);
+     `ASuccessAfterFailedBatchesLogsTheRecoveryWithItsCounts`; `AWriteAfterAFailureRunReportsAgainOnlyAfterASuccess`;
      `RetentionRunsOnceAMinuteAlsoWithoutFrames` (`ManualClock` advanced by 59 s deletes nothing; at 61 s the pass
      deletes the rows older than 24 h and keeps one 23 h 59 min old);
      `AStopPastItsBudgetCountsTheUndrainedFramesAsDropped` (writer held, `StopAsync` with a cancelled drain token:
@@ -397,9 +398,13 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
     and counts every frame still queued and every later frame as dropped, so "Dropped frames" keeps growing while
     history is off.
   - Loop: wait for the queue or the next retention time, whichever comes first; take up to 256 frames with `TryRead`
-    and write them as one batch. A failed batch adds its frame count to the drop count. The first failure after a
-    success reports one `StoreWriteError` (Warning) through `TryReportFailure`, which writes its log line; each later
-    failure logs one Warning line and reaches no panel until a batch succeeds again, as the link's one entry per incident (`board-protocol.md:275-277`).
+    and write them as one batch. A failed batch adds its frame count to the drop count. A failure incident runs from
+    the first failed batch to the next successful one. Its first failure reports one `StoreWriteError` (Warning)
+    through `TryReportFailure`, which writes its Warning line with the stack at once on the writer's thread; each later
+    failure logs one Debug line without the stack and reaches no panel, as the link's one entry per incident
+    (`board-protocol.md:275-277`). The next successful batch logs one Information line "Spectrum store writes recovered
+    after {Failures} failed batches, {Dropped} frames dropped", so a failing disk cannot fill the 25 MB rolling log
+    and roll the incident's start away.
   - Retention: once a minute, also while no frame arrives, `DeleteBefore(now - 24 h)`. The wait is
     `Task.Delay(untilNextRetention, timeProvider, token)` raced with `WaitToReadAsync`, and `now` is
     `timeProvider.GetUtcNow()`, so a test drives both through one `TimeProvider`. The

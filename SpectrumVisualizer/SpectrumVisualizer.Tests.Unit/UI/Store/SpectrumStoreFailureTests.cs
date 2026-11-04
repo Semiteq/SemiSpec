@@ -28,16 +28,40 @@ public sealed class SpectrumStoreFailureTests : SpectrumStoreTestBase
 
 		await FailOneBatchAsync(expectedDropped: 1);
 		await FailOneBatchAsync(expectedDropped: 2);
+		await FailOneBatchAsync(expectedDropped: 3);
 		await StopAsync();
 
 		var entry = Panel.Entries.Should().ContainSingle().Subject;
 		entry.View.Title.Should().Be(Resources.StoreWriteTitle);
 		entry.View.Severity.Should().Be(MessageSeverity.Warning);
 		entry.RepeatCount.Should().Be(1);
-		BatchFailureTimes().Should().HaveCount(
-			2, "the report writes the first batch's line and the store the repeat's");
+		var failedBatches = BatchFailureRecords();
+		failedBatches.Select(record => record.Level).Should().Equal(
+			[LogLevel.Warning, LogLevel.Debug, LogLevel.Debug],
+			"the report writes the first batch's line with its stack and the repeats log at Debug");
+		failedBatches.Skip(1).Should().OnlyContain(record => record.Exception == null);
 		Logger.Levels().Should().NotContain(LogLevel.Error);
-		Logger.Failures().Should().AllBeOfType<SqliteException>();
+		Logger.Failures().Should().ContainSingle().Which.Should().BeOfType<SqliteException>();
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task ASuccessAfterFailedBatchesLogsTheRecoveryWithItsCounts()
+	{
+		await StartOpenedAsync();
+		FailWritesOfSeq99();
+
+		await FailOneBatchAsync(expectedDropped: 1);
+		await FailOneBatchAsync(expectedDropped: 2);
+		Feed(StoreSamples.Spectrum(StoreSamples.Start, seq: 1));
+		await Waits.UntilAsync(() => Count("spectrum") == 1);
+		await StopAsync();
+
+		var recovered = Logger.Collector.GetSnapshot()
+			.Where(record => record.Message.StartsWith("Spectrum store writes recovered", StringComparison.Ordinal))
+			.Should().ContainSingle().Subject;
+		recovered.Level.Should().Be(LogLevel.Information);
+		recovered.Message.Should().Be(
+			"Spectrum store writes recovered after 2 failed batches, 2 frames dropped");
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]

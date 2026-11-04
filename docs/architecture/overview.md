@@ -454,10 +454,12 @@ returns a FluentResults `Result`, with a `SqliteException` or `IOException` as a
 - The writer task prepares and opens the file on the thread pool, so the UI thread does no file I/O; frames that
   arrive meanwhile wait in the queue. The log line "Spectrum store file <path>" names the opened file.
 - The loop waits for the queue or the next retention time, whichever comes first, takes up to 256 frames and writes
-  them as one batch. A failed batch counts its frames as dropped. The first failure after a success reports one
-  `StoreWriteError` through `TryReportFailure`, which writes its one log line at Warning; each later failure logs one
-  Warning line with its cause and reaches no panel until a batch succeeds again, so the panel gets one entry per
-  incident.
+  them as one batch. A failed batch counts its frames as dropped. A failure incident runs from the first failed batch
+  to the next successful one. Its first failure reports one `StoreWriteError` through `TryReportFailure`, which writes
+  the one Warning line with the cause's stack; each later failure logs one Debug line without the stack and reaches no
+  panel, so the panel gets one entry per incident. The next successful batch logs one Information line "Spectrum store
+  writes recovered after N failed batches, M frames dropped". At 2 to 3 frames per second a Warning with a stack per
+  batch would fill the 25 MB rolling log within 1 to 2 hours and roll the incident's first line away.
 - Any other failure ends history for the run. A failed prepare or open, or any exception before the file is open,
   reports one `StoreOpenError`; any exception after the open, outside a failed batch, reports one `StoreStoppedError`.
   The report writes the failure's one log line, at Error, with the original exception. The writer closes the file without a checkpoint, keeps the subscription, and from
@@ -540,8 +542,11 @@ extensions:
 - `ReportFailure(IError, ILogger)` maps the error with `ErrorMessageMapper`, adds it to the panel, and writes one log
   line at the level of its severity: Error, Warning or Information. The line carries the deepest exception in the
   error's reason chain, so a wrapped failure keeps its stack. The log line is written even when the panel throws.
-- `TryReportFailure(IError, ILogger, IScheduler)` moves the report to the UI scheduler and never throws there, for
-  callers whose exception would end an Rx stream or a dispatcher job.
+- `TryReportFailure(IError, ILogger, IScheduler)` writes the log line at once on the calling thread, at the level of
+  the severity, and moves only the panel entry to the UI scheduler, which writes no second line. It never throws, for
+  callers whose exception would end an Rx stream or a dispatcher job. The log line comes first because a failure late
+  in the close chain can find the dispatcher already stopped, and its scheduled job never runs. A repeat that
+  coalesces into the newest entry still logs at its severity here, since the caller's thread cannot read the panel.
 
 `ErrorMessageMapper.Map` turns an `IError` into a `MessageView` (title, detail, remedy, severity):
 

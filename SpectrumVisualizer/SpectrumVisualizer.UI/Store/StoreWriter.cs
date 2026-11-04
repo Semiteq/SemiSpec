@@ -33,7 +33,8 @@ internal sealed class StoreWriter(
 	private volatile bool _stopped;
 
 	// Written by the writer task; read once it ended.
-	private bool _writeFailing;
+	private int _failedBatches;
+	private long _failedFrames;
 	private Result<WalCheckpoint>? _checkpoint;
 
 	public long StoredFrames { get; private set; }
@@ -225,22 +226,39 @@ internal sealed class StoreWriter(
 		if (written.IsSuccess)
 		{
 			StoredFrames += batch.Count;
-			_writeFailing = false;
+			EndFailureIncident();
 			return;
 		}
 
 		countDropped(batch.Count);
-		if (_writeFailing)
+		_failedBatches++;
+		_failedFrames += batch.Count;
+		if (_failedBatches == 1)
 		{
-			logger.LogWarning(
-				ResultReporting.CauseOf(written.Errors),
-				"A batch of {Count} frames could not be written to the spectrum store",
-				batch.Count);
+			messagePanel.TryReportFailure(new StoreWriteError().CausedBy(written.Errors), logger, uiScheduler);
 			return;
 		}
 
-		_writeFailing = true;
-		messagePanel.TryReportFailure(new StoreWriteError().CausedBy(written.Errors), logger, uiScheduler);
+		logger.LogDebug("A batch of {Count} frames could not be written to the spectrum store", batch.Count);
+	}
+
+	/// <summary>
+	/// One Information line closes a run of failed batches, whose repeats logged at Debug only, so a failing disk
+	/// cannot roll the run's first Warning out of the log.
+	/// </summary>
+	private void EndFailureIncident()
+	{
+		if (_failedBatches == 0)
+		{
+			return;
+		}
+
+		logger.LogInformation(
+			"Spectrum store writes recovered after {Failures} failed batches, {Dropped} frames dropped",
+			_failedBatches,
+			_failedFrames);
+		_failedBatches = 0;
+		_failedFrames = 0;
 	}
 
 	private void DeleteExpired(SpectrumDatabase database)

@@ -164,10 +164,15 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 	/// </summary>
 	protected List<DateTimeOffset> BatchFailureTimes()
 	{
+		return [.. BatchFailureRecords().Select(record => record.Timestamp)];
+	}
+
+	/// <summary>The log lines of failed batches: the reported first one of a run and the repeats.</summary>
+	protected List<FakeLogRecord> BatchFailureRecords()
+	{
 		return [.. Logger.Collector.GetSnapshot()
 			.Where(record => record.Message.StartsWith(Resources.StoreWriteTitle, StringComparison.Ordinal)
-				|| record.Message.StartsWith("A batch of", StringComparison.Ordinal))
-			.Select(record => record.Timestamp)];
+				|| record.Message.StartsWith("A batch of", StringComparison.Ordinal))];
 	}
 
 	protected void Feed(params ReceivedFrame[] frames)
