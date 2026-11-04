@@ -441,19 +441,19 @@ the same run do not.
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Link/FakeSerialPortProvider.cs`, `FakePortStream.cs`,
   `RjcpSerialPortProviderTests.cs`
 
-- [ ] declare `ISerialPortProvider` with `PortNames()` and `Open(string portName)` returning `Result<Stream>`
-- [ ] implement `RjcpSerialPortProvider` with the settings of Solution Overview; sort names by the number after `COM`,
+- [x] declare `ISerialPortProvider` with `PortNames()` and `Open(string portName)` returning `Result<Stream>`
+- [x] implement `RjcpSerialPortProvider` with the settings of Solution Overview; sort names by the number after `COM`,
   others after them by ordinal; map `UnauthorizedAccessException` and an `IOException` with `HResult` 32 to
   `PortBusyError`, any other `IOException` to `PortNotFoundError`, with the port name in metadata
   (`WinNativeSerial.cs:990-1005`)
-- [ ] declare the five link errors in one file as FluentResults errors, each with an English message naming the port
-- [ ] write the test doubles: `FakePortStream.ReadAsync` returns the next scripted step (bytes, a 0-byte read, a
+- [x] declare the five link errors in one file as FluentResults errors, each with an English message naming the port
+- [x] write the test doubles: `FakePortStream.ReadAsync` returns the next scripted step (bytes, a 0-byte read, a
   `TimeoutException`, an `IOException`, an `InvalidOperationException`) and honours its token;
   `FakeSerialPortProvider` hands out queued open results, counts opens and has an editable port list
-- [ ] write `RjcpSerialPortProviderTests` for the name ordering (`COM2` before `COM10`), the exception mapping through
+- [x] write `RjcpSerialPortProviderTests` for the name ordering (`COM2` before `COM10`), the exception mapping through
   an internal static mapping function (an `IOException` with `HResult` 32 is busy), and for opening a name that
   `GetPortNames()` does not list, which returns `PortNotFoundError` without touching hardware
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 4: Synchronous decode step on FrameReader
 **Files:**
