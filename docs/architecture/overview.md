@@ -4,8 +4,10 @@
 
 SpectrumVisualizer shows the operator the spectrum the spectrometer board sends over a serial port. The code under
 `SpectrumVisualizer/` is the application shell: it starts, logs to a fixed folder, shows the main window, and routes
-reported failures and ReactiveUI's unhandled exceptions to the message panel. Nothing in it reads a port or the board; the content area shows a placeholder
-text and the status bar shows a fixed "Not connected".
+reported failures and ReactiveUI's unhandled exceptions to the message panel. Core decodes the board's frames from a
+byte pipe and maps wavelengths to pixels (`board-protocol.md`), but nothing in the app reads a port yet; the content
+area shows a placeholder text and the status bar shows a fixed "Not connected". A console tool, the board emulator,
+writes protocol frames to a serial port for manual runs.
 
 ## Stack
 
@@ -15,6 +17,8 @@ text and the status bar shows a fixed "Not connected".
 - Serilog with the file sink, bridged to `Microsoft.Extensions.Logging` through Serilog.Extensions.Logging.
 - FluentResults 4.0.0 for failures returned as values.
 - Microsoft.CodeAnalysis.ResxSourceGenerator for the text accessor (`ui-text.md`).
+- System.IO.Pipelines from the shared framework for the frame reader.
+- The board emulator only: System.CommandLine 2.0.2 and RJCP.SerialPortStream 3.0.5.
 
 `SpectrumVisualizer/Directory.Packages.props` holds every version.
 
@@ -23,6 +27,15 @@ text and the status bar shows a fixed "Not connected".
 | Component | Project | Responsibility |
 | --- | --- | --- |
 | `AppDataPaths` | Core | Resolves the log folder `SpectrumVisualizer\Logs` under the local app data root; fails on a root that is not fully qualified |
+| `Crc16Modbus` | Core | CRC-16/MODBUS of the frame, per byte or over a span |
+| `BoardFrame`, `SpectrumMeasurement` | Core | One decoded frame: state, `seq` and the measurement of a spectrum frame; the measurement rejects a pixel count that does not match its device |
+| `FrameEncoder` | Core | The bytes of a frame; used by the emulator and the tests |
+| `FrameDecoder` | Core | Finds and validates frames in a byte sequence; drops one byte per failed candidate |
+| `FrameReader` | Core | Yields the frames of a `PipeReader` and counts the dropped bytes |
+| `SequenceTracker` | Core | Counts the spectra lost between frames from `seq` |
+| `SpectrometerCalibration` | Core | Per device: the wavelength of each pixel, the pixel for a wavelength, the pixel window for a wavelength and `delta` |
+| `FrameSchedule`, `SpectrumGenerator` | Tools.BoardEmulator | Which frame the emulated board sends at a tick, and its synthetic spectrum |
+| `Program` (emulator) | Tools.BoardEmulator | Parses the options, opens the port, checks every 10 ms which frame is due and writes it, until Ctrl+C |
 | `AppLogging` | UI | Creates the log folder and the Serilog logger: `spectrum-visualizer.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
 | `AddUi(LoggingSetup)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, the message panel, the status bar and the main window view model, all singletons |

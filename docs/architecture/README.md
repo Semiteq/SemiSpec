@@ -5,6 +5,8 @@ English, present tense, the design as it is. Build and test commands live in the
 ## Documents
 
 - [overview.md](./overview.md): purpose, stack, components, startup and the error route.
+- [board-protocol.md](./board-protocol.md): the board-to-PC frame, the decoder, the `seq` rules, the wavelength
+  calibration and the board emulator.
 - [testing-strategy.md](./testing-strategy.md): the test project, what each kind of test owns, the headless setup.
 - [ui-theme.md](./ui-theme.md): the colours, the palette keys, the include manifest and the inset scale.
 - [ui-text.md](./ui-text.md): the English and Russian text sets and how the UI culture picks one.
@@ -28,7 +30,8 @@ None.
 | Instances | One window per process; a second running copy is allowed |
 | Tests | One `Tests.Unit` project: xUnit 3.2.2, AwesomeAssertions, Avalonia.Headless. No integration project until a test needs Docker or a real port |
 | Chart renderer | ScottPlot 5 |
-| Serial library | The chosen library is `RJCP.SerialPortStream` 3.0.5 with one cancellable read loop; no code reads a port yet. `System.IO.Ports` is rejected: its `ReadAsync` ignores the cancellation token on Windows and reopening after an unplug fails |
-| Board protocol | The chosen frame is the board-to-PC frame specified in Semiteq/OptoskyProj#20 (sync, length, CRC-16/MODBUS, sequence counter, heartbeat), the only format the app accepts; the app is read-only toward the board. No frame decoder exists yet |
+| Serial library | The chosen library is `RJCP.SerialPortStream` 3.0.5 with one cancellable read loop; the board emulator writes a port with it, and no code reads one yet. `System.IO.Ports` is rejected: its `ReadAsync` ignores the cancellation token on Windows and reopening after an unplug fails |
+| Board protocol | The chosen frame is the board-to-PC frame specified in Semiteq/OptoskyProj#20 (sync, length, CRC-16/MODBUS, sequence counter, heartbeat), the only format the app accepts; the app is read-only toward the board. Core decodes it from a `PipeReader` (`board-protocol.md`) |
+| Tools | Console tools live under `SpectrumVisualizer/` as `SpectrumVisualizer.Tools.*` on `System.CommandLine` 2.0.2 |
 | Spectrum storage | SQLite (`Microsoft.Data.Sqlite`), a file per running instance under the local app data folder, wiped at start, 24 h retention |
 | Installer | Inno Setup over a self-contained win-x64 publish folder; no single-file publish |

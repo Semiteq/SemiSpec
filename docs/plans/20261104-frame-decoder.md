@@ -218,11 +218,11 @@ type is decided by `len` only.
 - Create: `docs/architecture/board-protocol.md`
 - Modify: `docs/architecture/README.md`, `docs/architecture/overview.md`, `CLAUDE.md` (layout line for the tool)
 
-- [ ] write `board-protocol.md`: the frame (from OptoskyProj#20, in English), decoder rules, `seq` rules, calibration and
+- [x] write `board-protocol.md`: the frame (from OptoskyProj#20, in English), decoder rules, `seq` rules, calibration and
   the window (stating that the board's Amplitude window stays in pixels until the firmware change for OptoskyProj#7),
   the emulator's options, and the known stall: a corrupted header whose `len` reads as a valid value makes the decoder
   wait for that many bytes before the CRC can fail; present tense, no version numbers
-- [ ] update the index, the overview components table and the CLAUDE.md layout
+- [x] update the index, the overview components table and the CLAUDE.md layout
 
 ### Task 8: Verify acceptance criteria
 - [ ] run every command of Acceptance Evidence and record the results
