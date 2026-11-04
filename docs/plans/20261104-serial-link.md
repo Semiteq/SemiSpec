@@ -487,25 +487,27 @@ the same run do not.
 - Create: `SpectrumVisualizer/SpectrumVisualizer.UI/Link/SerialLink.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Link/SerialLinkTests.cs`
 
-- [ ] implement `SerialLink(ISerialPortProvider, IScheduler, ILogger<SerialLink>)` with `Frames`, `Status`,
+- [x] implement `SerialLink(ISerialPortProvider, IScheduler, ILogger<SerialLink>)` with `Frames`, `Status`,
   `StatusChanged`, `DroppedFrames`, `Connect(string)`, `DisconnectAsync()`, `Dispose()`; the session task publishes
   Connecting first and Disconnected last
-- [ ] implement the read loop of Solution Overview: write, flush, `DecodeBuffered`, tracker, channel, health
+- [x] implement the read loop of Solution Overview: write, flush, `DecodeBuffered`, tracker, channel, health
   evaluation after each read or tick, the drain, publishing only changed statuses; tear down by completing writer and
   reader
-- [ ] detect the four port-lost signals of Solution Overview, including the port-list check on every tick with no
+- [x] detect the four port-lost signals of Solution Overview, including the port-list check on every tick with no
   bytes; on loss publish PortUnavailable with `PortLostError` and end the session (the reopen arrives in Task 7)
-- [ ] end the session on an unexpected exception with an `ExceptionalError` fault
-- [ ] create the bounded channel (64, `DropOldest`, single reader and writer) with the dropped-frame counter
-- [ ] write tests: `FramesInRandomChunksReachTheChannel`, `SilenceForTenSecondsReportsBoardNotResponding`,
+- [x] end the session on an unexpected exception with an `ExceptionalError` fault
+- [x] create the bounded channel (64, `DropOldest`, single reader and writer) with the dropped-frame counter
+- [x] write tests: `FramesInRandomChunksReachTheChannel`, `SilenceForTenSecondsReportsBoardNotResponding`,
   `BytesWithoutAValidFrameForTenSecondsReportOtherDevice`, `AStalledCandidateIsDrainedAndTheFramesBehindItArrive`
   (released frames stamped with the drain time), `ADrainDiscardsThePartialFrameInFlight`,
   `AFullChannelDropsTheOldestFrame`, `AnUnexpectedExceptionEndsTheSessionWithAFault`
-- [ ] write port-loss tests: `AZeroByteReadReportsPortLost`, `AClosedPortReportsPortLost`,
+- [x] write port-loss tests: `AZeroByteReadReportsPortLost`, `AClosedPortReportsPortLost`,
   `AnIOExceptionReportsPortLost`, `APortThatVanishesFromThePortListReportsPortLost`
-- [ ] write tests: a heartbeat-only stream stays Receiving; the lost total follows `SequenceTracker`; a status equal
+- [x] write tests: a heartbeat-only stream stays Receiving; the lost total follows `SequenceTracker`; a status equal
   to the last one is not raised again
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] ➕ silence after a frame never drains: a partial frame in flight survives 30 s of read timeouts
+  (`SilenceAfterAFrameNeverDrainsThePartialFrameInFlight`)
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 7: Reopen, disconnect and link errors in the panel
 **Files:**

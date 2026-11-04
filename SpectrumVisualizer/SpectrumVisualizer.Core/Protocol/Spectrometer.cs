@@ -16,5 +16,8 @@ public static class SpectrometerExtensions
 			Spectrometer.Atp8000 => 512,
 			_ => throw new ArgumentOutOfRangeException(nameof(device), device, "Unknown spectrometer."),
 		};
+
+		/// <summary>The bytes of this spectrometer's spectrum frame on the wire.</summary>
+		public int FrameSize => FrameLayout.FrameSize(FrameLayout.SpectrumLength(device));
 	}
 }

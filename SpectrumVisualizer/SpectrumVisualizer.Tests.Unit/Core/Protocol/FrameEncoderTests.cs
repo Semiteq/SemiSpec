@@ -39,6 +39,7 @@ public sealed class FrameEncoderTests
 		var bytes = FrameEncoder.Encode(frame);
 
 		bytes.Should().HaveCount(frameSize);
+		device.FrameSize.Should().Be(frameSize);
 		bytes[0].Should().Be(0xAA);
 		bytes[1].Should().Be(0x55);
 		BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(2)).Should().Be((ushort)length);

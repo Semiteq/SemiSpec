@@ -10,6 +10,11 @@ internal sealed class FakePortStream : Stream
 	private readonly Channel<object> _steps = Channel.CreateUnbounded<object>();
 	private ReadOnlyMemory<byte> _remainder;
 
+	// The test thread pushes and waits, the link's session thread reads; _gate guards the two fields below.
+	private readonly Lock _gate = new();
+	private bool _readPending;
+	private TaskCompletionSource? _readPendingWaiter;
+
 	// Written by the link's session thread, read by the test thread.
 	private volatile bool _isDisposed;
 
@@ -36,29 +41,44 @@ internal sealed class FakePortStream : Stream
 			throw new ArgumentException("A chunk holds at least one byte; use PushZeroRead for an empty read.");
 		}
 
-		_steps.Writer.TryWrite(bytes);
+		Push(bytes);
 	}
 
 	public void PushZeroRead()
 	{
-		_steps.Writer.TryWrite(Array.Empty<byte>());
+		Push(Array.Empty<byte>());
 	}
 
 	public void PushTimeout()
 	{
-		_steps.Writer.TryWrite(new TimeoutException("the read timed out"));
+		Push(new TimeoutException("the read timed out"));
 	}
 
 	public void PushException(Exception exception)
 	{
-		_steps.Writer.TryWrite(exception);
+		Push(exception);
+	}
+
+	/// <summary>Completes once the reader has consumed every pushed step and waits for the next one.</summary>
+	public Task WaitForPendingReadAsync()
+	{
+		lock (_gate)
+		{
+			if (_readPending)
+			{
+				return Task.CompletedTask;
+			}
+
+			_readPendingWaiter ??= new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+			return _readPendingWaiter.Task;
+		}
 	}
 
 	public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
 	{
 		if (_remainder.IsEmpty)
 		{
-			switch (await _steps.Reader.ReadAsync(cancellationToken))
+			switch (TakeStep() ?? await _steps.Reader.ReadAsync(cancellationToken))
 			{
 				case Exception exception:
 					throw exception;
@@ -102,6 +122,32 @@ internal sealed class FakePortStream : Stream
 	public override void Write(byte[] buffer, int offset, int count)
 	{
 		throw new NotSupportedException();
+	}
+
+	private void Push(object step)
+	{
+		lock (_gate)
+		{
+			_readPending = false;
+			_steps.Writer.TryWrite(step);
+		}
+	}
+
+	/// <summary>Returns a step already pushed, or null after signalling that the read now waits.</summary>
+	private object? TakeStep()
+	{
+		lock (_gate)
+		{
+			if (_steps.Reader.TryRead(out var step))
+			{
+				return step;
+			}
+
+			_readPending = true;
+			_readPendingWaiter?.TrySetResult();
+			_readPendingWaiter = null;
+			return null;
+		}
 	}
 
 	protected override void Dispose(bool disposing)

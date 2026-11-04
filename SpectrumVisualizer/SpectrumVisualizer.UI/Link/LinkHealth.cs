@@ -1,3 +1,5 @@
+using SpectrumVisualizer.Core.Protocol;
+
 namespace SpectrumVisualizer.UI.Link;
 
 /// <summary>The OptoskyProj#20 health rules of an open port, as pure functions of the read loop's timestamps.</summary>
@@ -6,7 +8,7 @@ internal static class LinkHealth
 	public static readonly TimeSpan Window = TimeSpan.FromSeconds(10);
 
 	/// <summary>The ATP-2000 spectrum frame, the largest the board sends; a tail shorter than this is a stopped frame.</summary>
-	public const int LargestFrameBytes = 4120;
+	public static readonly int LargestFrameBytes = Spectrometer.Atp2000.FrameSize;
 
 	/// <summary>The reference is the last valid frame, or the port open before the first one.</summary>
 	public static LinkState Evaluate(
