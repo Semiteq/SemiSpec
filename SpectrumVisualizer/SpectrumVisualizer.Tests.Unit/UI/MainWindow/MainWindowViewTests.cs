@@ -16,14 +16,20 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 using ReactiveUI.Avalonia;
 
+using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Tests.Unit.UI.Link;
+using SpectrumVisualizer.Tests.Unit.UI.Spectrum;
+using SpectrumVisualizer.UI.Chart;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
+using SpectrumVisualizer.UI.Spectrum;
 
 using Xunit;
+
+using static SpectrumVisualizer.Tests.Unit.UI.Spectrum.SpectrumSamples;
 
 using MainWindowView = SpectrumVisualizer.UI.MainWindow.MainWindow;
 
@@ -38,6 +44,8 @@ public sealed class MainWindowViewTests : IDisposable
 	private readonly SerialLink _serialLink;
 	private readonly ConnectionBarViewModel _connectionBar;
 	private readonly AppStatusBarViewModel _statusBar;
+	private readonly FakeDisplayedSpectrumSource _spectrumSource = new();
+	private readonly SpectrumViewModel _spectrum;
 	private readonly MainWindowViewModel _viewModel;
 	private readonly MainWindowView _window;
 
@@ -56,17 +64,24 @@ public sealed class MainWindowViewTests : IDisposable
 			_messagePanel,
 			AvaloniaScheduler.Instance,
 			NullLogger<AppStatusBarViewModel>.Instance);
+		_spectrum = new SpectrumViewModel(
+			_spectrumSource,
+			_messagePanel,
+			TimeProvider.System,
+			AvaloniaScheduler.Instance,
+			NullLogger<SpectrumViewModel>.Instance);
 		_viewModel = new MainWindowViewModel(
 			_messagePanel,
 			_connectionBar,
 			_statusBar,
+			_spectrum,
 			new LogLevelControl(),
 			NullLogger<MainWindowViewModel>.Instance);
 		_window = new MainWindowView { DataContext = _viewModel };
 	}
 
 	[AvaloniaFact]
-	public void TheRealisedWindowShowsTheMenuThePlaceholderAndTheStatusBarWithTheMessagePanelHidden()
+	public void TheRealisedWindowShowsTheMenuTheContentPanesAndTheStatusBarWithTheMessagePanelHidden()
 	{
 		Realise();
 
@@ -75,9 +90,18 @@ public sealed class MainWindowViewTests : IDisposable
 		Named<Menu>(menuBar, "MainMenu").Items.OfType<MenuItem>().Select(item => item.Name)
 			.Should().Equal("FileMenu", "ViewMenu");
 
-		var placeholder = Named<TextBlock>(_window, "ContentPlaceholder");
-		placeholder.IsEffectivelyVisible.Should().BeTrue();
-		placeholder.Text.Should().Be(Resources.ContentPlaceholder);
+		var content = Named<Grid>(_window, "ContentArea");
+		var spectrumPane = Named<Border>(_window, "SpectrumPane");
+		var signalPane = Named<Border>(_window, "SignalPane");
+		new Control[] { spectrumPane, signalPane }.Select(pane => pane.Parent).Should().AllBeEquivalentTo(content);
+		new Control[] { spectrumPane, signalPane }.Select(Grid.GetColumn).Should().Equal(0, 1);
+		spectrumPane.Child.Should().BeOfType<SpectrumChartView>()
+			.Which.DataContext.Should().BeSameAs(_spectrum.Chart);
+		signalPane.Child.Should().BeOfType<SpectrumPanel>()
+			.Which.DataContext.Should().BeSameAs(_spectrum);
+		signalPane.Bounds.Width.Should().Be(SpectrumPanel.PaneWidth);
+		_window.GetVisualDescendants().OfType<Control>()
+			.Should().NotContain(control => control.Name == "ContentPlaceholder");
 
 		Named<Border>(_window, "MessagePanel").IsVisible.Should().BeFalse("no message has arrived yet");
 
@@ -116,12 +140,71 @@ public sealed class MainWindowViewTests : IDisposable
 			{
 				Named<AppMenuBar>(_window, "MenuBar"),
 				Named<Border>(_window, "ConnectionRow"),
-				Named<Border>(_window, "ContentArea"),
+				Named<Grid>(_window, "ContentArea"),
 				Named<Border>(_window, "MessagePanel"),
 				Named<Border>(_window, "StatusBar"),
 			}
 			.Select(Grid.GetRow)
 			.Should().Equal(0, 1, 2, 3, 4);
+	}
+
+	[AvaloniaFact]
+	public void TheSignalPaneRealisesEveryRowAndControl()
+	{
+		Realise();
+		var panel = SignalPanel();
+
+		string[] labels =
+			["DeviceLabel", "WavelengthLabel", "WindowLabel", "AmplitudeLabel", "SnrLabel", "QLabel", "UpdatedLabel"];
+		string[] values =
+			["DeviceValue", "WavelengthValue", "WindowValue", "AmplitudeValue", "SnrValue", "QValue", "UpdatedValue"];
+		string[] headers = ["SignalHeader", "ChartHeader"];
+		labels.Concat(values).Concat(headers).Select(name => Named<TextBlock>(panel, name))
+			.Should().OnlyContain(text => text.IsEffectivelyVisible && text.Bounds.Width > 0);
+
+		headers.Select(name => Named<TextBlock>(panel, name).Text)
+			.Should().Equal(Resources.SignalTitle, Resources.ChartTitle);
+		labels.Select(name => Named<TextBlock>(panel, name).Text).Should().Equal(
+			Resources.SignalDevice,
+			Resources.SignalWavelength,
+			Resources.SignalWindow,
+			Resources.SignalAmplitude,
+			Resources.SignalSnr,
+			Resources.SignalQ,
+			Resources.SignalUpdated);
+		values.Select(name => Named<TextBlock>(panel, name).Text)
+			.Should().OnlyContain(text => text == Resources.StatusNoValue, "no spectrum has arrived yet");
+
+		var invert = Named<CheckBox>(panel, "InvertSpectrum");
+		var logarithmic = Named<CheckBox>(panel, "LogarithmicScale");
+		invert.Content.Should().Be(Resources.ChartInvert);
+		logarithmic.Content.Should().Be(Resources.ChartLogScale);
+		new[] { invert, logarithmic }.Should().OnlyContain(box => box.IsEffectivelyVisible && box.IsChecked == false);
+
+		var resetScale = Named<Button>(panel, "ResetScale");
+		var stickToZero = Named<Button>(panel, "StickToZero");
+		resetScale.Content.Should().Be(Resources.ChartResetScale);
+		stickToZero.Content.Should().Be(Resources.ChartStickToZero);
+		new[] { resetScale, stickToZero }
+			.Should().OnlyContain(button => button.IsEffectivelyVisible && !button.IsEffectivelyEnabled);
+	}
+
+	[AvaloniaFact]
+	public void ACheckboxReachesTheChart()
+	{
+		Realise();
+		_spectrumSource.Current = Atp8000Peak;
+		_spectrumSource.Signal();
+		Dispatcher.UIThread.RunJobs();
+		var panel = SignalPanel();
+
+		Named<CheckBox>(panel, "LogarithmicScale").IsChecked = true;
+		Dispatcher.UIThread.RunJobs();
+
+		_spectrum.IsLogarithmic.Should().BeTrue();
+		_spectrum.Chart.Plot.Axes.Left.TickGenerator.Should().BeOfType<LogTickGenerator>();
+		Named<TextBlock>(panel, "DeviceValue").Text.Should().Be(Atp8000Peak.Measurement.Device.DisplayName);
+		Named<Button>(panel, "StickToZero").IsEffectivelyEnabled.Should().BeTrue("a spectrum is shown");
 	}
 
 	[AvaloniaFact]
@@ -254,6 +337,8 @@ public sealed class MainWindowViewTests : IDisposable
 	{
 		_window.Close();
 		_viewModel.Dispose();
+		_spectrum.Dispose();
+		_spectrumSource.Dispose();
 		_connectionBar.Dispose();
 		_statusBar.Dispose();
 		_serialLink.Dispose();
@@ -269,6 +354,11 @@ public sealed class MainWindowViewTests : IDisposable
 	private static TextBlock EntryText(Control entry, string name)
 	{
 		return entry.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Name == name);
+	}
+
+	private SpectrumPanel SignalPanel()
+	{
+		return Named<Border>(_window, "SignalPane").Child.Should().BeOfType<SpectrumPanel>().Which;
 	}
 
 	private MessagePanelView PanelView()

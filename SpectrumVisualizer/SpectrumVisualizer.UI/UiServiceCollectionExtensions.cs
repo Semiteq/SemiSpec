@@ -38,6 +38,7 @@ public static class UiServiceCollectionExtensions
 		services.AddSingleton<MessagePanelViewModel>();
 		services.AddSingleton<ConnectionBarViewModel>();
 		services.AddSingleton<AppStatusBarViewModel>();
+		services.AddSingleton<SpectrumViewModel>();
 		services.AddSingleton<MainWindowViewModel>();
 
 		return services;

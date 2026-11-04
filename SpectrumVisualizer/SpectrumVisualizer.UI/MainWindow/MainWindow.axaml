@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:SpectrumVisualizer.UI.MainWindow"
         xmlns:messages="clr-namespace:SpectrumVisualizer.UI.Messages"
+        xmlns:spectrum="clr-namespace:SpectrumVisualizer.UI.Spectrum"
         xmlns:text="clr-namespace:SpectrumVisualizer.UI.Localization"
         mc:Ignorable="d"
         d:DesignWidth="1280"
@@ -30,16 +31,29 @@
             <local:ConnectionBar DataContext="{Binding ConnectionBar}" />
         </Border>
 
-        <Border Grid.Row="2"
-                Name="ContentArea"
-                Background="{DynamicResource AppContentBackgroundBrush}"
-                Padding="16">
-            <TextBlock Name="ContentPlaceholder"
-                       Text="{x:Static text:Resources.ContentPlaceholder}"
-                       Foreground="{DynamicResource AppSecondaryForegroundBrush}"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center" />
-        </Border>
+        <!-- The chart is the one element that stretches; the signal pane keeps its width. -->
+        <Grid Grid.Row="2"
+              Name="ContentArea"
+              ColumnDefinitions="*,Auto">
+
+            <!-- No padding: ScottPlot draws its own axis margins over the panel background. -->
+            <Border Grid.Column="0"
+                    Name="SpectrumPane"
+                    Background="{DynamicResource AppPanelBackgroundBrush}">
+                <spectrum:SpectrumChartView DataContext="{Binding Spectrum.Chart}" />
+            </Border>
+
+            <Border Grid.Column="1"
+                    Name="SignalPane"
+                    Width="{x:Static spectrum:SpectrumPanel.PaneWidth}"
+                    Background="{DynamicResource AppPanelBackgroundBrush}"
+                    BorderThickness="1,0,0,0"
+                    BorderBrush="{DynamicResource AppBorderBrush}"
+                    Padding="16">
+                <spectrum:SpectrumPanel DataContext="{Binding Spectrum}" />
+            </Border>
+
+        </Grid>
 
         <Border Grid.Row="3"
                 Name="MessagePanel"

@@ -27,9 +27,6 @@
   <data name="MenuViewVerboseLogging" xml:space="preserve">
     <value>Verbose logging</value>
   </data>
-  <data name="ContentPlaceholder" xml:space="preserve">
-    <value>The spectrum appears here after a device connects</value>
-  </data>
   <data name="StatusNotConnected" xml:space="preserve">
     <value>Not connected</value>
   </data>

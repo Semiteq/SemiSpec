@@ -98,6 +98,16 @@ public sealed class CompositionRootTests : IDisposable
 	}
 
 	[AvaloniaFact]
+	public void TheMainWindowShowsTheContainersSpectrumViewModel()
+	{
+		using var provider = BuildContainer();
+
+		var spectrum = provider.GetRequiredService<MainWindowViewModel>().Spectrum;
+
+		spectrum.Should().BeSameAs(provider.GetRequiredService<SpectrumViewModel>());
+	}
+
+	[AvaloniaFact]
 	public async Task TheMainWindowViewModelSharesTheContainersPanelAndLogLevelControl()
 	{
 		using var provider = BuildContainer();

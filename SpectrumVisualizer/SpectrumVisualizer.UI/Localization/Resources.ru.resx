@@ -27,9 +27,6 @@
   <data name="MenuViewVerboseLogging" xml:space="preserve">
     <value>Подробный журнал</value>
   </data>
-  <data name="ContentPlaceholder" xml:space="preserve">
-    <value>Спектр появится здесь после подключения устройства</value>
-  </data>
   <data name="StatusNotConnected" xml:space="preserve">
     <value>Не подключено</value>
   </data>

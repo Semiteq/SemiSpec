@@ -9,10 +9,12 @@ using Microsoft.Reactive.Testing;
 using ReactiveUI.Avalonia;
 
 using SpectrumVisualizer.Tests.Unit.UI.Link;
+using SpectrumVisualizer.Tests.Unit.UI.Spectrum;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
+using SpectrumVisualizer.UI.Spectrum;
 
 using MainWindowView = SpectrumVisualizer.UI.MainWindow.MainWindow;
 
@@ -26,6 +28,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
 	private ConnectionBarViewModel? _connectionBar;
 	private AppStatusBarViewModel? _statusBar;
+	private SpectrumViewModel? _spectrum;
 	private MainWindowViewModel? _viewModel;
 	private MainWindowView? _window;
 
@@ -42,6 +45,8 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 
 	protected SerialLink SerialLink { get; }
 
+	private protected FakeDisplayedSpectrumSource SpectrumSource { get; } = new();
+
 	protected AppStatusBarViewModel StatusBar =>
 		_statusBar ?? throw new InvalidOperationException("Realise the window first.");
 
@@ -51,6 +56,8 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 		_viewModel?.Dispose();
 		_connectionBar?.Dispose();
 		_statusBar?.Dispose();
+		_spectrum?.Dispose();
+		SpectrumSource.Dispose();
 		SerialLink.Dispose();
 		Port.Dispose();
 		_messagePanel.Dispose();
@@ -83,10 +90,17 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 			_messagePanel,
 			AvaloniaScheduler.Instance,
 			NullLogger<AppStatusBarViewModel>.Instance);
+		_spectrum = new SpectrumViewModel(
+			SpectrumSource,
+			_messagePanel,
+			TimeProvider.System,
+			AvaloniaScheduler.Instance,
+			NullLogger<SpectrumViewModel>.Instance);
 		_viewModel = new MainWindowViewModel(
 			_messagePanel,
 			_connectionBar,
 			_statusBar,
+			_spectrum,
 			new LogLevelControl(),
 			NullLogger<MainWindowViewModel>.Instance);
 		_window = new MainWindowView { DataContext = _viewModel };

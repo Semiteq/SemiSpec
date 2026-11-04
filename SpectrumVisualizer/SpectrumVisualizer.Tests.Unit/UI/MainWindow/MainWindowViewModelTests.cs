@@ -15,10 +15,12 @@ using Serilog.Extensions.Logging;
 
 using SpectrumVisualizer.Tests.Unit.UI.Link;
 using SpectrumVisualizer.Tests.Unit.UI.Logging;
+using SpectrumVisualizer.Tests.Unit.UI.Spectrum;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
+using SpectrumVisualizer.UI.Spectrum;
 
 using Xunit;
 
@@ -37,6 +39,8 @@ public sealed class MainWindowViewModelTests : IDisposable
 	private readonly SerialLink _serialLink;
 	private readonly ConnectionBarViewModel _connectionBar;
 	private readonly AppStatusBarViewModel _statusBar;
+	private readonly FakeDisplayedSpectrumSource _spectrumSource = new();
+	private readonly SpectrumViewModel _spectrum;
 	private readonly MainWindowViewModel _viewModel;
 
 	public MainWindowViewModelTests()
@@ -59,10 +63,17 @@ public sealed class MainWindowViewModelTests : IDisposable
 			_messagePanel,
 			ImmediateScheduler.Instance,
 			NullLogger<AppStatusBarViewModel>.Instance);
+		_spectrum = new SpectrumViewModel(
+			_spectrumSource,
+			_messagePanel,
+			TimeProvider.System,
+			ImmediateScheduler.Instance,
+			NullLogger<SpectrumViewModel>.Instance);
 		_viewModel = new MainWindowViewModel(
 			_messagePanel,
 			_connectionBar,
 			_statusBar,
+			_spectrum,
 			_logLevelControl,
 			_loggerFactory.CreateLogger<MainWindowViewModel>());
 	}
@@ -137,6 +148,24 @@ public sealed class MainWindowViewModelTests : IDisposable
 	}
 
 	[AvaloniaFact]
+	public void TheSpectrumIsTheOneItWasGiven()
+	{
+		_viewModel.Spectrum.Should().BeSameAs(_spectrum);
+	}
+
+	[AvaloniaFact]
+	public void DisposeLeavesTheInjectedSpectrumToItsOwner()
+	{
+		var spectrum = SpectrumSamples.Atp8000Peak;
+
+		_viewModel.Dispose();
+		_spectrumSource.Current = spectrum;
+		_spectrumSource.Signal();
+
+		_spectrum.SignalInfo.Spectrum.Should().BeSameAs(spectrum, "the spectrum view model still shows new spectra");
+	}
+
+	[AvaloniaFact]
 	public async Task ExitAsksTheWindowToClose()
 	{
 		var requests = 0;
@@ -150,6 +179,8 @@ public sealed class MainWindowViewModelTests : IDisposable
 	public void Dispose()
 	{
 		_viewModel.Dispose();
+		_spectrum.Dispose();
+		_spectrumSource.Dispose();
 		_connectionBar.Dispose();
 		_statusBar.Dispose();
 		_serialLink.Dispose();

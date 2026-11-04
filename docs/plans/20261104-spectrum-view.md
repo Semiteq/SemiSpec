@@ -694,19 +694,20 @@ Data flow:
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/MainWindow/MainWindowViewTests.cs`,
   `MainWindowViewModelTests.cs`, `MainWindowLayoutTestBase.cs`, `UI/Di/CompositionRootTests.cs`
 
-- [ ] write `SpectrumPanel.axaml` (`x:DataType` `SpectrumViewModel`): the form grid of Solution Overview, every inset
+- [x] write `SpectrumPanel.axaml` (`x:DataType` `SpectrumViewModel`): the form grid of Solution Overview, every inset
   from the spacing table, values `NoWrap`, the pane width as `SpectrumPanel.Width` (a `const double`, first set from
-  the formula with an estimate, fixed in Task 12)
-- [ ] replace `ContentArea` (`MainWindow.axaml:33-42`) with a `Grid ColumnDefinitions="*,Auto"`: `SpectrumPane`
+  the formula with an estimate, fixed in Task 12); named `SpectrumPanel.PaneWidth`, because a const `Width` hides
+  `Control.Width`; estimate 352, applied to the `SignalPane` border that carries the padding
+- [x] replace `ContentArea` (`MainWindow.axaml:33-42`) with a `Grid ColumnDefinitions="*,Auto"`: `SpectrumPane`
   holding `SpectrumChartView` bound to `Spectrum.Chart`, and `SignalPane` holding `SpectrumPanel` bound to `Spectrum`
-- [ ] add `SpectrumViewModel Spectrum` to `MainWindowViewModel` (`MainWindowViewModel.cs:23-39`); register
+- [x] add `SpectrumViewModel Spectrum` to `MainWindowViewModel` (`MainWindowViewModel.cs:23-39`); register
   `SpectrumViewModel` in `AddUi` (`UiServiceCollectionExtensions.cs:31-34`); remove `ContentPlaceholder` from both
   resx sets
-- [ ] update `MainWindowViewTests` (`:69-80` placeholder test becomes the content-row test; `:35` construction) and
+- [x] update `MainWindowViewTests` (`:69-80` placeholder test becomes the content-row test; `:35` construction) and
   `MainWindowViewModelTests`; add `TheSignalPaneRealisesEveryRowAndControl` and `ACheckboxReachesTheChart`
-- [ ] `CompositionRootTests.EveryRegisteredServiceResolves` covers the new view model; add
+- [x] `CompositionRootTests.EveryRegisteredServiceResolves` covers the new view model; add
   `TheMainWindowShowsTheContainersSpectrumViewModel`
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 12: Desktop UI pre-handover checklist
 **Files:**
