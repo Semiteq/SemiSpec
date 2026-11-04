@@ -489,18 +489,18 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Chart/ChartPaletteTests.cs`
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/AppResourcesTests.cs`
 
-- [ ] pin `ScottPlot.Avalonia` 5.1.59 in `Directory.Packages.props` (alphabetical, between `RJCP.SerialPortStream` and
+- [x] pin `ScottPlot.Avalonia` 5.1.59 in `Directory.Packages.props` (alphabetical, between `RJCP.SerialPortStream` and
   `Semi.Avalonia`, `:24-25`) as in `SemiPlot/Directory.Packages.props:29`; add the `PackageReference` to the UI
   project (`SpectrumVisualizer.UI.csproj:17-33`)
-- [ ] add `AppAccentBrush`, `AppAccentFillBrush`, `AppMarkerLineBrush`, `AppMinorGridLineBrush` to both variants of
+- [x] add `AppAccentBrush`, `AppAccentFillBrush`, `AppMarkerLineBrush`, `AppMinorGridLineBrush` to both variants of
   `Palette.axaml` (after `:73` and `:137`) with the values of Technical Details
-- [ ] copy `ChartPalette.Apply` and `Resolve` (`SemiPlot/SemiPlot.UI/Chart/ChartPalette.cs:14-46`, `:57-65`) without
+- [x] copy `ChartPalette.Apply` and `Resolve` (`SemiPlot/SemiPlot.UI/Chart/ChartPalette.cs:14-46`, `:57-65`) without
   the marker half; `Resolve` multiplies the alpha by `brush.Opacity`; add `Colors(IResourceHost, ThemeVariant)`
   returning a `ChartColors` record (line, band fill, centre line) for the plottables
-- [ ] write `ChartPaletteTests` (`Component=UI`, `Area=Chart`): the five surfaces on a real `Plot` equal the resolved
+- [x] write `ChartPaletteTests` (`Component=UI`, `Area=Chart`): the five surfaces on a real `Plot` equal the resolved
   keys under Light and Dark; `AppAccentFillBrush` resolves to alpha 64; a missing key throws naming the key
-- [ ] extend `AppResourcesTests` with the four new keys under both variants
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] extend `AppResourcesTests` with the four new keys under both variants
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 2: Log axis and its tick generator
 **Files:**

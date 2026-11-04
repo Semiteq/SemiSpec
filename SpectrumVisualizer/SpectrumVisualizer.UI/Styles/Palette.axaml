@@ -71,6 +71,10 @@
             <SolidColorBrush x:Key="AppSeverityInfoBrush" Color="#3574F0" />
             <SolidColorBrush x:Key="AppConnectionOkBrush" Color="#208A3C" />
             <SolidColorBrush x:Key="AppConnectionFaultBrush" Color="#DB3B4B" />
+            <SolidColorBrush x:Key="AppAccentBrush" Color="#3574F0" />
+            <SolidColorBrush x:Key="AppAccentFillBrush" Color="#3574F0" Opacity="0.25" />
+            <SolidColorBrush x:Key="AppMarkerLineBrush" Color="#6F737A" />
+            <SolidColorBrush x:Key="AppMinorGridLineBrush" Color="#F4F5F7" />
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="Dark">
@@ -135,6 +139,10 @@
             <SolidColorBrush x:Key="AppSeverityInfoBrush" Color="#3574F0" />
             <SolidColorBrush x:Key="AppConnectionOkBrush" Color="#5FAD65" />
             <SolidColorBrush x:Key="AppConnectionFaultBrush" Color="#E55765" />
+            <SolidColorBrush x:Key="AppAccentBrush" Color="#3574F0" />
+            <SolidColorBrush x:Key="AppAccentFillBrush" Color="#3574F0" Opacity="0.25" />
+            <SolidColorBrush x:Key="AppMarkerLineBrush" Color="#A8ADBD" />
+            <SolidColorBrush x:Key="AppMinorGridLineBrush" Color="#2B2D30" />
         </ResourceDictionary>
 
     </ResourceDictionary.ThemeDictionaries>

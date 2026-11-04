@@ -22,6 +22,7 @@
     <PackageVersion Include="Microsoft.Reactive.Testing" Version="6.1.0"/>
     <PackageVersion Include="ReactiveUI.Avalonia" Version="12.0.3"/>
     <PackageVersion Include="RJCP.SerialPortStream" Version="3.0.5"/>
+    <PackageVersion Include="ScottPlot.Avalonia" Version="5.1.59"/>
     <PackageVersion Include="Semi.Avalonia" Version="12.0.3"/>
     <PackageVersion Include="Serilog" Version="4.3.1"/>
     <PackageVersion Include="Serilog.Extensions.Logging" Version="10.0.0"/>
