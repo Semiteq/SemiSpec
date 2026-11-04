@@ -63,12 +63,14 @@ public abstract class AppLifecycleTestBase : IAsyncDisposable
 		GC.SuppressFinalize(this);
 	}
 
-	protected ServiceProvider BuildContainer()
+	/// <summary>The production container with the fake port provider; replace swaps further registrations.</summary>
+	protected ServiceProvider BuildContainer(Action<IServiceCollection>? replace = null)
 	{
-		var provider = new ServiceCollection()
+		var services = new ServiceCollection()
 			.AddUi(_logging, _paths)
-			.Replace(ServiceDescriptor.Singleton<ISerialPortProvider>(PortProvider))
-			.BuildServiceProvider();
+			.Replace(ServiceDescriptor.Singleton<ISerialPortProvider>(PortProvider));
+		replace?.Invoke(services);
+		var provider = services.BuildServiceProvider();
 		_stores.Add(provider.GetRequiredService<SpectrumStore>());
 
 		return provider;

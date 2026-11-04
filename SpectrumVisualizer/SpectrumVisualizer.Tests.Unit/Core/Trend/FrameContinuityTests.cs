@@ -100,6 +100,17 @@ public sealed class FrameContinuityTests
 		_continuity.Observe(Spectrum(seq: 8, atSeconds: 10)).Should().Be(default(Continuity));
 	}
 
+	[Fact]
+	public void ASeqGapExactlyTenSecondsAfterTheLastFrameCountsTheLoss()
+	{
+		_continuity.Observe(Spectrum(seq: 7, atSeconds: 0));
+
+		var result = _continuity.Observe(Spectrum(seq: 9, atSeconds: 10));
+
+		result.Loss.Should().Be(new TrendBreak(UnixMs(10), 1), "a pause of exactly 10 s keeps the seq session");
+		result.NoSpectra.Should().BeNull();
+	}
+
 	[Theory]
 	[InlineData(BoardState.Atp8000MeasurementFailed, false)]
 	[InlineData(BoardState.Atp2000MeasurementFailed, true)]

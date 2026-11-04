@@ -1,5 +1,3 @@
-using System.Reactive.Concurrency;
-
 using Avalonia.Headless.XUnit;
 
 using AwesomeAssertions;
@@ -7,6 +5,9 @@ using AwesomeAssertions;
 using FluentResults;
 
 using Microsoft.Extensions.Logging;
+using Microsoft.Reactive.Testing;
+
+using ReactiveUI.Avalonia;
 
 using SpectrumVisualizer.Core.Store;
 using SpectrumVisualizer.Core.Trend;
@@ -76,21 +77,27 @@ public sealed class TrendFeedTests : TrendFeedTestBase
 		RangesOf(PointsCalls).Should().Equal(plan);
 	}
 
+	// The pool side of the read starts at once after the UI dispatch, so no test can pan between the two; this one pins
+	// the dispatch as the moment the window is taken and shows that a pan during the read changes no range.
 	[AvaloniaFact]
-	public async Task TheReadTakesTheVisibleWindowSnapshotFromTheTrigger()
+	public async Task TheReadTakesTheVisibleWindowAtTheUiDispatch()
 	{
-		Feed.Start();
+		var uiHop = new TestScheduler();
+		using var feed = new TrendFeed(
+			Distributor, Cache, Chart, Switching, ReadPointsAsync, ReadSpectrumAsync, MessagePanel, uiHop, Throttle, FeedLogger);
+		feed.Start();
 		ChangeKeyAfterTwentyMinutes(OtherNm);
-		var (from, to) = (Chart.From, Chart.To);
-		var plan = PlanFor(from, to);
 		HoldPoints();
 		PassThrottle();
-		await Waits.UntilAsync(() => PointsCalls.Count == 1);
+		PointsCalls.Should().BeEmpty("the read waits for the UI dispatch");
 
+		Chart.PanBy(TimeSpan.FromMinutes(-5));
+		var plan = PlanFor(Chart.From, Chart.To);
+		uiHop.AdvanceBy(1);
+		await Waits.UntilAsync(() => PointsCalls.Count == 1);
 		Chart.PanBy(TimeSpan.FromMinutes(-5));
 		ReleasePoints();
 
-		Chart.From.Should().NotBe(from, "the navigation moved after the trigger");
 		await Waits.UntilAsync(() => PointsCalls.Count == plan.Count);
 		RangesOf(PointsCalls).Should().Equal(plan);
 	}
@@ -184,7 +191,7 @@ public sealed class TrendFeedTests : TrendFeedTestBase
 			},
 			(_, _) => Task.FromResult(Result.Ok<StoredSpectrum?>(null)),
 			MessagePanel,
-			ImmediateScheduler.Instance,
+			AvaloniaScheduler.Instance,
 			Throttle,
 			FeedLogger);
 		feed.Start();
@@ -213,7 +220,7 @@ public sealed class TrendFeedTests : TrendFeedTestBase
 			history.IntensityPointsAsync,
 			history.SpectrumAtAsync,
 			MessagePanel,
-			ImmediateScheduler.Instance,
+			AvaloniaScheduler.Instance,
 			Throttle,
 			FeedLogger);
 		feed.Start();

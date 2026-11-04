@@ -182,6 +182,8 @@ public sealed class TrendChartViewTests : TrendChartViewTestBase
 		CrosshairLine.StartPoint.Y.Should().BeApproximately(DataRect.Top, 1.0);
 		CrosshairLine.EndPoint.Y.Should().BeApproximately(DataRect.Bottom, 1.0);
 		ReadoutBox.IsVisible.Should().BeTrue();
+		Canvas.GetLeft(ReadoutBox).Should().BeApproximately(
+			CrosshairLine.StartPoint.X, 0.5, "away from the right edge the box starts at the hover line");
 		ReadoutText.Text.Should().Be(Chart.ReadoutAt(TimeAt(hover)));
 		ReadoutText.Text.Should().NotBeNullOrEmpty();
 

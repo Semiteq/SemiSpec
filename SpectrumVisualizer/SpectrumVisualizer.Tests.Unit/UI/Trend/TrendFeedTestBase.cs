@@ -2,10 +2,14 @@ using System.Collections.Concurrent;
 using System.Reactive.Concurrency;
 using System.Threading.Channels;
 
+using Avalonia.Threading;
+
 using FluentResults;
 
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Reactive.Testing;
+
+using ReactiveUI.Avalonia;
 
 using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Core.Store;
@@ -20,7 +24,7 @@ namespace SpectrumVisualizer.Tests.Unit.UI.Trend;
 
 /// <summary>
 /// A trend feed over the chart stand: a real distributor over a channel, gated fake store readers, a test scheduler
-/// for the re-read throttle and the immediate scheduler as the UI scheduler.
+/// for the re-read throttle and the headless dispatcher as the feed's UI scheduler, so every hop runs on the UI thread.
 /// </summary>
 public abstract class TrendFeedTestBase : TrendChartTestBase
 {
@@ -48,7 +52,7 @@ public abstract class TrendFeedTestBase : TrendChartTestBase
 			ReadPointsAsync,
 			ReadSpectrumAsync,
 			MessagePanel,
-			ImmediateScheduler.Instance,
+			AvaloniaScheduler.Instance,
 			Throttle,
 			FeedLogger);
 		_requestCapture = Cache.ReReadRequested.Subscribe(Requests.Add);
@@ -114,9 +118,11 @@ public abstract class TrendFeedTestBase : TrendChartTestBase
 		return calls.Select(call => new TimeRange(call.From, call.To));
 	}
 
+	/// <summary>Ends the re-read throttle and runs the UI hop it queued, which starts the read.</summary>
 	protected void PassThrottle()
 	{
 		Throttle.AdvanceBy(ReReadThrottle.Ticks);
+		Dispatcher.UIThread.RunJobs();
 	}
 
 	/// <summary>Holds every later points read until ReleasePoints; the hold ignores the read's token.</summary>
@@ -158,7 +164,8 @@ public abstract class TrendFeedTestBase : TrendChartTestBase
 		return gate;
 	}
 
-	private async Task<Result<IntensityChunk>> ReadPointsAsync(
+	/// <summary>The fake points reader every feed of the stand uses.</summary>
+	protected async Task<Result<IntensityChunk>> ReadPointsAsync(
 		ushort wavelengthNm, byte delta, DateTimeOffset from, DateTimeOffset to, CancellationToken token)
 	{
 		var call = new PointsCall(wavelengthNm, delta, from, to, token);
@@ -169,7 +176,8 @@ public abstract class TrendFeedTestBase : TrendChartTestBase
 		return PointsResult(call);
 	}
 
-	private async Task<Result<StoredSpectrum?>> ReadSpectrumAsync(DateTimeOffset moment, CancellationToken token)
+	/// <summary>The fake spectrum reader every feed of the stand uses.</summary>
+	protected async Task<Result<StoredSpectrum?>> ReadSpectrumAsync(DateTimeOffset moment, CancellationToken token)
 	{
 		var call = new SpectrumCall(moment, token);
 		var gate = _spectrumGate.Task;

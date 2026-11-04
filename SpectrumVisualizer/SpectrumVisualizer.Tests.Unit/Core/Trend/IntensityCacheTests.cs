@@ -6,6 +6,7 @@ using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Core.Store;
 using SpectrumVisualizer.Core.Trend;
 using SpectrumVisualizer.Tests.Unit.Core.Store;
+using SpectrumVisualizer.Tests.Unit.UI.Trend;
 
 using Xunit;
 
@@ -182,16 +183,28 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 	}
 
 	[Fact]
-	public void AReturnMoreThanTheReturnSpanAfterTheChangeAsksForAReRead()
+	public void AReturnAtTheEndOfTheReturnWindowRestoresTheKeyWithoutARead()
 	{
 		AddSpectra(0, 200);
-		AddSpectra(200, 442, nm: OtherNm);
+		AddSpectra(200, 320, nm: OtherNm);
 
-		_cache.Add(StoreSamples.Spectrum(At(442), seq: 186));
+		_cache.Add(StoreSamples.Spectrum(At(320), seq: 64));
+
+		_requests.Should().HaveCount(2);
+		_requests[1].ReadsHistory.Should().BeFalse("the kept points end at 80 s and the window reaches 240 s past that");
+	}
+
+	[Fact]
+	public void AReturnPastTheReturnWindowAsksForAReReadOfThePointsBeforeTheRecentSpectra()
+	{
+		AddSpectra(0, 200);
+		AddSpectra(200, 321, nm: OtherNm);
+
+		_cache.Add(StoreSamples.Spectrum(At(321), seq: 65));
 
 		_requests.Should().HaveCount(2);
 		_requests[1].ReadsHistory.Should().BeTrue();
-		_requests[1].RecentStart.Should().Be(At(322));
+		_requests[1].RecentStart.Should().Be(At(201), "the recent spectra hold the last 120 s again");
 	}
 
 	[Fact]
@@ -253,7 +266,7 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 	}
 
 	[Fact]
-	public void TheFoldStartsAtTheRangeByBinarySearch()
+	public void AFoldOfADayCountsOnlyThePointsOfItsRange()
 	{
 		const int Day = 86_400;
 		var spectrum = StoreSamples.Spectrum(Start);
@@ -267,6 +280,25 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 
 		lastTenMinutes.Columns.Sum(column => column.Count).Should().Be(600);
 		wholeDay.Columns.Sum(column => column.Count).Should().Be(Day);
+	}
+
+	[Fact(Timeout = 120_000)]
+	public async Task FoldingWhileFramesAndChunksLandDoesNotThrow()
+	{
+		AddSpectra(0, 200);
+		_cache.Add(StoreSamples.Spectrum(At(200), nm: OtherNm, seq: 200));
+		var query = Query(SampleNm, SampleDelta, Start, At(3600), _second);
+		var second = 201;
+
+		await RenderWhileMutating.RunAsync(
+			() => _cache.Fold(query),
+			() =>
+			{
+				_cache.Add(StoreSamples.Spectrum(At(second), nm: OtherNm, seq: (byte)second));
+				_cache.LandHistory(1, Chunk(second % 80, (second % 80) + 1));
+				second++;
+			},
+			"a fold must never see the point lists mid-change");
 	}
 
 	[Fact]
