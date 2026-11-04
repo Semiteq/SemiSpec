@@ -540,14 +540,14 @@ the same run do not.
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Di/CompositionRootTests.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Di/AppLifecycleTests.cs`
 
-- [ ] register `RjcpSerialPortProvider` as `ISerialPortProvider` and `SerialLink` through a factory lambda with
+- [x] register `RjcpSerialPortProvider` as `ISerialPortProvider` and `SerialLink` through a factory lambda with
   `DefaultScheduler.Instance` (singletons)
-- [ ] resolve the link in `Configure`; in `CreateMainWindow` (`App.axaml.cs:55-64`) attach the `Closing` handler of
+- [x] resolve the link in `Configure`; in `CreateMainWindow` (`App.axaml.cs:55-64`) attach the `Closing` handler of
   Solution Overview: cancel the first close, await `DisconnectAsync` with a 5 s limit (a timeout logs a Warning), set
   the flag, close again
-- [ ] write tests: the link and the port provider resolve; a headless window close with an active link (fake
+- [x] write tests: the link and the port provider resolve; a headless window close with an active link (fake
   provider) finishes only after the link reports Disconnected; a second close passes at once
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 9: Connection row
 **Files:**

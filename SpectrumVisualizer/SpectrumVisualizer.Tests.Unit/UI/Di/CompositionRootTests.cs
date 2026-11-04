@@ -16,6 +16,7 @@ using Serilog.Events;
 using SpectrumVisualizer.Tests.Unit.UI.Logging;
 
 using SpectrumVisualizer.UI;
+using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
@@ -61,6 +62,15 @@ public sealed class CompositionRootTests : IDisposable
 		using var provider = BuildContainer();
 
 		provider.GetRequiredService<IScheduler>().Should().BeSameAs(AvaloniaScheduler.Instance);
+	}
+
+	[AvaloniaFact]
+	public void TheLinkIsOneSingletonOverTheRjcpPortProvider()
+	{
+		using var provider = BuildContainer();
+
+		provider.GetRequiredService<ISerialPortProvider>().Should().BeOfType<RjcpSerialPortProvider>();
+		provider.GetRequiredService<SerialLink>().Should().BeSameAs(provider.GetRequiredService<SerialLink>());
 	}
 
 	[AvaloniaFact]

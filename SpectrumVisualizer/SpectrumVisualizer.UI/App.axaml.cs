@@ -14,6 +14,7 @@ using ReactiveUI.Avalonia;
 
 using Semi.Avalonia;
 
+using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
 
@@ -23,7 +24,14 @@ public class App : Application
 {
 	private const string RussianLanguage = "ru";
 
+	private static readonly TimeSpan _linkStopLimit = TimeSpan.FromSeconds(5);
+
 	private MainWindowViewModel? _mainWindowViewModel;
+	private SerialLink? _serialLink;
+	private ILogger<App>? _logger;
+
+	// Started by the first close of the main window; a later close passes once the stop completes.
+	private Task? _linkStop;
 
 	// Written once on the UI thread in Configure; read by UnhandledErrorObserver on whichever thread
 	// ReactiveUI raises the exception, so the write is published with volatile.
@@ -62,7 +70,56 @@ public class App : Application
 				"The main window view model is not set. Call Run() before starting the app.");
 		}
 
-		return new MainWindow.MainWindow { DataContext = viewModel };
+		var window = new MainWindow.MainWindow { DataContext = viewModel };
+		window.Closing += OnMainWindowClosing;
+
+		return window;
+	}
+
+	/// <summary>Holds an operator close until the link has stopped, at most for the stop limit.</summary>
+	private async void OnMainWindowClosing(object? sender, WindowClosingEventArgs e)
+	{
+		try
+		{
+			if (_linkStop is not null)
+			{
+				e.Cancel = !_linkStop.IsCompleted;
+				return;
+			}
+
+			_linkStop = StopLinkAsync();
+
+			// An idle link stops at once; re-closing from inside Closing would re-enter Close.
+			if (_linkStop.IsCompleted || sender is not Window window)
+			{
+				return;
+			}
+
+			e.Cancel = true;
+			await _linkStop;
+			window.Close();
+		}
+		catch (Exception exception)
+		{
+			_logger?.LogError(exception, "Stopping the link on window close failed");
+		}
+	}
+
+	private async Task StopLinkAsync()
+	{
+		if (_serialLink is null)
+		{
+			return;
+		}
+
+		try
+		{
+			await _serialLink.DisconnectAsync().WaitAsync(_linkStopLimit);
+		}
+		catch (TimeoutException)
+		{
+			_logger?.LogWarning("The link did not stop within {Limit}; the window closes anyway", _linkStopLimit);
+		}
 	}
 
 	/// <summary>Runs the app until its window closes; the logger receives what ReactiveUI or a dispatcher job raises unhandled.</summary>
@@ -89,6 +146,8 @@ public class App : Application
 	{
 		_mainWindowViewModel = services.GetRequiredService<MainWindowViewModel>();
 		_messagePanel = services.GetRequiredService<MessagePanelViewModel>();
+		_serialLink = services.GetRequiredService<SerialLink>();
+		_logger = services.GetRequiredService<ILogger<App>>();
 	}
 
 	internal static AppBuilder BuildAvaloniaApp(IObserver<Exception> unhandledErrors)
