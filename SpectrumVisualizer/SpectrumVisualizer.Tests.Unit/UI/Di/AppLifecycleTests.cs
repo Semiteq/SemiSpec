@@ -71,6 +71,37 @@ public sealed class AppLifecycleTests : IDisposable
 	}
 
 	[AvaloniaFact]
+	public async Task ClosingTheWindowDuringTheReopenWaitStopsTheLink()
+	{
+		await using var port = new FakePortStream();
+		_portProvider.QueueOpen(port);
+		using var provider = BuildContainer();
+		var link = provider.GetRequiredService<SerialLink>();
+		var window = ShowMainWindow(provider);
+		var portUnavailable = new TaskCompletionSource();
+		link.StatusChanged += (_, status) =>
+		{
+			if (status.State == LinkState.PortUnavailable)
+			{
+				portUnavailable.TrySetResult();
+			}
+		};
+		link.Connect(PortName);
+		await port.WaitForPendingReadAsync().WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		port.PushZeroRead();
+		await portUnavailable.Task.WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+
+		var statusAtClose = new TaskCompletionSource<LinkStatus>();
+		window.Closed += (_, _) => statusAtClose.TrySetResult(link.Status);
+		window.Close();
+
+		var status = await statusAtClose.Task.WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		status.Should().Be(new LinkStatus(LinkState.Disconnected, null, null, 0, null),
+			"an open during the wait would meet an empty open queue and end the session with a fault");
+		_portProvider.OpenCount.Should().Be(1);
+	}
+
+	[AvaloniaFact]
 	public void WithAnIdleLinkTheWindowClosesAtOnce()
 	{
 		using var provider = BuildContainer();

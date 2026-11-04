@@ -646,15 +646,23 @@ the same run do not.
 - [x] run `dotnet test SpectrumVisualizer.slnx` and the emulator `--help` - must pass before next task
 
 ### Task 13: Verify acceptance criteria
-- [ ] run every command of Acceptance Evidence and record each result with its count
-- [ ] verify every Overview item: the link reads frames, the status bar shows every state, faults reach the panel
-  once, the seams of the skeleton are closed
-- [ ] verify edge cases: a stall drained without a fault state, a board that stops mid-frame giving one
+- [x] run every command of Acceptance Evidence and record each result with its count (Protocol 53, Link 59,
+  Messages 31, MainWindow 51, Di 16, Emulator 56, full 304, none skipped; Release build 0 warnings; format and
+  `dotnet terse SpectrumVisualizer` exit 0; old solution builds with 0 errors and its 15 existing warnings, no diff
+  since `2237e5e`, 13 of 13 pass; both `ui-theme.md` greps print nothing)
+- [x] verify every Overview item: the link reads frames, the status bar shows every state, faults reach the panel
+  once, the seams of the skeleton are closed (each item maps to a named passing test; the emulator items to the
+  Emulator tests)
+- [x] verify edge cases: a stall drained without a fault state, a board that stops mid-frame giving one
   NotResponding, a port lost mid-frame, a port that vanishes while reads keep timing out, Disconnect during the reopen
-  wait, a window close during a reopen wait
-- [ ] run the full suite: `dotnet test SpectrumVisualizer.slnx`; confirm the old solution builds and passes 13 of 13
-- [ ] start the app with `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI` and confirm the log gains its
-  start line; leave the port-pair checklist to the owner
+  wait, a window close during a reopen wait (➕ two had no test: `SerialLinkTests.APortLostMidFrameDropsTheHalfFrameAndTheReopenedPortStartsClean`
+  and `AppLifecycleTests.ClosingTheWindowDuringTheReopenWaitStopsTheLink`)
+- [x] run the full suite: `dotnet test SpectrumVisualizer.slnx`; confirm the old solution builds and passes 13 of 13
+  (304 of 304 twice; old solution 13 of 13)
+- [x] start the app with `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI` and confirm the log gains its
+  start line; leave the port-pair checklist to the owner (run under `timeout 15`; the log gained one "SpectrumVisualizer
+  starting" line; the manual smoke checklist is skipped - not automatable here, it needs com0com or real USB-UART
+  adapters, and stays in Post-Completion)
 
 ### Task 14: [Final] Update documentation
 - [ ] `docs/architecture/board-protocol.md`: replace the recovery sentence (`:109-112`) with the drain; add a link

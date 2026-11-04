@@ -248,6 +248,25 @@ public sealed class SerialLinkTests : IAsyncLifetime
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
+	public async Task APortLostMidFrameDropsTheHalfFrameAndTheReopenedPortStartsClean()
+	{
+		var spectrum = FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 2));
+		var half = spectrum.Length / 2;
+		await using var reopened = new FakePortStream();
+		await ConnectAsync();
+		await AtAsync(0, port => port.PushBytes(Concat(FrameEncoder.Encode(Heartbeat(1)), spectrum[..half])));
+
+		_port.PushException(new IOException("device monitoring thread has died"));
+		await WaitForStateAsync(LinkState.PortUnavailable);
+		await ReopenAsync(reopened, 1);
+		await AtAsync(reopened, 2, port => port.PushBytes(Concat(spectrum[half..], FrameEncoder.Encode(Heartbeat(3)))));
+
+		TakeFrames().Should().Equal(Heartbeat(1), Heartbeat(3));
+		_link.Status.State.Should().Be(LinkState.Receiving);
+		_link.Status.LostSpectra.Should().Be(0, "the reopen resets the sequence baseline");
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
 	public async Task AHeartbeatOnlyStreamStaysReceiving()
 	{
 		await ConnectAsync();
