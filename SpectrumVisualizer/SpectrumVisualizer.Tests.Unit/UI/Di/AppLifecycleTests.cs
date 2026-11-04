@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 using Serilog;
 
+using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Tests.Unit.UI.Link;
 using SpectrumVisualizer.Tests.Unit.UI.Logging;
 
@@ -20,6 +21,8 @@ using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 
 using Xunit;
+
+using static SpectrumVisualizer.Tests.Unit.Core.Protocol.ProtocolSamples;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Di;
 
@@ -34,14 +37,16 @@ public sealed class AppLifecycleTests : IDisposable
 	private static readonly TimeSpan _waitLimit = TimeSpan.FromSeconds(5);
 
 	private readonly FakeSerialPortProvider _portProvider = new(PortName);
+	private readonly CollectingSink _sink = new();
 	private readonly LoggingSetup _logging;
 
 	public AppLifecycleTests()
 	{
-		var logLevelControl = new LogLevelControl();
+		// Verbose, so the frame distributor's Debug start and stop lines reach the sink.
+		var logLevelControl = new LogLevelControl { IsVerbose = true };
 		var logger = new LoggerConfiguration()
 			.MinimumLevel.ControlledBy(logLevelControl.Switch)
-			.WriteTo.Sink(new CollectingSink())
+			.WriteTo.Sink(_sink)
 			.CreateLogger();
 		_logging = new LoggingSetup(logger, logLevelControl);
 	}
@@ -113,16 +118,64 @@ public sealed class AppLifecycleTests : IDisposable
 	}
 
 	[AvaloniaFact]
-	public void WithAnIdleLinkTheWindowClosesAtOnce()
+	public async Task WithAnIdleLinkTheWindowClosesOnceTheDistributorStops()
 	{
 		using var provider = BuildContainer();
 		var window = ShowMainWindow(provider);
-		var closed = false;
-		window.Closed += (_, _) => closed = true;
+		var closed = new TaskCompletionSource();
+		window.Closed += (_, _) => closed.TrySetResult();
 
 		window.Close();
 
-		closed.Should().BeTrue();
+		await closed.Task.WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+	}
+
+	[AvaloniaFact]
+	public async Task OpeningTheWindowStartsTheFrameDistributor()
+	{
+		await using var port = new FakePortStream();
+		_portProvider.QueueOpen(port);
+		using var provider = BuildContainer();
+		var link = provider.GetRequiredService<SerialLink>();
+		var received = new TaskCompletionSource<ReceivedFrame>(TaskCreationOptions.RunContinuationsAsynchronously);
+		using var subscription = provider.GetRequiredService<FrameDistributor>().Frames
+			.Subscribe(frame => received.TrySetResult(frame));
+		var window = ShowMainWindow(provider);
+		var closed = new TaskCompletionSource();
+		window.Closed += (_, _) => closed.TrySetResult();
+		link.Connect(PortName);
+		await port.WaitForPendingReadAsync().WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		var frame = SpectrumFrame(Spectrometer.Atp8000, 1);
+
+		port.PushBytes(FrameEncoder.Encode(frame));
+
+		var first = await received.Task.WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		first.Frame.Should().Be(frame);
+		window.Close();
+		await closed.Task.WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+	}
+
+	[AvaloniaFact]
+	public async Task ClosingTheWindowStopsTheDistributorAfterTheLink()
+	{
+		await using var port = new FakePortStream();
+		_portProvider.QueueOpen(port);
+		using var provider = BuildContainer();
+		var link = provider.GetRequiredService<SerialLink>();
+		var window = ShowMainWindow(provider);
+		var closed = new TaskCompletionSource();
+		window.Closed += (_, _) => closed.TrySetResult();
+		link.Connect(PortName);
+		await port.WaitForPendingReadAsync().WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+
+		window.Close();
+
+		await closed.Task.WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		var templates = _sink.Events.Select(logEvent => logEvent.MessageTemplate.Text).ToList();
+		var linkStopped = templates.IndexOf("The link on port {Port} stopped");
+		var distributorStopped = templates.IndexOf("The frame distributor stopped");
+		linkStopped.Should().BeGreaterThanOrEqualTo(0);
+		distributorStopped.Should().BeGreaterThan(linkStopped);
 	}
 
 	[AvaloniaFact]

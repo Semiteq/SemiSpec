@@ -563,14 +563,14 @@ Data flow:
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.UI/UiServiceCollectionExtensions.cs`, `App.axaml.cs`
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Di/CompositionRootTests.cs`, `AppLifecycleTests.cs`
 
-- [ ] register `FrameDistributor` through a factory lambda that passes `GetRequiredService<SerialLink>().Frames`, the
+- [x] register `FrameDistributor` through a factory lambda that passes `GetRequiredService<SerialLink>().Frames`, the
   shape the link's own registration has (`UiServiceCollectionExtensions.cs:27-30`), and `IDisplayedSpectrumSource` as
   `LiveSpectrumSource`, both singletons after the link
-- [ ] add the distributor to `ConfiguredServices` (`App.axaml.cs:168-172`) and resolve it in `Configure` (`:141-148`);
+- [x] add the distributor to `ConfiguredServices` (`App.axaml.cs:168-172`) and resolve it in `Configure` (`:141-148`);
   start it in the window's `Opened` beside the port refresh (`:70`)
-- [ ] stop it in the close path: `StopLinkAsync` (`:105-117`) becomes a stop of the link, then the distributor, both
+- [x] stop it in the close path: `StopLinkAsync` (`:105-117`) becomes a stop of the link, then the distributor, both
   inside the one 5 s limit; rename it `StopBackgroundServicesAsync` and its log line names both
-- [ ] write tests: the distributor and the source resolve as one instance each (`CompositionRootTests`);
+- [x] write tests: the distributor and the source resolve as one instance each (`CompositionRootTests`);
   `OpeningTheWindowStartsTheFrameDistributor` and `ClosingTheWindowStopsTheDistributorAfterTheLink` in the shape of the
   existing `AppLifecycleTests` (`AppLifecycleTests.cs:50-61`: a `FakePortStream` queued on `FakeSerialPortProvider`,
   then `link.Connect`). The first raises `Opened`, connects, feeds an encoded frame with `FakePortStream.PushBytes`
@@ -578,7 +578,7 @@ Data flow:
   for the close to complete, and asserts that the log sink (`CollectingSink`, `AppLifecycleTests.cs:44`) holds the
   distributor's Debug stop line after the link's "The link on port {Port} stopped" line (`SerialLink.cs:107`). No
   test-only writer to the link's channel exists
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 6: Scale and projection rules
 **Files:**

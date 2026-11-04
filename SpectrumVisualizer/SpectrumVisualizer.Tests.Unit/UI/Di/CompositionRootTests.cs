@@ -20,6 +20,7 @@ using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
+using SpectrumVisualizer.UI.Spectrum;
 
 using Xunit;
 
@@ -71,6 +72,18 @@ public sealed class CompositionRootTests : IDisposable
 
 		provider.GetRequiredService<ISerialPortProvider>().Should().BeOfType<RjcpSerialPortProvider>();
 		provider.GetRequiredService<SerialLink>().Should().BeSameAs(provider.GetRequiredService<SerialLink>());
+	}
+
+	[AvaloniaFact]
+	public void TheDistributorAndTheLiveSpectrumSourceAreOneInstanceEach()
+	{
+		using var provider = BuildContainer();
+
+		provider.GetRequiredService<FrameDistributor>()
+			.Should().BeSameAs(provider.GetRequiredService<FrameDistributor>());
+		provider.GetRequiredService<IDisplayedSpectrumSource>()
+			.Should().BeOfType<LiveSpectrumSource>()
+			.And.BeSameAs(provider.GetRequiredService<IDisplayedSpectrumSource>());
 	}
 
 	[AvaloniaFact]

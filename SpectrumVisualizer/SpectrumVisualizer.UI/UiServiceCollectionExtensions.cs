@@ -11,6 +11,7 @@ using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
+using SpectrumVisualizer.UI.Spectrum;
 
 namespace SpectrumVisualizer.UI;
 
@@ -28,6 +29,12 @@ public static class UiServiceCollectionExtensions
 			provider.GetRequiredService<ISerialPortProvider>(),
 			DefaultScheduler.Instance,
 			provider.GetRequiredService<ILogger<SerialLink>>()));
+		services.AddSingleton(provider => new FrameDistributor(
+			provider.GetRequiredService<SerialLink>().Frames,
+			provider.GetRequiredService<MessagePanelViewModel>(),
+			provider.GetRequiredService<IScheduler>(),
+			provider.GetRequiredService<ILogger<FrameDistributor>>()));
+		services.AddSingleton<IDisplayedSpectrumSource, LiveSpectrumSource>();
 		services.AddSingleton<MessagePanelViewModel>();
 		services.AddSingleton<ConnectionBarViewModel>();
 		services.AddSingleton<AppStatusBarViewModel>();
