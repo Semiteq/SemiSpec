@@ -603,24 +603,24 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Spectrum/SpectrumChartViewModelTests.cs`,
   `SpectrumChartViewModelRenderTests.cs`, `SpectrumSamples.cs`
 
-- [ ] implement `SpectrumChartViewModel` of Solution Overview: the `Plot`, two `SignalXY` lines built from
+- [x] implement `SpectrumChartViewModel` of Solution Overview: the `Plot`, two `SignalXY` lines built from
   `SpectrometerCalibration.For(device).WavelengthOf` (`SpectrometerCalibration.cs:51-54`), the band and the centre
   line, the axis labels from resx with `Plot.Font.Automatic()`, `Show(DisplayedSpectrum)`, `IsFollowing`,
   `TakeManualScale()`, `ResetScale()`, `StickToZero()`, `SetDisplay(bool inverted, bool logarithmic)`,
   `ApplyPalette(ChartColors)`, `RequestRedraw()` and `RedrawRequested`, `HasSpectrum`
-- [ ] every write to the plot (buffers, plottable visibility, limits, tick generator, minor grid width, colours through
+- [x] every write to the plot (buffers, plottable visibility, limits, tick generator, minor grid width, colours through
   `ApplyPalette` and `ChartPalette.Apply`) happens inside `lock (Plot.Sync)`; the chart keeps the last non-dark Y
   limits per axis type and clears them on a log or inversion toggle; the band and the centre line are hidden when
   `WavelengthNm - Delta .. WavelengthNm + Delta` does not overlap the shown device's range; `RedrawRequested` follows SemiPlot (raises only while a view subscribes; `Dispose` completes it)
-- [ ] write `SpectrumSamples`: an ATP-2000 and an ATP-8000 `DisplayedSpectrum` with a peak, and a dark one per device
-- [ ] write the `SpectrumChartViewModelTests` of Acceptance Evidence item 3 (`[AvaloniaFact]`, `Area=Spectrum`),
+- [x] write `SpectrumSamples`: an ATP-2000 and an ATP-8000 `DisplayedSpectrum` with a peak, and a dark one per device
+- [x] write the `SpectrumChartViewModelTests` of Acceptance Evidence item 3 (`[AvaloniaFact]`, `Area=Spectrum`),
   including `ShowNeverWritesTheFramesPixels` (a copy of the array equals it after `Show` with inversion and log on),
   `ABandOutsideTheDeviceRangeIsHiddenAndTheXLimitsStayTheDeviceRange`,
   `AFrameFromTheOtherDeviceWhileFrozenKeepsTheFrozenLimits` and `ApplyPaletteRunsUnderThePlotLock` (a second thread
   that holds `Plot.Sync` delays `ApplyPalette` until it releases)
-- [ ] write `SpectrumChartViewModelRenderTests`: a dark frame per axis type, then `Plot.RenderInMemory(640, 480)`
+- [x] write `SpectrumChartViewModelRenderTests`: a dark frame per axis type, then `Plot.RenderInMemory(640, 480)`
   throws nothing and `Plot.Axes.GetLimits()` (`ScottPlot.xml:272`) is finite on all four sides; the same for an inverted dark frame on log
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 8: Signal pane view model and texts
 **Files:**

@@ -171,4 +171,10 @@
   <data name="StatusNoValue" xml:space="preserve">
     <value>-</value>
   </data>
+  <data name="SpectrumAxisWavelength" xml:space="preserve">
+    <value>Wavelength, nm</value>
+  </data>
+  <data name="SpectrumAxisIntensity" xml:space="preserve">
+    <value>Intensity</value>
+  </data>
 </root>
