@@ -143,32 +143,32 @@ Automatable (baseline 172 of 172 at `2237e5e`):
      NotResponding, so a board that stops mid-frame gives NotResponding and never moves to OtherDevice; the 10 s
      boundary is inclusive; a drain is due 10 s after the last frame when a byte arrived since it, and again every 10 s
      while that holds.
-   - `SerialLinkTests.FramesInRandomChunksReachTheChannel`: an ATP-2000 frame, an ATP-8000 frame and a heartbeat,
+   - `SerialLinkStreamTests.FramesInRandomChunksReachTheChannel`: an ATP-2000 frame, an ATP-8000 frame and a heartbeat,
      written in random chunks from a fixed seed, come out of `Frames` in order.
-   - `SerialLinkTests.SilenceForTenSecondsReportsBoardNotResponding`.
-   - `SerialLinkTests.BytesWithoutAValidFrameForTenSecondsReportOtherDevice` (frames with a corrupted CRC).
-   - `SerialLinkTests.AStalledCandidateIsDrainedAndTheFramesBehindItArrive`: a false `AA 55` with `len` 4114, then
+   - `SerialLinkStreamTests.SilenceForTenSecondsReportsBoardNotResponding`.
+   - `SerialLinkStreamTests.BytesWithoutAValidFrameForTenSecondsReportOtherDevice` (frames with a corrupted CRC).
+   - `SerialLinkStreamTests.AStalledCandidateIsDrainedAndTheFramesBehindItArrive`: a false `AA 55` with `len` 4114, then
      heartbeats every 3 s of virtual time; after 10 s the link drains, the heartbeats reach the channel stamped with the
      drain time, and the state stays Receiving without publishing NotResponding or OtherDevice.
-   - `SerialLinkTests.ADrainDiscardsThePartialFrameInFlight`: a drain while half a frame is buffered drops those bytes,
+   - `SerialLinkStreamTests.ADrainDiscardsThePartialFrameInFlight`: a drain while half a frame is buffered drops those bytes,
      and the frame's second half, arriving on the fresh pipe, is discarded as garbage.
-   - `SerialLinkTests.AZeroByteReadReportsPortLost`, `SerialLinkTests.AClosedPortReportsPortLost` (an
-     `InvalidOperationException` from the read), `SerialLinkTests.AnIOExceptionReportsPortLost`,
-     `SerialLinkTests.APortThatVanishesFromThePortListReportsPortLost` (read timeouts keep coming while
+   - `SerialLinkPortLossTests.AZeroByteReadReportsPortLost`, `SerialLinkPortLossTests.AClosedPortReportsPortLost` (an
+     `InvalidOperationException` from the read), `SerialLinkPortLossTests.AnIOExceptionReportsPortLost`,
+     `SerialLinkPortLossTests.APortThatVanishesFromThePortListReportsPortLost` (read timeouts keep coming while
      `PortNames()` no longer lists the port).
-   - `SerialLinkTests.ALostPortReopensAfterOneSecond` and `SerialLinkTests.ReopeningResetsTheSequenceBaseline` (a frame
+   - `SerialLinkPortLossTests.ALostPortReopensAfterOneSecond` and `SerialLinkPortLossTests.ReopeningResetsTheSequenceBaseline` (a frame
      with `seq` 57 after a reopen reports no loss).
-   - `SerialLinkTests.APortHeldByAnotherProgramReportsPortBusyAndRetries` (both `UnauthorizedAccessException` and an
-     `IOException` with `HResult` 32), `SerialLinkTests.AMissingPortReportsPortNotFoundAndRetries`.
-   - `SerialLinkTests.DisconnectCancelsAPendingReadAndStopsRetrying` and
-     `SerialLinkTests.DisconnectDuringTheReopenWaitOpensNothingMore`: disconnect during the wait, advance the scheduler
+   - `SerialLinkPortLossTests.APortHeldByAnotherProgramReportsPortBusyAndRetries` (both `UnauthorizedAccessException` and an
+     `IOException` with `HResult` 32), `SerialLinkPortLossTests.AMissingPortReportsPortNotFoundAndRetries`.
+   - `SerialLinkSessionTests.DisconnectCancelsAPendingReadAndStopsRetrying` and
+     `SerialLinkSessionTests.DisconnectDuringTheReopenWaitOpensNothingMore`: disconnect during the wait, advance the scheduler
      1 s, and the open count does not grow.
-   - `SerialLinkTests.LostSpectraAccumulateAcrossReopensAndResetOnConnect`.
-   - `SerialLinkTests.AFullChannelDropsTheOldestFrame`: 65 frames with no reader leave frames 2 to 65 in the channel
+   - `SerialLinkSessionTests.LostSpectraAccumulateAcrossReopensAndResetOnConnect`.
+   - `SerialLinkSessionTests.AFullChannelDropsTheOldestFrame`: 65 frames with no reader leave frames 2 to 65 in the channel
      (➕ review: the `DroppedFrames` counter had no production reader and was removed; only the first drop of a
      session logs at Debug).
-   - `SerialLinkTests.EachFaultIsPublishedOnceAndRetriesStayQuiet`: 5 failed reopens publish one `PortLostError`.
-   - `SerialLinkTests.AnUnexpectedExceptionEndsTheSessionWithAFault`.
+   - `SerialLinkPortLossTests.EachFaultIsPublishedOnceAndRetriesStayQuiet`: 5 failed reopens publish one `PortLostError`.
+   - `SerialLinkSessionTests.AnUnexpectedExceptionEndsTheSessionWithAFault`.
 3. `dotnet test SpectrumVisualizer.slnx --filter "Area=Messages"` passes, including the severity tests: Info, Warning
    and Error entries carry their dot class and log at Information, Warning and Error; each link error maps to its own
    title and severity; no link error's detail contains its port name.
@@ -249,8 +249,8 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
 ## Solution Overview
 - **Where the link lives.** `SpectrumVisualizer.UI/Link/` holds the link, its port seam and its errors. Core stays free
   of serial port code and keeps its single FluentResults reference; the UI project references `RJCP.SerialPortStream`.
-- **Port seam.** `ISerialPortProvider` (`IReadOnlyList<string> PortNames()`, `Result<Stream> Open(string portName)`) is
-  the process boundary; the interface exists so the link runs in tests without hardware. `RjcpSerialPortProvider` is
+- **Port seam.** `ISerialPortProvider` (`Result<IReadOnlyList<string>> PortNames()`, `Result<Stream> Open(string
+  portName)`, neither throws) is the process boundary; the interface exists so the link runs in tests without hardware. `RjcpSerialPortProvider` is
   the one production implementation: `SerialPortStream.GetPortNames()` sorted by the number after `COM`, a port at
   115200 baud, 8N1, `ReadTimeout = 1000` ms, `ThrowOnReadError = true`. `Open` maps `UnauthorizedAccessException` and
   an `IOException` with `HResult` 32 (sharing violation) to `PortBusyError`, and any other `IOException` or a name
@@ -303,13 +303,13 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
   ends it: the pipe is torn down, the port closed, and Disconnected is published with an `ExceptionalError` fault.
 - **Typed errors** (`UI/Link/LinkErrors.cs`, one closed family): `PortBusyError` and `PortNotFoundError` (Error: the
   operator acts), `PortLostError`, `BoardNotRespondingError` and `UnrecognisedDataError` (Warning: the link retries
-  and the operator watches). Each carries the port name in its FluentResults metadata and its log message, never in
+  and the operator watches). Each carries the port name in its error message and its log message, never in
   the mapped `MessageView`, so a repeat on another port still coalesces. `ErrorMessageMapper` gains one arm per type.
 - **Frames out.** `Frames` is a `ChannelReader<BoardFrame>` over `Channel.CreateBounded<BoardFrame>(new
   BoundedChannelOptions(64) { FullMode = DropOldest, SingleWriter = true, SingleReader = true }, itemDropped)`. 64
   frames are about 50 s of ATP-8000 spectra at 1.3 per second and at most 64 x 4120 bytes of frame data. `Wait` is
   ruled out: a reader that falls behind would block the read loop, stop the reads and trip the 10 s status on a
-  healthy board. `itemDropped` increments `DroppedFrames` and logs at Debug. The channel has one reader; the
+  healthy board. `itemDropped` logs the first drop of a session at Debug. The channel has one reader; the
   spectrum-view slice adds it and hands each frame to every later consumer, the store included. Until then the channel
   fills and drops the oldest frame, which is expected.
 - **Lost spectra.** The status bar shows the total since the operator's Connect, kept across automatic reopens. Each
@@ -335,8 +335,8 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
   leaves `Handled` false, so the exception still ends the app and is logged as Fatal.
 - **Severity.** `MessageView` gains `MessageSeverity Severity` (`Info`, `Warning`, `Error`, from SemiPlot);
   `ResultReporting` logs at the severity's level and at Debug for a coalesced repeat; the dot takes
-  `AppSeverityErrorBrush`, `AppSeverityWarningBrush` or `AppSeverityInfoBrush` through SemiPlot's
-  `SeverityMatchConverter`. The existing exception and unknown-error mappings are Error. Record equality still
+  `AppSeverityErrorBrush`, `AppSeverityWarningBrush` or `AppSeverityInfoBrush` through `ObjectConverters.Equal`
+  against `x:Static` severity values. The existing exception and unknown-error mappings are Error. Record equality still
   coalesces identical entries, against the newest entry only.
 - **Connection row.** A new `Auto` row under the menu: label "Port", a 240 px combo box of port names (choice width),
   Refresh, Connect, Disconnect. The combo box and Connect are enabled only while the link is Disconnected; Connect also
@@ -410,7 +410,7 @@ the same run do not.
 
 ### Task 1: Message severity
 **Files:**
-- Create: `SpectrumVisualizer/SpectrumVisualizer.UI/Messages/MessageSeverity.cs`, `SeverityMatchConverter.cs`
+- Create: `SpectrumVisualizer/SpectrumVisualizer.UI/Messages/MessageSeverity.cs`
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.UI/Messages/MessageView.cs`, `ErrorMessageMapper.cs`,
   `ResultReporting.cs`, `MessagePanelView.axaml`
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.UI/Styles/Palette.axaml`
@@ -464,10 +464,11 @@ the same run do not.
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Link/FakeSerialPortProvider.cs`, `FakePortStream.cs`,
   `RjcpSerialPortProviderTests.cs`
 
-- [x] declare `ISerialPortProvider` with `PortNames()` and `Open(string portName)` returning `Result<Stream>`
+- [x] declare `ISerialPortProvider` with `PortNames()` returning `Result<IReadOnlyList<string>>` and
+  `Open(string portName)` returning `Result<Stream>`
 - [x] implement `RjcpSerialPortProvider` with the settings of Solution Overview; sort names by the number after `COM`,
   others after them by ordinal; map `UnauthorizedAccessException` and an `IOException` with `HResult` 32 to
-  `PortBusyError`, any other `IOException` to `PortNotFoundError`, with the port name in metadata
+  `PortBusyError`, any other `IOException` to `PortNotFoundError`, with the port name in the error message
   (`WinNativeSerial.cs:990-1005`)
 - [x] declare the five link errors in one file as FluentResults errors, each with an English message naming the port
 - [x] write the test doubles: `FakePortStream.ReadAsync` returns the next scripted step (bytes, a 0-byte read, a
@@ -493,7 +494,7 @@ the same run do not.
 
 ### Task 5: Link health evaluator
 **Files:**
-- Create: `SpectrumVisualizer/SpectrumVisualizer.UI/Link/LinkHealth.cs`, `LinkState.cs` (with `LinkStatus`)
+- Create: `SpectrumVisualizer/SpectrumVisualizer.UI/Link/LinkHealth.cs`, `LinkStatus.cs` (with `LinkState`)
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Link/LinkHealthTests.cs`
 
 - [x] declare `LinkState` and the `LinkStatus` record of Solution Overview
@@ -508,10 +509,11 @@ the same run do not.
 ### Task 6: Serial link session and read loop
 **Files:**
 - Create: `SpectrumVisualizer/SpectrumVisualizer.UI/Link/SerialLink.cs`
-- Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Link/SerialLinkTests.cs`
+- Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Link/SerialLinkTestBase.cs`, `SerialLinkStreamTests.cs`,
+  `SerialLinkPortLossTests.cs`, `SerialLinkSessionTests.cs`
 
 - [x] implement `SerialLink(ISerialPortProvider, IScheduler, ILogger<SerialLink>)` with `Frames`, `Status`,
-  `StatusChanged`, `DroppedFrames`, `Connect(string)`, `DisconnectAsync()`, `Dispose()`; the session task publishes
+  `StatusChanged`, `Connect(string)`, `DisconnectAsync()`, `Dispose()`; the session task publishes
   Connecting first and Disconnected last
 - [x] implement the read loop of Solution Overview: write, flush, `DecodeBuffered`, tracker, channel, health
   evaluation after each read or tick, the drain, publishing only changed statuses; tear down by completing writer and
@@ -537,7 +539,7 @@ the same run do not.
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.UI/Link/SerialLink.cs`
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.UI/Messages/ErrorMessageMapper.cs`
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.UI/Localization/Resources.resx`, `Resources.ru.resx`
-- Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Link/SerialLinkTests.cs`,
+- Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Link/SerialLinkPortLossTests.cs`, `SerialLinkSessionTests.cs`,
   `UI/Messages/ErrorMessageMapperTests.cs`
 
 - [x] implement the open-with-retry and port-loss paths of the session flow: the cancellable 1 s wait on the link's
@@ -638,7 +640,7 @@ the same run do not.
 - [x] at the window's minimum width the connection row and every status segment show; record the measured width
   (➕ the window had no `MinWidth`; `MainWindow.MinimumWidth` = 968. Measured with the longest texts, widest of
   Microsoft YaHei, Segoe UI, Arial and Inter at 14 px: status bar 900.8 px en, 962.3 px ru; connection row 595.4 px en,
-  654.9 px ru; `MainWindowLayoutTests`)
+  654.9 px ru; `MainWindowTextFitTests`)
 - [x] ➕ review: the Russian "Порт недоступен, переподключение" widens the status bar to 1042.4 px, so
   `MainWindow.MinimumWidth` is 1048; the layout test now measures each row unbounded, because a clamped `DesiredSize`
   never showed an overflow
@@ -672,8 +674,8 @@ the same run do not.
 - [x] run `dotnet test SpectrumVisualizer.slnx` and the emulator `--help` - must pass before next task
 
 ### Task 13: Verify acceptance criteria
-- [x] run every command of Acceptance Evidence and record each result with its count (Protocol 53, Link 59,
-  Messages 31, MainWindow 51, Di 16, Emulator 56, full 304, none skipped; Release build 0 warnings; format and
+- [x] run every command of Acceptance Evidence and record each result with its count (Protocol 56, Link 64,
+  Messages 31, MainWindow 53, Di 16, Emulator 56, full 314, none skipped; Release build 0 warnings; format and
   `dotnet terse SpectrumVisualizer` exit 0; old solution builds with 0 errors and its 15 existing warnings, no diff
   since `2237e5e`, 13 of 13 pass; both `ui-theme.md` greps print nothing)
 - [x] verify every Overview item: the link reads frames, the status bar shows every state, faults reach the panel
@@ -681,10 +683,10 @@ the same run do not.
   Emulator tests)
 - [x] verify edge cases: a stall drained without a fault state, a board that stops mid-frame giving one
   NotResponding, a port lost mid-frame, a port that vanishes while reads keep timing out, Disconnect during the reopen
-  wait, a window close during a reopen wait (➕ two had no test: `SerialLinkTests.APortLostMidFrameDropsTheHalfFrameAndTheReopenedPortStartsClean`
+  wait, a window close during a reopen wait (➕ two had no test: `SerialLinkPortLossTests.APortLostMidFrameDropsTheHalfFrameAndTheReopenedPortStartsClean`
   and `AppLifecycleTests.ClosingTheWindowDuringTheReopenWaitStopsTheLink`)
 - [x] run the full suite: `dotnet test SpectrumVisualizer.slnx`; confirm the old solution builds and passes 13 of 13
-  (304 of 304 twice; old solution 13 of 13)
+  (314 of 314 twice; old solution 13 of 13)
 - [x] start the app with `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI` and confirm the log gains its
   start line; leave the port-pair checklist to the owner (run under `timeout 15`; the log gained one "SpectrumVisualizer
   starting" line; the manual smoke checklist is skipped - not automatable here, it needs com0com or real USB-UART
