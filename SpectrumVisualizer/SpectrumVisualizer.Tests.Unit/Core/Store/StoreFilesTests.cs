@@ -90,6 +90,19 @@ public sealed class StoreFilesTests : IDisposable
 	}
 
 	[Fact]
+	public void PrepareKeepsAStoreNameWhoseMiddleIsNotAProcessId()
+	{
+		var copy = _folder.FileIn("spectra-1234 - Copy.db");
+		Touch(copy, copy + "-wal");
+
+		var result = StoreFiles.Prepare(StoreFiles.InstanceFile(_folder.Root, 77));
+
+		result.Value.Should().Be(new StoreSweep(DeletedFiles: 0, KeptFiles: 0));
+		File.Exists(copy).Should().BeTrue();
+		File.Exists(copy + "-wal").Should().BeTrue();
+	}
+
+	[Fact]
 	public void PrepareCreatesAMissingFolder()
 	{
 		var folder = Path.Combine(_folder.Root, "nested", "Spectra");

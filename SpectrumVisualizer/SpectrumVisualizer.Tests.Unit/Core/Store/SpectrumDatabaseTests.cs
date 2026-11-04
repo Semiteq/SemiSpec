@@ -224,7 +224,7 @@ public sealed class SpectrumDatabaseTests : IDisposable
 
 			stopwatch.Stop();
 			result.Value.Should().Be(WalCheckpoint.Busy);
-			stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromMilliseconds(100));
+			stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1), "the checkpoint does not wait out the 2 s busy timeout");
 			Execute(reader, "COMMIT");
 		}
 

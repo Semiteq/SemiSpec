@@ -258,6 +258,13 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 		elapsed.Should().BeLessThan(_closeLimit);
 		(Count("spectrum") + Store.DroppedFrames).Should().Be(Fed);
 		LatestStoppedLine().Should().EndWith("checkpoint Busy");
+		var failedBatches = _logger.Collector.GetSnapshot()
+			.Where(record => record.Message.StartsWith("A batch of", StringComparison.Ordinal))
+			.Select(record => record.Timestamp)
+			.ToList();
+		failedBatches.Should().HaveCountGreaterThanOrEqualTo(2);
+		(failedBatches[^1] - failedBatches[^2]).Should().BeLessThan(
+			TimeSpan.FromSeconds(1.6), "a batch after the stop gives up after the 1 s busy timeout, not 2 s");
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
