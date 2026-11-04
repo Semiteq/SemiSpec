@@ -729,16 +729,17 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Trend/TrendChartViewModelTests.cs`,
   `TrendChartViewModelRenderTests.cs`, `TrendReadoutTests.cs`
 
-- [ ] write `TrendChartViewModel` per Solution Overview: plot, envelope, strip, moment line, `DateTimeAutomatic` on the
+- [x] write `TrendChartViewModel` per Solution Overview: plot, envelope, strip, moment line, `DateTimeAutomatic` on the
   existing bottom axis, the navigation model, `Refresh`, `ZoomAt`, `PanBy`, `SetWidth`, `FollowLive`, `IsFollowing`,
   `HasPoints`, `RedrawRequested`, `ApplyPalette`, the last fold for the readout
-- [ ] write `TrendPresets` (1 min, 10 min, 1 h, 6 h, 24 h; labels from the two format keys) and `TrendReadout.For(column,
-  key)`
-- [ ] add `ChartColors` members for the envelope, the moment line and the strip to `ChartPalette.Colors`
-- [ ] add the resx keys of Technical Details in both sets
-- [ ] write `TrendChartViewModelTests`, `TrendChartViewModelRenderTests` and `TrendReadoutTests` of Acceptance Evidence
+- [x] write `TrendPresets` (1 min, 10 min, 1 h, 6 h, 24 h; labels from the two format keys) and `TrendReadout.For(column,
+  key)`, written as `For(series, index, key)`: an empty column between drawn ones reads the gap reason of the column
+  that ends the gap, or the column the line comes from, with the failures of the whole empty run
+- [x] add `ChartColors` members for the envelope, the moment line and the strip to `ChartPalette.Colors`
+- [x] add the resx keys of Technical Details in both sets
+- [x] write `TrendChartViewModelTests`, `TrendChartViewModelRenderTests` and `TrendReadoutTests` of Acceptance Evidence
   item 1
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (826 of 826)
 
 ### Task 9: Trend feed and moment reads
 **Files:**

@@ -65,6 +65,18 @@ public sealed class IntensityCache : IDisposable
 	/// <summary>Raised on a key change; a request with ReadsHistory false only cancels the pending read.</summary>
 	public IObservable<ReReadRequest> ReReadRequested { get; }
 
+	/// <summary>The wavelength and delta of the latest spectrum frame; null before the first spectrum.</summary>
+	public TrendKey? Key
+	{
+		get
+		{
+			lock (_gate)
+			{
+				return _key;
+			}
+		}
+	}
+
 	/// <summary>The receive time of the oldest point; null before the first spectrum.</summary>
 	public DateTimeOffset? FirstPointAt
 	{

@@ -64,6 +64,20 @@ public sealed class ChartPaletteTests
 	[AvaloniaTheory]
 	[InlineData("Light")]
 	[InlineData("Dark")]
+	public void ColorsResolveTheEnvelopeTheMomentLineAndTheFailureStrip(string variantName)
+	{
+		var variant = VariantOf(variantName);
+
+		var colors = ChartPalette.Colors(Application.Current!, variant);
+
+		colors.Envelope.Should().Be(Expected("AppAccentBrush", variant));
+		colors.MomentLine.Should().Be(Expected("AppMarkerLineBrush", variant));
+		colors.FailureStrip.Should().Be(Expected("AppSeverityErrorBrush", variant));
+	}
+
+	[AvaloniaTheory]
+	[InlineData("Light")]
+	[InlineData("Dark")]
 	public void ATranslucentKeyKeepsItsOpacityInTheAlpha(string variantName)
 	{
 		var colors = ChartPalette.Colors(Application.Current!, VariantOf(variantName));
