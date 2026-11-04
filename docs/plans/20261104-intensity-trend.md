@@ -665,15 +665,18 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Trend/TrendNavigationModelTests.cs`,
   `TrendColumnsTests.cs`, `OverviewGeometryTests.cs`
 
-- [ ] copy `TrendNavigationModel` (`SemiPlot/SemiPlot.Core/Trends/TrendNavigationModel.cs`) with widths 10 s .. 24 h,
-  on `DateTimeOffset` in UTC
-- [ ] write `TrendColumns.Map` and `ColumnWidth` per Technical Details; `EnvelopeColumn` moves to Core here, as a
-  record struct with no UI type
-- [ ] copy the parts of `MinimapGeometry` the overview uses (`WindowFraction`, `FractionAt`, `TimeAtFraction`, band
-  figures over `IntensitySeries`) without markers and pens
-- [ ] copy the navigation tests named in Acceptance Evidence item 1 and the geometry tests at `MinimapGeometryTests.cs:57`
+- [x] copy `TrendNavigationModel` (`SemiPlot/SemiPlot.Core/Trends/TrendNavigationModel.cs`) with widths 10 s .. 24 h,
+  on `DateTimeOffset` in UTC. `SetWindow` (the stripped calendar form) and the argument guards are left out;
+  `SetWidth` while sticky keeps the right edge with no clamp, so a preset keeps following like `OnLiveEdge`
+- [x] write `TrendColumns.Map` and `ColumnWidth` per Technical Details; `EnvelopeColumn` moves to Core here, as a
+  record struct with no UI type. `Map` takes the time-to-X conversion as a `Func<DateTimeOffset, double>`, because
+  `LocalTimeAxis` lands in the UI project in Task 7; Task 8 passes `LocalTimeAxis.ToAxis`
+- [x] copy the parts of `MinimapGeometry` the overview uses (`WindowFraction`, `FractionAt`, `TimeAtFraction`, band
+  figures over `IntensitySeries`) without markers and pens; `MarkerSpan` (the 6 px window highlight) is copied as
+  `HighlightSpan` with `SpanLeftWithin`; the band takes column `Start` as X and `Last` as the centre
+- [x] copy the navigation tests named in Acceptance Evidence item 1 and the geometry tests at `MinimapGeometryTests.cs:57`
   (underscores dropped, as the spectrum-view slice did); write `TrendColumnsTests`
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (752 of 752)
 
 ### Task 6: Switching spectrum source and the historical chart rules
 **Files:**
