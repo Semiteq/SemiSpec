@@ -42,6 +42,9 @@ public sealed class SpectrumDatabase : IDisposable
 		INSERT INTO heartbeat (received_at, seq, state) VALUES ($received_at, $seq, $state)
 		""";
 
+	// Microsoft.Data.Sqlite counts the busy timeout in whole seconds and waits forever on 0, so 1 s is the shortest.
+	private const int ShortBusyTimeoutSeconds = 1;
+
 	private const string DeleteOlder = """
 		DELETE FROM spectrum WHERE received_at < $cutoff;
 		DELETE FROM heartbeat WHERE received_at < $cutoff;
@@ -50,8 +53,6 @@ public sealed class SpectrumDatabase : IDisposable
 	private readonly SqliteConnection _connection;
 	private readonly SqliteCommand _insertSpectrum;
 	private readonly SqliteCommand _insertHeartbeat;
-	private readonly byte[] _atp2000Pixels = new byte[sizeof(ushort) * Spectrometer.Atp2000.PixelCount];
-	private readonly byte[] _atp8000Pixels = new byte[sizeof(ushort) * Spectrometer.Atp8000.PixelCount];
 
 	private SpectrumDatabase(SqliteConnection connection)
 	{
@@ -165,6 +166,14 @@ public sealed class SpectrumDatabase : IDisposable
 		}
 	}
 
+	/// <summary>Makes every later statement give up on a held lock after 1 s instead of the default 2 s.</summary>
+	public void ShortenBusyTimeout()
+	{
+		_connection.DefaultTimeout = ShortBusyTimeoutSeconds;
+		_insertSpectrum.CommandTimeout = ShortBusyTimeoutSeconds;
+		_insertHeartbeat.CommandTimeout = ShortBusyTimeoutSeconds;
+	}
+
 	/// <summary>Closes the connection without a checkpoint.</summary>
 	public void Dispose()
 	{
@@ -175,8 +184,6 @@ public sealed class SpectrumDatabase : IDisposable
 
 	private void WriteSpectrum(ReceivedFrame received, SpectrumMeasurement measurement)
 	{
-		var pixels = PixelBufferFor(measurement.Device);
-		MemoryMarshal.AsBytes(measurement.Pixels.AsSpan()).CopyTo(pixels);
 		var parameters = _insertSpectrum.Parameters;
 		parameters["$received_at"].Value = received.ReceivedAt.ToUnixTimeMilliseconds();
 		parameters["$device"].Value = (byte)measurement.Device;
@@ -187,7 +194,7 @@ public sealed class SpectrumDatabase : IDisposable
 		parameters["$q"].Value = NullForNaN(measurement.Q);
 		parameters["$seq"].Value = received.Frame.Seq;
 		parameters["$state"].Value = (byte)received.Frame.State;
-		parameters["$pixels"].Value = pixels;
+		parameters["$pixels"].Value = MemoryMarshal.AsBytes(measurement.Pixels.AsSpan()).ToArray();
 		_insertSpectrum.ExecuteNonQuery();
 	}
 
@@ -198,16 +205,6 @@ public sealed class SpectrumDatabase : IDisposable
 		parameters["$seq"].Value = received.Frame.Seq;
 		parameters["$state"].Value = (byte)received.Frame.State;
 		_insertHeartbeat.ExecuteNonQuery();
-	}
-
-	private byte[] PixelBufferFor(Spectrometer device)
-	{
-		return device switch
-		{
-			Spectrometer.Atp2000 => _atp2000Pixels,
-			Spectrometer.Atp8000 => _atp8000Pixels,
-			_ => throw new ArgumentOutOfRangeException(nameof(device), device, "Unknown spectrometer."),
-		};
 	}
 
 	private static object NullForNaN(float value)

@@ -78,7 +78,7 @@ public sealed class SpectrumDatabaseTests : IDisposable
 	}
 
 	[Fact]
-	public void ANaNAmplitudeRoundTripsAsNaN()
+	public void NaNFloatsAreStoredAsNull()
 	{
 		var pixels = ProtocolSamples.Ramp(Spectrometer.Atp8000);
 		var measurement = new SpectrumMeasurement(Spectrometer.Atp8000, 1310, 5, float.NaN, 1f, float.NaN, pixels);
@@ -90,11 +90,9 @@ public sealed class SpectrumDatabaseTests : IDisposable
 		using var plain = OpenPlain();
 		using var reader = Query(plain, "SELECT amplitude, snr, q FROM spectrum");
 		reader.Read().Should().BeTrue();
-		var amplitude = reader.IsDBNull(0) ? float.NaN : reader.GetFloat(0);
-		var q = reader.IsDBNull(2) ? float.NaN : reader.GetFloat(2);
-		float.IsNaN(amplitude).Should().BeTrue();
+		reader.IsDBNull(0).Should().BeTrue();
 		reader.GetFloat(1).Should().Be(1f);
-		float.IsNaN(q).Should().BeTrue();
+		reader.IsDBNull(2).Should().BeTrue();
 	}
 
 	[Fact]
@@ -189,6 +187,24 @@ public sealed class SpectrumDatabaseTests : IDisposable
 		result.IsFailed.Should().BeTrue();
 		stopwatch.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromSeconds(1.9))
 			.And.BeLessThanOrEqualTo(TimeSpan.FromSeconds(2.5));
+		Execute(holder, "ROLLBACK");
+	}
+
+	[Fact]
+	public void AfterShortenBusyTimeoutAWriteAgainstAHeldLockFailsAfterOneSecond()
+	{
+		using var database = OpenDatabase();
+		using var holder = OpenPlain();
+		Execute(holder, "BEGIN IMMEDIATE");
+		database.ShortenBusyTimeout();
+		var stopwatch = Stopwatch.StartNew();
+
+		var result = database.Write([StoreSamples.Spectrum(StoreSamples.Start)]);
+
+		stopwatch.Stop();
+		result.IsFailed.Should().BeTrue();
+		stopwatch.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromSeconds(0.9))
+			.And.BeLessThanOrEqualTo(TimeSpan.FromSeconds(1.5));
 		Execute(holder, "ROLLBACK");
 	}
 

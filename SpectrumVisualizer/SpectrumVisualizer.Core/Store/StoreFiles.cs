@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using FluentResults;
 
 namespace SpectrumVisualizer.Core.Store;
@@ -14,7 +16,10 @@ public static class StoreFiles
 		return Path.Combine(folder, $"{FilePrefix}{processId}{DatabaseExtension}");
 	}
 
-	/// <summary>Creates the folder, wipes the own file, and deletes every other store file no live instance holds open.</summary>
+	/// <summary>
+	/// Creates the folder and wipes the own file, or fails; then deletes every other store file no live instance holds
+	/// open. A sweep that cannot list the folder deletes nothing and carries its failure in the result.
+	/// </summary>
 	public static Result<StoreSweep> Prepare(string instanceFile)
 	{
 		var folder = Path.GetDirectoryName(instanceFile)!;
@@ -33,13 +38,21 @@ public static class StoreFiles
 
 	private static StoreSweep Sweep(string folder, string instanceFile)
 	{
-		var names = Directory.GetFiles(folder, FilePrefix + "*");
+		string[] names;
+		try
+		{
+			names = Directory.GetFiles(folder, FilePrefix + "*");
+		}
+		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+		{
+			return new StoreSweep(DeletedFiles: 0, KeptFiles: 0, ex);
+		}
+
 		var deleted = 0;
 		var kept = 0;
 		foreach (var name in names)
 		{
-			if (!name.EndsWith(DatabaseExtension, StringComparison.OrdinalIgnoreCase)
-				|| string.Equals(name, instanceFile, StringComparison.OrdinalIgnoreCase))
+			if (DatabaseOf(name) != name || string.Equals(name, instanceFile, StringComparison.OrdinalIgnoreCase))
 			{
 				continue;
 			}
@@ -60,8 +73,7 @@ public static class StoreFiles
 
 		foreach (var name in names)
 		{
-			var database = DatabaseOfSidecar(name);
-			if (database is not null && !File.Exists(database))
+			if (DatabaseOf(name) is { } database && database != name && !File.Exists(database))
 			{
 				TryDelete(name);
 			}
@@ -70,18 +82,27 @@ public static class StoreFiles
 		return new StoreSweep(deleted, kept);
 	}
 
-	private static string? DatabaseOfSidecar(string name)
+	/// <summary>The store file a file belongs to, itself or the file of its sidecar; null outside spectra-&lt;digits&gt;.db.</summary>
+	private static string? DatabaseOf(string file)
 	{
+		var database = file;
 		foreach (var suffix in _sidecarSuffixes)
 		{
-			var databaseSuffix = DatabaseExtension + suffix;
-			if (name.EndsWith(databaseSuffix, StringComparison.OrdinalIgnoreCase))
+			if (file.EndsWith(DatabaseExtension + suffix, StringComparison.OrdinalIgnoreCase))
 			{
-				return name[..^suffix.Length];
+				database = file[..^suffix.Length];
 			}
 		}
 
-		return null;
+		var name = Path.GetFileName(database);
+		if (!name.StartsWith(FilePrefix, StringComparison.OrdinalIgnoreCase)
+			|| !name.EndsWith(DatabaseExtension, StringComparison.OrdinalIgnoreCase))
+		{
+			return null;
+		}
+
+		var processId = name[FilePrefix.Length..^DatabaseExtension.Length];
+		return int.TryParse(processId, NumberStyles.None, CultureInfo.InvariantCulture, out _) ? database : null;
 	}
 
 	private static void DeleteWithSidecars(string database)
@@ -107,5 +128,8 @@ public static class StoreFiles
 	}
 }
 
-/// <summary>Counts of the other instances' store files the sweep deleted and the ones a live instance kept open.</summary>
-public sealed record StoreSweep(int DeletedFiles, int KeptFiles);
+/// <summary>
+/// Counts of the other instances' store files the sweep deleted and the ones a live instance kept open; Failure is what
+/// stopped the sweep from listing the folder, null when it ran.
+/// </summary>
+public sealed record StoreSweep(int DeletedFiles, int KeptFiles, Exception? Failure = null);

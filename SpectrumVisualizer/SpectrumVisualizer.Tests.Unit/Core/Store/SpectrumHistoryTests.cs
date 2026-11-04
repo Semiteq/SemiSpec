@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+
 using AwesomeAssertions;
 
 using FluentResults;
@@ -18,7 +21,12 @@ namespace SpectrumVisualizer.Tests.Unit.Core.Store;
 [Trait("Category", "Unit")]
 public sealed class SpectrumHistoryTests : IDisposable
 {
+	private const int TestTimeoutMs = 30_000;
+
 	private static readonly DateTimeOffset _start = StoreSamples.Start;
+
+	// The busy timeout is 2 s; a read or a commit that waited on a lock would take at least that long.
+	private static readonly TimeSpan _wellUnderTheBusyTimeout = TimeSpan.FromSeconds(1);
 
 	private readonly TempFolder _folder = new();
 	private readonly string _path;
@@ -78,6 +86,20 @@ public sealed class SpectrumHistoryTests : IDisposable
 	}
 
 	[Fact]
+	public async Task ANaNAmplitudeAndQReadBackAsNaN()
+	{
+		var measurement = new SpectrumMeasurement(
+			Spectrometer.Atp8000, 1310, 5, float.NaN, 1f, float.NaN, ProtocolSamples.Ramp(Spectrometer.Atp8000));
+		Store(new ReceivedFrame(new BoardFrame(BoardState.Atp8000Connected, 1, measurement), _start));
+
+		var stored = (await _history.SpectrumAtAsync(_start, Token)).Value!;
+
+		float.IsNaN(stored.Measurement.Amplitude).Should().BeTrue();
+		stored.Measurement.Snr.Should().Be(1f);
+		float.IsNaN(stored.Measurement.Q).Should().BeTrue();
+	}
+
+	[Fact]
 	public async Task TheSeriesMeansTheWindowPerSpectrum()
 	{
 		Store(
@@ -94,6 +116,18 @@ public sealed class SpectrumHistoryTests : IDisposable
 		series.Columns[2].Count.Should().Be(0);
 		double.IsNaN(series.Columns[2].Min).Should().BeTrue();
 		series.Columns.Sum(column => column.Count).Should().Be(3, "a row at To lies outside the range");
+	}
+
+	[Fact]
+	public async Task ARowInsideTheLastMillisecondBeforeToIsInTheSeries()
+	{
+		var stamp = _start.AddSeconds(5);
+		Store(StoreSamples.Spectrum(stamp));
+		var query = Query(StoreSamples.SampleNm, StoreSamples.SampleDelta, _start, stamp.AddTicks(TimeSpan.TicksPerMillisecond / 2), 1);
+
+		var series = (await _history.IntensitySeriesAsync(query, Token)).Value;
+
+		series.Columns[0].Count.Should().Be(1, "the row's stamp lies before To");
 	}
 
 	[Fact]
@@ -228,6 +262,8 @@ public sealed class SpectrumHistoryTests : IDisposable
 	[Fact]
 	public async Task AReadOfAFileWithoutTheSchemaFails()
 	{
+		await File.WriteAllBytesAsync(_path, [], Token);
+
 		var result = await _history.StoredRangeAsync(Token);
 
 		result.IsFailed.Should().BeTrue();
@@ -236,40 +272,48 @@ public sealed class SpectrumHistoryTests : IDisposable
 	}
 
 	[Fact]
-	public async Task TheHistoryReadsWhileTheWriterWrites()
+	public async Task AReadOfAMissingFileFailsAndCreatesNoFile()
+	{
+		var result = await _history.StoredRangeAsync(Token);
+
+		result.IsFailed.Should().BeTrue();
+		result.Errors.Should().ContainSingle().Which.Should().BeOfType<ExceptionalError>()
+			.Which.Exception.Should().BeOfType<SqliteException>();
+		File.Exists(_path).Should().BeFalse();
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task TheHistoryReadsBesideAnOpenWriteTransaction()
+	{
+		Store(StoreSamples.Spectrum(_start.AddSeconds(1)));
+		using var writer = StoreConnection.Open(_path);
+		Execute(writer, "BEGIN IMMEDIATE");
+		Execute(writer, "DELETE FROM spectrum");
+		var stopwatch = Stopwatch.StartNew();
+
+		var series = await SeriesAsync(StoreSamples.SampleNm, StoreSamples.SampleDelta, columns: 1);
+
+		stopwatch.Elapsed.Should().BeLessThan(_wellUnderTheBusyTimeout);
+		series.Columns[0].Count.Should().Be(1, "the read sees the last commit, not the open transaction");
+		Execute(writer, "ROLLBACK");
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task TheWriterCommitsBesideAnOpenReadSnapshot()
 	{
 		using var database = SpectrumDatabase.Open(_path).Value;
-		using var stop = new CancellationTokenSource();
-		var batches = 0;
-		var writer = Task.Run(
-			() =>
-			{
-				while (!stop.IsCancellationRequested)
-				{
-					var at = _start.AddSeconds(batches);
-					var written = database.Write([StoreSamples.Spectrum(at), StoreSamples.Spectrum(at.AddMilliseconds(500))]);
-					written.IsSuccess.Should().BeTrue();
-					Interlocked.Increment(ref batches);
-				}
-			},
-			Token);
-		var query = Query(StoreSamples.SampleNm, StoreSamples.SampleDelta, _start, _start.AddDays(1), 100);
-		var reads = new List<Result<IntensitySeries>>();
-		try
-		{
-			while (reads.Count < 20 || Volatile.Read(ref batches) < 3)
-			{
-				reads.Add(await _history.IntensitySeriesAsync(query, Token));
-			}
-		}
-		finally
-		{
-			await stop.CancelAsync();
-			await writer;
-		}
+		database.Write([StoreSamples.Spectrum(_start)]).IsSuccess.Should().BeTrue();
+		using var reader = StoreConnection.OpenReader(_path);
+		Execute(reader, "BEGIN");
+		Execute(reader, "SELECT count(*) FROM spectrum");
+		var stopwatch = Stopwatch.StartNew();
 
-		reads.Should().AllSatisfy(read => read.IsSuccess.Should().BeTrue());
-		reads[^1].Value.Columns.Sum(column => column.Count).Should().BePositive();
+		var written = await Task.Run(() => database.Write([StoreSamples.Spectrum(_start.AddSeconds(1))]), Token);
+
+		stopwatch.Elapsed.Should().BeLessThan(_wellUnderTheBusyTimeout);
+		written.IsSuccess.Should().BeTrue("WAL lets the writer commit while a reader holds its snapshot");
+		Execute(reader, "COMMIT");
+		(await _history.StoredRangeAsync(Token)).Value.Should().Be(new StoredRange(_start, _start.AddSeconds(1)));
 	}
 
 	private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -314,6 +358,14 @@ public sealed class SpectrumHistoryTests : IDisposable
 	private static double RampMean(Spectrometer device, ushort nm, byte delta)
 	{
 		var window = SpectrometerCalibration.For(device).Window(nm, delta);
-		return SpectrumIntensity.Mean(ProtocolSamples.Ramp(device), window);
+		var pixels = ProtocolSamples.Ramp(device).AsSpan(window.First, window.Last - window.First + 1);
+		return QueryWindows.MeanOf(MemoryMarshal.AsBytes(pixels));
+	}
+
+	private static void Execute(SqliteConnection connection, string sql)
+	{
+		using var command = connection.CreateCommand();
+		command.CommandText = sql;
+		command.ExecuteNonQuery();
 	}
 }

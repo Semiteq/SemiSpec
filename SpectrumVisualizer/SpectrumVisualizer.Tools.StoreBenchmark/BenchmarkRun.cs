@@ -65,12 +65,10 @@ public static class BenchmarkRun
 		output.Write(Invariant(
 			$"Store benchmark: {options.Rows} {options.Device.DisplayName} spectra 500 ms apart ({SpanHours(options):0.##} h), "));
 		output.Write(Invariant(
-			$"{options.FirstWavelengthNm} nm, {options.ChangedWavelengthNm} nm from {options.ChangeAt} of the rows on, "));
-		output.Write(Invariant(
-			$"delta {BenchmarkFile.Delta}, {options.ChurnRounds} churn rounds, {Columns} columns, "));
+			$"{options.WavelengthNm} nm, delta {BenchmarkFile.Delta}, {options.ChurnRounds} churn rounds, {Columns} columns, "));
 		output.WriteLine(Invariant($"batches of {BenchmarkFile.BatchSize}. Folder {folder}."));
 		output.Write(Invariant(
-			$"Series query the {options.ChangedWavelengthNm} nm window. First is the first run on a fresh connection; "));
+			$"Series query the {options.WavelengthNm} nm window. First is the first run on a fresh connection; "));
 		output.WriteLine(
 			$"Median, Min and Max cover the {WarmRuns} runs after it. The OS file cache is not dropped (that needs "
 			+ "administrator rights), so a first run can be warm too.");
@@ -94,18 +92,18 @@ public static class BenchmarkRun
 		WriteValue(output, state, "File size per 1000 spectra, after checkpoint (MB)", PerThousand(file, options), "0.000");
 		WriteValue(output, state, $"File size, {span} (MB)", file.FileBytes / BytesPerMegabyte, "0.0");
 
-		var recent = Query(options.ChangedWavelengthNm, file.WindowTo - _tenMinutes, file.WindowTo);
+		var recent = Query(options.WavelengthNm, file.WindowTo - _tenMinutes, file.WindowTo);
 		var recentSubstr = Time(output, state, "Series 10 min to 1000 columns, substr (ms)", file,
-			c => ReadStrategies.Pixels(c, recent, PixelStrategy.Substr, token));
+			c => SpectrumHistory.ReadSeries(c, recent, token));
 		var recentBlob = Time(output, state, "Series 10 min to 1000 columns, SqliteBlob (ms)", file,
-			c => ReadStrategies.Pixels(c, recent, PixelStrategy.Blob, token));
+			c => BlobSeries.Read(c, recent, token));
 		Compare(mismatches, $"{state} 10 min SqliteBlob against substr", recentBlob, recentSubstr);
 
-		var whole = Query(options.ChangedWavelengthNm, file.WindowFrom, file.WindowTo);
+		var whole = Query(options.WavelengthNm, file.WindowFrom, file.WindowTo);
 		var wholeSubstr = Time(output, state, $"Series {span} to 1000 columns, substr (ms)", file,
-			c => ReadStrategies.Pixels(c, whole, PixelStrategy.Substr, token));
+			c => SpectrumHistory.ReadSeries(c, whole, token));
 		var wholeBlob = Time(output, state, $"Series {span} to 1000 columns, SqliteBlob (ms)", file,
-			c => ReadStrategies.Pixels(c, whole, PixelStrategy.Blob, token));
+			c => BlobSeries.Read(c, whole, token));
 		Compare(mismatches, $"{state} {span} SqliteBlob against substr", wholeBlob, wholeSubstr);
 		await MeasureHistoryAsync(output, state, span, file, (recent, recentSubstr), (whole, wholeSubstr), mismatches, token);
 
@@ -114,7 +112,7 @@ public static class BenchmarkRun
 		var walBytes = await file.WalBytesAfterReadBesideWriterAsync(() =>
 		{
 			using var connection = file.OpenReader();
-			ReadStrategies.Pixels(connection, whole, PixelStrategy.Substr, token);
+			SpectrumHistory.ReadSeries(connection, whole, token);
 		});
 		WriteValue(output, state, $"WAL after a {span} substr series read beside a writer at 2 spectra/s (MB)",
 			walBytes / BytesPerMegabyte, "0.000");

@@ -112,19 +112,19 @@
     <value>История спектров отключена</value>
   </data>
   <data name="StoreOpenDetail" xml:space="preserve">
-    <value>Приложение не смогло создать файл истории спектров. Спектр отображается, но не сохраняется.</value>
+    <value>Программа не смогла создать файл истории спектров. Спектр отображается, но не сохраняется.</value>
   </data>
   <data name="StoreOpenRemedy" xml:space="preserve">
-    <value>Перезапустите приложение. Если ошибка повторится, отправьте файл журнала разработчику.</value>
+    <value>Перезапустите программу. Если ошибка повторится, передайте файл журнала разработчику.</value>
   </data>
   <data name="StoreWriteTitle" xml:space="preserve">
     <value>Не удалось записать историю спектров</value>
   </data>
   <data name="StoreWriteDetail" xml:space="preserve">
-    <value>Принятые кадры не записались в файл истории; они учтены как отброшенные.</value>
+    <value>Принятые кадры не удалось записать в файл истории; они учтены как отброшенные.</value>
   </data>
   <data name="StoreWriteRemedy" xml:space="preserve">
-    <value>Проверьте свободное место на системном диске. Приложение продолжает попытки.</value>
+    <value>Проверьте свободное место на системном диске и закройте программы, открывшие файл истории спектров. Программа продолжает попытки записи.</value>
   </data>
   <data name="LinkRestoredTitle" xml:space="preserve">
     <value>Идёт приём данных</value>

@@ -38,7 +38,8 @@ public sealed class AppLifecycleTests : IAsyncDisposable
 	private const string PortName = "COM3";
 
 	private const string DistributorStopped = "The frame distributor stopped";
-	private const string StoreStopped = "The spectrum store stopped: {Stored} frames stored, {Dropped} frames dropped";
+	private const string StoreStopped =
+		"The spectrum store stopped: {Stored} frames stored, {Dropped} frames dropped, checkpoint {Checkpoint}";
 
 	private static readonly TimeSpan _waitLimit = TimeSpan.FromSeconds(5);
 
@@ -222,17 +223,19 @@ public sealed class AppLifecycleTests : IAsyncDisposable
 	}
 
 	[AvaloniaFact]
-	public async Task AfterTheCloseTheStoreFileHasNoWal()
+	public async Task AfterTheCloseTheStoreFileHasAnEmptyWal()
 	{
 		using var provider = BuildContainer();
 		var window = ShowMainWindow(provider);
+		var storePath = provider.GetRequiredService<StoreFile>().Path;
 
+		// Open across the close, so the WAL outlives the writer's close and shows what the checkpoint did to it.
+		using var idle = await OpenIdleConnectionAsync(storePath);
 		await PushOneFrameThenCloseAsync(provider, window, SpectrumFrame(Spectrometer.Atp2000, 3));
 
-		var storePath = provider.GetRequiredService<StoreFile>().Path;
-		File.Exists(storePath).Should().BeTrue();
 		var wal = new FileInfo(storePath + "-wal");
-		(wal.Exists ? wal.Length : 0).Should().Be(0);
+		wal.Exists.Should().BeTrue("the idle connection keeps the WAL file");
+		wal.Length.Should().Be(0);
 	}
 
 	[AvaloniaFact]
@@ -342,6 +345,38 @@ public sealed class AppLifecycleTests : IAsyncDisposable
 		using var command = connection.CreateCommand();
 		command.CommandText = "SELECT group_concat(seq) FROM (SELECT seq FROM spectrum ORDER BY id)";
 		return command.ExecuteScalar() as string;
+	}
+
+	/// <summary>
+	/// A connection that has read the store file once the writer created its schema; it never creates the file, which
+	/// would make the writer's wipe fail.
+	/// </summary>
+	private static async Task<SqliteConnection> OpenIdleConnectionAsync(string path)
+	{
+		var connectionString = new SqliteConnectionStringBuilder
+		{
+			DataSource = path,
+			Mode = SqliteOpenMode.ReadWrite,
+			Pooling = false
+		}.ToString();
+		var deadline = DateTimeOffset.UtcNow + _waitLimit;
+		while (true)
+		{
+			var connection = new SqliteConnection(connectionString);
+			try
+			{
+				connection.Open();
+				using var command = connection.CreateCommand();
+				command.CommandText = "SELECT count(*) FROM spectrum";
+				command.ExecuteScalar();
+				return connection;
+			}
+			catch (SqliteException) when (DateTimeOffset.UtcNow < deadline)
+			{
+				connection.Dispose();
+				await Task.Delay(10, TestContext.Current.CancellationToken);
+			}
+		}
 	}
 
 	private List<string> LoggedTemplates()

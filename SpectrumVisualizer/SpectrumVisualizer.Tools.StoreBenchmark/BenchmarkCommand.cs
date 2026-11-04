@@ -31,16 +31,9 @@ public static class BenchmarkCommand
 
 	private static readonly Option<int> _device = new Option<int>("--device")
 	{
-		Description = "The device of every row: 2000 (ATP-2000, 650 then 700 nm) or 8000 (ATP-8000, 1550 then 1600 nm).",
+		Description = "The device of every row: 2000 (ATP-2000 at 650 nm) or 8000 (ATP-8000 at 1550 nm).",
 		DefaultValueFactory = _ => 2000,
 	}.AcceptOnlyFromAmong([.. _models.Keys]);
-
-	private static readonly Option<double> _changeAt = new("--change-at")
-	{
-		Description = "From this fraction of the rows on, the rows carry the second wavelength; 1 never changes.",
-		DefaultValueFactory = _ => 0.875,
-		CustomParser = ParseFraction,
-	};
 
 	private static readonly Option<int> _churnRounds = new("--churn-rounds")
 	{
@@ -63,7 +56,7 @@ public static class BenchmarkCommand
 	{
 		var root = new RootCommand("Fills a spectrum store file and measures its writes, size and reads.")
 		{
-			_rows, _device, _changeAt, _churnRounds, _folder, _keep,
+			_rows, _device, _churnRounds, _folder, _keep,
 		};
 		root.SetAction((parsed, cancellationToken) => run(From(parsed), cancellationToken));
 		return root;
@@ -74,23 +67,9 @@ public static class BenchmarkCommand
 		return new BenchmarkOptions(
 			parsed.GetValue(_rows),
 			_models[parsed.GetValue(_device).ToString(CultureInfo.InvariantCulture)],
-			parsed.GetValue(_changeAt),
 			parsed.GetValue(_churnRounds),
 			parsed.GetValue(_folder),
 			parsed.GetValue(_keep));
-	}
-
-	private static double ParseFraction(ArgumentResult result)
-	{
-		var text = result.Tokens[^1].Value;
-		if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var fraction)
-			|| fraction is not (>= 0 and <= 1))
-		{
-			result.AddError($"Option '--change-at' expects a number from 0 to 1, got '{text}'.");
-			return 0;
-		}
-
-		return fraction;
 	}
 
 	private static int ParseWhole(ArgumentResult result, string name, int minimum, int maximum)

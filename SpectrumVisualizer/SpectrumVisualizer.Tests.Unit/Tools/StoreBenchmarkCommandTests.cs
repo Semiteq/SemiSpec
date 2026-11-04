@@ -17,36 +17,31 @@ public sealed class StoreBenchmarkCommandTests
 	{
 		var options = await ParseAsync();
 
-		options.Should().Be(new BenchmarkOptions(172_800, Spectrometer.Atp2000, 0.875, 24, null, false));
-		options.FirstWavelengthNm.Should().Be(650);
-		options.ChangedWavelengthNm.Should().Be(700);
+		options.Should().Be(new BenchmarkOptions(172_800, Spectrometer.Atp2000, 24, null, false));
+		options.WavelengthNm.Should().Be(650);
 	}
 
 	[Fact]
-	public async Task Device8000UsesWavelengthsInsideItsRange()
+	public async Task Device8000UsesAWavelengthInsideItsRange()
 	{
 		var options = await ParseAsync("--device", "8000");
 
 		options.Device.Should().Be(Spectrometer.Atp8000);
-		options.FirstWavelengthNm.Should().Be(1550);
-		options.ChangedWavelengthNm.Should().Be(1600);
+		options.WavelengthNm.Should().Be(1550);
 	}
 
 	[Fact]
 	public async Task EveryOptionGivenIsParsed()
 	{
 		var options = await ParseAsync(
-			"--rows", "1200", "--change-at", "0", "--churn-rounds", "0", "--folder", "out", "--keep");
+			"--rows", "1200", "--churn-rounds", "0", "--folder", "out", "--keep");
 
-		options.Should().Be(new BenchmarkOptions(1200, Spectrometer.Atp2000, 0, 0, "out", true));
+		options.Should().Be(new BenchmarkOptions(1200, Spectrometer.Atp2000, 0, "out", true));
 	}
 
 	[Theory]
 	[InlineData("--rows", "10")]
 	[InlineData("--rows", "1199")]
-	[InlineData("--change-at", "1.5")]
-	[InlineData("--change-at", "-0.1")]
-	[InlineData("--change-at", "NaN")]
 	[InlineData("--churn-rounds", "25")]
 	[InlineData("--churn-rounds", "-1")]
 	[InlineData("--device", "4000")]

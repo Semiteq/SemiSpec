@@ -11,7 +11,7 @@ namespace SpectrumVisualizer.Tools.StoreBenchmark;
 
 /// <summary>
 /// One benchmark store file and its writer: row position p holds row p mod Rows at FirstRowAt + p x 500 ms, so a
-/// churn round re-inserts the oldest rows one span later with their own wavelength.
+/// churn round re-inserts the oldest rows one span later with their own pixels.
 /// </summary>
 internal sealed class BenchmarkFile : IDisposable
 {
@@ -27,7 +27,6 @@ internal sealed class BenchmarkFile : IDisposable
 
 	private readonly SpectrumDatabase _database;
 	private readonly BenchmarkOptions _options;
-	private readonly long _changeIndex;
 	private readonly DateTimeOffset _firstRowAt;
 	private readonly ushort[][] _pixelPool;
 	private long _windowStart;
@@ -41,7 +40,6 @@ internal sealed class BenchmarkFile : IDisposable
 		Path = path;
 		_database = database;
 		_options = options;
-		_changeIndex = (long)(options.ChangeAt * options.Rows);
 		_firstRowAt = lastRowAt - (_rowInterval * (options.Rows - 1));
 		_pixelPool = PixelPool(options.Device);
 	}
@@ -199,10 +197,9 @@ internal sealed class BenchmarkFile : IDisposable
 
 	private ReceivedFrame FrameAt(long row, DateTimeOffset receivedAt)
 	{
-		var wavelength = row >= _changeIndex ? _options.ChangedWavelengthNm : _options.FirstWavelengthNm;
 		var measurement = new SpectrumMeasurement(
 			_options.Device,
-			wavelength,
+			_options.WavelengthNm,
 			Delta,
 			1000f + (row % 100),
 			50f,

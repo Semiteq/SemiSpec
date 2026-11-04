@@ -37,7 +37,7 @@ public sealed class StoreBenchmarkRunTests : IDisposable
 	public async Task ASmallRunPrintsEveryMeasurementAndTheStrategiesAgree()
 	{
 		var output = new StringWriter();
-		var options = new BenchmarkOptions(2000, Spectrometer.Atp2000, 0.5, 2, _folder.Root, Keep: false);
+		var options = new BenchmarkOptions(2000, Spectrometer.Atp2000, 2, _folder.Root, Keep: false);
 
 		var exitCode = await BenchmarkRun.RunAsync(options, output, TestContext.Current.CancellationToken);
 
@@ -59,7 +59,7 @@ public sealed class StoreBenchmarkRunTests : IDisposable
 	public async Task ARunInItsOwnTempFolderDeletesTheFolder()
 	{
 		var output = new StringWriter();
-		var options = new BenchmarkOptions(1200, Spectrometer.Atp2000, 1, 0, Folder: null, Keep: false);
+		var options = new BenchmarkOptions(1200, Spectrometer.Atp2000, 0, Folder: null, Keep: false);
 
 		var exitCode = await BenchmarkRun.RunAsync(options, output, TestContext.Current.CancellationToken);
 

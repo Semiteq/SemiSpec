@@ -54,7 +54,7 @@ public sealed class AppStatusBarViewModel : ReactiveObject, IDisposable
 		_disposables.Add(serialLink
 			.StatusUpdates(uiScheduler)
 			.Subscribe(Apply, exception => _logger.LogError(exception, "The status bar stopped following the link")));
-		_disposables.Add(DroppedFramesOf(serialLink, store, uiScheduler)
+		_disposables.Add(DroppedFramesOf(store, uiScheduler)
 			.Select(dropped => Resources.FormatStatusDroppedFramesFormat(dropped.ToString(Resources.Culture)))
 			.ToProperty(this, bar => bar.DroppedFramesText, out _droppedFramesText));
 	}
@@ -112,10 +112,10 @@ public sealed class AppStatusBarViewModel : ReactiveObject, IDisposable
 		_disposables.Dispose();
 	}
 
-	private static IObservable<long> DroppedFramesOf(SerialLink serialLink, SpectrumStore store, IScheduler uiScheduler)
+	private IObservable<long> DroppedFramesOf(SpectrumStore store, IScheduler uiScheduler)
 	{
-		var linkDropped = serialLink
-			.StatusUpdates(uiScheduler)
+		var linkDropped = this
+			.WhenAnyValue(bar => bar.Status)
 			.Select(status => status.DroppedFrames);
 		var storeDropped = store.DroppedFramesChanged
 			.ObserveOn(uiScheduler)

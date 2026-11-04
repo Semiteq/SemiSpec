@@ -124,7 +124,7 @@
     <value>Received frames could not be written to the history file; they count as dropped frames.</value>
   </data>
   <data name="StoreWriteRemedy" xml:space="preserve">
-    <value>Check the free space on the system drive. The application keeps trying.</value>
+    <value>Check the free space on the system drive, and close any program that opened the spectrum history file. The application keeps trying.</value>
   </data>
   <data name="LinkRestoredTitle" xml:space="preserve">
     <value>Receiving data</value>

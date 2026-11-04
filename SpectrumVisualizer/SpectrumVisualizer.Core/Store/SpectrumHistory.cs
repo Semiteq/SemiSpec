@@ -80,8 +80,8 @@ public sealed class SpectrumHistory(string path)
 				END
 			FROM spectrum WHERE received_at >= $from AND received_at < $to
 			""";
-		command.Parameters.AddWithValue("$from", query.From.ToUnixTimeMilliseconds());
-		command.Parameters.AddWithValue("$to", query.To.ToUnixTimeMilliseconds());
+		command.Parameters.AddWithValue("$from", query.FromMilliseconds);
+		command.Parameters.AddWithValue("$to", query.ToMilliseconds);
 		using var reader = command.ExecuteReader();
 		var buffer = new byte[windows.LargestByteCount];
 		var rows = 0;

@@ -107,6 +107,26 @@ public sealed record IntensityQuery
 
 	public int Columns { get; }
 
+	/// <summary>From in the stored Unix milliseconds, rounded down, so the SQL range keeps every row the fold keeps.</summary>
+	public long FromMilliseconds
+	{
+		get
+		{
+			var milliseconds = From.ToUnixTimeMilliseconds();
+			return DateTimeOffset.FromUnixTimeMilliseconds(milliseconds) > From ? milliseconds - 1 : milliseconds;
+		}
+	}
+
+	/// <summary>To in the stored Unix milliseconds, rounded up, so a row stamped in the millisecond To falls inside stays in.</summary>
+	public long ToMilliseconds
+	{
+		get
+		{
+			var milliseconds = To.ToUnixTimeMilliseconds();
+			return DateTimeOffset.FromUnixTimeMilliseconds(milliseconds) < To ? milliseconds + 1 : milliseconds;
+		}
+	}
+
 	/// <summary>Builds the query, or fails for an empty range or fewer than one column.</summary>
 	public static Result<IntensityQuery> Create(ushort wavelengthNm, byte delta, DateTimeOffset from, DateTimeOffset to, int columns)
 	{

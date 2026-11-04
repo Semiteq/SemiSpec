@@ -48,16 +48,24 @@ public sealed class SpectrumStore : IDisposable
 	private readonly ISubject<Unit> _droppedFramesChanged = Subject.Synchronize(new Subject<Unit>());
 	private long _droppedFrames;
 
-	// Start, StopAsync and Dispose run on the UI thread; the writer task only disposes the subscription Start made.
+	// Start, StopAsync and Dispose run on the UI thread.
 	private IDisposable? _subscription;
+	private Task _writer = Task.CompletedTask;
+	private bool _started;
+
+	// Created by Start on the UI thread; cancelled by Dispose and the drain token, disposed by the writer task when it
+	// ends. Each touch holds the gate, so no cancel meets a disposed source.
+	private readonly Lock _cancellationGate = new();
 	private CancellationTokenSource? _cancellation;
 	private CancellationTokenSource? _drainCancellation;
-	private Task _writer = Task.CompletedTask;
-	private bool _stopped;
+
+	// Set by StopAsync and Dispose on the UI thread, read by the writer task.
+	private volatile bool _stopped;
 
 	// Written and read by the writer task only.
 	private long _storedFrames;
 	private bool _writeFailing;
+	private StopCheckpoint _checkpoint;
 
 	public SpectrumStore(
 		FrameDistributor distributor,
@@ -76,7 +84,7 @@ public sealed class SpectrumStore : IDisposable
 		DroppedFramesChanged = _droppedFramesChanged.AsObservable();
 	}
 
-	/// <summary>Frames lost to a full queue, a failed batch or a stop past its budget, since the start.</summary>
+	/// <summary>Frames lost to a full queue, a failed batch, a failed store or a stop past its budget, since the start.</summary>
 	public long DroppedFrames => Interlocked.Read(ref _droppedFrames);
 
 	/// <summary>Signals after each change of DroppedFrames, on the thread that counted; read the count after it.</summary>
@@ -85,11 +93,12 @@ public sealed class SpectrumStore : IDisposable
 	/// <summary>Subscribes to the distributor and starts the writer task once; does nothing after a start or a stop.</summary>
 	public void Start()
 	{
-		if (_cancellation is not null || _stopped)
+		if (_started || _stopped)
 		{
 			return;
 		}
 
+		_started = true;
 		_cancellation = new CancellationTokenSource();
 		_drainCancellation = new CancellationTokenSource();
 		var cancellationToken = _cancellation.Token;
@@ -99,37 +108,46 @@ public sealed class SpectrumStore : IDisposable
 	}
 
 	/// <summary>
-	/// Stops taking frames and completes once the writer has written the queue and closed the file; when drainToken
-	/// fires first, the frames still queued count as dropped. Completes at once when nothing started; a later call
-	/// completes with the writer of the first.
+	/// Stops taking frames and completes once the writer has written the queue and closed the file; from the stop on a
+	/// held lock fails a batch after 1 s, and when drainToken fires the frames still queued count as dropped. Completes
+	/// at once when nothing started; a later call completes with the writer of the first.
 	/// </summary>
 	public async Task StopAsync(CancellationToken drainToken = default)
 	{
 		_stopped = true;
-		if (_cancellation is not { } cancellation || _drainCancellation is not { } drainCancellation)
+		if (_subscription is not { } subscription)
 		{
 			await _writer.ConfigureAwait(false);
 			return;
 		}
 
-		_cancellation = null;
-		_drainCancellation = null;
-		_subscription?.Dispose();
+		_subscription = null;
+		subscription.Dispose();
 		_queue.Writer.TryComplete();
-		await using (drainToken.Register(drainCancellation.Cancel))
+		await using (drainToken.Register(CancelDrain))
 		{
 			await _writer.ConfigureAwait(false);
 		}
-
-		cancellation.Dispose();
-		drainCancellation.Dispose();
 	}
 
 	/// <summary>Cancels the writer without waiting, for the container's synchronous dispose; the writer closes the file.</summary>
 	public void Dispose()
 	{
 		_stopped = true;
-		_cancellation?.Cancel();
+		_subscription?.Dispose();
+		_subscription = null;
+		lock (_cancellationGate)
+		{
+			_cancellation?.Cancel();
+		}
+	}
+
+	private void CancelDrain()
+	{
+		lock (_cancellationGate)
+		{
+			_drainCancellation?.Cancel();
+		}
 	}
 
 	private void Enqueue(ReceivedFrame received)
@@ -153,31 +171,65 @@ public sealed class SpectrumStore : IDisposable
 
 	private async Task RunWriterAsync(CancellationToken cancellationToken, CancellationToken drainToken)
 	{
-		if (OpenDatabase() is not { } database)
-		{
-			_subscription?.Dispose();
-			return;
-		}
-
-		var drained = false;
 		try
 		{
-			await WriteQueuedAsync(database, cancellationToken, drainToken).ConfigureAwait(false);
-			drained = true;
+			if (!await StoreAsync(cancellationToken, drainToken).ConfigureAwait(false))
+			{
+				await DiscardUntilCompletedAsync(cancellationToken).ConfigureAwait(false);
+			}
 		}
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 		{
-			// Dispose ends the writer this way; the file closes below without a checkpoint.
-		}
-		catch (Exception exception)
-		{
-			_logger.LogError(exception, "The spectrum store writer stopped on a failure");
+			// Dispose ends the writer this way; the file is already closed without a checkpoint.
+			CountDropped(DiscardQueued());
 		}
 		finally
 		{
-			_subscription?.Dispose();
-			Close(database, checkpoint: drained);
+			ReleaseCancellation();
+			_logger.LogDebug(
+				"The spectrum store stopped: {Stored} frames stored, {Dropped} frames dropped, checkpoint {Checkpoint}",
+				_storedFrames,
+				DroppedFrames,
+				_checkpoint);
 		}
+	}
+
+	/// <summary>Opens the file and writes the queue into it until the queue completes; false after a failure that ends history.</summary>
+	private async Task<bool> StoreAsync(CancellationToken cancellationToken, CancellationToken drainToken)
+	{
+		SpectrumDatabase? database = null;
+		try
+		{
+			database = OpenDatabase();
+			if (database is null)
+			{
+				return false;
+			}
+
+			await WriteQueuedAsync(database, cancellationToken, drainToken).ConfigureAwait(false);
+			CheckpointAndClose(database);
+			database = null;
+			return true;
+		}
+		catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+		{
+			ReportFailure(exception, opened: database is not null);
+			return false;
+		}
+		finally
+		{
+			database?.Dispose();
+		}
+	}
+
+	/// <summary>Counts every frame still queued and every later one as dropped until the queue completes.</summary>
+	private async Task DiscardUntilCompletedAsync(CancellationToken cancellationToken)
+	{
+		do
+		{
+			CountDropped(DiscardQueued());
+		}
+		while (await _queue.Reader.WaitToReadAsync(cancellationToken).ConfigureAwait(false));
 	}
 
 	private SpectrumDatabase? OpenDatabase()
@@ -185,10 +237,7 @@ public sealed class SpectrumStore : IDisposable
 		var path = _storeFile.Path;
 		var opened = StoreFiles.Prepare(path).Bind(sweep =>
 		{
-			_logger.LogDebug(
-				"The spectrum store sweep deleted {Deleted} files and kept {Kept} files of live instances",
-				sweep.DeletedFiles,
-				sweep.KeptFiles);
+			LogSweep(sweep);
 			return SpectrumDatabase.Open(path);
 		});
 		if (opened.IsFailed)
@@ -200,6 +249,33 @@ public sealed class SpectrumStore : IDisposable
 
 		_logger.LogInformation("Spectrum store file {Path}", path);
 		return opened.Value;
+	}
+
+	private void LogSweep(StoreSweep sweep)
+	{
+		if (sweep.Failure is { } failure)
+		{
+			_logger.LogWarning(failure, "The spectrum store sweep could not list the store folder; it deleted nothing");
+			return;
+		}
+
+		_logger.LogDebug(
+			"The spectrum store sweep deleted {Deleted} files and kept {Kept} files of live instances",
+			sweep.DeletedFiles,
+			sweep.KeptFiles);
+	}
+
+	private void ReportFailure(Exception exception, bool opened)
+	{
+		if (!opened)
+		{
+			_logger.LogError(exception, "The spectrum store file {Path} could not be opened", _storeFile.Path);
+			_messagePanel.TryReportFailure(new StoreOpenError(_storeFile.Path).CausedBy(exception), _logger, _uiScheduler);
+			return;
+		}
+
+		_logger.LogError(exception, "The spectrum store writer failed; every later frame counts as dropped");
+		_messagePanel.TryReportFailure(new StoreWriteError().CausedBy(exception), _logger, _uiScheduler);
 	}
 
 	private async Task WriteQueuedAsync(
@@ -216,6 +292,11 @@ public sealed class SpectrumStore : IDisposable
 				// Each pending wait is kept until it completes: the queue allows one reader wait at a time.
 				readable ??= _queue.Reader.WaitToReadAsync(cancellationToken).AsTask();
 				await Task.WhenAny(readable, retentionDue).ConfigureAwait(false);
+				if (_stopped)
+				{
+					database.ShortenBusyTimeout();
+				}
+
 				if (retentionDue.IsCompleted)
 				{
 					await retentionDue.ConfigureAwait(false);
@@ -257,7 +338,17 @@ public sealed class SpectrumStore : IDisposable
 			batch.Add(received);
 		}
 
-		var written = database.Write(batch);
+		Result written;
+		try
+		{
+			written = database.Write(batch);
+		}
+		catch (Exception)
+		{
+			CountDropped(batch.Count);
+			throw;
+		}
+
 		if (written.IsSuccess)
 		{
 			_storedFrames += batch.Count;
@@ -303,29 +394,28 @@ public sealed class SpectrumStore : IDisposable
 		return discarded;
 	}
 
-	private void Close(SpectrumDatabase database, bool checkpoint)
+	private void CheckpointAndClose(SpectrumDatabase database)
 	{
-		if (!checkpoint)
+		var closed = database.CheckpointAndClose();
+		if (closed.IsFailed)
 		{
-			database.Dispose();
-		}
-		else
-		{
-			var closed = database.CheckpointAndClose();
-			if (closed.IsFailed)
-			{
-				_logger.LogWarning(CauseOf(closed.Errors), "The spectrum store WAL could not be checkpointed");
-			}
-			else if (closed.Value == WalCheckpoint.Busy)
-			{
-				_logger.LogDebug("The spectrum store WAL stays: a reader held a snapshot at the checkpoint");
-			}
+			_checkpoint = StopCheckpoint.Failed;
+			_logger.LogWarning(CauseOf(closed.Errors), "The spectrum store WAL could not be checkpointed");
+			return;
 		}
 
-		_logger.LogDebug(
-			"The spectrum store stopped: {Stored} frames stored, {Dropped} frames dropped",
-			_storedFrames,
-			DroppedFrames);
+		_checkpoint = closed.Value == WalCheckpoint.Busy ? StopCheckpoint.Busy : StopCheckpoint.Truncated;
+	}
+
+	private void ReleaseCancellation()
+	{
+		lock (_cancellationGate)
+		{
+			_cancellation?.Dispose();
+			_cancellation = null;
+			_drainCancellation?.Dispose();
+			_drainCancellation = null;
+		}
 	}
 
 	private static Exception? CauseOf(IEnumerable<IError> errors)
@@ -344,5 +434,14 @@ public sealed class SpectrumStore : IDisposable
 		}
 
 		return null;
+	}
+
+	/// <summary>The writer's last closing step, named in its stopped line.</summary>
+	private enum StopCheckpoint
+	{
+		Skipped,
+		Truncated,
+		Busy,
+		Failed,
 	}
 }

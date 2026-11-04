@@ -28,9 +28,15 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 {
 	private const int TestTimeoutMs = 30_000;
 	private const byte FailingSeq = 99;
+	private const int QueueCapacity = 1024;
+	private const int BatchSize = 256;
 
-	// A held write lock costs a batch 2 s and the closing checkpoint up to 2 s more.
+	// A held write lock costs a batch the 2 s busy timeout, 1 s once the stop began; the checkpoint never waits.
 	private static readonly TimeSpan _stopLimit = TimeSpan.FromSeconds(10);
+
+	// The app's close chain: its limit, and the drain token that fires the store's close reserve before it.
+	private static readonly TimeSpan _closeLimit = TimeSpan.FromSeconds(5);
+	private static readonly TimeSpan _closeReserve = TimeSpan.FromSeconds(1.5);
 
 	// A frame the store took would reach the file within this long; nothing waits on it in the passing case.
 	private static readonly TimeSpan _noWriteWait = TimeSpan.FromMilliseconds(200);
@@ -97,6 +103,8 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 	[Fact(Timeout = TestTimeoutMs)]
 	public async Task TheSubscriberOnlyEnqueues()
 	{
+		const int Fed = QueueCapacity + BatchSize + 100;
+		_channel = Channel.CreateUnbounded<ReceivedFrame>();
 		CreateStore();
 		var beforeStore = new ConcurrentQueue<long>();
 		var afterStore = new ConcurrentQueue<long>();
@@ -107,11 +115,12 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 		await OpenedAsync();
 		using var holder = HoldWriteLock();
 
-		Feed([.. Enumerable.Range(0, 10).Select(i => StoreSamples.Spectrum(StoreSamples.Start.AddSeconds(i)))]);
+		Feed([.. Enumerable.Repeat(StoreSamples.Spectrum(StoreSamples.Start), Fed)]);
 
-		await Waits.UntilAsync(() => afterStore.Count == 10);
+		await Waits.UntilAsync(() => afterStore.Count == Fed);
 		var slowest = beforeStore.Zip(afterStore, Stopwatch.GetElapsedTime).Max();
 		slowest.Should().BeLessThan(TimeSpan.FromMilliseconds(50));
+		Store.DroppedFrames.Should().BePositive("the last frames met a full queue");
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
@@ -176,25 +185,35 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 	public async Task RetentionRunsOnceAMinuteAlsoWithoutFrames()
 	{
 		var now = StoreSamples.Start.AddHours(25);
+		var firstPass = now.AddSeconds(61);
 		var clock = new ManualClock(now);
 		await StartOpenedAsync(clock);
 		Feed(
 			StoreSamples.Spectrum(StoreSamples.Start, seq: 1),
 			StoreSamples.Heartbeat(StoreSamples.Start, seq: 2),
+			StoreSamples.Spectrum(firstPass - TimeSpan.FromHours(23) - TimeSpan.FromMinutes(59), seq: 5),
 			StoreSamples.Spectrum(now, seq: 3));
-		await Waits.UntilAsync(() => Count("spectrum") == 2 && Count("heartbeat") == 1);
+		await Waits.UntilAsync(() => Count("spectrum") == 3 && Count("heartbeat") == 1);
 
-		clock.Advance(TimeSpan.FromSeconds(61));
+		clock.Advance(TimeSpan.FromSeconds(59));
+		Feed(StoreSamples.Spectrum(now, seq: 6));
 
-		await Waits.UntilAsync(() => Count("spectrum") == 1 && Count("heartbeat") == 0);
-		Scalar("SELECT seq FROM spectrum").Should().Be(3L);
+		// A due retention pass runs before the batch the writer takes after it.
+		await Waits.UntilAsync(() => Count("spectrum") == 4);
+		Count("heartbeat").Should().Be(1, "no minute has passed");
+
+		clock.Advance(firstPass - now - TimeSpan.FromSeconds(59));
+
+		await Waits.UntilAsync(() => Count("spectrum") == 3 && Count("heartbeat") == 0);
+		Scalar("SELECT group_concat(seq) FROM (SELECT seq FROM spectrum ORDER BY id)").Should().Be("5,3,6",
+			"the row 23 h 59 min old at the pass survives");
 		Feed(StoreSamples.Spectrum(StoreSamples.Start, seq: 4));
-		await Waits.UntilAsync(() => Count("spectrum") == 2);
+		await Waits.UntilAsync(() => Count("spectrum") == 4);
 
 		clock.Advance(TimeSpan.FromSeconds(61));
 
-		await Waits.UntilAsync(() => Count("spectrum") == 1);
-		Scalar("SELECT seq FROM spectrum").Should().Be(3L);
+		await Waits.UntilAsync(() => Count("spectrum") == 2);
+		Scalar("SELECT group_concat(seq) FROM (SELECT seq FROM spectrum ORDER BY id)").Should().Be("3,6");
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
@@ -216,7 +235,48 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 		await stop.WaitAsync(_stopLimit, TestContext.Current.CancellationToken);
 
 		(Count("spectrum") + Store.DroppedFrames).Should().Be(Fed);
-		Store.DroppedFrames.Should().BeGreaterThanOrEqualTo(Fed - 256, "a batch holds at most 256 frames");
+		Store.DroppedFrames.Should().BeGreaterThanOrEqualTo(Fed - BatchSize, "a batch holds at most 256 frames");
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task AStopAgainstALockHeldThroughItEndsInsideTheCloseLimit()
+	{
+		const int Fed = 600;
+		_channel = Channel.CreateUnbounded<ReceivedFrame>();
+		await StartOpenedAsync();
+		TimeSpan elapsed;
+
+		using (HoldWriteLock())
+		{
+			await FeedAsync([.. Enumerable.Repeat(StoreSamples.Spectrum(StoreSamples.Start), Fed)]);
+			using var drain = new CancellationTokenSource(_closeLimit - _closeReserve);
+			var stopwatch = Stopwatch.StartNew();
+			await Store.StopAsync(drain.Token).WaitAsync(_stopLimit, TestContext.Current.CancellationToken);
+			elapsed = stopwatch.Elapsed;
+		}
+
+		elapsed.Should().BeLessThan(_closeLimit);
+		(Count("spectrum") + Store.DroppedFrames).Should().Be(Fed);
+		LatestStoppedLine().Should().EndWith("checkpoint Busy");
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task DisposeCountsTheQueuedFramesAsDropped()
+	{
+		const int Fed = 600;
+		_channel = Channel.CreateUnbounded<ReceivedFrame>();
+		await StartOpenedAsync();
+
+		using (HoldWriteLock())
+		{
+			await FeedAsync([.. Enumerable.Repeat(StoreSamples.Spectrum(StoreSamples.Start), Fed)]);
+			Store.Dispose();
+			await Waits.UntilAsync(StoppedLogged);
+		}
+
+		Count("spectrum").Should().Be(0);
+		Store.DroppedFrames.Should().Be(Fed);
+		LatestStoppedLine().Should().EndWith("checkpoint Skipped");
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
@@ -235,7 +295,7 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
-	public async Task DataStaysAcrossLinkSessions()
+	public async Task FramesFromTwoSequenceRunsShareOneFile()
 	{
 		await StartOpenedAsync();
 		ReceivedFrame[] firstSession = [.. Enumerable.Range(0, 3)
@@ -260,25 +320,25 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 		_channel = Channel.CreateUnbounded<ReceivedFrame>();
 		await StartOpenedAsync();
 
+		// Open across the stop, so the WAL outlives the writer's close and shows what the checkpoint did to it.
+		using var idle = OpenPlain();
+		Scalar(idle, "SELECT count(*) FROM spectrum");
 		await FeedAsync([.. Enumerable.Repeat(StoreSamples.Spectrum(StoreSamples.Start), Fed)]);
 		await StopAsync();
 
 		Count("spectrum").Should().Be(Fed);
 		Store.DroppedFrames.Should().Be(0);
 		var wal = new FileInfo(_path + "-wal");
-		(!wal.Exists || wal.Length == 0).Should().BeTrue("the checkpoint truncates the WAL");
-		_logger.Collector.LatestRecord.Message.Should().Be(
-			$"The spectrum store stopped: {Fed} frames stored, 0 frames dropped");
+		wal.Exists.Should().BeTrue("the idle connection keeps the WAL file");
+		wal.Length.Should().Be(0, "the checkpoint truncates the WAL");
+		LatestStoppedLine().Should().Be(
+			$"The spectrum store stopped: {Fed} frames stored, 0 frames dropped, checkpoint Truncated");
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
 	public async Task AStopWithAFullQueueDrainsInsideTheCloseLimit()
 	{
-		const int QueueCapacity = 1024;
-		const int BatchSize = 256;
 		const int Fed = QueueCapacity + BatchSize;
-		var closeLimit = TimeSpan.FromSeconds(5);
-		var closeReserve = TimeSpan.FromSeconds(0.5);
 		_channel = Channel.CreateUnbounded<ReceivedFrame>();
 		await StartOpenedAsync();
 
@@ -287,11 +347,11 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 			await FeedAsync([.. Enumerable.Repeat(StoreSamples.Spectrum(StoreSamples.Start), Fed)]);
 		}
 
-		using var drain = new CancellationTokenSource(closeLimit - closeReserve);
+		using var drain = new CancellationTokenSource(_closeLimit - _closeReserve);
 		var stopwatch = Stopwatch.StartNew();
 		await Store.StopAsync(drain.Token).WaitAsync(_stopLimit, TestContext.Current.CancellationToken);
 
-		stopwatch.Elapsed.Should().BeLessThan(closeLimit);
+		stopwatch.Elapsed.Should().BeLessThan(_closeLimit);
 		(Count("spectrum") + Store.DroppedFrames).Should().Be(Fed);
 		Store.DroppedFrames.Should().BeLessThanOrEqualTo(BatchSize, "only frames past the full queue are dropped");
 		Count("spectrum").Should().BeGreaterThanOrEqualTo(QueueCapacity, "the full queue drains before the drain token");
@@ -314,7 +374,7 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
-	public async Task AFailedOpenReportsOneErrorAndStoresNothing()
+	public async Task AFailedOpenReportsOneErrorAndCountsEveryFrameAsDropped()
 	{
 		var blocker = _folder.FileIn("blocker");
 		await File.WriteAllTextAsync(blocker, "a file where the store folder belongs", TestContext.Current.CancellationToken);
@@ -329,10 +389,54 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 		var entry = _panel.Entries.Should().ContainSingle().Subject;
 		entry.View.Title.Should().Be(Resources.StoreOpenTitle);
 		entry.View.Severity.Should().Be(MessageSeverity.Error);
-		Store.DroppedFrames.Should().Be(0, "no history exists to have holes");
+		Store.DroppedFrames.Should().Be(2, "history is off, so every frame is missing from it");
 		File.Exists(path).Should().BeFalse();
 		_logger.Failures().Should().ContainSingle().Which.Should().BeAssignableTo<IOException>();
 		_logger.Levels().Should().NotContain(LogLevel.Information);
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task AnOpenThatThrowsReportsOneErrorAndCountsEveryFrameAsDropped()
+	{
+		var path = _folder.FileIn("spectra-\0.db");
+		CreateStore(path: path);
+		StartStore();
+
+		await Waits.UntilAsync(() => _panel.Entries.Count == 1);
+		await FeedAsync(StoreSamples.Spectrum(StoreSamples.Start), StoreSamples.Heartbeat(StoreSamples.Start));
+		await StopAsync();
+
+		var entry = _panel.Entries.Should().ContainSingle().Subject;
+		entry.View.Title.Should().Be(Resources.StoreOpenTitle);
+		entry.View.Severity.Should().Be(MessageSeverity.Error);
+		Store.DroppedFrames.Should().Be(2);
+		_logger.Failures().Should().ContainSingle().Which.Should().BeOfType<ArgumentException>();
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task AFailureAfterTheOpenReportsOnceAndCountsEveryLaterFrameAsDropped()
+	{
+		var clock = new ManualClock(StoreSamples.Start);
+		await StartOpenedAsync(clock);
+		await FeedAsync(StoreSamples.Spectrum(StoreSamples.Start, seq: 1));
+		await Waits.UntilAsync(() => Count("spectrum") == 1);
+		var failure = new InvalidOperationException("the clock failed");
+		clock.NowFailure = failure;
+
+		clock.Advance(TimeSpan.FromSeconds(61));
+
+		await Waits.UntilAsync(() => _panel.Entries.Count == 1);
+		await FeedAsync(StoreSamples.Spectrum(StoreSamples.Start, seq: 2), StoreSamples.Heartbeat(StoreSamples.Start));
+		await StopAsync();
+
+		var entry = _panel.Entries.Should().ContainSingle().Subject;
+		entry.View.Title.Should().Be(Resources.StoreWriteTitle);
+		Count("spectrum").Should().Be(1);
+		Store.DroppedFrames.Should().Be(2);
+		_logger.Failures().Should().ContainSingle().Which.Should().BeSameAs(failure);
+		LatestStoppedLine().Should().EndWith("checkpoint Skipped");
+		var delete = () => File.Delete(_path);
+		delete.Should().NotThrow("the writer closed the file after the failure");
 	}
 
 	private static Channel<ReceivedFrame> LinkChannel()
@@ -384,8 +488,14 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 
 	private bool StoppedLogged()
 	{
+		return LatestStoppedLine() is not null;
+	}
+
+	private string? LatestStoppedLine()
+	{
 		return _logger.Collector.GetSnapshot()
-			.Any(record => record.Message.StartsWith("The spectrum store stopped", StringComparison.Ordinal));
+			.Select(record => record.Message)
+			.LastOrDefault(message => message.StartsWith("The spectrum store stopped", StringComparison.Ordinal));
 	}
 
 	private void Feed(params ReceivedFrame[] frames)
@@ -439,6 +549,11 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 	private object? Scalar(string sql)
 	{
 		using var connection = OpenPlain();
+		return Scalar(connection, sql);
+	}
+
+	private static object? Scalar(SqliteConnection connection, string sql)
+	{
 		using var command = connection.CreateCommand();
 		command.CommandText = sql;
 		return command.ExecuteScalar();
@@ -459,8 +574,16 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 		private readonly List<ManualTimer> _timers = [];
 		private DateTimeOffset _now = start;
 
+		/// <summary>When set, every later GetUtcNow throws it.</summary>
+		public Exception? NowFailure { get; set; }
+
 		public override DateTimeOffset GetUtcNow()
 		{
+			if (NowFailure is { } failure)
+			{
+				throw failure;
+			}
+
 			lock (_gate)
 			{
 				return _now;

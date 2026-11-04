@@ -10,11 +10,12 @@ public sealed class QueryWindows(ushort nm, byte delta)
 {
 	private readonly PixelWindow _atp2000 = SpectrometerCalibration.For(Spectrometer.Atp2000).Window(nm, delta);
 	private readonly PixelWindow _atp8000 = SpectrometerCalibration.For(Spectrometer.Atp8000).Window(nm, delta);
-	private readonly bool _atp2000Covers = SpectrumIntensity.Covers(Spectrometer.Atp2000, nm);
-	private readonly bool _atp8000Covers = SpectrumIntensity.Covers(Spectrometer.Atp8000, nm);
+	private readonly bool _atp2000Covers = InFirmwareTable(Spectrometer.Atp2000, nm);
+	private readonly bool _atp8000Covers = InFirmwareTable(Spectrometer.Atp8000, nm);
 
 	public int LargestByteCount => Math.Max(ByteCount(_atp2000), ByteCount(_atp8000));
 
+	/// <summary>True when the wavelength lies inside the device's firmware table range.</summary>
 	public bool Covers(Spectrometer device)
 	{
 		return device == Spectrometer.Atp2000 ? _atp2000Covers : _atp8000Covers;
@@ -40,6 +41,18 @@ public sealed class QueryWindows(ushort nm, byte delta)
 	public static double MeanOf(ReadOnlySpan<byte> windowBytes)
 	{
 		var pixels = MemoryMarshal.Cast<byte, ushort>(windowBytes);
-		return SpectrumIntensity.Mean(pixels, new PixelWindow(0, pixels.Length - 1));
+		long sum = 0;
+		foreach (var pixel in pixels)
+		{
+			sum += pixel;
+		}
+
+		return (double)sum / pixels.Length;
+	}
+
+	private static bool InFirmwareTable(Spectrometer device, ushort nm)
+	{
+		var calibration = SpectrometerCalibration.For(device);
+		return calibration.FirstNm <= nm && nm <= calibration.LastNm;
 	}
 }
