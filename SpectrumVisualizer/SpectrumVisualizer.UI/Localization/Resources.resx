@@ -75,6 +75,15 @@
   <data name="PortNotFoundRemedy" xml:space="preserve">
     <value>Check the cable and the adapter. The application retries every second; to pick another port, press Disconnect.</value>
   </data>
+  <data name="PortListTitle" xml:space="preserve">
+    <value>Cannot list the ports</value>
+  </data>
+  <data name="PortListDetail" xml:space="preserve">
+    <value>Windows did not return the list of serial ports.</value>
+  </data>
+  <data name="PortListRemedy" xml:space="preserve">
+    <value>Press Refresh. If the list stays empty, check the adapter driver.</value>
+  </data>
   <data name="PortLostTitle" xml:space="preserve">
     <value>Connection lost</value>
   </data>

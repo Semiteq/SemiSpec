@@ -45,7 +45,12 @@ public sealed class MainWindowViewTests : IDisposable
 	{
 		var portProvider = new FakeSerialPortProvider();
 		_serialLink = new SerialLink(portProvider, ImmediateScheduler.Instance, NullLogger<SerialLink>.Instance);
-		_connectionBar = new ConnectionBarViewModel(portProvider, _serialLink, AvaloniaScheduler.Instance);
+		_connectionBar = new ConnectionBarViewModel(
+			portProvider,
+			_serialLink,
+			_messagePanel,
+			AvaloniaScheduler.Instance,
+			NullLogger<ConnectionBarViewModel>.Instance);
 		_statusBar = new AppStatusBarViewModel(
 			_serialLink,
 			_messagePanel,

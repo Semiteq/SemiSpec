@@ -25,6 +25,11 @@ public static class ErrorMessageMapper
 				Resources.PortNotFoundDetail,
 				Resources.PortNotFoundRemedy,
 				MessageSeverity.Error),
+			PortListError => new MessageView(
+				Resources.PortListTitle,
+				Resources.PortListDetail,
+				Resources.PortListRemedy,
+				MessageSeverity.Warning),
 			PortLostError => new MessageView(
 				Resources.PortLostTitle,
 				Resources.PortLostDetail,

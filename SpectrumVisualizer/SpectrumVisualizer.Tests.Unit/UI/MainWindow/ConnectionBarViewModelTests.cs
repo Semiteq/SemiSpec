@@ -16,6 +16,7 @@ using SpectrumVisualizer.Tests.Unit.UI.Link;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.MainWindow;
+using SpectrumVisualizer.UI.Messages;
 
 using Xunit;
 
@@ -30,13 +31,14 @@ public sealed class ConnectionBarViewModelTests : IDisposable
 
 	private readonly FakeSerialPortProvider _portProvider = new(PortName, "COM5");
 	private readonly FakePortStream _port = new();
+	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
 	private readonly SerialLink _serialLink;
 	private readonly ConnectionBarViewModel _viewModel;
 
 	public ConnectionBarViewModelTests()
 	{
 		_serialLink = new SerialLink(_portProvider, new TestScheduler(), NullLogger<SerialLink>.Instance);
-		_viewModel = new ConnectionBarViewModel(_portProvider, _serialLink, AvaloniaScheduler.Instance);
+		_viewModel = NewViewModel();
 	}
 
 	[AvaloniaFact]
@@ -89,6 +91,16 @@ public sealed class ConnectionBarViewModelTests : IDisposable
 		_viewModel.Ports.Should().BeEmpty();
 		_viewModel.SelectedPort.Should().BeNull();
 		_viewModel.PortPlaceholder.Should().Be(Resources.ConnectionPortPlaceholder);
+		_messagePanel.Entries.Should().ContainSingle()
+			.Which.View.Should().Be(ErrorMessageMapper.Map(new PortListError()));
+	}
+
+	[AvaloniaFact]
+	public void AListingThatWorksAddsNoPanelEntry()
+	{
+		_viewModel.RefreshPorts();
+
+		_messagePanel.Entries.Should().BeEmpty();
 	}
 
 	[AvaloniaFact]
@@ -169,7 +181,7 @@ public sealed class ConnectionBarViewModelTests : IDisposable
 		_serialLink.Connect(PortName);
 		await _port.WaitForPendingReadAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
 
-		using var lateViewModel = new ConnectionBarViewModel(_portProvider, _serialLink, AvaloniaScheduler.Instance);
+		using var lateViewModel = NewViewModel();
 
 		lateViewModel.IsIdle.Should().BeFalse("the link was already active when the view model was built");
 	}
@@ -179,6 +191,17 @@ public sealed class ConnectionBarViewModelTests : IDisposable
 		_viewModel.Dispose();
 		_serialLink.Dispose();
 		_port.Dispose();
+		_messagePanel.Dispose();
+	}
+
+	private ConnectionBarViewModel NewViewModel()
+	{
+		return new ConnectionBarViewModel(
+			_portProvider,
+			_serialLink,
+			_messagePanel,
+			AvaloniaScheduler.Instance,
+			NullLogger<ConnectionBarViewModel>.Instance);
 	}
 
 	private static bool CanExecute(ICommand command)

@@ -100,6 +100,18 @@ public sealed class ErrorMessageMapperTests
 	}
 
 	[Fact]
+	public void MapGivesAFailedPortListingItsOwnTextAtWarning()
+	{
+		var view = ErrorMessageMapper.Map(new PortListError().CausedBy(new Error("the port registry key is gone")));
+
+		view.Should().Be(new MessageView(
+			Resources.PortListTitle,
+			Resources.PortListDetail,
+			Resources.PortListRemedy,
+			MessageSeverity.Warning));
+	}
+
+	[Fact]
 	public void MapGivesTwoPortLostErrorsOnDifferentPortsEqualViews()
 	{
 		var first = ErrorMessageMapper.Map(new PortLostError("COM3"));

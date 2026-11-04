@@ -4,10 +4,13 @@ using System.Reactive.Concurrency;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
 
+using Microsoft.Extensions.Logging;
+
 using ReactiveUI;
 
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Localization;
+using SpectrumVisualizer.UI.Messages;
 
 namespace SpectrumVisualizer.UI.MainWindow;
 
@@ -17,12 +20,21 @@ public sealed class ConnectionBarViewModel : ReactiveObject, IDisposable
 	private readonly CompositeDisposable _disposables = [];
 	private readonly ISerialPortProvider _serialPortProvider;
 	private readonly SerialLink _serialLink;
+	private readonly MessagePanelViewModel _messagePanel;
+	private readonly ILogger<ConnectionBarViewModel> _logger;
 	private readonly ObservableAsPropertyHelper<bool> _isIdle;
 
-	public ConnectionBarViewModel(ISerialPortProvider serialPortProvider, SerialLink serialLink, IScheduler uiScheduler)
+	public ConnectionBarViewModel(
+		ISerialPortProvider serialPortProvider,
+		SerialLink serialLink,
+		MessagePanelViewModel messagePanel,
+		IScheduler uiScheduler,
+		ILogger<ConnectionBarViewModel> logger)
 	{
 		_serialPortProvider = serialPortProvider;
 		_serialLink = serialLink;
+		_messagePanel = messagePanel;
+		_logger = logger;
 
 		_disposables.Add(serialLink
 			.StatusUpdates(uiScheduler)
@@ -61,12 +73,19 @@ public sealed class ConnectionBarViewModel : ReactiveObject, IDisposable
 	public ReactiveCommand<Unit, Unit> DisconnectCommand { get; }
 
 	/// <summary>
-	/// Reads the port list again and keeps the selection while its port is still listed; a failed listing shows none.
+	/// Reads the port list again and keeps the selection while its port is still listed; a failed listing goes to
+	/// the message panel and shows no port.
 	/// </summary>
 	public void RefreshPorts()
 	{
 		var selectedPort = SelectedPort;
-		var portNames = _serialPortProvider.PortNames().ValueOrDefault ?? [];
+		var listed = _serialPortProvider.PortNames();
+		if (listed.IsFailed)
+		{
+			_messagePanel.ReportFailure(new PortListError().CausedBy(listed.Errors), _logger);
+		}
+
+		var portNames = listed.ValueOrDefault ?? [];
 
 		// Clearing the bound list pushes null into SelectedPort, so the selection is restored after the adds.
 		Ports.Clear();

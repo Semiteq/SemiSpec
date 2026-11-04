@@ -13,6 +13,10 @@ public sealed class PortBusyError(string portName)
 public sealed class PortNotFoundError(string portName)
 	: LinkError($"Port {portName} was not found.");
 
+/// <summary>Windows did not return the list of serial ports; the listing failure rides along as its cause.</summary>
+public sealed class PortListError()
+	: Error("The serial ports could not be listed.");
+
 /// <summary>The open port had a read fail or return zero bytes, or the port left the port list.</summary>
 public sealed class PortLostError(string portName)
 	: LinkError($"Port {portName} was lost.");

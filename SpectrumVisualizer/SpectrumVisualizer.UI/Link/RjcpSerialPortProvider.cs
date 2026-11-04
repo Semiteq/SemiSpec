@@ -27,18 +27,21 @@ public sealed class RjcpSerialPortProvider(ILogger<RjcpSerialPortProvider> logge
 		}
 		catch (Exception exception) when (exception is not OperationCanceledException)
 		{
-			logger.LogDebug(exception, "Listing the serial ports failed");
+			logger.LogWarning(exception, "Listing the serial ports failed");
 			return Result.Fail<IReadOnlyList<string>>(new ExceptionalError(exception));
 		}
 	}
 
-	/// <summary>Every failure, of the listing and the constructor included, is a retryable link error.</summary>
+	/// <summary>
+	/// Every failure, of the constructor included, is a retryable link error. A failed listing is no proof that
+	/// the port is gone, so the open goes ahead.
+	/// </summary>
 	public Result<Stream> Open(string portName)
 	{
 		var listed = PortNames();
-		if (listed.IsFailed || !listed.Value.Contains(portName, StringComparer.OrdinalIgnoreCase))
+		if (listed.IsSuccess && !listed.Value.Contains(portName, StringComparer.OrdinalIgnoreCase))
 		{
-			return Result.Fail<Stream>(new PortNotFoundError(portName).CausedBy(listed.Errors));
+			return Result.Fail<Stream>(new PortNotFoundError(portName));
 		}
 
 		SerialPortStream? port = null;

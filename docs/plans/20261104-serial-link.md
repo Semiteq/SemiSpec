@@ -254,7 +254,9 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
   the one production implementation: `SerialPortStream.GetPortNames()` sorted by the number after `COM`, a port at
   115200 baud, 8N1, `ReadTimeout = 1000` ms, `ThrowOnReadError = true`. `Open` maps `UnauthorizedAccessException` and
   an `IOException` with `HResult` 32 (sharing violation) to `PortBusyError`, and any other `IOException` or a name
-  missing from `GetPortNames()` to `PortNotFoundError`.
+  missing from a `GetPortNames()` that worked to `PortNotFoundError`; a failed listing logs a Warning and `Open`
+  tries the port anyway. The connection row reports a failed listing to the panel as `PortListError` (Warning; no
+  port name, so it sits outside the `LinkError` family).
 - **Synchronous decode step in Core.** `FrameReader` gains `void DecodeBuffered(PipeReader reader,
   ICollection<BoardFrame> frames)`: it calls `TryRead`, decodes every whole frame with the existing `DecodeAll`, and
   when the writer has completed runs the existing `DrainAfterCompletion`; it then calls `AdvanceTo(consumed, end)`. `ReadAllAsync` stays as it is with its tests.

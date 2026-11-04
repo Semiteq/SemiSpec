@@ -46,13 +46,14 @@ the board emulator, writes protocol frames to a serial port for manual runs.
 | `LinkHealth` | UI | The 10 s health rules and the drain rule, as pure functions of timestamps |
 | `LinkState`, `LinkStatus` | UI | What the link publishes: the state, the port, the latest `state` bits, the lost total and the fault on entry |
 | `LinkError` and its five errors | UI | `PortBusyError`, `PortNotFoundError`, `PortLostError`, `BoardNotRespondingError`, `UnrecognisedDataError`, each with the port in its message |
+| `PortListError` | UI | Windows did not return the port list; no port name, the listing failure as its cause |
 | `AppLogging` | UI | Creates the log folder and the Serilog logger: `spectrum-visualizer.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
 | `AddUi(LoggingSetup)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, the message panel, the connection row, the status bar and the main window view model, all singletons |
 | `Program` | UI | Entry point: paths, logging, container, `App.Run` with the logger for unhandled exceptions |
 | `App` | UI | Builds the Avalonia app with the exception handler, subscribes dispatcher exceptions, sets Semi's control strings to the UI culture, creates the main window from the container, refreshes the port list when the window opens and stops the link before it closes |
 | `MainWindowViewModel` | UI | Exit request, the verbose-logging command, and the panel, connection row and status bar view models |
-| `ConnectionBarViewModel` | UI | The port list, the selection and the Refresh, Connect and Disconnect commands |
+| `ConnectionBarViewModel` | UI | The port list, the selection and the Refresh, Connect and Disconnect commands; reports a failed listing to the panel |
 | `AppStatusBarViewModel` | UI | The status bar texts and dot tone from `SerialLink.Status`; reports each fault and the restored entry to the panel |
 | `MessagePanelViewModel` | UI | The bounded, newest-first list of messages the operator reads |
 | `MessageSeverity` | UI | Info, Warning or Error on a message; the panel picks the dot class with `ObjectConverters.Equal` against each value |
@@ -132,7 +133,7 @@ The port list and Connect are enabled only while the link is Disconnected; Conne
 Disconnect is enabled in every other state, and Refresh in every state. `IsIdle` follows
 `SerialLink.StatusUpdates(uiScheduler)`, which starts with `SerialLink.Status` and moves every later change to the UI
 scheduler, so it is right from construction. Refresh reads the port list again and keeps the selection when its port is
-still listed; a listing that fails shows an empty list. With no ports the list shows the placeholder "No ports found"; the placeholder is empty while ports are
+still listed; a listing that fails shows an empty list and reports a `PortListError` to the message panel. With no ports the list shows the placeholder "No ports found"; the placeholder is empty while ports are
 listed. Connect and Refresh are synchronous commands; Disconnect awaits `DisconnectAsync`.
 
 ### Status bar
@@ -173,6 +174,7 @@ extensions:
 | --- | --- |
 | `PortBusyError`, `PortNotFoundError` | Error: the operator acts |
 | `PortLostError`, `BoardNotRespondingError`, `UnrecognisedDataError` | Warning: the link retries and the operator watches |
+| `PortListError` | Warning: the operator presses Refresh |
 | an exception error | Error; the detail keeps the exception type and message |
 | any other error | Error; the detail keeps the error's own message |
 

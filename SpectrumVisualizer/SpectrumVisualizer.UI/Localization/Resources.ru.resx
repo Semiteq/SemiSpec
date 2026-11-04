@@ -75,6 +75,15 @@
   <data name="PortNotFoundRemedy" xml:space="preserve">
     <value>Проверьте кабель и адаптер. Программа повторяет попытку каждую секунду; чтобы выбрать другой порт, нажмите «Отключить».</value>
   </data>
+  <data name="PortListTitle" xml:space="preserve">
+    <value>Не удалось получить список портов</value>
+  </data>
+  <data name="PortListDetail" xml:space="preserve">
+    <value>Windows не вернула список последовательных портов.</value>
+  </data>
+  <data name="PortListRemedy" xml:space="preserve">
+    <value>Нажмите «Обновить». Если список остаётся пустым, проверьте драйвер адаптера.</value>
+  </data>
   <data name="PortLostTitle" xml:space="preserve">
     <value>Связь потеряна</value>
   </data>

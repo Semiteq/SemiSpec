@@ -43,7 +43,12 @@ public sealed class MainWindowViewModelTests : IDisposable
 	{
 		var portProvider = new FakeSerialPortProvider();
 		_serialLink = new SerialLink(portProvider, ImmediateScheduler.Instance, NullLogger<SerialLink>.Instance);
-		_connectionBar = new ConnectionBarViewModel(portProvider, _serialLink, ImmediateScheduler.Instance);
+		_connectionBar = new ConnectionBarViewModel(
+			portProvider,
+			_serialLink,
+			_messagePanel,
+			ImmediateScheduler.Instance,
+			NullLogger<ConnectionBarViewModel>.Instance);
 		_serilogLogger = new LoggerConfiguration()
 			.MinimumLevel.ControlledBy(_logLevelControl.Switch)
 			.WriteTo.Sink(_sink)

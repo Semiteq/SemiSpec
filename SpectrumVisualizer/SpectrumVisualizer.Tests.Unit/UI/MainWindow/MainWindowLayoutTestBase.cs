@@ -72,7 +72,12 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 
 	protected MainWindowView Realise()
 	{
-		_connectionBar = new ConnectionBarViewModel(PortProvider, SerialLink, AvaloniaScheduler.Instance);
+		_connectionBar = new ConnectionBarViewModel(
+			PortProvider,
+			SerialLink,
+			_messagePanel,
+			AvaloniaScheduler.Instance,
+			NullLogger<ConnectionBarViewModel>.Instance);
 		_statusBar = new AppStatusBarViewModel(
 			SerialLink,
 			_messagePanel,

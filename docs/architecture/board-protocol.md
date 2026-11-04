@@ -162,10 +162,11 @@ state has one writer, and `Status` is published with `Volatile.Write`.
 `RjcpSerialPortProvider` is the production implementation over `RJCP.SerialPortStream`:
 
 - `PortNames()` asks an unopened `SerialPortStream` for the names and sorts them by the number after `COM`
-  (`COM2` before `COM10`), then any other name by ordinal. A listing that throws is logged at Debug and returned as
-  a failed result, so the connection row shows an empty list.
-- `Open` checks the name against `PortNames()` first, so an unlisted name or a failed listing returns
-  `PortNotFoundError` without touching the driver; a listing failure rides along as its cause. It opens at 115200
+  (`COM2` before `COM10`), then any other name by ordinal. A listing that throws is logged at Warning and returned as
+  a failed result. The connection row then shows an empty list and reports a `PortListError` to the message panel.
+- `Open` checks the name against `PortNames()` first, so a name missing from a listing that worked returns
+  `PortNotFoundError` without touching the driver. A failed listing is no proof that the port is gone, the same rule
+  the read loop applies, so `Open` goes ahead and tries the port. It opens at 115200
   baud, 8N1, with `ReadTimeout` 1000 ms and `ThrowOnReadError` on. The `SerialPortStream` constructor can throw as
   well as `Open()`, so both sit inside one `try`.
 - `Open` never throws: every exception except `OperationCanceledException` becomes a link error, so the session keeps

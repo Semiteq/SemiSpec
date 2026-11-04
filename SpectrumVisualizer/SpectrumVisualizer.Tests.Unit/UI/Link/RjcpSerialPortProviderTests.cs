@@ -77,6 +77,7 @@ public sealed class RjcpSerialPortProviderTests
 		result.IsFailed.Should().BeTrue();
 		result.Errors.Should().ContainSingle().Which.Should().BeOfType<PortNotFoundError>()
 			.Which.Message.Should().Contain(MissingPort);
+		result.Errors[0].Reasons.Should().BeEmpty("a listing that worked has no failure to carry");
 	}
 
 	[Theory]
