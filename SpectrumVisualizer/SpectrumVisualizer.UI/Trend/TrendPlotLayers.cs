@@ -65,7 +65,6 @@ public sealed class TrendPlotLayers
 		}
 	}
 
-	/// <summary>Shows the moment line at the moment, or hides it for null.</summary>
 	public void MarkMoment(DateTimeOffset? moment)
 	{
 		lock (_plot.Sync)

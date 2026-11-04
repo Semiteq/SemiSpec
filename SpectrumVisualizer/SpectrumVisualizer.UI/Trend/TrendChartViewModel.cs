@@ -140,7 +140,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		Refresh();
 	}
 
-	/// <summary>Sets the width and keeps the right edge; following stays as it was.</summary>
+	/// <summary>Sets the width, keeping the right edge unless the pan floor moves it.</summary>
 	public void SetWidth(TimeSpan width)
 	{
 		_navigation.SetWidth(width);

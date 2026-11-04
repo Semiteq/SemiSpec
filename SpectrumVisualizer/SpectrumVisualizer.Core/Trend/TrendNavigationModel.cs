@@ -43,7 +43,7 @@ public sealed class TrendNavigationModel(DateTimeOffset from, DateTimeOffset to,
 		DetachUnlessHolding(now);
 	}
 
-	/// <summary>Sets the width exactly, off the zoom ladder, keeping the right edge and sticky.</summary>
+	/// <summary>Sets the width exactly, off the zoom ladder, keeping the right edge unless the pan floor moves it.</summary>
 	public void SetWidth(TimeSpan width)
 	{
 		var clampedWidth = ClampWidthSpan(width);
@@ -81,7 +81,6 @@ public sealed class TrendNavigationModel(DateTimeOffset from, DateTimeOffset to,
 		From = now - width;
 	}
 
-	/// <summary>A window that no longer holds now stops following.</summary>
 	private void DetachUnlessHolding(DateTimeOffset now)
 	{
 		if (now > To || now < From)

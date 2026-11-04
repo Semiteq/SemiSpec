@@ -5,7 +5,7 @@ using SpectrumVisualizer.Core.Trend;
 namespace SpectrumVisualizer.UI.Trend;
 
 /// <summary>
-/// A 4 px bar along the bottom of the data area over each marked column; it never steers the axis limits.
+/// A 4 px bar along the bottom of the data area over each failure range; it never steers the axis limits.
 /// </summary>
 public sealed class TrendMarkerStrip : IPlottable
 {
@@ -63,6 +63,6 @@ public sealed class TrendMarkerStrip : IPlottable
 		}
 	}
 
-	/// <summary>The X range of one marked column of the trend, in axis units.</summary>
+	/// <summary>One failure range, in axis units.</summary>
 	private readonly record struct StripSpan(double FromX, double ToX);
 }

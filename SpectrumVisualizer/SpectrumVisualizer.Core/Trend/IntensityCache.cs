@@ -32,7 +32,7 @@ public sealed class IntensityCache : IDisposable
 	private QueryWindows? _windows;
 	private int _generation;
 
-	/// <summary>True while the timeline holds every spectrum of the run at the key: no re-read is pending.</summary>
+	/// <summary>True while the timeline holds every spectrum of the run at the key.</summary>
 	private bool _historyComplete;
 
 	private KeyBlock? _previous;
@@ -64,7 +64,7 @@ public sealed class IntensityCache : IDisposable
 	/// <summary>Raised on a key change; a request with ReadsHistory false only cancels the pending read.</summary>
 	public IObservable<ReReadRequest> ReReadRequested { get; }
 
-	/// <summary>The key of the latest spectrum frame and the receive times of the oldest and newest points.</summary>
+	/// <summary>Null before the first spectrum.</summary>
 	public TrendExtent? Extent
 	{
 		get

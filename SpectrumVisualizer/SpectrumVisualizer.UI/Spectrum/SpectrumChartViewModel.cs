@@ -249,10 +249,6 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		_redrawRequests.OnNext(Unit.Default);
 	}
 
-	/// <summary>
-	/// Runs the change under Plot.Sync and records the shown device when the scale ends frozen, then raises IsFollowing
-	/// outside the lock and redraws.
-	/// </summary>
 	private void ChangeScale(Action change)
 	{
 		var wasFollowing = IsFollowing;

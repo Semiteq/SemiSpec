@@ -127,7 +127,7 @@ public partial class OverviewView : UserControl
 		_isDragging = false;
 	}
 
-	// Capture can be lost mid-drag without a PointerReleased (window deactivation); clear the drag flag.
+	// Capture can be lost mid-drag without a PointerReleased (window deactivation).
 	private void OnPointerCaptureLost(object? sender, PointerCaptureLostEventArgs eventArgs)
 	{
 		_isDragging = false;

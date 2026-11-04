@@ -187,7 +187,6 @@ public static class OverviewGeometry
 		return new BandFigure(outline, centerLine);
 	}
 
-	/// <summary>A break in a column with values: an empty column goes before the values.</summary>
 	private static bool PutsGapBeforeValues(IntensityColumn column)
 	{
 		return TrendColumns.OpensGap(column) && column.Count > 0;

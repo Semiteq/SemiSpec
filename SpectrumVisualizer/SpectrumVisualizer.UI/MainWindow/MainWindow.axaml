@@ -36,7 +36,6 @@
         <Grid Grid.Row="2"
               Name="ContentArea"
               ColumnDefinitions="*,Auto">
-            <!-- The spectrum is the primary live view, so it takes the larger share. -->
             <Grid.RowDefinitions>
                 <RowDefinition Height="3*"
                                MinHeight="{x:Static local:MainWindow.SpectrumRowMinHeight}" />

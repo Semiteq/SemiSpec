@@ -73,7 +73,7 @@ public sealed class SpectrumHistory(string path)
 	}
 
 	/// <summary>
-	/// The window mean of every stored spectrum in [from, to), in receive order; NaN for an uncovered device.
+	/// The window mean of every stored spectrum in [from, to), in receive order; NaN for an uncovered device or a corrupt row.
 	/// </summary>
 	public Task<Result<IntensityChunk>> IntensityPointsAsync(
 		ushort wavelengthNm, byte delta, DateTimeOffset from, DateTimeOffset to, CancellationToken token)

@@ -20,10 +20,10 @@ public partial class MainWindow : Window
 	/// </summary>
 	public const double MinimumHeight = 688;
 
-	/// <summary>The spectrum plot's 67 px of axis margins over a data area of at least 120 px.</summary>
+	/// <summary>At least 120 px of data area under the measured axis margins.</summary>
 	public const double SpectrumRowMinHeight = 192;
 
-	/// <summary>The pane's 1 px border and the trend plot's 83 px of axis margins over a 120 px data area.</summary>
+	/// <summary>At least 120 px of data area under the measured axis margins.</summary>
 	public const double TrendRowMinHeight = 208;
 
 	private IDisposable? _exitSubscription;

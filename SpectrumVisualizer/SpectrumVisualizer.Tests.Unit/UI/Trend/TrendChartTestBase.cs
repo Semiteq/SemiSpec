@@ -15,7 +15,7 @@ using static SpectrumVisualizer.Tests.Unit.Core.Store.StoreSamples;
 namespace SpectrumVisualizer.Tests.Unit.UI.Trend;
 
 /// <summary>
-/// A trend chart over a real cache, a test scheduler as the UI scheduler and a clock stopped at Start.
+/// A trend chart over a real cache, a test scheduler as the UI scheduler and a fake clock that starts at Start and moves to each added frame.
 /// </summary>
 public abstract class TrendChartTestBase : IDisposable
 {

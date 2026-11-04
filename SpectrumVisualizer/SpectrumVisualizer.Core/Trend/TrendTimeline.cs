@@ -69,9 +69,6 @@ internal sealed class TrendTimeline
 		TimeOrdered.DropBefore(_failures, unixMs, TimeOf);
 	}
 
-	/// <summary>
-	/// Folds the points, breaks and failure marks of the query's range; the query's key is not checked.
-	/// </summary>
 	public IntensitySeries Fold(IntensityQuery query)
 	{
 		var fromMs = query.From.ToUnixTimeMilliseconds();

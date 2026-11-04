@@ -60,7 +60,6 @@ public partial class TrendChartView : UserControl
 		PlotControl.PointerExited += OnPointerExited;
 	}
 
-	/// <summary>Animation-frame callbacks that served a redraw request since the view was built.</summary>
 	internal int ServedFrameCount => _frames.ServedFrameCount;
 
 	protected override void OnLoaded(RoutedEventArgs e)
@@ -100,8 +99,6 @@ public partial class TrendChartView : UserControl
 		var reportDataAreaWidth = ReportDataAreaWidthTo(chart);
 		renderManager.RenderFinished += reportDataAreaWidth;
 
-		// RenderFinished is a plain delegate property, so the removal keeps the empty-delegate contract instead of
-		// leaving null behind.
 		_subscriptions.Add(Disposable.Create(() => renderManager.RenderFinished =
 			(renderManager.RenderFinished - reportDataAreaWidth) ?? _noRenderFinishedHandler));
 		_subscriptions.Add(chart.RedrawRequested.Subscribe(_ => _frames.Request(), _frames.ClearPending));
@@ -222,8 +219,7 @@ public partial class TrendChartView : UserControl
 		drag.ViewModel.ShowMoment(TimeAt(drag.Origin));
 	}
 
-	// Capture can be lost mid-drag without a PointerReleased (window deactivation, focus steal); this mirrors the
-	// release path's cleanup so the drag state and the grab cursor do not stay stuck.
+	// Capture can be lost mid-drag without a PointerReleased (window deactivation, focus steal).
 	private void OnPointerCaptureLost(object? sender, PointerCaptureLostEventArgs eventArgs)
 	{
 		if (_drag is not { } drag || eventArgs.Pointer != drag.Pointer)
