@@ -285,7 +285,8 @@ out, so a repeat on another port coalesces into one row.
 `Frames` is a `ChannelReader<ReceivedFrame>` over a bounded channel of 64 frames with `DropOldest`, one writer and one
 reader. 64 frames are about 50 s of ATP-8000 spectra at 1.3 per second. `Wait` would let a slow reader block the read
 loop and trip the 10 s status on a healthy board. A reader that falls behind drops many frames in a row, so only the
-first drop of a session logs at Debug. No code reads the channel, so it fills and drops the oldest frame.
+first drop of a session logs at Debug. `FrameDistributor` is the one reader: it keeps the latest frame that carries a
+spectrum and forwards every frame to its subscribers (`overview.md`, Spectrum).
 
 ### Stop
 
@@ -317,7 +318,8 @@ wavelength maps to it.
 `Window(nm, delta)` returns the inclusive `PixelWindow` from `PixelFor(max(nm - delta, 0))` to `PixelFor(nm + delta)`,
 with `delta` in nm (OptoskyProj#7). Clamping in `PixelFor` keeps both ends inside 0…P-1. The board builds its noise
 window the same way, but its Amplitude window is ±`delta` pixels around `PixelForWave(wavelength)`, so the app's and
-the board's amplitudes differ on ATP-2000. OptoskyProj#7 tracks moving the board's Amplitude window to nm.
+the board's amplitudes differ on ATP-2000. OptoskyProj#7 tracks moving the board's Amplitude window to nm. The chart's
+band is the app's window, ±`delta` nm around the frame's wavelength.
 
 ## Board emulator
 

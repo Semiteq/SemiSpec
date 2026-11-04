@@ -38,7 +38,7 @@ dotnet test SpectrumVisualizer.Tests                  # old app
 
 `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit` is the only test project of the new app: xUnit, AwesomeAssertions,
 Avalonia.Headless. Every test class carries three traits: `Component` (`Core|UI|Tools`), `Area`
-(`Calibration|Di|Emulator|Link|Logging|MainWindow|Messages|Paths|Protocol|Resources`) and `Category` (`Unit`).
+(`Calibration|Chart|Di|Emulator|Link|Logging|MainWindow|Messages|Paths|Protocol|Resources|Spectrum`) and `Category` (`Unit`).
 `xunit.runner.json` sets `failSkips`, so a skipped test fails the run. A hung run leaves
 `SpectrumVisualizer.Tests.Unit.exe` locked, and the next build fails with MSB3027 until the process is killed.
 
@@ -66,7 +66,8 @@ then builds and tests the old app.
 .github/workflows/               CI
 SpectrumVisualizer/              new app: build props, .editorconfig, projects below
   SpectrumVisualizer.Core/       UI-free code: paths, board protocol, wavelength calibration
-  SpectrumVisualizer.UI/         Avalonia WinExe: startup, logging, serial link, main window, messages, styles, resx text
+  SpectrumVisualizer.UI/         Avalonia WinExe: startup, logging, serial link, main window, spectrum chart,
+                                 messages, styles, resx text
   SpectrumVisualizer.Tools.BoardEmulator/
                                  console tool: writes board frames to a COM port
   SpectrumVisualizer.Tests.Unit/ unit and headless UI tests

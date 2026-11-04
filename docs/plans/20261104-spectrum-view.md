@@ -809,27 +809,27 @@ Data flow:
   skipped as not automatable and stays with the owner
 
 ### Task 14: [Final] Update documentation
-- [ ] `docs/architecture/overview.md`: the purpose paragraph (`:5-11`, "No code reads the decoded frames" at `:10` is
+- [x] `docs/architecture/overview.md`: the purpose paragraph (`:5-11`, "No code reads the decoded frames" at `:10` is
   no longer true); the Stack list (`:13-25`) gains ScottPlot.Avalonia 5.1.59; the components table (`:29-61`) gains
   `FrameDistributor`, `DisplayedSpectrum`, `IDisplayedSpectrumSource`, `LiveSpectrumSource`, `SpectrumProjection`,
   `SpectrumScale`, `SpectrumChartViewModel`, `SignalInfoViewModel`, `SpectrumViewModel`, `ChartPalette`, `LogAxis`,
   `LogTickGenerator`; startup (`Opened` starts the distributor, `Closing` stops the link, then the distributor); the
   main window rows (`:103-111`, the content row) and the minimum width paragraph (`:116-122`); a "Spectrum" section:
   data flow, latest-only, the scale rules, the log floor, inversion, the empty state, the stock input
-- [ ] `docs/architecture/board-protocol.md`: "Frames out" (`:283-288`): the distributor is the one reader and forwards
+- [x] `docs/architecture/board-protocol.md`: "Frames out" (`:283-288`): the distributor is the one reader and forwards
   every frame; the calibration window paragraph (`:317-320`) notes that the chart's band is the app's nm window
-- [ ] `docs/architecture/README.md`: the Chart renderer row (`:32`) names ScottPlot.Avalonia 5.1.59, the cache wrapper
+- [x] `docs/architecture/README.md`: the Chart renderer row (`:32`) names ScottPlot.Avalonia 5.1.59, the cache wrapper
   and the frame-paced redraw; a Frame distribution row (one reader, latest spectrum, subscribers own their scheduling)
-- [ ] `docs/architecture/ui-theme.md`: the four keys in the key table (`:44-55`) and a "The plot" section (the surfaces,
+- [x] `docs/architecture/ui-theme.md`: the four keys in the key table (`:44-55`) and a "The plot" section (the surfaces,
   the alpha times `Opacity` rule, the repaint on load and variant change)
-- [ ] `docs/architecture/ui-text.md`: the key owners (`:39-46`): Signal pane, Chart controls, Spectrum chart; remove
+- [x] `docs/architecture/ui-text.md`: the key owners (`:39-46`): Signal pane, Chart controls, Spectrum chart; remove
   `ContentPlaceholder` (`:41`); `StatusNoValue` gains the signal pane as a second reader
-- [ ] `docs/architecture/testing-strategy.md`: the Area list (`:20-22`) gains `Chart` and `Spectrum`; rows for Chart
+- [x] `docs/architecture/testing-strategy.md`: the Area list (`:20-22`) gains `Chart` and `Spectrum`; rows for Chart
   (log axis, tick generator, palette), Spectrum (rules, view models, render tests, chart view) and the distributor in
   the Link row; the Layout row covers the signal pane
-- [ ] `readme.md`: replace "The new app has no spectrum chart and no storage, so the old app is still the one that
+- [x] `readme.md`: replace "The new app has no spectrum chart and no storage, so the old app is still the one that
   shows the spectrum" (`:16-17`) with what the spectrum screen shows
-- [ ] `CLAUDE.md`: add `Chart` and `Spectrum` to the Area list (`:40-41`); the Layout line for `SpectrumVisualizer.UI/`
+- [x] `CLAUDE.md`: add `Chart` and `Spectrum` to the Area list (`:40-41`); the Layout line for `SpectrumVisualizer.UI/`
   names the spectrum chart
 
 ## Post-Completion
