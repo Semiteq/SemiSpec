@@ -58,7 +58,7 @@ writes protocol frames to a serial port for manual runs.
 | `SignalInfoViewModel` | UI | The seven signal pane texts of the shown spectrum |
 | `SpectrumViewModel` | UI | The spectrum screen: applies the source's latest spectrum to the chart and the signal pane, the Invert and Logarithmic checkboxes, Reset scale and Stick to zero |
 | `ChartPalette` | UI | Paints ScottPlot's figure, data area, grid and axes from the palette, and resolves the colours of the line, the band and the centre line |
-| `LogAxis`, `LogTickGenerator`, `TickCache` | UI | The ticks of an axis that runs in decades, their labels under the current culture, and a cache keyed on the limits and the length |
+| `LogAxis`, `LogTickGenerator` | UI | The ticks of an axis that runs in decades, their labels under the current culture, and a cache of the last two results keyed on the limits, the length and the culture |
 | `AppLogging` | UI | Creates the log folder and the Serilog logger: `spectrum-visualizer.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
 | `AddUi(LoggingSetup)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, `LiveSpectrumSource` as the `IDisplayedSpectrumSource`, the message panel, the connection row, the status bar, the spectrum view model and the main window view model, all singletons |

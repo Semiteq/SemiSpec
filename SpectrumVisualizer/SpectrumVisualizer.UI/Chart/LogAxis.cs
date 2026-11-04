@@ -15,16 +15,6 @@ public static class LogAxis
 	private static readonly double[] _insideDecade = [2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
 	private static readonly double[] _strideMantissas = [1.0, 2.0, 3.0, 5.0];
 
-	/// <summary>A gap stays NaN; any value below the floor, zero and negatives included, lands on it.</summary>
-	public static double Project(double value, double floor)
-	{
-		if (double.IsNaN(value))
-		{
-			return value;
-		}
-
-		return value > 0.0 ? Math.Max(Math.Log10(value), floor) : floor;
-	}
 
 	public static IReadOnlyList<LogTick> Ticks(double minLog, double maxLog, double pixelLength)
 	{

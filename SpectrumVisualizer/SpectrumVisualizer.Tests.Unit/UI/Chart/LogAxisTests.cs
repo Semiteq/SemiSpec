@@ -12,39 +12,12 @@ namespace SpectrumVisualizer.Tests.Unit.UI.Chart;
 public sealed class LogAxisTests
 {
 	private const double MinimumMajorGap = 40.0;
-	private const double Floor = -9.0;
-	private const double ProjectionTolerance = 1e-12;
+
 	private const double PositionTolerance = 1e-9;
 	private const double RelativeValueTolerance = 1e-9;
 	private const double GapTolerance = 1e-6;
 	private static readonly TimeSpan _ticksDeadline = TimeSpan.FromSeconds(5);
 
-	[Fact]
-	public void ProjectPositiveValueGivesItsDecade()
-	{
-		LogAxis.Project(100.0, Floor).Should().BeApproximately(2.0, ProjectionTolerance);
-		LogAxis.Project(1e-6, Floor).Should().BeApproximately(-6.0, ProjectionTolerance);
-	}
-
-	[Theory]
-	[InlineData(0.0)]
-	[InlineData(-5.0)]
-	public void ProjectNonPositiveValueLandsOnTheFloor(double value)
-	{
-		LogAxis.Project(value, Floor).Should().Be(Floor);
-	}
-
-	[Fact]
-	public void ProjectPositiveValueBelowTheFloorLandsOnTheFloor()
-	{
-		LogAxis.Project(1e-12, Floor).Should().Be(Floor);
-	}
-
-	[Fact]
-	public void ProjectGapStaysNaN()
-	{
-		double.IsNaN(LogAxis.Project(double.NaN, Floor)).Should().BeTrue();
-	}
 
 	[Fact]
 	public void TicksSixDecadesOver400PixelsPutMajorsOnDecadesAndMinorsInside()

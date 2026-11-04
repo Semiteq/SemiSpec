@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 using ScottPlot;
@@ -9,7 +10,7 @@ public sealed class LogTickGenerator : ITickGenerator
 {
 	private const string LabelFormat = "0.###";
 
-	private readonly TickCache<TickKey> _cache = new();
+	private readonly TickCache _cache = new();
 
 	public Tick[] Ticks { get; private set; } = [];
 
@@ -17,7 +18,7 @@ public sealed class LogTickGenerator : ITickGenerator
 
 	public void Regenerate(CoordinateRange range, Edge edge, PixelLength size, Paint paint, LabelStyle labelStyle)
 	{
-		var key = new TickKey(range.Min, range.Max, size.Length);
+		var key = new TickKey(range.Min, range.Max, size.Length, CultureInfo.CurrentCulture.Name);
 
 		if (!_cache.TryFind(key, out var ticks))
 		{
@@ -28,11 +29,6 @@ public sealed class LogTickGenerator : ITickGenerator
 		Ticks = ticks;
 	}
 
-	/// <summary>An axis runs in decades while this generator ticks it; ScottPlot leaves an unbound axis null.</summary>
-	internal static bool IsLogarithmic(IYAxis? axis)
-	{
-		return axis?.TickGenerator is LogTickGenerator;
-	}
 
 	private static Tick[] Generate(TickKey key)
 	{
@@ -63,5 +59,39 @@ public sealed class LogTickGenerator : ITickGenerator
 		return ticks;
 	}
 
-	private readonly record struct TickKey(double MinLog, double MaxLog, float PixelLength);
+	/// <summary>The culture is part of the key, because the labels are formatted under it.</summary>
+	private readonly record struct TickKey(double MinLog, double MaxLog, float PixelLength, string CultureName);
+
+	/// <summary>The last two tick results, used only by Regenerate under Plot.Sync.</summary>
+	private sealed class TickCache
+	{
+		private Entry? _recent;
+		private Entry? _older;
+
+		public bool TryFind(TickKey key, [NotNullWhen(true)] out Tick[]? ticks)
+		{
+			if (_recent is { } recent && recent.Key == key)
+			{
+				ticks = recent.Ticks;
+				return true;
+			}
+
+			if (_older is { } older && older.Key == key)
+			{
+				(_recent, _older) = (older, _recent);
+				ticks = older.Ticks;
+				return true;
+			}
+
+			ticks = null;
+			return false;
+		}
+
+		public void Add(TickKey key, Tick[] ticks)
+		{
+			(_recent, _older) = (new Entry(key, ticks), _recent);
+		}
+
+		private sealed record Entry(TickKey Key, Tick[] Ticks);
+	}
 }
