@@ -710,15 +710,15 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Trend/EnvelopePathTests.cs`, `EnvelopeLineTests.cs`,
   `TrendMarkerStripTests.cs`, `LocalTimeAxisTests.cs`
 
-- [ ] copy `EnvelopePath` (`SemiPlot/SemiPlot.UI/Chart/EnvelopePath.cs:18-148`) without stepped mode, hold and unread
+- [x] copy `EnvelopePath` (`SemiPlot/SemiPlot.UI/Chart/EnvelopePath.cs:18-148`) without stepped mode, hold and unread
   vertices, and the segment-distance helpers (no hit test here)
-- [ ] copy `EnvelopeLine` (`SemiPlot/SemiPlot.UI/Chart/EnvelopeLine.cs:12-124`, `:202-225`) with `ReplaceColumns` only:
+- [x] copy `EnvelopeLine` (`SemiPlot/SemiPlot.UI/Chart/EnvelopeLine.cs:12-124`, `:202-225`) with `ReplaceColumns` only:
   no append, fold, hold, resume gap, log projection, pen style or active width
-- [ ] write `TrendMarkerStrip`, an `IPlottable` that fills a 4 px bar at the bottom of the data area over each failed
+- [x] write `TrendMarkerStrip`, an `IPlottable` that fills a 4 px bar at the bottom of the data area over each failed
   column; copy `LocalTimeAxis` (`SemiPlot/SemiPlot.UI/Chart/LocalTimeAxis.cs:8-20`)
-- [ ] copy the tests named in Acceptance Evidence item 1 and `EnvelopeLineTests.cs:49` (render while the UI thread
+- [x] copy the tests named in Acceptance Evidence item 1 and `EnvelopeLineTests.cs:49` (render while the UI thread
   replaces columns); write `TrendMarkerStripTests` and the gap render check of `ChartGapRenderTests.cs:57`
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (790 of 790)
 
 ### Task 8: Trend chart view model and readout
 **Files:**
