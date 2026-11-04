@@ -642,18 +642,18 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.UI/Spectrum/SpectrumViewModel.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Spectrum/SpectrumViewModelTests.cs`
 
-- [ ] implement `SpectrumViewModel(IDisplayedSpectrumSource, MessagePanelViewModel, TimeProvider, IScheduler
+- [x] implement `SpectrumViewModel(IDisplayedSpectrumSource, MessagePanelViewModel, TimeProvider, IScheduler
   uiScheduler, ILogger<SpectrumViewModel>)` of Solution Overview: builds `Chart` and `SignalInfo`, the latest-only
   pipeline with `ObserveOn` first, `IsInverted`, `IsLogarithmic`, `ResetScaleCommand`, `StickToZeroCommand`,
   `Dispose` for the subscription, the commands and both children
-- [ ] a failure in the pipeline logs at Error and goes to `TryReportFailure`; it ends that subscription
-- [ ] write `SpectrumViewModelTests` of Acceptance Evidence item 3 over `FakeDisplayedSpectrumSource`: the three
+- [x] a failure in the pipeline logs at Error and goes to `TryReportFailure`; it ends that subscription
+- [x] write `SpectrumViewModelTests` of Acceptance Evidence item 3 over `FakeDisplayedSpectrumSource`: the three
   queued signals apply once (count `Chart.RedrawRequested` emissions with a subscribed observer), the spectrum at
   construction shows, `TheSameCachedSpectrumIsAppliedOnceByReference` (two signals with one `Current` instance apply
   once; a new instance with equal values applies again), Stick to zero follows `HasSpectrum`,
   `ResetScaleShowsTheFrozenState` (disabled while following, enabled after `TakeManualScale()`, disabled after Reset),
   the checkboxes reach `Chart.SetDisplay`, a throwing `Current` adds one Error entry
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 10: Spectrum chart view
 **Files:**
