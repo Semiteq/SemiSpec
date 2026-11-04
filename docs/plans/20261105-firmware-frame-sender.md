@@ -100,8 +100,9 @@
 - Review phases that diff only SpectrumVisualizer get the OptoskyProj files by absolute path
   (`C:/Users/admin/projects/OptoskyProj/OptoskyEncoder/OptoskyEncoder/main.c`, `pc_link.c`, `pc_link.h`,
   `C:/Users/admin/projects/OptoskyProj/OptoskyEncoder/HostTest/pc_link_test.c`), so the C code gets its review.
-- `main.c` cannot compile here. Every rule that can live without registers lives in `pc_link.c` and is checked on the
-  host; `main.c` changes stay thin glue that the owner's board check covers.
+- The AVR glue is not compiled in this run: the team builds the firmware by hand, and no AVR toolchain is installed.
+  Every rule that can live without registers lives in `pc_link.c` and is checked on the host; `main.c` changes stay
+  thin glue that the owner's build and board check cover.
 
 ## Testing Strategy
 - **host C checks** (OptoskyProj): `OptoskyEncoder/HostTest/pc_link_test.c`, plain C11 with no test framework. Each
@@ -109,7 +110,8 @@
   frames file named by `argv[1]` and exits 0.
 - **unit tests** (SpectrumVisualizer): `FirmwareFrameTests` in `SpectrumVisualizer.Tests.Unit/Core/Protocol`, traits
   `Component=Core`, `Area=Protocol`, `Category=Unit`.
-- **board**: the owner's manual checklist in Acceptance Evidence; it is the only check of the `main.c` glue.
+- **board**: the owner's manual checklist in Acceptance Evidence. It covers what the host check leaves unverified,
+  listed by name at the start of that checklist.
 
 ## Acceptance Evidence
 Today the board sends the `01 FF…1E` ladder high byte first (`main.c:901-923`, `:948`); the app's `FrameDecoder` finds
@@ -152,7 +154,16 @@ Automatable, on this machine:
    lines.
 
 Manual board checklist (owner, after building `OptoskyEncoder.atsln` in Atmel Studio and flashing per `README.md:112-124`,
-with the app from this branch on the USARTC0 adapter at 115200):
+with the app from this branch on the USARTC0 adapter at 115200).
+
+The host check leaves three things unverified; the steps below cover them:
+- the DREIF/TXCIF/1000 ms state machine in the new `Send2Aplication()`: steps 1-3 (frames complete, heartbeats and
+  spectra alternate, no frame is cut);
+- the bit pattern of the target's `(float)uint16_t`: step 2 (Amplitude, SNR and Q in the app equal the PLC values);
+- the main-loop pass rate that keeps the 2-byte USARTC0 TX buffer fed: steps 2 and 4. Throughput is passes x 2
+  bytes per pass, as today; the 32-byte budget at `main.c:945` never delivers 32 bytes in one pass, because the loop
+  stops when `DREIF` clears. A slow pass rate shows as frames that arrive later than 4120 bytes at 115200 baud
+  (about 358 ms) allows, or as the 1000 ms abandon (a `seq` gap in the app).
 
 1. Power the board with both spectrometers and no PLC trigger. Within 3 s the status bar shows the link up; a
    heartbeat arrives every 3 s with `seq` 0 and state bits 0 and 1 set.
@@ -421,7 +432,7 @@ Repository: OptoskyProj. Commit: `feat(firmware): отправлять ПК ка
   `PcSenderInit` in `main()` after `sei()`
 - [ ] leave `crc16()`, `ReadPlcFloat`, `float_converter`, `OnLegacyByte`, `Begin()`, the PLC, spectrometer, encoder
   and calculation code byte for byte unchanged: `git diff` touches only the lines above
-- [ ] no host test reaches `main.c` (it needs AVR headers); re-run Acceptance Evidence item 1 and item 6 - must pass
+- [ ] no host test reaches `main.c` (the AVR glue is not compiled in this run); re-run Acceptance Evidence item 1 and item 6 - must pass
   before task 5
 
 ### Task 5: Verify acceptance criteria
@@ -461,6 +472,14 @@ Repositories: OptoskyProj (commit `docs(readme): описать протокол
 *Items requiring manual intervention or external systems - no checkboxes, informational only*
 
 **Manual verification:**
+- Optional compile gate before Atmel Studio: `winget install ZakKemble.avr-gcc`, then from
+  `OptoskyEncoder/OptoskyEncoder/` run `avr-gcc -mmcu=atxmega128a1u -Os -funsigned-char -fpack-struct -Wall -DNDEBUG
+  -I SRC -c main.c pc_link.c SRC/*.c` and compare its warnings with the same run on `df5201f` (without `pc_link.c`).
+  The cproj builds against the XMEGAA DFP through `-B`, so this gate is valid only if the toolchain's bundled avr-libc
+  headers cover `atxmega128a1u`.
+- Before flashing, save the current `Release/*.hex`: the repository no longer carries a `.hex` (PR #2), so the saved
+  file is the only way back to the old firmware.
+- Switch the board and the PC app together: the old WinForms app cannot read the new frames.
 - The owner builds `OptoskyEncoder.atsln` in Atmel Studio (Release, `-Os`), checks the build has no new warnings and
   that flash and SRAM use fit the ATxmega128A1U, flashes the board, and runs the manual board checklist of Acceptance
   Evidence against the app: spectra on both devices, heartbeats, `seq` with its wrap, dark frames, the PLC wavelength
@@ -470,6 +489,8 @@ Repositories: OptoskyProj (commit `docs(readme): описать протокол
 - The OptoskyProj PR body carries `Closes Semiteq/OptoskyProj#20`. No PR is created in this run.
 - The SpectrumVisualizer branch carries only the golden frames, their test and the doc paragraph; it ships with the
   app's stacked PRs.
+- Merge: no PRs are open in OptoskyProj. A revived `fix/watchdog` or `fix/dma-fault-reset` branch conflicts in two
+  lines around the `PcSenderInit` call after `sei()` (`main.c:1679`); `fix/encoder-i2c-timeout` touches `main.c:1367`.
 
 **Follow-up question for the owner:**
 - The idle spectrometer's fault bit (`SpectrumFault[d]`, set at `main.c:502` and `:996`, cleared only by that device's
