@@ -225,8 +225,15 @@ type is decided by `len` only.
 - [x] update the index, the overview components table and the CLAUDE.md layout
 
 ### Task 8: Verify acceptance criteria
-- [ ] run every command of Acceptance Evidence and record the results
-- [ ] confirm the old solution still builds and passes 13 tests
+- [x] run every command of Acceptance Evidence and record the results: `--filter "Area=Protocol"` 42/42 pass (every
+  sub-item of item 1 has a named test); `--filter "Area=Calibration"` 15/15 pass; `dotnet build SpectrumVisualizer.slnx
+  -c Release --no-incremental` 0 warnings, 0 errors; `dotnet format --verify-no-changes` exit 0; `dotnet terse
+  SpectrumVisualizer` exit 0; emulator `--help` prints `--port`, `--device`, `--rate`, `--wavelength`, `--delta`,
+  `--bad-crc-every`, exit 0; full `dotnet test SpectrumVisualizer.slnx` 142/142 pass; manual port-pair smoke check left
+  to the owner (not automatable)
+- [x] confirm the old solution still builds and passes 13 tests: `dotnet build SpectrumVisualizer.sln` 0 errors, 15
+  warnings (nullable CS86xx and CS0618 in `SpectrumVisualizer.Uart` and `SpectrumVisualizer.Tests`, which this slice does not touch:
+  `git diff --stat 6769d23..HEAD` over the old projects is empty); `dotnet test SpectrumVisualizer.Tests` 13/13 pass
 
 ### Task 9: [Final] Update documentation
 - [ ] update `readme.md` with the emulator's run command
