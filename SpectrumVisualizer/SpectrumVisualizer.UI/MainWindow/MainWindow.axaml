@@ -13,6 +13,7 @@
         Title="{x:Static text:Resources.WindowTitle}"
         Width="1280"
         Height="800"
+        MinWidth="{x:Static local:MainWindow.MinimumWidth}"
         WindowStartupLocation="CenterScreen">
 
     <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">

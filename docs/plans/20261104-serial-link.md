@@ -608,15 +608,22 @@ the same run do not.
 - Modify (only to fix a miss): `SpectrumVisualizer/SpectrumVisualizer.UI/MainWindow/ConnectionBar.axaml`,
   `AppStatusBar.axaml`, `MainWindow.axaml`, `Messages/MessagePanelView.axaml`, the resx pair
 
-- [ ] every gap and inset in the connection row and the status bar reads off the spacing table; the `ui-theme.md:61-63`
-  grep prints nothing
-- [ ] every field width reads off the width table (the port combo box 240) or carries a stated reason
-- [ ] at the window's minimum width the connection row and every status segment show; record the measured width
-- [ ] at a large width no gap grows between related items: the connection row and the status bar stay left-aligned
-- [ ] every label, button and status text fits on one line in English and Russian, measured in the realised headless
-  window with the longest state text
-- [ ] every link state keeps the window size: the status bar and the connection row change text and colour, never their
-  set of rows; the `ui-theme.md:74-76` grep prints nothing
+- [x] every gap and inset in the connection row and the status bar reads off the spacing table; the `ui-theme.md:61-63`
+  grep prints nothing (rows 16,8; spacing 8; label to field 4 + 8 = 12; dot gap 8; separators 8,4)
+- [x] every field width reads off the width table (the port combo box 240) or carries a stated reason (the buttons size
+  to their text with Semi's 12,0 padding; the placeholder measures 103 px en, 132 px ru in its 196 px slot)
+- [x] at the window's minimum width the connection row and every status segment show; record the measured width
+  (➕ the window had no `MinWidth`; `MainWindow.MinimumWidth` = 968. Measured with the longest texts, widest of
+  Microsoft YaHei, Segoe UI, Arial and Inter at 14 px: status bar 900.8 px en, 962.3 px ru; connection row 595.4 px en,
+  654.9 px ru; `MainWindowLayoutTests`)
+- [x] at a large width no gap grows between related items: the connection row and the status bar stay left-aligned
+  (every part keeps its left edge from 1280 to 2560 px)
+- [x] every label, button and status text fits on one line in English and Russian, measured in the realised headless
+  window with the longest state text (every text is `NoWrap` and the row widths above fit 968 px)
+- [x] every link state keeps the window size: the status bar and the connection row change text and colour, never their
+  set of rows; the `ui-theme.md:74-76` grep prints nothing (Disconnected, PortUnavailable, Waiting, Receiving,
+  NotResponding, OtherDevice, Disconnected keep the window, both row heights and their visible parts; Connecting is
+  transient and its text is in the width check)
 
 ### Task 12: Emulator dark frames, failure bits and both spectrometers
 **Files:**

@@ -5,6 +5,9 @@ namespace SpectrumVisualizer.UI.MainWindow;
 
 public partial class MainWindow : Window
 {
+	/// <summary>The status bar with its longest texts in either language; MainWindowLayoutTests measures it.</summary>
+	public const double MinimumWidth = 968;
+
 	private IDisposable? _exitSubscription;
 
 	public MainWindow()
