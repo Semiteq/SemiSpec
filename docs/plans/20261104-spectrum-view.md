@@ -174,7 +174,8 @@ Automatable (baseline 320 of 320 at `5fca2ab`):
      `ADarkFrameKeepsTheLastNonDarkYLimitsOfTheSameDeviceOnEveryDisplay`,
      `ADarkFrameAfterALogToggleKeepsTheLogLimitsOfThePeak`,
      `AToggleDuringADarkFrameTakesTheLastNonDarkLimitsInTheNewMode`,
-     `StickToZeroOnADarkFrameUsesTheLastNonDarkMaximum`, `ADarkFirstFrameAfterADeviceSwitchTakesTheFlatRange`.
+     `StickToZeroOnADarkFrameUsesTheLastNonDarkMaximum`, `ADarkFirstFrameAfterADeviceSwitchTakesTheFlatRange`,
+     `ADarkFrameAfterTheOtherDeviceKeepsTheLimitsOfItsOwnDevicesLastPeak`.
    - `SpectrumChartViewModelRenderTests.ADarkFrameRendersOnTheLinearAxisWithFiniteLimits` and
      `ADarkFrameRendersOnTheLogAxisAtTheFloorWithFiniteLimits`: `Plot.RenderInMemory(640, 480)` throws nothing and
      every axis limit is finite, and after a peak the dark frame keeps its limits;
@@ -348,12 +349,12 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
   `MouseDragZoomRectangle`; ScottPlot still applies a shorter pan on release, and the next spectrum sets the limits
   back while following. A bare click, a press and release without a
   move, keeps it following; so does a key press. While it follows, every spectrum sets the limits; while frozen, no
-  spectrum moves them. While a dark frame is shown, the Y limits come from the last non-dark measurement of the same
+  spectrum moves them. While a dark frame is shown, the Y limits come from the last non-dark measurement of its own
   device projected in the current mode, so the axis does not jump every Nth frame, Stick to zero takes that spectrum's maximum, and a log
   or inversion toggle shows that spectrum's limits in the new mode. The dark line draws at its floor inside that range
   (on the log axis the floor of 0 decades lies below a range from a spectrum whose minimum is above 1, so the data area
-  is empty for that frame), and X still follows the dark frame's device. With no earlier non-dark frame, or when the
-  last one came from the other device, the flat-range limits apply. This is the old
+  is empty for that frame), and X still follows the dark frame's device. With no earlier non-dark frame of that
+  device, the flat-range limits apply. This is the old
   OxyPlot behaviour: its axes rescaled on every update until the operator zoomed, and Reset scale reset them
   (`SpectrumPainter.cs:66-70`, `:82`). The limits come from `SpectrumScale`, never from ScottPlot's autoscale, so a
   flat range has a defined answer and no limit is NaN. Reset scale is enabled only while a spectrum is shown and the
@@ -450,9 +451,9 @@ Scale rules (`SpectrumScale`, pure; `ys` are the projected values of the shown s
 | Stick to zero | same | `0 .. rawMax x 1.2`; `0 .. 1` when `rawMax == 0` | `0 .. log10(rawMax x 1.2)`; `0 .. 1` when `rawMax <= 1` |
 | Frozen | unchanged | unchanged | unchanged |
 
-The reference is the shown spectrum, or, while a dark frame is shown, the last non-dark measurement of the same device
-projected again in the current inversion and axis mode; with no earlier non-dark frame, or one from the other device,
-the dark frame is its own reference and takes the flat range. `rawMax` is the reference's largest displayed value before the log projection (after inversion). A
+The reference is the shown spectrum, or, while a dark frame is shown, the last non-dark measurement of its own device
+projected again in the current inversion and axis mode; with no earlier non-dark frame of that device the dark frame
+is its own reference and takes the flat range. `rawMax` is the reference's largest displayed value before the log projection (after inversion). A
 dark frame is one whose raw pixels are all zero. Every input is a finite `ushort` or its logarithm, so every limit is
 finite.
 
@@ -653,8 +654,8 @@ Data flow:
   every scale change runs through one helper that takes `Plot.Sync`, raises `IsFollowing` after the lock and requests
   a redraw
 - [x] every write to the plot (buffers, plottable visibility, limits, tick generator, minor grid width, colours through
-  `ApplyPalette` and `ChartPalette.Apply`) happens inside `lock (Plot.Sync)`; the chart keeps the last non-dark
-  measurement and, for a dark frame of the same device, projects it again in the current mode as the reference of the
+  `ApplyPalette` and `ChartPalette.Apply`) happens inside `lock (Plot.Sync)`; each device line keeps its last
+  non-dark measurement, and a dark frame projects its own device's again in the current mode as the reference of the
   Y limits; the band and the centre line are hidden when
   `WavelengthNm - Delta .. WavelengthNm + Delta` does not overlap the shown device's range; `RedrawRequested` follows SemiPlot (raises only while a view subscribes; `Dispose` completes it)
 - [x] write `SpectrumSamples`: an ATP-2000 and an ATP-8000 `DisplayedSpectrum` with a peak, and a dark one per device
@@ -848,7 +849,8 @@ Data flow:
   stream keeps the last spectrum; a throwing subscriber leaves the frame to the others and is reported once.
   The kept Y limits were tested on the linear axis only;
   `ADarkFrameKeepsTheLastNonDarkYLimitsOfTheSameDeviceOnEveryDisplay` now covers all four combinations of log and
-  inversion, and `ADarkFirstFrameAfterADeviceSwitchTakesTheFlatRange` the device switch. The flat range with no earlier
+  inversion, and `ADarkFirstFrameAfterADeviceSwitchTakesTheFlatRange` and
+  `ADarkFrameAfterTheOtherDeviceKeepsTheLimitsOfItsOwnDevicesLastPeak` the device switch. The flat range with no earlier
   spectrum: the three render tests (both axes; an inverted dark frame is all zero, as
   `FillInvertsOverTheFrameMaximumThenTakesTheFlooredLog` shows). Device change:
   `AnAtp2000FrameAfterAnAtp8000FrameShowsTheAtp2000LineOnly`, `AFrameFromTheOtherDeviceWhileFrozenKeepsTheFrozenLimits`;

@@ -243,6 +243,21 @@ public sealed class SpectrumChartViewModelScaleTests : IDisposable
 		_chart.ShouldSpanTheDeviceRange(Spectrometer.Atp2000);
 	}
 
+	[AvaloniaFact]
+	public void ADarkFrameAfterTheOtherDeviceKeepsTheLimitsOfItsOwnDevicesLastPeak()
+	{
+		_chart.Show(Atp8000Peak);
+		var kept = _chart.Plot.Axes.GetLimits();
+		_chart.Show(Atp2000Peak);
+
+		_chart.Show(Dark(Spectrometer.Atp8000));
+
+		var limits = _chart.Plot.Axes.GetLimits();
+		limits.Bottom.Should().Be(kept.Bottom);
+		limits.Top.Should().Be(kept.Top);
+		_chart.ShouldSpanTheDeviceRange(Spectrometer.Atp8000);
+	}
+
 	/// <summary>The scale follows and its Y limits are the spectrum's following limits in the given display.</summary>
 	private void ShouldFollow(DisplayedSpectrum spectrum, SpectrumDisplay display)
 	{

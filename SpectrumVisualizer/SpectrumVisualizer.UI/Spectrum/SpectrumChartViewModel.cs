@@ -35,7 +35,6 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 	private readonly double[] _referenceYs =
 		new double[Math.Max(Spectrometer.Atp2000.PixelCount, Spectrometer.Atp8000.PixelCount)];
 	private DisplayedSpectrum? _shown;
-	private SpectrumMeasurement? _lastNonDark;
 	private SpectrumDisplay _display;
 
 	public SpectrumChartViewModel()
@@ -201,7 +200,7 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		var projection = SpectrumProjection.Fill(measurement.Pixels, _display, line.Ys);
 		if (!projection.IsDark)
 		{
-			_lastNonDark = measurement;
+			line.LastNonDark = measurement;
 		}
 
 		_atp2000Line.Plottable.IsVisible = line == _atp2000Line;
@@ -222,7 +221,7 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 	/// </summary>
 	private ReferenceSpectrum ProjectReference(SpectrumMeasurement shown)
 	{
-		var reference = _lastNonDark is { } lastNonDark && lastNonDark.Device == shown.Device ? lastNonDark : shown;
+		var reference = LineFor(shown.Device).LastNonDark ?? shown;
 		var ys = _referenceYs.AsSpan(0, reference.Pixels.Length);
 		var projection = SpectrumProjection.Fill(reference.Pixels, _display, ys);
 		return new ReferenceSpectrum(ys, projection);
@@ -268,7 +267,17 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		RequestRedraw();
 	}
 
-	private sealed record DeviceLine(SignalXY Plottable, double[] Xs, double[] Ys);
+	private sealed class DeviceLine(SignalXY plottable, double[] xs, double[] ys)
+	{
+		public SignalXY Plottable { get; } = plottable;
+
+		public double[] Xs { get; } = xs;
+
+		public double[] Ys { get; } = ys;
+
+		/// <summary>The device's last non-dark measurement, the Y reference while it shows a dark frame.</summary>
+		public SpectrumMeasurement? LastNonDark { get; set; }
+	}
 
 	private readonly ref struct ReferenceSpectrum(Span<double> ys, ProjectedSpectrum projection)
 	{

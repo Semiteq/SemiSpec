@@ -273,9 +273,9 @@ sets them, so a flat range has a defined answer and no limit is NaN.
 
 The reference is the spectrum the Y limits come from: the shown spectrum, or, while a dark frame is shown, the last
 non-dark measurement, projected again in the current inversion and axis mode. A dark frame is one whose raw pixels are
-all zero. The chart keeps one last non-dark measurement and reuses it only for a dark frame of the same device. With
-no earlier non-dark frame, or when the last one came from the other device, the dark frame is its own reference and
-takes the flat range: the other device's intensities say nothing about this one. So a dark frame
+all zero. The chart keeps the last non-dark measurement of each device, and a dark frame takes its own device's. With
+no earlier non-dark frame of that device the dark frame is its own reference and takes the flat range: the other
+device's intensities say nothing about this one. So a dark frame
 while following keeps the Y limits of the spectrum before it, Stick to zero on a dark frame takes that spectrum's
 `rawMax`, and a log or inversion toggle during a dark frame shows that spectrum's limits in the new mode; X follows the
 dark frame's device in every case. On the log axis the dark line lies at 0 decades, below a range kept from a spectrum
