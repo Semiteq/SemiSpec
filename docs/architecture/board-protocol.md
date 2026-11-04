@@ -47,7 +47,7 @@ Measurement part:
 | Offset | Size | Field |
 | --- | --- | --- |
 | 0 | 1 | `device`: 1 = ATP-2000, 2 = ATP-8000; sets P |
-| 1 | 2 | `wavelength`, u16, nm: the wavelength the spectrum was taken for |
+| 1 | 2 | `wavelength`, u16, nm, 189-2460: the wavelength the spectrum was taken for |
 | 3 | 1 | `delta`, u8, 0-100: half-width of the window around `wavelength` |
 | 4 | 4 | `amplitude`, f32: mean over the window, the value the PLC receives |
 | 8 | 4 | `snr`, f32: signal-to-noise as a ratio, not dB |
@@ -91,11 +91,24 @@ because the next read may complete the sync.
 `FrameReader.ReadAllAsync(PipeReader, CancellationToken)` runs the decoder over a pipe. It yields every whole frame in
 the buffer before it reads again, marks the rest of the buffer examined so the next read waits for new bytes, ends when
 the writer completes, and surfaces cancellation as `OperationCanceledException`. Malformed input never throws; it adds
-to `DiscardedBytes`, a running count that any thread may read.
+to `DiscardedBytes`, a running count that any thread may read. The bytes of a partial frame left when the writer
+completes are added to `DiscardedBytes` too.
 
-A corrupted header whose `len` still reads as a valid value stalls the decoder: it waits for that many bytes before
-the CRC can fail. The worst case is 4120 bytes, about 0.36 s at 115200 baud. No frame is lost, because the bytes stay
-in the buffer: after the CRC fails, the decoder drops one byte and finds the real frames behind it.
+A false candidate whose `len` reads as a valid value stalls the decoder: it waits for the whole frame before the CRC
+can fail. Three inputs produce one: a corrupted header that keeps a valid `len`, a false `AA 55` followed by a valid
+`len` inside pixel data, and a stream opened in the middle of a frame. The wait is a byte count, not a time: up to
+4120 bytes (`len` 4114) or 1048 bytes (`len` 1042). How long it takes depends on the traffic behind the candidate:
+
+| Traffic | Wait |
+| --- | --- |
+| spectra of the same kind flowing | about one frame period |
+| ATP-8000 spectra at 1-1.3 per second, behind a 4114 candidate | about 3-4 s |
+| heartbeats only, one 8-byte frame every 3 s | about 26 min (`len` 4114), about 6.5 min (`len` 1042) |
+
+No frame is lost, because the bytes stay in the buffer: after the CRC fails, the decoder drops one byte and finds the
+real frames behind it, and they arrive late in one burst. A wait over 10 s trips the "no valid frame" status of
+OptoskyProj#20. Recovery belongs to the serial-link slice, which owns the port: when that status fires, it drops the
+decoder's buffer.
 
 ## Sequence counter
 
@@ -142,8 +155,8 @@ wavelength maps to it.
 
 `Window(nm, delta)` returns the inclusive `PixelWindow` from `PixelFor(max(nm - delta, 0))` to `PixelFor(nm + delta)`,
 with `delta` in nm (OptoskyProj#7). Clamping in `PixelFor` keeps both ends inside 0…P-1. The board builds its noise
-window the same way, but its Amplitude window is still ±`delta` pixels around `PixelForWave(wavelength)` until the
-firmware change for OptoskyProj#7 lands. Until then the app's and the board's amplitudes differ on ATP-2000.
+window the same way, but its Amplitude window is ±`delta` pixels around `PixelForWave(wavelength)`, so the app's and
+the board's amplitudes differ on ATP-2000. OptoskyProj#7 tracks moving the board's Amplitude window to nm.
 
 ## Board emulator
 
@@ -152,19 +165,12 @@ adapters or a com0com pair:
 
 ```powershell
 dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator -- --port COM5
+dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator -- --help
 ```
 
-| Option | Default | Meaning |
-| --- | --- | --- |
-| `--port` | required | serial port to write to |
-| `--device` | `8000` | `2000` (ATP-2000) or `8000` (ATP-8000) |
-| `--rate` | `1` | spectrum frames per second; `0` sends heartbeats only |
-| `--wavelength` | 650 (ATP-2000), 1550 (ATP-8000) | peak and measurement wavelength, nm |
-| `--delta` | `10` | measurement half-width, nm |
-| `--bad-crc-every` | `0` | corrupt the CRC of every nth frame sent, heartbeats included; `0` never |
-
-The port runs at 115200 baud, fixed. An ATP-2000 frame takes about 0.36 s on the wire, so the port caps `--rate` near
-2.8 for ATP-2000.
+`--help` lists the options, their defaults and ranges. The port runs at 115200 baud, fixed. An ATP-2000 frame takes
+about 0.36 s on the wire, so the port caps `--rate` near 2.8 for ATP-2000. A failed write, for example an unplugged
+adapter, prints one line and exits with code 1.
 
 `SpectrumGenerator` builds the spectrum once: a Gaussian peak at the wavelength (σ = max(`delta`, 1)/2 nm, height
 30000) over a flat floor of 1000. The frame carries `amplitude` 30000, `snr` 30 and `q` 0. `state` has only the

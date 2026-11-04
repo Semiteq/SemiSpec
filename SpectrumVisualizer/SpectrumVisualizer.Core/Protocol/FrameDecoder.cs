@@ -25,6 +25,7 @@ public static class FrameDecoder
 		[NotNullWhen(true)] out BoardFrame? frame,
 		out long discarded)
 	{
+		frame = null;
 		discarded = 0;
 		while (true)
 		{
@@ -33,13 +34,11 @@ public static class FrameDecoder
 			{
 				discarded += buffer.Length;
 				buffer = buffer.Slice(buffer.End);
-				frame = null;
 				return false;
 			}
 
 			discarded += reader.Consumed;
 			buffer = buffer.Slice(reader.Position);
-			frame = null;
 			var candidate = CheckHeader(buffer, out var frameSize, out var device);
 			if (candidate == Candidate.Incomplete)
 			{

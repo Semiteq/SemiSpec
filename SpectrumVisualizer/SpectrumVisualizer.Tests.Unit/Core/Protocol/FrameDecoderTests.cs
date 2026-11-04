@@ -128,6 +128,17 @@ public sealed class FrameDecoderTests
 		AssertDropsThenFindsHeartbeat(truncatedHeader);
 	}
 
+	[Theory]
+	[InlineData(Spectrometer.Atp2000)]
+	[InlineData(Spectrometer.Atp8000)]
+	public void ACorruptedPixelByteDropsTheWholeSpectrumFrameAndTheNextFrameDecodes(Spectrometer device)
+	{
+		var corrupted = FrameEncoder.Encode(Spectrum(device, 3));
+		corrupted[100] ^= 0x01;
+
+		AssertDropsThenFindsHeartbeat(corrupted);
+	}
+
 	[Fact]
 	public void ADeviceThatDisagreesWithTheLengthDropsOneByteAndResynchronises()
 	{
@@ -157,6 +168,18 @@ public sealed class FrameDecoderTests
 		byte[] garbage = [0x00, 0x11, 0x22, 0x55, 0x33];
 
 		AssertDropsThenFindsHeartbeat(garbage);
+	}
+
+	[Fact]
+	public void ABufferWithoutASyncByteIsDiscardedWhole()
+	{
+		var buffer = new ReadOnlySequence<byte>([0x00, 0x11, 0x55]);
+
+		var found = FrameDecoder.TryReadFrame(ref buffer, out _, out var discarded);
+
+		found.Should().BeFalse();
+		discarded.Should().Be(3);
+		buffer.Length.Should().Be(0);
 	}
 
 	[Fact]

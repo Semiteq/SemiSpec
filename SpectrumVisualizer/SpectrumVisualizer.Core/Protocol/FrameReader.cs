@@ -23,6 +23,11 @@ public sealed class FrameReader
 			var result = await reader.ReadAsync(cancellationToken).ConfigureAwait(false);
 			var buffer = result.Buffer;
 			DecodeAll(ref buffer, frames);
+			if (result.IsCompleted)
+			{
+				Interlocked.Add(ref _discardedBytes, buffer.Length);
+			}
+
 			reader.AdvanceTo(buffer.Start, buffer.End);
 
 			foreach (var frame in frames)

@@ -38,8 +38,9 @@
 ## Testing Strategy
 - **unit tests** in `SpectrumVisualizer.Tests.Unit`, plain `[Fact]`/`[Theory]` (no ReactiveUI, no Avalonia), traits
   `Component`, `Area=Protocol` or `Area=Calibration`, `Category=Unit`.
-- the decoder is tested through a `System.IO.Pipelines.Pipe`: every frame form written whole, split at every byte
-  boundary, and in random chunk sizes from a fixed seed.
+- `FrameDecoderTests` decodes every frame form whole and split at every byte boundary into a two-segment
+  `ReadOnlySequence`; `FrameReaderTests` writes frames through a `System.IO.Pipelines.Pipe` in random chunk sizes from
+  a fixed seed.
 
 ## Acceptance Evidence
 Automatable:
@@ -73,7 +74,7 @@ Manual smoke checklist (owner, with a port pair):
 
 ## Solution Overview
 - `SpectrumVisualizer.Core/Protocol/`:
-  - `Crc16Modbus` — static, per-byte update and span overload.
+  - `Crc16Modbus` — static, one public `Compute` over a span.
   - `BoardFrame` record: `BoardState State`, `byte Seq`, `SpectrumMeasurement? Measurement`. `BoardState` is a
     `[Flags]` enum (bits 0-3 as in #20). `SpectrumMeasurement` record: `Spectrometer Device`, `ushort WavelengthNm`,
     `byte Delta`, `float Amplitude`, `float Snr`, `float Q`, `ushort[] Pixels`. `Spectrometer` enum: `Atp2000 = 1`,
@@ -160,6 +161,7 @@ type is decided by `len` only.
 **Files:**
 - Create: `SpectrumVisualizer.Core/Protocol/FrameDecoder.cs`, `FrameReader.cs`
 - Create: `SpectrumVisualizer.Tests.Unit/Core/Protocol/FrameDecoderTests.cs`, `FrameReaderTests.cs`
+- ➕ Create: `SpectrumVisualizer.Tests.Unit/Core/Protocol/ProtocolSamples.cs` (sample frames shared by the protocol tests)
 
 - [x] write decoder tests first: heartbeat example; both spectrum forms round-trip (compare with `BeEquivalentTo`,
   because `Pixels` is an array); split at every byte boundary; random chunks from a fixed seed through a `Pipe`; false

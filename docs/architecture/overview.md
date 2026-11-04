@@ -5,7 +5,7 @@
 SpectrumVisualizer shows the operator the spectrum the spectrometer board sends over a serial port. The code under
 `SpectrumVisualizer/` is the application shell: it starts, logs to a fixed folder, shows the main window, and routes
 reported failures and ReactiveUI's unhandled exceptions to the message panel. Core decodes the board's frames from a
-byte pipe and maps wavelengths to pixels (`board-protocol.md`), but nothing in the app reads a port yet; the content
+byte pipe and maps wavelengths to pixels (`board-protocol.md`), but nothing in the app reads a port; the content
 area shows a placeholder text and the status bar shows a fixed "Not connected". A console tool, the board emulator,
 writes protocol frames to a serial port for manual runs.
 

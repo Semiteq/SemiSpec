@@ -15,6 +15,9 @@ public sealed record EmulatorOptions(
 	byte Delta,
 	int BadCrcEvery)
 {
+	private const double MinimumRate = 0.001;
+	private const byte MaximumDelta = 100;
+
 	private static readonly Option<string> _port = new("--port")
 	{
 		Description = "Serial port to write frames to, for example COM5.",
@@ -29,8 +32,8 @@ public sealed record EmulatorOptions(
 
 	private static readonly Option<double> _rate = new("--rate")
 	{
-		Description = "Spectrum frames per second; 0 sends only a heartbeat every 3 s. At 115200 baud an "
-					  + "ATP-2000 frame takes about 0.36 s, so the port caps the rate near 2.8.",
+		Description = "Spectrum frames per second, at least 0.001; 0 sends only a heartbeat every 3 s. At 115200 "
+					  + "baud an ATP-2000 frame takes about 0.36 s, so the port caps the rate near 2.8.",
 		DefaultValueFactory = _ => 1.0,
 		CustomParser = ParseRate,
 	};
@@ -39,21 +42,19 @@ public sealed record EmulatorOptions(
 	{
 		Description = "Wavelength of the peak and of the measurement, in nm. Defaults to 650 for ATP-2000 and "
 					  + "1550 for ATP-8000.",
-		CustomParser = result => ParseWhole(result, "--wavelength", ushort.MaxValue) is { } nm ? (ushort)nm : null,
 	};
 
 	private static readonly Option<byte> _delta = new("--delta")
 	{
-		Description = "Half-width of the measurement window, in nm.",
+		Description = "Half-width of the measurement window, in nm, from 0 to 100.",
 		DefaultValueFactory = _ => 10,
-		CustomParser = result => (byte)(ParseWhole(result, "--delta", byte.MaxValue) ?? 0),
+		CustomParser = result => (byte)ParseWhole(result, "--delta", MaximumDelta),
 	};
 
 	private static readonly Option<int> _badCrcEvery = new("--bad-crc-every")
 	{
 		Description = "Corrupt the CRC of every nth frame sent, heartbeats included; 0 never.",
-		DefaultValueFactory = _ => 0,
-		CustomParser = result => ParseWhole(result, "--bad-crc-every", int.MaxValue) ?? 0,
+		CustomParser = result => ParseWhole(result, "--bad-crc-every", int.MaxValue),
 	};
 
 	public static RootCommand BuildCommand(Func<EmulatorOptions, CancellationToken, Task<int>> run)
@@ -88,16 +89,17 @@ public sealed record EmulatorOptions(
 		var text = result.Tokens[^1].Value;
 		if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var rate)
 			|| !double.IsFinite(rate)
-			|| rate < 0)
+			|| rate < 0
+			|| rate is > 0 and < MinimumRate)
 		{
-			result.AddError($"Option '--rate' expects a finite number of at least 0, got '{text}'.");
+			result.AddError($"Option '--rate' expects 0 or a finite number of at least 0.001, got '{text}'.");
 			return 0;
 		}
 
 		return rate;
 	}
 
-	private static int? ParseWhole(ArgumentResult result, string name, int maximum)
+	private static int ParseWhole(ArgumentResult result, string name, int maximum)
 	{
 		var text = result.Tokens[^1].Value;
 		if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
@@ -105,7 +107,7 @@ public sealed record EmulatorOptions(
 			|| value > maximum)
 		{
 			result.AddError($"Option '{name}' expects a whole number from 0 to {maximum}, got '{text}'.");
-			return null;
+			return 0;
 		}
 
 		return value;

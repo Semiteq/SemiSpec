@@ -21,7 +21,6 @@ public sealed class SpectrometerCalibration
 
 	private SpectrometerCalibration(Spectrometer device, double[] coefficients, ushort firstNm, ushort lastNm)
 	{
-		Device = device;
 		FirstNm = firstNm;
 		LastNm = lastNm;
 		_wavelengths = new double[device.PixelCount];
@@ -30,8 +29,6 @@ public sealed class SpectrometerCalibration
 			_wavelengths[pixel] = Evaluate(coefficients, pixel);
 		}
 	}
-
-	public Spectrometer Device { get; }
 
 	/// <summary>Lowest wavelength of the firmware table; PixelFor clamps lower values to it.</summary>
 	public ushort FirstNm { get; }
@@ -65,11 +62,6 @@ public sealed class SpectrometerCalibration
 		}
 
 		var above = ~index;
-		if (above == 0)
-		{
-			return 0;
-		}
-
 		if (above == _wavelengths.Length)
 		{
 			return _wavelengths.Length - 1;

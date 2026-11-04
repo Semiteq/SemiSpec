@@ -72,7 +72,7 @@ public sealed class SpectrometerCalibrationTests
 	{
 		var window = _atp2000.Window(500, 10);
 
-		window.Should().Be(new PixelWindow(_atp2000.PixelFor(490), _atp2000.PixelFor(510)));
+		window.Should().Be(new PixelWindow(762, 812));
 	}
 
 	[Fact]

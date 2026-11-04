@@ -76,16 +76,19 @@ public sealed class FrameScheduleTests
 	public void ARateAboveOneFrameInThreeSecondsSendsNoHeartbeat()
 	{
 		var schedule = new FrameSchedule(Options(rate: 0.5), _time);
+		var frames = new List<BoardFrame>();
 
 		for (var tick = 0; tick < 100; tick++)
 		{
 			if (schedule.Next() is { } bytes)
 			{
-				Decode(bytes).Measurement.Should().NotBeNull();
+				frames.Add(Decode(bytes));
 			}
 
 			_time.Advance(TimeSpan.FromMilliseconds(100));
 		}
+
+		frames.Should().HaveCount(5).And.OnlyContain(frame => frame.Measurement != null);
 	}
 
 	[Fact]

@@ -28,18 +28,4 @@ public sealed class Crc16ModbusTests
 
 		crc.Should().Be(0xB380);
 	}
-
-	[Fact]
-	public void UpdatingByteByByteEqualsComputingOverTheSpan()
-	{
-		var data = Encoding.ASCII.GetBytes("123456789");
-		var crc = Crc16Modbus.Initial;
-
-		foreach (var b in data)
-		{
-			crc = Crc16Modbus.Update(crc, b);
-		}
-
-		crc.Should().Be(Crc16Modbus.Compute(data));
-	}
 }

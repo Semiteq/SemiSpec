@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+
 namespace SpectrumVisualizer.Core.Protocol;
 
 /// <summary>One frame from the board: a heartbeat when Measurement is null, a spectrum frame otherwise.</summary>
@@ -73,4 +75,29 @@ public sealed record SpectrumMeasurement
 	public float Q { get; }
 
 	public ushort[] Pixels { get; }
+
+	public bool Equals(SpectrumMeasurement? other)
+	{
+		return other is not null
+			&& Device == other.Device
+			&& WavelengthNm == other.WavelengthNm
+			&& Delta == other.Delta
+			&& Amplitude.Equals(other.Amplitude)
+			&& Snr.Equals(other.Snr)
+			&& Q.Equals(other.Q)
+			&& Pixels.AsSpan().SequenceEqual(other.Pixels);
+	}
+
+	public override int GetHashCode()
+	{
+		var hash = new HashCode();
+		hash.Add(Device);
+		hash.Add(WavelengthNm);
+		hash.Add(Delta);
+		hash.Add(Amplitude);
+		hash.Add(Snr);
+		hash.Add(Q);
+		hash.AddBytes(MemoryMarshal.AsBytes(Pixels.AsSpan()));
+		return hash.ToHashCode();
+	}
 }

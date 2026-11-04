@@ -38,9 +38,9 @@ dotnet test SpectrumVisualizer.Tests                  # old app
 
 `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit` is the only test project of the new app: xUnit, AwesomeAssertions,
 Avalonia.Headless. Every test class carries three traits: `Component` (`Core|UI|Tools`), `Area`
-(`Calibration|Di|Emulator|Logging|MainWindow|Messages|Paths|Protocol|Resources`) and `Category` (`Unit`). `xunit.runner.json` sets `failSkips`, so a
-skipped test fails the run. A hung run leaves `SpectrumVisualizer.Tests.Unit.exe` locked, and the next build fails with
-MSB3027 until the process is killed.
+(`Calibration|Di|Emulator|Logging|MainWindow|Messages|Paths|Protocol|Resources`) and `Category` (`Unit`).
+`xunit.runner.json` sets `failSkips`, so a skipped test fails the run. A hung run leaves
+`SpectrumVisualizer.Tests.Unit.exe` locked, and the next build fails with MSB3027 until the process is killed.
 
 ## Format
 

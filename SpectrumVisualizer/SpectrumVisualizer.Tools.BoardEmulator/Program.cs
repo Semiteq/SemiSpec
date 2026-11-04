@@ -46,6 +46,11 @@ public static class Program
 		{
 			Console.WriteLine("stopped");
 		}
+		catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+		{
+			await Console.Error.WriteLineAsync($"Cannot write to {options.Port}: {exception.Message}");
+			return 1;
+		}
 
 		return 0;
 	}
