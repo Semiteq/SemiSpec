@@ -4,9 +4,11 @@ using System.Globalization;
 using FluentResults;
 
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Core.Store;
+using SpectrumVisualizer.Core.Trend;
 
 namespace SpectrumVisualizer.Tools.StoreBenchmark;
 
@@ -14,6 +16,8 @@ namespace SpectrumVisualizer.Tools.StoreBenchmark;
 public static class BenchmarkRun
 {
 	private const int Columns = 1000;
+	private const int TrendColumns = 2048;
+	private const int OtherWavelengthStepNm = 50;
 	private const int WarmRuns = 5;
 	private const int RetentionRows = 120;
 	private const double BytesPerMegabyte = 1024 * 1024;
@@ -63,6 +67,9 @@ public static class BenchmarkRun
 		output.WriteLine(
 			$"Median, Min and Max cover the {WarmRuns} runs after it. The OS file cache is not dropped (that needs "
 			+ "administrator rights), so a first run can be warm too.");
+		output.Write(Invariant($"Trend rows fold a cache of the file's frames to {TrendColumns} columns and re-read at "));
+		output.WriteLine(Invariant(
+			$"{OtherWavelengthNm(options, 0)} and {OtherWavelengthNm(options, 1)} nm in turn, one key change per run."));
 		output.WriteLine();
 		output.WriteLine("| File | Metric | First | Median | Min | Max |");
 		output.WriteLine("| --- | --- | --- | --- | --- | --- |");
@@ -84,6 +91,7 @@ public static class BenchmarkRun
 		Time(measured, $"Series {span} to {Columns} columns, substr (ms)",
 			c => SpectrumHistory.ReadSeries(c, whole, token));
 		await MeasureHistoryAsync(measured, span, recent, whole);
+		await MeasureTrendAsync(measured, span);
 
 		WriteTiming(measured, $"One retention pass, {RetentionRows} rows (ms)",
 			file.TimeRetentionPasses(WarmRuns + 1, RetentionRows));
@@ -108,6 +116,76 @@ public static class BenchmarkRun
 			() => history.IntensitySeriesAsync(whole, token));
 		var last = await TimeAsync(measured, "SpectrumAt the end of the range, SpectrumHistory (ms)",
 			() => history.SpectrumAtAsync(measured.File.WindowTo, token)) ?? throw new InvalidOperationException($"{measured.State}: SpectrumAt the end of the range found no spectrum");
+	}
+
+	/// <summary>Times the fold and the re-read of an IntensityCache filled from the frames of the file's rows.</summary>
+	private static async Task MeasureTrendAsync(MeasuredState measured, string span)
+	{
+		var (options, file) = (measured.Options, measured.File);
+		using var cache = new IntensityCache(new FixedTimeProvider(file.WindowTo), NullLogger<IntensityCache>.Instance);
+		foreach (var frame in file.WindowFrames())
+		{
+			cache.Add(frame);
+		}
+
+		var whole = TrendQuery(options.WavelengthNm, file.WindowFrom, file.WindowTo);
+		var points = cache.Fold(whole).Columns.Sum(column => column.Count + column.UncoveredCount);
+		TimeInMemory(measured, Invariant($"Trend cache fold, {span} ({points} points) to {TrendColumns} columns (ms)"),
+			() => cache.Fold(whole));
+		var recent = TrendQuery(options.WavelengthNm, file.WindowTo - _tenMinutes, file.WindowTo);
+		TimeInMemory(measured, $"Trend cache fold, 10 min to {TrendColumns} columns (ms)", () => cache.Fold(recent));
+		await TimeReReadsAsync(measured, cache);
+	}
+
+	/// <summary>
+	/// Changes the key once per run and lands TrendHistoryPlan's ranges read through IntensityPointsAsync, timed from
+	/// the key-changing frame's Add to the visible range's landing and to the last chunk's.
+	/// </summary>
+	private static async Task TimeReReadsAsync(MeasuredState measured, IntensityCache cache)
+	{
+		var history = new SpectrumHistory(measured.File.Path);
+		ReReadRequest? request = null;
+		using var subscription = cache.ReReadRequested.Subscribe(changed => request = changed);
+		var toVisible = new double[WarmRuns + 1];
+		var toLast = new double[WarmRuns + 1];
+		var landedPoints = 0L;
+		for (var run = 0; run < toVisible.Length; run++)
+		{
+			var wavelengthNm = OtherWavelengthNm(measured.Options, run);
+			var frame = measured.File.FrameAfterWindow(run, wavelengthNm);
+			request = null;
+			var stopwatch = Stopwatch.StartNew();
+			cache.Add(frame);
+			var reRead = request is { ReadsHistory: true } asked
+				? asked
+				: throw new InvalidOperationException($"{measured.State}: the key change to {wavelengthNm} nm asked no read");
+			var ranges = TrendHistoryPlan.For(frame.ReceivedAt - _tenMinutes, frame.ReceivedAt, frame.ReceivedAt, reRead.RecentStart);
+			for (var i = 0; i < ranges.Count; i++)
+			{
+				var chunk = await history.IntensityPointsAsync(
+					wavelengthNm, BenchmarkFile.Delta, ranges[i].From, ranges[i].To, measured.Token);
+				BenchmarkFile.ThrowIfFailed(chunk);
+				cache.LandHistory(reRead.Generation, chunk.Value);
+				landedPoints += chunk.Value.Points.Length;
+				toVisible[run] = i == 0 ? stopwatch.Elapsed.TotalMilliseconds : toVisible[run];
+			}
+
+			toLast[run] = stopwatch.Elapsed.TotalMilliseconds;
+		}
+
+		if (landedPoints == 0)
+		{
+			throw new InvalidOperationException($"{measured.State}: the trend re-reads landed no stored point");
+		}
+
+		WriteTiming(measured, "Trend re-read at another wavelength: visible 10 min first, to its landing (ms)", toVisible);
+		WriteTiming(measured, "Trend re-read at another wavelength: the whole day in its plan, to the last chunk (ms)", toLast);
+	}
+
+	/// <summary>Alternates two wavelengths above the stored one, inside both devices' firmware table ranges.</summary>
+	private static ushort OtherWavelengthNm(BenchmarkOptions options, int run)
+	{
+		return (ushort)(options.WavelengthNm + (OtherWavelengthStepNm * (1 + (run % 2))));
 	}
 
 	private static async Task<T> TimeAsync<T>(MeasuredState measured, string metric, Func<Task<Result<T>>> read)
@@ -143,6 +221,19 @@ public static class BenchmarkRun
 		WriteTiming(measured, metric, milliseconds);
 	}
 
+	private static void TimeInMemory(MeasuredState measured, string metric, Func<IntensitySeries> fold)
+	{
+		var milliseconds = new double[WarmRuns + 1];
+		for (var run = 0; run < milliseconds.Length; run++)
+		{
+			var stopwatch = Stopwatch.StartNew();
+			fold();
+			milliseconds[run] = stopwatch.Elapsed.TotalMilliseconds;
+		}
+
+		WriteTiming(measured, metric, milliseconds);
+	}
+
 	/// <summary>Writes the first run, then the median, min and max of the runs after it.</summary>
 	private static void WriteTiming(MeasuredState measured, string metric, double[] milliseconds)
 	{
@@ -163,6 +254,14 @@ public static class BenchmarkRun
 	private static IntensityQuery Query(ushort wavelengthNm, DateTimeOffset from, DateTimeOffset to)
 	{
 		var widthMilliseconds = Math.Max((long)(to - from).TotalMilliseconds / Columns, 1);
+		var width = TimeSpan.FromMilliseconds(widthMilliseconds);
+		return IntensityQuery.Create(wavelengthNm, BenchmarkFile.Delta, from, to, width).Value;
+	}
+
+	/// <summary>A query over the range in TrendColumns columns of the whole millisecond width the trend computes.</summary>
+	private static IntensityQuery TrendQuery(ushort wavelengthNm, DateTimeOffset from, DateTimeOffset to)
+	{
+		var widthMilliseconds = Math.Max(((long)(to - from).TotalMilliseconds + TrendColumns - 1) / TrendColumns, 1);
 		var width = TimeSpan.FromMilliseconds(widthMilliseconds);
 		return IntensityQuery.Create(wavelengthNm, BenchmarkFile.Delta, from, to, width).Value;
 	}
@@ -188,4 +287,13 @@ public static class BenchmarkRun
 		BenchmarkOptions Options,
 		BenchmarkFile File,
 		CancellationToken Token);
+
+	/// <summary>A clock stopped at the newest row, so the cache's 24 h retention keeps every row, churned ones too.</summary>
+	private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
+	{
+		public override DateTimeOffset GetUtcNow()
+		{
+			return now;
+		}
+	}
 }

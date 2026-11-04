@@ -639,13 +639,24 @@ Data flow:
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark/BenchmarkRun.cs`
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Tools/StoreBenchmarkRunTests.cs`
 
-- [ ] add the four rows of Acceptance Evidence item 10 after the `SpectrumHistory` rows (`BenchmarkRun.cs:84`): fill an
+- [x] add the four rows of Acceptance Evidence item 10 after the `SpectrumHistory` rows (`BenchmarkRun.cs:84`): fill an
   `IntensityCache` from the file's frames, time `Fold` over 24 h and 10 min to 2048 columns; time the plan at a
   wavelength other than `options.WavelengthNm` inside the device's table range, to the visible landing and to the last
-  chunk
-- [ ] extend `ASmallRunPrintsEveryMeasurementAndDeletesItsFile` with the four rows
-- [ ] run the tool with the defaults and record the four rows in this checkbox
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+  chunk. `BenchmarkFile` gained `WindowFrames()` and `FrameAfterWindow(index, wavelengthNm)` so the cache sees the
+  same frames the file holds; the cache runs on a clock stopped at the newest row; each re-read run changes the key
+  once (stored + 50 nm and + 100 nm in turn) and is timed from that frame's `Add` through `LandHistory` of each chunk
+- [x] extend `ASmallRunPrintsEveryMeasurementAndDeletesItsFile` with the four rows
+- [x] run the tool with the defaults and record the four rows in this checkbox. Measured 2026-11-04 on the dev laptop
+  (Intel Core i7-1355U, SSD, OS file cache not dropped), 172 800 ATP-2000 rows, re-read at 700 and 750 nm; first run,
+  then warm median (min to max) of 5:
+
+  | Row | Fresh file | Churned file | Target (warm median) |
+  | --- | --- | --- | --- |
+  | Trend cache fold, 24 h (172 800 points) to 2048 columns | 1.3; 1.2 (1.2 to 1.2) ms | 1.3; 1.3 (1.3 to 1.3) ms | at most 20 ms, met |
+  | Trend cache fold, 10 min to 2048 columns | 0.1; 0.1 (0.1 to 0.1) ms | 0.1; 0.1 (0.1 to 0.1) ms | at most 2 ms, met |
+  | Trend re-read, visible 10 min first, to its landing | 14.4; 4.8 (4.4 to 13.2) ms | 5.2; 4.6 (4.5 to 5.4) ms | at most 100 ms, met |
+  | Trend re-read, the whole day in its plan, to the last chunk | 706.5; 705.0 (686.3 to 748.1) ms | 704.1; 698.6 (693.3 to 715.9) ms | at most 2 000 ms, met |
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 5: Navigation model, column mapping and overview geometry
 **Files:**
