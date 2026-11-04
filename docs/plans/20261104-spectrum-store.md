@@ -538,15 +538,18 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Core/Store/StoreFiles.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Store/StoreFilesTests.cs`, `TempFolder.cs`
 
-- [ ] implement `StoreFiles.InstanceFile(string folder, int processId)` returning `spectra-<id>.db` under the folder
-- [ ] implement `StoreFiles.Prepare(string instanceFile)` returning `Result`: create the folder, delete the own file
+- [x] implement `StoreFiles.InstanceFile(string folder, int processId)` returning `spectra-<id>.db` under the folder
+- [x] implement `StoreFiles.Prepare(string instanceFile)` returning `Result`: create the folder, delete the own file
   and sidecars, sweep the other `spectra-*.db` files and orphan sidecars by the delete rule of Solution Overview; a
-  kept live file logs nothing here (the caller logs the result counts)
-- [ ] write `TempFolder` (a fresh folder under `Path.GetTempPath()`, `ClearAllPools` and a recursive delete in
+  kept live file logs nothing here (the caller logs the result counts). Returns `Result<StoreSweep>` with
+  `DeletedFiles` and `KeptFiles`, the counts the caller logs.
+- [x] write `TempFolder` (a fresh folder under `Path.GetTempPath()`, `ClearAllPools` and a recursive delete in
   `Dispose`) for every store test
-- [ ] write the `StoreFilesTests` of Acceptance Evidence item 1 (`Component=Core`, `Area=Store`), including
-  `PrepareKeepsTheFileOfALiveInstance` with an open `SqliteConnection` on the other file
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] write the `StoreFilesTests` of Acceptance Evidence item 1 (`Component=Core`, `Area=Store`), including
+  `PrepareKeepsTheFileOfALiveInstance` with an open `SqliteConnection` on the other file; the ASSUMPTION holds (SQLite
+  opens without `FILE_SHARE_DELETE`). Added `PrepareKeepsFilesOutsideTheStoreNaming` and
+  `PrepareFailsWhenTheFolderPathIsAFile`.
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (514 of 514)
 
 ### Task 3: Database: schema, batched writes, retention, checkpoint
 **Files:**
