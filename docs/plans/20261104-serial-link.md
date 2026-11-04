@@ -460,13 +460,13 @@ the same run do not.
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Core/Protocol/FrameReader.cs`
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Protocol/FrameReaderTests.cs`
 
-- [ ] add `DecodeBuffered(PipeReader, ICollection<BoardFrame>)` of Solution Overview over the existing `DecodeAll`
+- [x] add `DecodeBuffered(PipeReader, ICollection<BoardFrame>)` of Solution Overview over the existing `DecodeAll`
   (`FrameReader.cs:46-56`) and `DrainAfterCompletion` (`:59-67`); leave `ReadAllAsync` (`:16-44`) unchanged
-- [ ] write tests: frames written across several `Pipe` writes come out in order through repeated calls; a partial
+- [x] write tests: frames written across several `Pipe` writes come out in order through repeated calls; a partial
   frame stays buffered and returns no frame; two whole frames in one write both come out; with the writer completed
   the frames behind a stalled false candidate come out and the call returns true; `DiscardedBytes` counts the
   dropped bytes
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - the existing `FrameReaderTests` still pass - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - the existing `FrameReaderTests` still pass - must pass before next task
 
 ### Task 5: Link health evaluator
 **Files:**

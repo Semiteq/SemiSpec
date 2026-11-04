@@ -7,7 +7,7 @@ namespace SpectrumVisualizer.Core.Protocol;
 /// <summary>Turns a byte pipe into board frames and counts the bytes the decoder dropped.</summary>
 public sealed class FrameReader
 {
-	// Written by the thread that enumerates ReadAllAsync, read from any thread.
+	// Written by the thread that enumerates ReadAllAsync or calls DecodeBuffered, read from any thread.
 	private long _discardedBytes;
 
 	public long DiscardedBytes => Interlocked.Read(ref _discardedBytes);
@@ -43,7 +43,26 @@ public sealed class FrameReader
 		}
 	}
 
-	private void DecodeAll(ref ReadOnlySequence<byte> buffer, List<BoardFrame> frames)
+	/// <summary>Decodes the bytes already in the pipe without waiting; returns whether the writer has completed.</summary>
+	public bool DecodeBuffered(PipeReader reader, ICollection<BoardFrame> frames)
+	{
+		if (!reader.TryRead(out var result))
+		{
+			return false;
+		}
+
+		var buffer = result.Buffer;
+		DecodeAll(ref buffer, frames);
+		if (result.IsCompleted)
+		{
+			DrainAfterCompletion(ref buffer, frames);
+		}
+
+		reader.AdvanceTo(buffer.Start, buffer.End);
+		return result.IsCompleted;
+	}
+
+	private void DecodeAll(ref ReadOnlySequence<byte> buffer, ICollection<BoardFrame> frames)
 	{
 		long discarded;
 		while (FrameDecoder.TryReadFrame(ref buffer, out var frame, out discarded))
@@ -56,7 +75,7 @@ public sealed class FrameReader
 	}
 
 	/// <summary>No more bytes will come, so a pending candidate is invalid: drop one byte and decode again.</summary>
-	private void DrainAfterCompletion(ref ReadOnlySequence<byte> buffer, List<BoardFrame> frames)
+	private void DrainAfterCompletion(ref ReadOnlySequence<byte> buffer, ICollection<BoardFrame> frames)
 	{
 		while (!buffer.IsEmpty)
 		{
