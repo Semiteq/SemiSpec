@@ -5,18 +5,20 @@ using Avalonia.Interactivity;
 
 using ScottPlot.Interactivity.UserActionResponses;
 
-using Serilog;
-
 using SpectrumVisualizer.UI.Chart;
 
 namespace SpectrumVisualizer.UI.Spectrum;
 
 public partial class SpectrumChartView : UserControl
 {
+	// ScottPlot 5.1.59 MouseDragPan and MouseDragZoomRectangle ignore a held move shorter than this from the press.
+	private const double DragThreshold = 5.0;
+
 	private IDisposable? _redrawSubscription;
 	private SpectrumChartViewModel? _viewModel;
 	private int _frameSequence;
 	private int? _pendingFrame;
+	private Point? _pressPosition;
 
 	public SpectrumChartView()
 	{
@@ -31,9 +33,11 @@ public partial class SpectrumChartView : UserControl
 			or KeyboardAutoscale
 			or KeyboardPanAndZoom);
 
-		// AvaPlot's class handler marks the wheel event handled, so both handlers run in the tunnel phase, before it.
+		// AvaPlot's class handler marks the wheel event handled, so these handlers run in the tunnel phase, before it.
 		PlotControl.AddHandler(PointerWheelChangedEvent, OnPlotPointerWheelChanged, RoutingStrategies.Tunnel);
+		PlotControl.AddHandler(PointerPressedEvent, OnPlotPointerPressed, RoutingStrategies.Tunnel);
 		PlotControl.AddHandler(PointerMovedEvent, OnPlotPointerMoved, RoutingStrategies.Tunnel);
+		PlotControl.AddHandler(PointerReleasedEvent, OnPlotPointerReleased, RoutingStrategies.Tunnel);
 	}
 
 	/// <summary>Animation-frame callbacks that served a redraw request since the view was built.</summary>
@@ -83,12 +87,14 @@ public partial class SpectrumChartView : UserControl
 
 		var variant = application.ActualThemeVariant;
 		var plot = PlotControl.Plot;
+		var colors = ChartPalette.Colors(application, variant);
+
+		// One hold of the lock, so no render sees new surfaces with old series colours; ApplyPalette re-enters it.
 		lock (plot.Sync)
 		{
 			ChartPalette.Apply(plot, application, variant);
+			_viewModel?.ApplyPalette(colors);
 		}
-
-		_viewModel?.ApplyPalette(ChartPalette.Colors(application, variant));
 	}
 
 	private void OnDataContextChanged(object? sender, EventArgs eventArgs)
@@ -98,17 +104,19 @@ public partial class SpectrumChartView : UserControl
 		ClearPendingFrame();
 		_viewModel = DataContext as SpectrumChartViewModel;
 
+		// A null DataContext leaves the plot in place: AvaPlot.Reset disposes the plot it replaces, and that plot is
+		// the view model's, so the same view model coming back finds its plottables.
 		if (_viewModel is null)
 		{
 			return;
 		}
 
-		PlotControl.Reset(_viewModel.Plot);
-		_redrawSubscription = _viewModel.RedrawRequested
-			.Subscribe(
-				_ => RequestFrame(),
-				ReportFailureOf(nameof(SpectrumChartViewModel.RedrawRequested)),
-				ClearPendingFrame);
+		if (!ReferenceEquals(PlotControl.Plot, _viewModel.Plot))
+		{
+			PlotControl.Reset(_viewModel.Plot);
+		}
+
+		_redrawSubscription = _viewModel.RedrawRequested.Subscribe(_ => RequestFrame(), ClearPendingFrame);
 		RepaintChart();
 	}
 
@@ -147,11 +155,6 @@ public partial class SpectrumChartView : UserControl
 		_pendingFrame = null;
 	}
 
-	private static Action<Exception> ReportFailureOf(string pipeline)
-	{
-		return failure => Log.Error(failure, "The spectrum chart view's {Pipeline} subscription ended on a failure", pipeline);
-	}
-
 	private void OnPlotPointerWheelChanged(object? sender, PointerWheelEventArgs eventArgs)
 	{
 		if (DataContext is SpectrumChartViewModel chart)
@@ -160,15 +163,33 @@ public partial class SpectrumChartView : UserControl
 		}
 	}
 
+	private void OnPlotPointerPressed(object? sender, PointerPressedEventArgs eventArgs)
+	{
+		_pressPosition = eventArgs.GetPosition(PlotControl);
+	}
+
+	private void OnPlotPointerReleased(object? sender, PointerReleasedEventArgs eventArgs)
+	{
+		_pressPosition = null;
+	}
+
+	/// <summary>A held move freezes the scale once it is far enough from the press for ScottPlot to pan or zoom.</summary>
 	private void OnPlotPointerMoved(object? sender, PointerEventArgs eventArgs)
 	{
-		if (DataContext is not SpectrumChartViewModel { IsFollowing: true } chart)
+		if (DataContext is not SpectrumChartViewModel { IsFollowing: true } chart || _pressPosition is not { } press)
 		{
 			return;
 		}
 
-		var buttons = eventArgs.GetCurrentPoint(PlotControl).Properties;
-		if (buttons.IsLeftButtonPressed || buttons.IsRightButtonPressed || buttons.IsMiddleButtonPressed)
+		var point = eventArgs.GetCurrentPoint(PlotControl);
+		var buttons = point.Properties;
+		if (!buttons.IsLeftButtonPressed && !buttons.IsRightButtonPressed && !buttons.IsMiddleButtonPressed)
+		{
+			return;
+		}
+
+		var distance = Math.Max(Math.Abs(point.Position.X - press.X), Math.Abs(point.Position.Y - press.Y));
+		if (distance >= DragThreshold)
 		{
 			chart.TakeManualScale();
 		}

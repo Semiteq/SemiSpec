@@ -25,12 +25,12 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 	private readonly DeviceLine _atp8000Line;
 	private readonly VerticalLine _centreLine;
 	private readonly Subject<Unit> _redrawRequests = new();
+	private readonly double[] _referenceYs =
+		new double[Math.Max(Spectrometer.Atp2000.PixelCount, Spectrometer.Atp8000.PixelCount)];
 	private DisplayedSpectrum? _shown;
-	private ProjectedSpectrum _shownProjection;
+	private SpectrumMeasurement? _lastNonDark;
 	private bool _isInverted;
 	private bool _isLogarithmic;
-	private AxisRange? _lastNonDarkY;
-	private bool _isDisposed;
 
 	public SpectrumChartViewModel()
 	{
@@ -50,11 +50,7 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 	public Plot Plot { get; } = new();
 
 	/// <summary>True while every spectrum sets the limits; false once the operator zoomed, panned or stuck to zero.</summary>
-	public bool IsFollowing
-	{
-		get;
-		private set => this.RaiseAndSetIfChanged(ref field, value);
-	} = true;
+	public bool IsFollowing { get; private set; } = true;
 
 	public bool HasSpectrum
 	{
@@ -85,6 +81,8 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 			return;
 		}
 
+		var wasFollowing = IsFollowing;
+
 		lock (Plot.Sync)
 		{
 			if (logarithmic != _isLogarithmic)
@@ -95,46 +93,57 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 
 			_isInverted = inverted;
 			_isLogarithmic = logarithmic;
-			_lastNonDarkY = null;
 			IsFollowing = true;
 			Project();
 		}
 
+		RaiseFollowingChanged(wasFollowing);
 		RequestRedraw();
 	}
 
-	/// <summary>Freezes the limits where ScottPlot's own pan or zoom left them.</summary>
+	/// <summary>Freezes the limits where ScottPlot's own pan or zoom left them; before the first spectrum there is nothing to freeze.</summary>
 	public void TakeManualScale()
 	{
-		IsFollowing = false;
-	}
-
-	public void ResetScale()
-	{
-		lock (Plot.Sync)
-		{
-			IsFollowing = true;
-			Project();
-		}
-
-		RequestRedraw();
-	}
-
-	/// <summary>Y from zero to 1.2 times the largest displayed value, X over the device range, then frozen.</summary>
-	public void StickToZero()
-	{
-		if (_shown is not { } shown)
+		if (!HasSpectrum)
 		{
 			return;
 		}
 
+		var wasFollowing = IsFollowing;
+		IsFollowing = false;
+		RaiseFollowingChanged(wasFollowing);
+	}
+
+	public void ResetScale()
+	{
+		var wasFollowing = IsFollowing;
 		lock (Plot.Sync)
 		{
-			var limits = SpectrumScale.StuckToZero(LineFor(shown.Measurement.Device).Xs, _shownProjection.RawMax, _isLogarithmic);
-			SetLimits(limits);
+			IsFollowing = true;
+			Project();
+		}
+
+		RaiseFollowingChanged(wasFollowing);
+		RequestRedraw();
+	}
+
+	/// <summary>Y from zero to 1.2 times the largest displayed value of the reference spectrum, X over the device range, then frozen.</summary>
+	public void StickToZero()
+	{
+		if (_shown is not { Measurement: var measurement })
+		{
+			return;
+		}
+
+		var wasFollowing = IsFollowing;
+		lock (Plot.Sync)
+		{
+			var rawMax = ProjectReference(measurement).Projection.RawMax;
+			SetLimits(SpectrumScale.StuckToZero(LineFor(measurement.Device).Xs, rawMax, _isLogarithmic));
 			IsFollowing = false;
 		}
 
+		RaiseFollowingChanged(wasFollowing);
 		RequestRedraw();
 	}
 
@@ -153,12 +162,6 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 
 	public void Dispose()
 	{
-		if (_isDisposed)
-		{
-			return;
-		}
-
-		_isDisposed = true;
 		_redrawRequests.OnCompleted();
 		_redrawRequests.Dispose();
 		Plot.Dispose();
@@ -193,23 +196,33 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		}
 
 		var line = LineFor(measurement.Device);
-		_shownProjection = SpectrumProjection.Fill(measurement.Pixels, _isInverted, _isLogarithmic, line.Ys);
+		var projection = SpectrumProjection.Fill(measurement.Pixels, _isInverted, _isLogarithmic, line.Ys);
+		if (!projection.IsDark)
+		{
+			_lastNonDark = measurement;
+		}
+
 		_atp2000Line.Plottable.IsVisible = line == _atp2000Line;
 		_atp8000Line.Plottable.IsVisible = line == _atp8000Line;
 		PlaceWindow(measurement, line.Xs);
 
-		if (!IsFollowing)
+		if (IsFollowing)
 		{
-			return;
+			var ys = projection.IsDark ? ProjectReference(measurement).Ys : line.Ys;
+			SetLimits(SpectrumScale.Following(line.Xs, ys, _isLogarithmic));
 		}
+	}
 
-		var limits = SpectrumScale.Following(line.Xs, line.Ys, _shownProjection.IsDark, _isLogarithmic, _lastNonDarkY);
-		if (!_shownProjection.IsDark)
-		{
-			_lastNonDarkY = limits.Y;
-		}
-
-		SetLimits(limits);
+	/// <summary>
+	/// The spectrum the Y limits come from, projected in the current mode: the shown one, or while a dark frame is
+	/// shown the last non-dark one, so the axis does not jump on every dark frame; caller holds Plot.Sync.
+	/// </summary>
+	private ReferenceSpectrum ProjectReference(SpectrumMeasurement shown)
+	{
+		var reference = _lastNonDark ?? shown;
+		var ys = _referenceYs.AsSpan(0, reference.Pixels.Length);
+		var projection = SpectrumProjection.Fill(reference.Pixels, _isInverted, _isLogarithmic, ys);
+		return new ReferenceSpectrum(ys, projection);
 	}
 
 	private void PlaceWindow(SpectrumMeasurement measurement, double[] xs)
@@ -235,5 +248,21 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		_redrawRequests.OnNext(Unit.Default);
 	}
 
+	/// <summary>Raised after Plot.Sync is released, so no subscriber runs under the plot lock.</summary>
+	private void RaiseFollowingChanged(bool wasFollowing)
+	{
+		if (wasFollowing != IsFollowing)
+		{
+			this.RaisePropertyChanged(nameof(IsFollowing));
+		}
+	}
+
 	private sealed record DeviceLine(SignalXY Plottable, double[] Xs, double[] Ys);
+
+	private readonly ref struct ReferenceSpectrum(Span<double> ys, ProjectedSpectrum projection)
+	{
+		public ReadOnlySpan<double> Ys { get; } = ys;
+
+		public ProjectedSpectrum Projection { get; } = projection;
+	}
 }

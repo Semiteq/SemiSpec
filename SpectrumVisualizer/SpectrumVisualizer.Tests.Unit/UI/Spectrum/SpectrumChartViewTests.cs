@@ -13,6 +13,8 @@ using ScottPlot.Avalonia;
 using ScottPlot.Interactivity.UserActionResponses;
 using ScottPlot.Plottables;
 
+using SpectrumVisualizer.Core.Calibration;
+using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Spectrum;
 
@@ -191,19 +193,115 @@ public sealed class SpectrumChartViewTests : IDisposable
 		_chart.IsFollowing.Should().BeTrue();
 	}
 
-	[AvaloniaFact]
-	public void AMoveWithAButtonHeldFreezesTheScale()
+	[AvaloniaTheory]
+	[InlineData(0.0, true)]
+	[InlineData(2.0, true)]
+	[InlineData(6.0, false)]
+	[InlineData(40.0, false)]
+	public void AHeldMoveFreezesTheScaleFromFivePixels(double distance, bool keepsFollowing)
 	{
 		var centre = ShowSpectrum();
+		var moved = new Point(centre.X + distance, centre.Y);
 		_window.MouseMove(centre);
 
 		_window.MouseDown(centre, MouseButton.Left);
 		// The headless window does not track the held button, so the move carries it as the platform would.
-		_window.MouseMove(new Point(centre.X + 40, centre.Y), RawInputModifiers.LeftMouseButton);
-		_window.MouseUp(new Point(centre.X + 40, centre.Y), MouseButton.Left);
+		_window.MouseMove(moved, RawInputModifiers.LeftMouseButton);
+		var followingWhileHeld = _chart.IsFollowing;
+		_window.MouseUp(moved, MouseButton.Left);
 		Dispatcher.UIThread.RunJobs();
 
-		_chart.IsFollowing.Should().BeFalse();
+		followingWhileHeld.Should().Be(keepsFollowing, "ScottPlot pans only from 5 px away from the press");
+		_chart.IsFollowing.Should().Be(keepsFollowing);
+	}
+
+	[AvaloniaFact]
+	public void AWheelOnTheEmptyPlotLeavesTheFirstSpectrumFollowing()
+	{
+		Realise();
+		var centre = PlotControl.TranslatePoint(
+				new Point(PlotControl.Bounds.Width / 2, PlotControl.Bounds.Height / 2),
+				_window)
+			?? throw new InvalidOperationException("The plot control is not in the window.");
+
+		_window.MouseWheel(centre, new Vector(0.0, 1.0));
+		Dispatcher.UIThread.RunJobs();
+		_chart.Show(SpectrumSamples.Atp8000Peak);
+
+		_chart.IsFollowing.Should().BeTrue();
+		var calibration = SpectrometerCalibration.For(Spectrometer.Atp8000);
+		var limits = _chart.Plot.Axes.GetLimits();
+		limits.Left.Should().Be(calibration.WavelengthOf(0));
+		limits.Right.Should().Be(calibration.WavelengthOf(Spectrometer.Atp8000.PixelCount - 1));
+	}
+
+	[AvaloniaFact]
+	public void AnUnloadedViewIgnoresAVariantChange()
+	{
+		var application = Application.Current!;
+		var previous = application.RequestedThemeVariant;
+		try
+		{
+			application.RequestedThemeVariant = ThemeVariant.Light;
+			Realise();
+			_window.Content = null;
+			Dispatcher.UIThread.RunJobs();
+
+			application.RequestedThemeVariant = ThemeVariant.Dark;
+			Dispatcher.UIThread.RunJobs();
+
+			_chart.Plot.FigureBackground.Color.Should().Be(Expected("AppPanelBackgroundBrush", ThemeVariant.Light));
+		}
+		finally
+		{
+			application.RequestedThemeVariant = previous;
+		}
+	}
+
+	[AvaloniaFact]
+	public void ANullDataContextAndBackKeepsThePlottables()
+	{
+		Realise();
+		var plottables = _chart.Plot.GetPlottables().ToList();
+
+		_view.DataContext = null;
+		_view.DataContext = _chart;
+		Dispatcher.UIThread.RunJobs();
+
+		PlotControl.Plot.Should().BeSameAs(_chart.Plot);
+		_chart.Plot.GetPlottables().Should().Equal(plottables);
+	}
+
+	[AvaloniaFact]
+	public void ADataContextSwitchEndsTheOldRedrawSubscription()
+	{
+		using var other = new SpectrumChartViewModel();
+		Realise();
+
+		_view.DataContext = other;
+		DriveOneFrame();
+		var framesBefore = _view.ServedFrameCount;
+		_chart.Show(SpectrumSamples.Atp8000Peak);
+		DriveOneFrame();
+
+		PlotControl.Plot.Should().BeSameAs(other.Plot);
+		_view.ServedFrameCount.Should().Be(framesBefore, "the old view model's requests no longer reach the view");
+	}
+
+	[AvaloniaFact]
+	public void DisposingTheViewModelClearsThePendingFrame()
+	{
+		var disposed = new SpectrumChartViewModel();
+		_view.DataContext = disposed;
+		Realise();
+		DriveOneFrame();
+		var framesBefore = _view.ServedFrameCount;
+
+		disposed.Show(SpectrumSamples.Atp8000Peak);
+		disposed.Dispose();
+		DriveOneFrame();
+
+		_view.ServedFrameCount.Should().Be(framesBefore, "the completed requests left no frame to serve");
 	}
 
 	private static void DriveOneFrame()

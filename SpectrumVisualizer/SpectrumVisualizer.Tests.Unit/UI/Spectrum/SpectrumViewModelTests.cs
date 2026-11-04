@@ -40,19 +40,23 @@ public sealed class SpectrumViewModelTests : IDisposable
 	private SpectrumViewModel ViewModel => _viewModel ??= NewViewModel(_source);
 
 	[AvaloniaFact]
-	public async Task ThreeQueuedSignalsApplyTheLatestSpectrumOnce()
+	public void ThreeQueuedSignalsApplyTheLatestSpectrumOnce()
 	{
 		var redraws = CountRedraws();
 		var latest = Atp8000Peak;
 		_source.Current = Atp2000Peak;
+		using var signalled = new ManualResetEventSlim();
 
-		await Task.Run(() =>
+		// A blocking wait, not an await: an await lets the dispatcher run the first signal before the last one.
+		_ = Task.Run(() =>
 		{
 			_source.Signal();
 			_source.Signal();
 			_source.Current = latest;
 			_source.Signal();
+			signalled.Set();
 		});
+		signalled.Wait(Waits.Limit).Should().BeTrue("a throw in the signalling task never sets the event");
 		Dispatcher.UIThread.RunJobs();
 
 		redraws().Should().Be(1);
@@ -60,17 +64,19 @@ public sealed class SpectrumViewModelTests : IDisposable
 	}
 
 	[AvaloniaFact]
-	public void TheSameCachedSpectrumIsAppliedOnceByReference()
+	public void TheSameMeasurementIsAppliedOnceByReference()
 	{
 		var redraws = CountRedraws();
-		var cached = Atp8000Peak;
+		var shown = Atp8000Peak;
+		var sameMeasurement = shown with { ReceivedAt = shown.ReceivedAt.AddSeconds(1) };
 		var equalCopy = Atp8000Peak;
-		equalCopy.Should().Be(cached).And.NotBeSameAs(cached);
+		equalCopy.Measurement.Should().Be(shown.Measurement).And.NotBeSameAs(shown.Measurement);
 
-		_source.Current = cached;
+		_source.Current = shown;
 		SignalAndRun();
+		_source.Current = sameMeasurement;
 		SignalAndRun();
-		redraws().Should().Be(1);
+		redraws().Should().Be(1, "a new record around the same measurement is the same spectrum");
 
 		_source.Current = equalCopy;
 		SignalAndRun();
@@ -150,22 +156,58 @@ public sealed class SpectrumViewModelTests : IDisposable
 	}
 
 	[AvaloniaFact]
-	public void AThrowingCurrentAddsOneErrorEntryAndEndsTheSubscription()
+	public void AThrowingShowReportsOnceAndTheNextSpectrumStillShows()
 	{
-		using var throwing = new ThrowingSpectrumSource();
-		_viewModel = NewViewModel(throwing);
-		var redraws = CountRedraws();
+		var throwOnce = true;
+		ViewModel.Chart.RedrawRequested.Subscribe(_ =>
+		{
+			if (throwOnce)
+			{
+				throwOnce = false;
+				throw new InvalidOperationException("the chart failed");
+			}
+		});
 
-		Dispatcher.UIThread.RunJobs();
-		throwing.Signal();
+		_source.Current = Atp2000Peak;
+		SignalAndRun();
+		var next = Atp8000Peak;
+		_source.Current = next;
+		SignalAndRun();
+
+		ShouldHaveReportedOneError();
+		ViewModel.SignalInfo.Spectrum.Should().BeSameAs(next);
+	}
+
+	[AvaloniaFact]
+	public void AThrowingCurrentOnALaterSignalReportsAndThePipelineGoesOn()
+	{
+		using var failing = new FailingSpectrumSource();
+		_viewModel = NewViewModel(failing);
 		Dispatcher.UIThread.RunJobs();
 
-		_messagePanel.Entries.Should().ContainSingle();
-		_messagePanel.Entries[0].View.Severity.Should().Be(MessageSeverity.Error);
-		_messagePanel.Entries[0].View.Detail.Should().Contain(nameof(InvalidOperationException));
-		_logger.Levels().Should().Equal(LogLevel.Error);
-		throwing.Reads.Should().Be(1, "the failure ends the subscription");
-		redraws().Should().Be(0);
+		failing.Fails = true;
+		failing.Signal();
+		Dispatcher.UIThread.RunJobs();
+		var next = Atp8000Peak;
+		failing.Fails = false;
+		failing.Spectrum = next;
+		failing.Signal();
+		Dispatcher.UIThread.RunJobs();
+
+		ShouldHaveReportedOneError();
+		failing.Reads.Should().Be(3, "the failed read leaves the subscription alive");
+		ViewModel.SignalInfo.Spectrum.Should().BeSameAs(next);
+	}
+
+	[AvaloniaFact]
+	public void DisposeEndsTheChangedSubscription()
+	{
+		_ = ViewModel;
+		_source.HasSubscribers.Should().BeTrue();
+
+		ViewModel.Dispose();
+
+		_source.HasSubscribers.Should().BeFalse();
 	}
 
 	public void Dispose()
@@ -199,19 +241,31 @@ public sealed class SpectrumViewModelTests : IDisposable
 		Dispatcher.UIThread.RunJobs();
 	}
 
-	/// <summary>A source whose Current throws on every read.</summary>
-	private sealed class ThrowingSpectrumSource : IDisplayedSpectrumSource, IDisposable
+	private void ShouldHaveReportedOneError()
+	{
+		_messagePanel.Entries.Should().ContainSingle();
+		_messagePanel.Entries[0].View.Severity.Should().Be(MessageSeverity.Error);
+		_messagePanel.Entries[0].View.Detail.Should().Contain(nameof(InvalidOperationException));
+		_logger.Levels().Should().Equal(LogLevel.Error);
+	}
+
+	/// <summary>A source whose Current throws while Fails is set and returns Spectrum otherwise.</summary>
+	private sealed class FailingSpectrumSource : IDisplayedSpectrumSource, IDisposable
 	{
 		private readonly Subject<RxUnit> _changed = new();
 
 		public int Reads { get; private set; }
+
+		public bool Fails { get; set; }
+
+		public DisplayedSpectrum? Spectrum { get; set; }
 
 		public DisplayedSpectrum? Current
 		{
 			get
 			{
 				Reads++;
-				throw new InvalidOperationException("the source failed");
+				return Fails ? throw new InvalidOperationException("the source failed") : Spectrum;
 			}
 		}
 

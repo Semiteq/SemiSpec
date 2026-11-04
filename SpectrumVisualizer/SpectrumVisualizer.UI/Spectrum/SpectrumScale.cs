@@ -13,20 +13,10 @@ internal static class SpectrumScale
 	private const double StuckHeadroom = 1.2;
 	private static readonly AxisRange _stuckEmptyRange = new(0.0, 1.0);
 
-	/// <summary>A dark frame keeps lastNonDarkY when there is one, so the axis does not jump on every dark frame.</summary>
-	public static SpectrumLimits Following(
-		ReadOnlySpan<double> xs,
-		ReadOnlySpan<double> ys,
-		bool isDark,
-		bool logarithmic,
-		AxisRange? lastNonDarkY)
+	/// <summary>X over the device range of xs; Y over ys padded by five percent, or widened when ys is flat.</summary>
+	public static SpectrumLimits Following(ReadOnlySpan<double> xs, ReadOnlySpan<double> ys, bool logarithmic)
 	{
 		var x = DeviceRange(xs);
-		if (isDark && lastNonDarkY is { } kept)
-		{
-			return new SpectrumLimits(x, kept);
-		}
-
 		var min = double.PositiveInfinity;
 		var max = double.NegativeInfinity;
 		foreach (var y in ys)

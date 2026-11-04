@@ -37,15 +37,14 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 		_disposables.Add(source.Changed
 			.ObserveOn(uiScheduler)
 			.StartWith(Unit.Default)
-			.Select(_ => source.Current)
+			.Select(_ => ReadCurrent(source))
 			.WhereNotNull()
-			.DistinctUntilChanged<DisplayedSpectrum>(ReferenceEqualityComparer.Instance)
-			.Do(Show)
-			.Subscribe(_ => { }, ReportPipelineFailure));
+			.DistinctUntilChanged(spectrum => spectrum.Measurement, ReferenceEqualityComparer.Instance)
+			.Subscribe(Show, ReportPipelineFailure));
 
 		_disposables.Add(this
 			.WhenAnyValue(spectrum => spectrum.IsInverted, spectrum => spectrum.IsLogarithmic)
-			.Subscribe(display => Chart.SetDisplay(display.Item1, display.Item2)));
+			.Subscribe(display => Chart.SetDisplay(display.Item1, display.Item2), ReportPipelineFailure));
 
 		var canStickToZero = Chart.WhenAnyValue(chart => chart.HasSpectrum);
 		var canResetScale = Chart.WhenAnyValue(
@@ -83,10 +82,32 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 		_disposables.Dispose();
 	}
 
+	/// <summary>A failed read is reported and skipped, so the next signal reads again.</summary>
+	private DisplayedSpectrum? ReadCurrent(IDisplayedSpectrumSource source)
+	{
+		try
+		{
+			return source.Current;
+		}
+		catch (Exception exception)
+		{
+			ReportPipelineFailure(exception);
+			return null;
+		}
+	}
+
+	/// <summary>A failed show is reported and skipped, so the next spectrum still shows.</summary>
 	private void Show(DisplayedSpectrum spectrum)
 	{
-		Chart.Show(spectrum);
-		SignalInfo.Spectrum = spectrum;
+		try
+		{
+			Chart.Show(spectrum);
+			SignalInfo.Spectrum = spectrum;
+		}
+		catch (Exception exception)
+		{
+			ReportPipelineFailure(exception);
+		}
 	}
 
 	private void ReportPipelineFailure(Exception exception)

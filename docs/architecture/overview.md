@@ -203,7 +203,7 @@ flag, so the first Receiving after a fault-free Connect adds none. A throw insid
 2. `FrameDistributor` reads it. For a frame that carries a measurement it publishes `LatestSpectrum` with
    `Volatile.Write`; then it calls each subscriber's `OnNext` inside its own try/catch (distributor task).
 3. `LiveSpectrumSource` passes spectrum frames on as `Changed` (distributor task).
-4. `SpectrumViewModel` moves the signal to the UI scheduler, reads `Current`, drops a repeat by reference, calls
+4. `SpectrumViewModel` moves the signal to the UI scheduler, reads `Current`, drops a repeat of the same measurement, calls
    `Chart.Show` and sets `SignalInfo.Spectrum` (UI thread).
 5. `Chart.Show` fills the line's buffer and the limits under `lock (Plot.Sync)` and requests a redraw.
 6. The view serves one redraw in the next display frame.
@@ -220,13 +220,14 @@ completes, so the read task lives across link sessions and ends only on `StopAsy
 its start and its end. `Start` after a start or a stop does nothing; `StopAsync` completes at once when nothing runs.
 Subscribers own their scheduling and never block the read task.
 
-`SpectrumViewModel` subscribes in its constructor with `Changed.ObserveOn(uiScheduler).StartWith(...)`, then
-`Select(_ => source.Current)`, `WhereNotNull` and `DistinctUntilChanged` by reference, then `Do(Show)`. Signals queued
-while the UI thread is busy each read the same latest `Current`, and the live source returns one instance per frame,
-so the chart applies the latest spectrum once without comparing pixel arrays (record equality on
-`SpectrumMeasurement` compares every pixel). A spectrum present at construction shows at once. A failure in the
-pipeline, `Show` included, goes to `TryReportFailure` and ends the subscription. The view model is a container
-singleton, so the subscription lives for the process.
+`SpectrumViewModel` subscribes in its constructor with `Changed.ObserveOn(uiScheduler).StartWith(...)`, then a read of
+`source.Current`, `WhereNotNull` and `DistinctUntilChanged` on the measurement by reference, then `Show`. Signals queued
+while the UI thread is busy each read the same latest measurement, so the chart applies the latest spectrum once without
+comparing pixel arrays (record equality on `SpectrumMeasurement` compares every pixel). A spectrum present at
+construction shows at once. A throw from the `Current` read or from `Show` goes to `TryReportFailure` and skips that
+spectrum only; the next signal reads and shows again. Only a failure of `Changed` itself ends the subscription, through
+the same report. The Invert and Logarithmic subscription reports a failure the same way. The view model is a container
+singleton, so the subscriptions live for the process.
 
 ### The chart
 
@@ -253,25 +254,34 @@ sets them, so a flat range has a defined answer and no limit is NaN.
 
 | Case | X | Y, linear | Y, log (decades) |
 | --- | --- | --- | --- |
-| Following | `xs[0] .. xs[P - 1]` | `min - 5 % .. max + 5 %` of the span | the same, in decades |
-| Following, a dark frame after a non-dark one | same | the last non-dark Y limits | the last non-dark Y limits |
-| Following, flat (`min == max`) otherwise | same | `v - 1 .. v + 1` | `v - 0.5 .. v + 0.5` |
+| Following | `xs[0] .. xs[P - 1]` of the shown device | `min - 5 % .. max + 5 %` of the reference's span | the same, in decades |
+| Following, flat reference (`min == max`) | same | `v - 1 .. v + 1` | `v - 0.5 .. v + 0.5` |
 | Stick to zero | same | `0 .. rawMax x 1.2`; `0 .. 1` when `rawMax` is 0 | `0 .. log10(rawMax x 1.2)`; `0 .. 1` when `rawMax <= 1` |
 | Frozen | unchanged | unchanged | unchanged |
 
-`rawMax` is the largest displayed value before the log step, after inversion. A dark frame is one whose raw pixels are
-all zero. A dark frame while following keeps the last non-dark Y limits, so the axis does not jump on every dark frame,
-and X still follows the dark frame's device. On the log axis the dark line lies at 0 decades, below a range kept from a
-spectrum whose minimum is above 1, so the data area is empty for that frame. The chart keeps one set of last non-dark
-Y limits; a log or inversion toggle clears it, because the toggle changes their units or their curve.
+The reference is the spectrum the Y limits come from: the shown spectrum, or, while a dark frame is shown, the last
+non-dark measurement, projected again in the current inversion and axis mode. A dark frame is one whose raw pixels are
+all zero. With no earlier non-dark frame the dark frame is its own reference and takes the flat range. So a dark frame
+while following keeps the Y limits of the spectrum before it, Stick to zero on a dark frame takes that spectrum's
+`rawMax`, and a log or inversion toggle during a dark frame shows that spectrum's limits in the new mode; X follows the
+dark frame's device in every case. On the log axis the dark line lies at 0 decades, below a range kept from a spectrum
+whose minimum is above 1, so the data area is empty for that frame. `rawMax` is the reference's largest displayed value
+before the log step, after inversion.
 
-The scale follows from the start, after Reset scale and after a log or inversion toggle. It freezes on a wheel step over
-the plot, on the first pointer move with a button held, and after Stick to zero. Tunnel handlers for
-`PointerWheelChanged` and `PointerMoved` on `AvaPlot` call `TakeManualScale()`; they run before ScottPlot's class
-handler, which marks the wheel event handled. A bare click and a key press keep it following. While frozen, a frame
-from the other device keeps the frozen limits, and its line can lie outside them until Reset scale. Reset scale is
-enabled only while a spectrum is shown and the scale is frozen, so the button also shows the frozen state; Stick to
-zero is enabled once a spectrum is shown.
+The scale follows from the start, after Reset scale and after a log or inversion toggle. Once a spectrum is shown it
+freezes on a wheel step over the plot, on a pointer move with a button held 5 px or more from the press, and after
+Stick to zero. Before the first spectrum neither input freezes it, so the first spectrum sets the limits. Tunnel
+handlers for `PointerWheelChanged`, `PointerPressed`, `PointerMoved` and `PointerReleased` on `AvaPlot` record the
+press and call `TakeManualScale()`; they run before ScottPlot's class handler, which marks the wheel event handled. The
+5 px is ScottPlot 5.1.59's own floor: `MouseDragPan` and `MouseDragZoomRectangle` ignore a held move shorter than
+that, so a shorter move would freeze limits ScottPlot never moved. `MouseDragZoom` (right button) has no floor, so a
+right drag under 5 px zooms a little and the next frame sets the limits back. ScottPlot's `MouseDragPan` also restores
+the press-time limits on release before it applies the drag, so a press held across a frame ends on limits panned from
+the press-time view, not from the last frame. A bare click and a key press keep the scale following. While frozen, a
+frame from the other device keeps the frozen limits, and its line can lie outside them until Reset scale. Reset scale
+is enabled only while a spectrum is shown and the scale is frozen, so the button also shows the frozen state; Stick to
+zero is enabled once a spectrum is shown. `IsFollowing` raises its change after `Plot.Sync` is released, so no
+subscriber runs under the plot lock.
 
 ScottPlot's input processor stays on with five responses: `MouseInteractWithPlottables`, `MouseDragZoomRectangle`,
 `MouseDragPan`, `MouseDragZoom` and `MouseWheelZoom`. The view removes `DoubleClickBenchmark`, `SingleClickAutoscale`,
@@ -282,11 +292,16 @@ autoscaler never sets the limits, and keyboard input never moves them.
 
 `SpectrumChartView` holds `AvaPlot` alone inside the `PlotLayer` decorator, whose `CacheMode` is a `BitmapCache`. The
 cache never goes on `AvaPlot` itself: there Avalonia 12 freezes the plot on its first frame. The view binds the chart
-with `PlotControl.Reset(chart.Plot)` when its `DataContext` changes and subscribes `RedrawRequested`. Each request asks
+with `PlotControl.Reset(chart.Plot)` when its `DataContext` changes and subscribes `RedrawRequested`; disposing the
+chart completes that stream and clears a pending frame. `AvaPlot.Reset` disposes the plot it replaces, so the view
+skips it when the control already holds the chart's plot and leaves the control alone on a null `DataContext`: the same
+chart coming back keeps its plottables. A switch to another chart still disposes the previous chart's plot, because
+ScottPlot has no public way to detach a plot; the app builds one chart for the process. Each request asks
 `TopLevel.RequestAnimationFrame` once per pending frame and invalidates the plot in the callback, so every request
 before the next display frame joins one redraw. Nothing calls `AvaPlot.Refresh()`; ScottPlot redraws on its own only
 while the operator drags or zooms. The view repaints the plot from the palette on `OnLoaded` and on the application's
-`ActualThemeVariantChanged`, and removes that handler in `OnUnloaded` (`ui-theme.md`).
+`ActualThemeVariantChanged`, and removes that handler in `OnUnloaded` (`ui-theme.md`). One hold of `Plot.Sync` paints
+the surfaces and the series colours, so no render sees one without the other.
 
 Until the first spectrum a line over the plot reads "No spectrum yet. Connect to the board in the row above." After a
 Disconnect the last spectrum stays and its update time tells its age; a new Connect does not clear it.
@@ -340,7 +355,3 @@ outside ReactiveUI, for example in a code-behind event handler. With a panel it 
 `TryReportFailure` and sets `Handled`, so the app keeps running. Before `Configure` there is no panel: the exception
 stays unhandled, ends the dispatcher loop, and `Program` logs it as Fatal and exits with code 1; the handler does not
 log it a second time.
-
-One subscription sits outside the panel route: `SpectrumChartView`'s `RedrawRequested` subscription logs a failure
-through Serilog's static `Log.Error` only, because the view has neither the panel nor a logger. `RedrawRequested` only
-completes and never fails, so the handler does not run in practice.

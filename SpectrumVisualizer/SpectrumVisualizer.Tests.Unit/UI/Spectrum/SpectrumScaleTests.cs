@@ -43,7 +43,7 @@ public sealed class SpectrumScaleTests
 		double expectedBottom,
 		double expectedTop)
 	{
-		var limits = SpectrumScale.Following(_xs, ys, isDark: false, logarithmic, lastNonDarkY: null);
+		var limits = SpectrumScale.Following(_xs, ys, logarithmic);
 
 		limits.X.Should().Be(new AxisRange(400.0, 600.0));
 		limits.Y.Min.Should().BeApproximately(expectedBottom, Tolerance);
@@ -74,8 +74,7 @@ public sealed class SpectrumScaleTests
 
 		SpectrumLimits[] all =
 		[
-			SpectrumScale.Following(xs, ys, projected.IsDark, logarithmic, lastNonDarkY: null),
-			SpectrumScale.Following(xs, ys, projected.IsDark, logarithmic, new AxisRange(-500, 32500)),
+			SpectrumScale.Following(xs, ys, logarithmic),
 			SpectrumScale.StuckToZero(xs, projected.RawMax, logarithmic),
 		];
 
@@ -85,34 +84,6 @@ public sealed class SpectrumScaleTests
 			values.Should().OnlyContain(value => double.IsFinite(value));
 			limits.Y.Max.Should().BeGreaterThan(limits.Y.Min);
 		}
-	}
-
-	[Fact]
-	public void ADarkFrameWhileFollowingKeepsTheLastNonDarkYLimits()
-	{
-		var previousXs = Wavelengths(Spectrometer.Atp8000);
-		var previousYs = new double[previousXs.Length];
-		previousYs.AsSpan().Fill(1000);
-		previousYs[100] = 31000;
-		var previous = SpectrumScale.Following(previousXs, previousYs, isDark: false, logarithmic: false, null);
-		var darkXs = Wavelengths(Spectrometer.Atp2000);
-
-		var limits = SpectrumScale.Following(darkXs, new double[darkXs.Length], isDark: true, logarithmic: false, previous.Y);
-
-		limits.Y.Should().Be(previous.Y);
-		limits.X.Should().Be(new AxisRange(darkXs[0], darkXs[^1]));
-	}
-
-	[Fact]
-	public void ADarkFrameWithNoEarlierSpectrumTakesTheFlatRangeLimits()
-	{
-		var xs = Wavelengths(Spectrometer.Atp2000);
-		var ys = new double[xs.Length];
-
-		SpectrumScale.Following(xs, ys, isDark: true, logarithmic: false, lastNonDarkY: null).Y
-			.Should().Be(new AxisRange(-1.0, 1.0));
-		SpectrumScale.Following(xs, ys, isDark: true, logarithmic: true, lastNonDarkY: null).Y
-			.Should().Be(new AxisRange(-0.5, 0.5));
 	}
 
 	private static double[] Wavelengths(Spectrometer device)

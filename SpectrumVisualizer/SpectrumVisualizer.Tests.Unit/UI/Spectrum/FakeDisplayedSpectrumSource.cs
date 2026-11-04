@@ -16,6 +16,8 @@ internal sealed class FakeDisplayedSpectrumSource : IDisplayedSpectrumSource, ID
 
 	public IObservable<RxUnit> Changed => _changed.AsObservable();
 
+	public bool HasSubscribers => _changed.HasObservers;
+
 	public void Signal()
 	{
 		_changed.OnNext(RxUnit.Default);

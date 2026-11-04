@@ -183,6 +183,77 @@ public sealed class SpectrumChartViewModelTests : IDisposable
 		ShouldSpanTheDeviceRange(Spectrometer.Atp2000);
 	}
 
+	[AvaloniaTheory]
+	[InlineData(true, false)]
+	[InlineData(false, true)]
+	[InlineData(true, true)]
+	public void ToggleWhileASpectrumIsShownTakesTheFollowingLimitsOfTheNewMode(bool inverted, bool logarithmic)
+	{
+		var spectrum = Atp2000Peak;
+		_chart.Show(spectrum);
+
+		_chart.SetDisplay(inverted, logarithmic);
+
+		ShouldFollow(spectrum, inverted, logarithmic);
+		var line = _chart.Plot.GetPlottables<SignalXY>().Single(plottable => plottable.IsVisible).GetAxisLimits();
+		var top = inverted ? PeakTop - Floor : PeakTop;
+		line.Top.Should().BeApproximately(logarithmic ? Math.Log10(top) : top, Tolerance, "the line is in decades on the log axis");
+	}
+
+	[AvaloniaFact]
+	public void ADarkFrameAfterALogToggleKeepsTheLogLimitsOfThePeak()
+	{
+		var peak = Atp2000Peak;
+		_chart.Show(peak);
+		_chart.SetDisplay(inverted: false, logarithmic: true);
+
+		_chart.Show(Dark(Spectrometer.Atp2000));
+
+		ShouldFollow(peak, inverted: false, logarithmic: true);
+	}
+
+	[AvaloniaTheory]
+	[InlineData(false, true)]
+	[InlineData(true, false)]
+	[InlineData(true, true)]
+	public void AToggleDuringADarkFrameTakesTheLastNonDarkLimitsInTheNewMode(bool inverted, bool logarithmic)
+	{
+		var peak = Atp2000Peak;
+		_chart.Show(peak);
+		_chart.Show(Dark(Spectrometer.Atp2000));
+
+		_chart.SetDisplay(inverted, logarithmic);
+
+		ShouldFollow(peak, inverted, logarithmic);
+	}
+
+	[AvaloniaTheory]
+	[InlineData(false, PeakTop * 1.2)]
+	[InlineData(true, 4.5705429398818973)]
+	public void StickToZeroOnADarkFrameUsesTheLastNonDarkMaximum(bool logarithmic, double expectedTop)
+	{
+		_chart.SetDisplay(inverted: false, logarithmic);
+		_chart.Show(Atp2000Peak);
+		_chart.Show(Dark(Spectrometer.Atp8000));
+
+		_chart.StickToZero();
+
+		var limits = _chart.Plot.Axes.GetLimits();
+		limits.Bottom.Should().Be(0);
+		limits.Top.Should().BeApproximately(expectedTop, Tolerance);
+		ShouldSpanTheDeviceRange(Spectrometer.Atp8000);
+	}
+
+	[AvaloniaFact]
+	public void AManualScaleBeforeTheFirstSpectrumDoesNothing()
+	{
+		_chart.TakeManualScale();
+
+		_chart.IsFollowing.Should().BeTrue();
+		_chart.Show(Atp8000Peak);
+		ShouldSpanTheDeviceRange(Spectrometer.Atp8000);
+	}
+
 	[AvaloniaFact]
 	public void TheLogAxisCarriesALogTickGeneratorAndMinorGridlinesAndTheLinearAxisNeither()
 	{
@@ -258,13 +329,14 @@ public sealed class SpectrumChartViewModelTests : IDisposable
 	[AvaloniaFact]
 	public void EveryShowRequestsOneRedrawAndDisposeCompletesTheRequests()
 	{
+		var chart = new SpectrumChartViewModel();
 		var requests = 0;
 		var completed = false;
-		using var subscription = _chart.RedrawRequested.Subscribe(_ => requests++, () => completed = true);
+		using var subscription = chart.RedrawRequested.Subscribe(_ => requests++, () => completed = true);
 
-		_chart.Show(Atp2000Peak);
-		_chart.Show(Atp8000Peak);
-		_chart.Dispose();
+		chart.Show(Atp2000Peak);
+		chart.Show(Atp8000Peak);
+		chart.Dispose();
 
 		requests.Should().Be(2);
 		completed.Should().BeTrue();
@@ -324,6 +396,20 @@ public sealed class SpectrumChartViewModelTests : IDisposable
 		var limits = _chart.Plot.Axes.GetLimits();
 		limits.Left.Should().Be(calibration.WavelengthOf(0));
 		limits.Right.Should().Be(calibration.WavelengthOf(device.PixelCount - 1));
+	}
+
+	/// <summary>The scale follows and its Y limits are the spectrum's following limits in the given mode.</summary>
+	private void ShouldFollow(DisplayedSpectrum spectrum, bool inverted, bool logarithmic)
+	{
+		var pixels = spectrum.Measurement.Pixels;
+		var ys = new double[pixels.Length];
+		SpectrumProjection.Fill(pixels, inverted, logarithmic, ys);
+		var expected = SpectrumScale.Following([0.0, 1.0], ys, logarithmic);
+
+		_chart.IsFollowing.Should().BeTrue();
+		var limits = _chart.Plot.Axes.GetLimits();
+		limits.Bottom.Should().BeApproximately(expected.Y.Min, Tolerance);
+		limits.Top.Should().BeApproximately(expected.Y.Max, Tolerance);
 	}
 
 	private void ShouldHaveLimits(double left, double right, double bottom, double top)

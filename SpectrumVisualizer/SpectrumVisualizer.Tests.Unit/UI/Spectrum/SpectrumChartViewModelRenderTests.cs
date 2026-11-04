@@ -35,9 +35,12 @@ public sealed class SpectrumChartViewModelRenderTests : IDisposable
 		limits.Top.Should().Be(1.0);
 
 		_chart.Show(Atp2000Peak);
+		var kept = RenderedLimits();
 		_chart.Show(Dark(Spectrometer.Atp2000));
 
-		RenderedLimits();
+		var afterDark = RenderedLimits();
+		afterDark.Bottom.Should().Be(kept.Bottom);
+		afterDark.Top.Should().Be(kept.Top);
 	}
 
 	[AvaloniaFact]
