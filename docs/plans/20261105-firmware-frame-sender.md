@@ -409,14 +409,14 @@ Repository: SpectrumVisualizer. Commit: `test(protocol): decode the firmware gol
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/SpectrumVisualizer.Tests.Unit.csproj` (copy the data file
   to the output, as `xunit.runner.json` at `:27`)
 
-- [ ] copy `out/firmware-frames.txt` to `FirmwareFrames.txt`; Acceptance Evidence item 2 exits 0
-- [ ] build the four expected `BoardFrame`s in C# from the table in Technical Details (ramp computed in C#, not read
+- [x] copy `out/firmware-frames.txt` to `FirmwareFrames.txt`; Acceptance Evidence item 2 exits 0
+- [x] build the four expected `BoardFrame`s in C# from the table in Technical Details (ramp computed in C#, not read
   from the file)
-- [ ] write a theory over the four names: the line decodes through `FrameDecoder.TryReadFrame` to one frame, 0
+- [x] write a theory over the four names: the line decodes through `FrameDecoder.TryReadFrame` to one frame, 0
   discarded bytes, equal to the expected frame (`BeEquivalentTo`)
-- [ ] write a theory over the four names: the line equals `FrameEncoder.Encode(expected)` byte for byte
-- [ ] write a fact that the file holds exactly the four names, so a frame missing from the C output fails
-- [ ] run `dotnet test SpectrumVisualizer.slnx --filter "Area=Protocol"`, `dotnet format SpectrumVisualizer.slnx
+- [x] write a theory over the four names: the line equals `FrameEncoder.Encode(expected)` byte for byte
+- [x] write a fact that the file holds exactly the four names, so a frame missing from the C output fails
+- [x] run `dotnet test SpectrumVisualizer.slnx --filter "Area=Protocol"`, `dotnet format SpectrumVisualizer.slnx
   --verify-no-changes`, `dotnet terse` on the new file - must pass before task 4
 
 ### Task 4: Send the new frame from main.c
