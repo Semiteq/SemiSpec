@@ -425,14 +425,14 @@ Repository: OptoskyProj. Commit: `feat(firmware): отправлять ПК ка
 **Files:**
 - Modify: `OptoskyEncoder/OptoskyEncoder/main.c`
 
-- [ ] `#include "pc_link.h"`; replace the PC send state at `main.c:234-237` with `PcLink` and `PcLastProgressMs`
-- [ ] add `ReadPcPixelByte` and `PcStateByte`; rewrite `StartSend2Aplication(uint8_t d)` and `Send2Aplication()` per
+- [x] `#include "pc_link.h"`; replace the PC send state at `main.c:234-237` with `PcLink` and `PcLastProgressMs`
+- [x] add `ReadPcPixelByte` and `PcStateByte`; rewrite `StartSend2Aplication(uint8_t d)` and `Send2Aplication()` per
   Technical Details; delete `PcWord()`
-- [ ] change the call in `Q_factor()` (`main.c:1068`) and the guard in `RequstAtp()` (`main.c:1494-1495`); call
+- [x] change the call in `Q_factor()` (`main.c:1068`) and the guard in `RequstAtp()` (`main.c:1494-1495`); call
   `PcSenderInit` in `main()` after `sei()`
-- [ ] leave `crc16()`, `ReadPlcFloat`, `float_converter`, `OnLegacyByte`, `Begin()`, the PLC, spectrometer, encoder
+- [x] leave `crc16()`, `ReadPlcFloat`, `float_converter`, `OnLegacyByte`, `Begin()`, the PLC, spectrometer, encoder
   and calculation code byte for byte unchanged: `git diff` touches only the lines above
-- [ ] no host test reaches `main.c` (the AVR glue is not compiled in this run); re-run Acceptance Evidence item 1 and item 6 - must pass
+- [x] no host test reaches `main.c` (the AVR glue is not compiled in this run); re-run Acceptance Evidence item 1 and item 6 - must pass
   before task 5
 
 ### Task 5: Verify acceptance criteria
