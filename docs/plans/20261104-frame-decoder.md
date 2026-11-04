@@ -236,9 +236,10 @@ type is decided by `len` only.
   `git diff --stat 6769d23..HEAD` over the old projects is empty); `dotnet test SpectrumVisualizer.Tests` 13/13 pass
 
 ### Task 9: [Final] Update documentation
-- [ ] update `readme.md` with the emulator's run command
-- [ ] update `CLAUDE.md` if new patterns appeared
-- [ ] leave this plan in `docs/plans/` (archiving is delivery work)
+- [x] update `readme.md` with the emulator's run command (`--help` runs, exit 0; `--port COM5 --device 2000 --rate 0`
+  parses and exits 1 with `Cannot open COM5: Port not found: COM5` on a machine with no COM ports)
+- [x] update `CLAUDE.md` if new patterns appeared (no new pattern; added the emulator `--help` command to Build)
+- [x] leave this plan in `docs/plans/` (left in place: archiving is delivery work)
 
 ## Post-Completion
 **Manual verification:**

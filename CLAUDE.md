@@ -19,6 +19,7 @@ All commands run from the repo root.
 ```powershell
 dotnet build SpectrumVisualizer.slnx -c Release       # new app; warnings are errors
 dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI
+dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator -- --help
 dotnet build SpectrumVisualizer.sln                   # old app
 ```
 
