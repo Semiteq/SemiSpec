@@ -58,21 +58,14 @@ internal sealed class BenchmarkFile : IDisposable
 	/// <summary>Deletes what an earlier run left at the path and opens a fresh store file there.</summary>
 	public static BenchmarkFile Create(string path, BenchmarkOptions options, DateTimeOffset lastRowAt)
 	{
-		DeleteFiles(path);
+		StoreFiles.DeleteWithSidecars(path);
 		var database = SpectrumDatabase.Open(path);
 		if (database.IsFailed)
 		{
-			throw new IOException(database.Errors[0].Message);
+			throw new IOException($"The benchmark file '{path}' could not be opened: {database.Errors[0].Message}");
 		}
 
 		return new BenchmarkFile(path, database.Value, options, lastRowAt);
-	}
-
-	public static void DeleteFiles(string path)
-	{
-		File.Delete(path);
-		File.Delete(path + "-wal");
-		File.Delete(path + "-shm");
 	}
 
 	/// <summary>Writes every row once and returns the insert throughput in spectra per second.</summary>
@@ -88,7 +81,7 @@ internal sealed class BenchmarkFile : IDisposable
 		for (var round = 0; round < rounds; round++)
 		{
 			var nextBoundary = Boundary(round + 1);
-			Check(_database.DeleteBefore(TimeAt(nextBoundary)));
+			ThrowIfFailed(_database.DeleteBefore(TimeAt(nextBoundary)));
 			written += WritePositions(_options.Rows + Boundary(round), _options.Rows + nextBoundary);
 		}
 
@@ -104,7 +97,7 @@ internal sealed class BenchmarkFile : IDisposable
 		{
 			var cutoff = TimeAt(_windowStart + ((pass + 1L) * retentionRows));
 			var stopwatch = Stopwatch.StartNew();
-			Check(_database.DeleteBefore(cutoff));
+			ThrowIfFailed(_database.DeleteBefore(cutoff));
 			milliseconds[pass] = stopwatch.Elapsed.TotalMilliseconds;
 		}
 
@@ -136,7 +129,7 @@ internal sealed class BenchmarkFile : IDisposable
 	{
 		using var connection = StoreConnection.Open(Path);
 		using var command = connection.CreateCommand();
-		command.CommandText = "PRAGMA wal_checkpoint(TRUNCATE)";
+		command.CommandText = StoreConnection.CheckpointTruncate;
 		using var reader = command.ExecuteReader();
 		reader.Read();
 		if (reader.GetInt32(0) != 0)
@@ -163,7 +156,7 @@ internal sealed class BenchmarkFile : IDisposable
 		{
 			do
 			{
-				Check(_database.Write([FrameAt(0, at)]));
+				ThrowIfFailed(_database.Write([FrameAt(0, at)]));
 				at += _rowInterval;
 			}
 			while (await timer.WaitForNextTickAsync(token));
@@ -188,7 +181,7 @@ internal sealed class BenchmarkFile : IDisposable
 			}
 
 			var stopwatch = Stopwatch.StartNew();
-			Check(_database.Write(batch));
+			ThrowIfFailed(_database.Write(batch));
 			elapsed += stopwatch.Elapsed;
 		}
 
@@ -218,7 +211,8 @@ internal sealed class BenchmarkFile : IDisposable
 		return (long)_options.Rows * part / ChurnParts;
 	}
 
-	private static void Check(Result result)
+	/// <summary>Throws the failure's messages: the benchmark has no way to go on past a failed store call.</summary>
+	public static void ThrowIfFailed(IResultBase result)
 	{
 		if (result.IsFailed)
 		{

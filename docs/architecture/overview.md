@@ -39,7 +39,7 @@ and reads.
 | `Crc16Modbus` | Core | CRC-16/MODBUS of the frame, over a span |
 | `BoardFrame`, `SpectrumMeasurement` | Core | One decoded frame: state, `seq` and the measurement of a spectrum frame; the measurement rejects a pixel count that does not match its device |
 | `ReceivedFrame` | Core | A decoded frame with its receive time; the item of the link's channel and of the store queue (`Core/Protocol/`) |
-| `Spectrometer` | Core | The two devices, their pixel count and the size of their spectrum frame |
+| `Spectrometer` | Core | The two devices, their pixel count, the size of their spectrum frame and the wavelength both tools default to |
 | `FrameEncoder` | Core | The bytes of a frame; used by the emulator and the tests |
 | `FrameDecoder` | Core | Finds and validates frames in a byte sequence; drops one byte per failed candidate |
 | `FrameReader` | Core | Yields the frames of a `PipeReader`, or decodes what is buffered without a wait, and counts the dropped bytes |
@@ -59,6 +59,7 @@ and reads.
 | `EmulatorCommand` | Tools.BoardEmulator | Parses and range-checks the command line into an `EmulatorOptions` record; rejects `--failed` for the other spectrometer without `--both-connected` |
 | `Program` (emulator) | Tools.BoardEmulator | Opens the port, checks every 10 ms which frame is due and writes it, until Ctrl+C |
 | `BenchmarkCommand` | Tools.StoreBenchmark | Parses and range-checks the command line into a `BenchmarkOptions` record |
+| `ToolCommandLine` | both tools | The model numbers of `--device` and `--failed` and the whole-number option parser; one source file under `SpectrumVisualizer/Shared/` that each tool project compiles as its own internal copy, since the two tools share no project but Core |
 | `BenchmarkRun`, `BenchmarkFile` | Tools.StoreBenchmark | Fills a store file through `SpectrumDatabase`, churns it, measures inserts, size, series reads, `SpectrumHistory`, retention and WAL growth, and prints one table |
 | `BlobSeries` | Tools.StoreBenchmark | The per-row `SqliteBlob` partial read it compares with the `substr` read of `SpectrumHistory.ReadSeries` |
 | `ISerialPortProvider`, `RjcpSerialPortProvider` | UI | Lists the COM ports and opens one for the link, mapping open failures to typed errors |

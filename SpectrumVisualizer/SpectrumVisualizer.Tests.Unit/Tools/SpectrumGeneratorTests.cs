@@ -18,7 +18,7 @@ public sealed class SpectrumGeneratorTests
 	[InlineData(Spectrometer.Atp8000, 512)]
 	public void TheSpectrumHasThePixelCountOfItsDevice(Spectrometer device, int pixelCount)
 	{
-		var measurement = SpectrumGenerator.Generate(device, EmulatorOptions.DefaultWavelength(device), 10);
+		var measurement = SpectrumGenerator.Generate(device, device.DefaultWavelengthNm, 10);
 
 		measurement.Device.Should().Be(device);
 		measurement.Pixels.Should().HaveCount(pixelCount);

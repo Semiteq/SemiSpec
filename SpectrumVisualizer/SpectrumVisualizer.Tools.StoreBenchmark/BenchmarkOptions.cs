@@ -10,6 +10,6 @@ public sealed record BenchmarkOptions(
 	string? Folder,
 	bool Keep)
 {
-	/// <summary>The wavelength of every row and of the series: inside the device's firmware table range.</summary>
-	public ushort WavelengthNm => Device == Spectrometer.Atp2000 ? (ushort)650 : (ushort)1550;
+	/// <summary>The wavelength of every row and of the series.</summary>
+	public ushort WavelengthNm => Device.DefaultWavelengthNm;
 }

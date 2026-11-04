@@ -8,15 +8,13 @@ namespace SpectrumVisualizer.Tools.StoreBenchmark;
 /// <summary>The pixel read the benchmark measures against SpectrumHistory's substr read, kept for measuring again.</summary>
 public static class BlobSeries
 {
-	private const int RowsPerCancellationCheck = 256;
-
 	/// <summary>Every row's window mean through a per-row SqliteBlob handle that reads the window's bytes only.</summary>
 	public static IntensitySeries Read(SqliteConnection connection, IntensityQuery query, CancellationToken token)
 	{
 		var buckets = new IntensityBuckets(query);
 		var windows = new QueryWindows(query.WavelengthNm, query.Delta);
 		using var command = connection.CreateCommand();
-		command.CommandText = "SELECT id, received_at, device FROM spectrum WHERE received_at >= $from AND received_at < $to";
+		command.CommandText = $"SELECT id, received_at, device FROM spectrum WHERE {SpectrumHistory.InQueryRange}";
 		command.Parameters.AddWithValue("$from", query.FromMilliseconds);
 		command.Parameters.AddWithValue("$to", query.ToMilliseconds);
 		using var reader = command.ExecuteReader();
@@ -24,7 +22,7 @@ public static class BlobSeries
 		var rows = 0;
 		while (reader.Read())
 		{
-			if (++rows % RowsPerCancellationCheck == 0)
+			if (++rows % SpectrumHistory.RowsPerCancellationCheck == 0)
 			{
 				token.ThrowIfCancellationRequested();
 			}

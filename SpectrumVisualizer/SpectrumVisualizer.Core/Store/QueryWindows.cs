@@ -6,12 +6,12 @@ using SpectrumVisualizer.Core.Protocol;
 namespace SpectrumVisualizer.Core.Store;
 
 /// <summary>The queried window of each device in the stored pixel blob, and whether the device covers the wavelength.</summary>
-public sealed class QueryWindows(ushort nm, byte delta)
+public sealed class QueryWindows(ushort wavelengthNm, byte delta)
 {
-	private readonly PixelWindow _atp2000 = SpectrometerCalibration.For(Spectrometer.Atp2000).Window(nm, delta);
-	private readonly PixelWindow _atp8000 = SpectrometerCalibration.For(Spectrometer.Atp8000).Window(nm, delta);
-	private readonly bool _atp2000Covers = InFirmwareTable(Spectrometer.Atp2000, nm);
-	private readonly bool _atp8000Covers = InFirmwareTable(Spectrometer.Atp8000, nm);
+	private readonly PixelWindow _atp2000 = SpectrometerCalibration.For(Spectrometer.Atp2000).Window(wavelengthNm, delta);
+	private readonly PixelWindow _atp8000 = SpectrometerCalibration.For(Spectrometer.Atp8000).Window(wavelengthNm, delta);
+	private readonly bool _atp2000Covers = InFirmwareTable(Spectrometer.Atp2000, wavelengthNm);
+	private readonly bool _atp8000Covers = InFirmwareTable(Spectrometer.Atp8000, wavelengthNm);
 
 	public int LargestByteCount => Math.Max(ByteCount(_atp2000), ByteCount(_atp8000));
 
@@ -50,9 +50,9 @@ public sealed class QueryWindows(ushort nm, byte delta)
 		return (double)sum / pixels.Length;
 	}
 
-	private static bool InFirmwareTable(Spectrometer device, ushort nm)
+	private static bool InFirmwareTable(Spectrometer device, ushort wavelengthNm)
 	{
 		var calibration = SpectrometerCalibration.For(device);
-		return calibration.FirstNm <= nm && nm <= calibration.LastNm;
+		return calibration.FirstNm <= wavelengthNm && wavelengthNm <= calibration.LastNm;
 	}
 }

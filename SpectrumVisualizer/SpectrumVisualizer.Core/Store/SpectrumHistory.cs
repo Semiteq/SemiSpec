@@ -11,7 +11,11 @@ namespace SpectrumVisualizer.Core.Store;
 /// <summary>Reads a spectrum store file: a stored spectrum, the intensity series and the stored range; each call opens its own reader connection on the thread pool.</summary>
 public sealed class SpectrumHistory(string path)
 {
-	private const int RowsPerCancellationCheck = 256;
+	/// <summary>How many rows a series read takes between two checks of its token.</summary>
+	public const int RowsPerCancellationCheck = 256;
+
+	/// <summary>The rows of a series: received inside [$from, $to) of an <see cref="IntensityQuery"/>.</summary>
+	public const string InQueryRange = "received_at >= $from AND received_at < $to";
 
 	private const string NearestAtOrBefore = """
 		SELECT received_at, device, wavelength_nm, delta, amplitude, snr, q, seq, state, pixels
@@ -78,7 +82,7 @@ public sealed class SpectrumHistory(string path)
 				WHEN {(byte)Spectrometer.Atp2000} THEN substr(pixels, {QueryWindows.ByteStart(atp2000)}, {QueryWindows.ByteCount(atp2000)})
 				WHEN {(byte)Spectrometer.Atp8000} THEN substr(pixels, {QueryWindows.ByteStart(atp8000)}, {QueryWindows.ByteCount(atp8000)})
 				END
-			FROM spectrum WHERE received_at >= $from AND received_at < $to
+			FROM spectrum WHERE {InQueryRange}
 			""";
 		command.Parameters.AddWithValue("$from", query.FromMilliseconds);
 		command.Parameters.AddWithValue("$to", query.ToMilliseconds);

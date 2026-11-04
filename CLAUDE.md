@@ -76,6 +76,7 @@ SpectrumVisualizer/              new app: build props, .editorconfig, projects b
   SpectrumVisualizer.Tools.StoreBenchmark/
                                  console tool: fills a store file and measures its writes, size and reads
   SpectrumVisualizer.Tests.Unit/ unit and headless UI tests
+  Shared/                        source linked into both tools (<Compile Include Link>): shared option parsing
 SpectrumVisualizer.Uart/         old WinForms app
 SpectrumVisualizer.Tests/        old app's MSTest tests
 docs/                            architecture docs and plans

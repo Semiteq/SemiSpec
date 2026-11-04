@@ -23,7 +23,8 @@ public static class BenchmarkRun
 
 	public static async Task<int> RunAsync(BenchmarkOptions options, TextWriter output, CancellationToken token)
 	{
-		var folder = options.Folder ?? Path.Combine(Path.GetTempPath(), $"spectrum-store-benchmark-{Guid.NewGuid():N}");
+		var folder = options.Folder
+			?? Path.Combine(Path.GetTempPath(), $"spectrum-store-benchmark-{Guid.NewGuid():N}");
 		Directory.CreateDirectory(folder);
 		var file = BenchmarkFile.Create(Path.Combine(folder, "spectra.db"), options, DateTimeOffset.UtcNow);
 		var mismatches = new List<string>();
@@ -31,9 +32,9 @@ public static class BenchmarkRun
 		{
 			WriteHeader(output, options, folder);
 			var throughput = file.Fill();
-			await MeasureAsync(output, "fresh", throughput, options, file, mismatches, token);
+			await MeasureAsync(new MeasuredState(output, "fresh", options, file, mismatches, token), throughput);
 			throughput = file.Churn(options.ChurnRounds);
-			await MeasureAsync(output, "churned", throughput, options, file, mismatches, token);
+			await MeasureAsync(new MeasuredState(output, "churned", options, file, mismatches, token), throughput);
 		}
 		finally
 		{
@@ -41,7 +42,7 @@ public static class BenchmarkRun
 			SqliteConnection.ClearAllPools();
 			if (!options.Keep)
 			{
-				BenchmarkFile.DeleteFiles(file.Path);
+				StoreFiles.DeleteWithSidecars(file.Path);
 				if (options.Folder is null)
 				{
 					Directory.Delete(folder);
@@ -62,10 +63,9 @@ public static class BenchmarkRun
 
 	private static void WriteHeader(TextWriter output, BenchmarkOptions options, string folder)
 	{
-		output.Write(Invariant(
-			$"Store benchmark: {options.Rows} {options.Device.DisplayName} spectra 500 ms apart ({SpanHours(options):0.##} h), "));
-		output.Write(Invariant(
-			$"{options.WavelengthNm} nm, delta {BenchmarkFile.Delta}, {options.ChurnRounds} churn rounds, {Columns} columns, "));
+		output.Write(Invariant($"Store benchmark: {options.Rows} {options.Device.DisplayName} spectra 500 ms apart "));
+		output.Write(Invariant($"({SpanHours(options):0.##} h), {options.WavelengthNm} nm, delta {BenchmarkFile.Delta}, "));
+		output.Write(Invariant($"{options.ChurnRounds} churn rounds, {Columns} columns, "));
 		output.WriteLine(Invariant($"batches of {BenchmarkFile.BatchSize}. Folder {folder}."));
 		output.Write(Invariant(
 			$"Series query the {options.WavelengthNm} nm window. First is the first run on a fresh connection; "));
@@ -77,74 +77,65 @@ public static class BenchmarkRun
 		output.WriteLine("| --- | --- | --- | --- | --- | --- |");
 	}
 
-	private static async Task MeasureAsync(
-		TextWriter output,
-		string state,
-		double throughput,
-		BenchmarkOptions options,
-		BenchmarkFile file,
-		List<string> mismatches,
-		CancellationToken token)
+	private static async Task MeasureAsync(MeasuredState measured, double throughput)
 	{
+		var (options, file, token) = (measured.Options, measured.File, measured.Token);
 		file.Checkpoint();
 		var span = Invariant($"{SpanHours(options):0.##} h");
-		WriteValue(output, state, "Insert throughput, batches of 256 (spectra/s)", throughput, "0");
-		WriteValue(output, state, "File size per 1000 spectra, after checkpoint (MB)", PerThousand(file, options), "0.000");
-		WriteValue(output, state, $"File size, {span} (MB)", file.FileBytes / BytesPerMegabyte, "0.0");
+		WriteValue(measured, $"Insert throughput, batches of {BenchmarkFile.BatchSize} (spectra/s)", throughput, "0");
+		WriteValue(measured, "File size per 1000 spectra, after checkpoint (MB)", PerThousand(file, options), "0.000");
+		WriteValue(measured, $"File size, {span} (MB)", file.FileBytes / BytesPerMegabyte, "0.0");
 
 		var recent = Query(options.WavelengthNm, file.WindowTo - _tenMinutes, file.WindowTo);
-		var recentSubstr = Time(output, state, "Series 10 min to 1000 columns, substr (ms)", file,
+		var recentSubstr = Time(measured, $"Series 10 min to {Columns} columns, substr (ms)",
 			c => SpectrumHistory.ReadSeries(c, recent, token));
-		var recentBlob = Time(output, state, "Series 10 min to 1000 columns, SqliteBlob (ms)", file,
+		var recentBlob = Time(measured, $"Series 10 min to {Columns} columns, SqliteBlob (ms)",
 			c => BlobSeries.Read(c, recent, token));
-		Compare(mismatches, $"{state} 10 min SqliteBlob against substr", recentBlob, recentSubstr);
+		Compare(measured, "10 min SqliteBlob against substr", recentBlob, recentSubstr);
 
 		var whole = Query(options.WavelengthNm, file.WindowFrom, file.WindowTo);
-		var wholeSubstr = Time(output, state, $"Series {span} to 1000 columns, substr (ms)", file,
+		var wholeSubstr = Time(measured, $"Series {span} to {Columns} columns, substr (ms)",
 			c => SpectrumHistory.ReadSeries(c, whole, token));
-		var wholeBlob = Time(output, state, $"Series {span} to 1000 columns, SqliteBlob (ms)", file,
+		var wholeBlob = Time(measured, $"Series {span} to {Columns} columns, SqliteBlob (ms)",
 			c => BlobSeries.Read(c, whole, token));
-		Compare(mismatches, $"{state} {span} SqliteBlob against substr", wholeBlob, wholeSubstr);
-		await MeasureHistoryAsync(output, state, span, file, (recent, recentSubstr), (whole, wholeSubstr), mismatches, token);
+		Compare(measured, $"{span} SqliteBlob against substr", wholeBlob, wholeSubstr);
+		await MeasureHistoryAsync(measured, span, (recent, recentSubstr), (whole, wholeSubstr));
 
-		WriteTiming(output, state, $"One retention pass, {RetentionRows} rows (ms)",
+		WriteTiming(measured, $"One retention pass, {RetentionRows} rows (ms)",
 			file.TimeRetentionPasses(WarmRuns + 1, RetentionRows));
 		var walBytes = await file.WalBytesAfterReadBesideWriterAsync(() =>
 		{
 			using var connection = file.OpenReader();
 			SpectrumHistory.ReadSeries(connection, whole, token);
 		});
-		WriteValue(output, state, $"WAL after a {span} substr series read beside a writer at 2 spectra/s (MB)",
+		WriteValue(measured, $"WAL after a {span} substr series read beside a writer at 2 spectra/s (MB)",
 			walBytes / BytesPerMegabyte, "0.000");
 	}
 
 	/// <summary>Times SpectrumHistory, connection open included, against the substr reads it runs.</summary>
 	private static async Task MeasureHistoryAsync(
-		TextWriter output,
-		string state,
+		MeasuredState measured,
 		string span,
-		BenchmarkFile file,
 		(IntensityQuery Query, IntensitySeries Substr) recent,
-		(IntensityQuery Query, IntensitySeries Substr) whole,
-		List<string> mismatches,
-		CancellationToken token)
+		(IntensityQuery Query, IntensitySeries Substr) whole)
 	{
-		var history = new SpectrumHistory(file.Path);
-		var recentSeries = await TimeAsync(output, state, "Series 10 min to 1000 columns, SpectrumHistory (ms)",
+		var history = new SpectrumHistory(measured.File.Path);
+		var token = measured.Token;
+		var recentSeries = await TimeAsync(measured, $"Series 10 min to {Columns} columns, SpectrumHistory (ms)",
 			() => history.IntensitySeriesAsync(recent.Query, token));
-		Compare(mismatches, $"{state} 10 min SpectrumHistory against substr", recentSeries, recent.Substr);
-		var wholeSeries = await TimeAsync(output, state, $"Series {span} to 1000 columns, SpectrumHistory (ms)",
+		Compare(measured, "10 min SpectrumHistory against substr", recentSeries, recent.Substr);
+		var wholeSeries = await TimeAsync(measured, $"Series {span} to {Columns} columns, SpectrumHistory (ms)",
 			() => history.IntensitySeriesAsync(whole.Query, token));
-		Compare(mismatches, $"{state} {span} SpectrumHistory against substr", wholeSeries, whole.Substr);
-		var last = await TimeAsync(output, state, "SpectrumAt the end of the range, SpectrumHistory (ms)",
-			() => history.SpectrumAtAsync(file.WindowTo, token));
+		Compare(measured, $"{span} SpectrumHistory against substr", wholeSeries, whole.Substr);
+		var last = await TimeAsync(measured, "SpectrumAt the end of the range, SpectrumHistory (ms)",
+			() => history.SpectrumAtAsync(measured.File.WindowTo, token));
 		if (last is null)
 		{
-			mismatches.Add($"{state} SpectrumAt the end of the range found no spectrum");
+			measured.Mismatches.Add($"{measured.State} SpectrumAt the end of the range found no spectrum");
 		}
 	}
 
-	private static async Task<T> TimeAsync<T>(TextWriter output, string state, string metric, Func<Task<Result<T>>> read)
+	private static async Task<T> TimeAsync<T>(MeasuredState measured, string metric, Func<Task<Result<T>>> read)
 	{
 		var milliseconds = new double[WarmRuns + 1];
 		Result<T>? result = null;
@@ -153,29 +144,22 @@ public static class BenchmarkRun
 			var stopwatch = Stopwatch.StartNew();
 			result = await read();
 			milliseconds[run] = stopwatch.Elapsed.TotalMilliseconds;
-			if (result.IsFailed)
-			{
-				throw new InvalidOperationException(string.Join("; ", result.Errors.Select(error => error.Message)));
-			}
+			BenchmarkFile.ThrowIfFailed(result);
 		}
 
-		WriteTiming(output, state, metric, milliseconds);
+		WriteTiming(measured, metric, milliseconds);
 		return result!.Value;
 	}
 
 	private static IntensitySeries Time(
-		TextWriter output,
-		string state,
-		string metric,
-		BenchmarkFile file,
-		Func<SqliteConnection, IntensitySeries> read)
+		MeasuredState measured, string metric, Func<SqliteConnection, IntensitySeries> read)
 	{
 		var milliseconds = new double[WarmRuns + 1];
 		IntensitySeries? series = null;
 		for (var run = 0; run < milliseconds.Length; run++)
 		{
 			var stopwatch = Stopwatch.StartNew();
-			using (var connection = file.OpenReader())
+			using (var connection = measured.File.OpenReader())
 			{
 				series = read(connection);
 			}
@@ -183,34 +167,38 @@ public static class BenchmarkRun
 			milliseconds[run] = stopwatch.Elapsed.TotalMilliseconds;
 		}
 
-		WriteTiming(output, state, metric, milliseconds);
+		WriteTiming(measured, metric, milliseconds);
 		return series!;
 	}
 
 	/// <summary>Writes the first run, then the median, min and max of the runs after it.</summary>
-	private static void WriteTiming(TextWriter output, string state, string metric, double[] milliseconds)
+	private static void WriteTiming(MeasuredState measured, string metric, double[] milliseconds)
 	{
 		var warm = milliseconds[1..];
 		Array.Sort(warm);
-		output.WriteLine(Invariant(
-			$"| {state} | {metric} | {milliseconds[0]:0.0} | {warm[warm.Length / 2]:0.0} | {warm[0]:0.0} | {warm[^1]:0.0} |"));
+		var median = warm[warm.Length / 2];
+		measured.Output.WriteLine(Invariant(
+			$"| {measured.State} | {metric} | {milliseconds[0]:0.0} | {median:0.0} | {warm[0]:0.0} | {warm[^1]:0.0} |"));
 	}
 
-	private static void WriteValue(TextWriter output, string state, string metric, double value, string format)
+	private static void WriteValue(MeasuredState measured, string metric, double value, string format)
 	{
 		var text = double.IsNaN(value) ? "n/a" : value.ToString(format, CultureInfo.InvariantCulture);
-		output.WriteLine($"| {state} | {metric} | - | {text} | - | - |");
+		measured.Output.WriteLine($"| {measured.State} | {metric} | - | {text} | - | - |");
 	}
 
-	private static void Compare(List<string> mismatches, string what, IntensitySeries actual, IntensitySeries expected)
+	private static void Compare(MeasuredState measured, string what, IntensitySeries actual, IntensitySeries expected)
 	{
 		for (var i = 0; i < expected.Columns.Length; i++)
 		{
 			var a = actual.Columns[i];
 			var e = expected.Columns[i];
-			if (a.Count != e.Count || a.UncoveredCount != e.UncoveredCount || !Near(a.Min, e.Min) || !Near(a.Max, e.Max))
+			if (a.Count != e.Count
+				|| a.UncoveredCount != e.UncoveredCount
+				|| !Near(a.Min, e.Min)
+				|| !Near(a.Max, e.Max))
 			{
-				mismatches.Add($"{what}: column {i} is {a}, expected {e}");
+				measured.Mismatches.Add($"{measured.State} {what}: column {i} is {a}, expected {e}");
 				return;
 			}
 		}
@@ -221,9 +209,9 @@ public static class BenchmarkRun
 		return (double.IsNaN(actual) && double.IsNaN(expected)) || Math.Abs(actual - expected) <= Tolerance;
 	}
 
-	private static IntensityQuery Query(ushort nm, DateTimeOffset from, DateTimeOffset to)
+	private static IntensityQuery Query(ushort wavelengthNm, DateTimeOffset from, DateTimeOffset to)
 	{
-		return IntensityQuery.Create(nm, BenchmarkFile.Delta, from, to, Columns).Value;
+		return IntensityQuery.Create(wavelengthNm, BenchmarkFile.Delta, from, to, Columns).Value;
 	}
 
 	private static double PerThousand(BenchmarkFile file, BenchmarkOptions options)
@@ -240,4 +228,13 @@ public static class BenchmarkRun
 	{
 		return text.ToString(CultureInfo.InvariantCulture);
 	}
+
+	/// <summary>What the rows of one file state share: the output, the state's name, the run and its mismatches.</summary>
+	private sealed record MeasuredState(
+		TextWriter Output,
+		string State,
+		BenchmarkOptions Options,
+		BenchmarkFile File,
+		List<string> Mismatches,
+		CancellationToken Token);
 }

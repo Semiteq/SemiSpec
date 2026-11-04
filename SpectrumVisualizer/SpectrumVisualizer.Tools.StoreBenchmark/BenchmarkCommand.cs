@@ -1,8 +1,4 @@
 using System.CommandLine;
-using System.CommandLine.Parsing;
-using System.Globalization;
-
-using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.Tools.StoreBenchmark;
 
@@ -16,30 +12,24 @@ public static class BenchmarkCommand
 
 	public const int MaximumChurnRounds = 24;
 
-	private static readonly Dictionary<string, Spectrometer> _models = new()
-	{
-		["2000"] = Spectrometer.Atp2000,
-		["8000"] = Spectrometer.Atp8000,
-	};
-
 	private static readonly Option<int> _rows = new("--rows")
 	{
 		Description = "Spectra to insert, 500 ms apart, ending at the start time; at least 1200.",
 		DefaultValueFactory = _ => DefaultRows,
-		CustomParser = result => ParseWhole(result, "--rows", MinimumRows, int.MaxValue),
+		CustomParser = result => ToolCommandLine.ParseWhole(result, "--rows", MinimumRows, int.MaxValue),
 	};
 
 	private static readonly Option<int> _device = new Option<int>("--device")
 	{
 		Description = "The device of every row: 2000 (ATP-2000 at 650 nm) or 8000 (ATP-8000 at 1550 nm).",
 		DefaultValueFactory = _ => 2000,
-	}.AcceptOnlyFromAmong([.. _models.Keys]);
+	}.AcceptOnlyFromAmong([.. ToolCommandLine.Models.Keys]);
 
 	private static readonly Option<int> _churnRounds = new("--churn-rounds")
 	{
 		Description = "Rounds of 'delete the oldest 1/24 of the span, insert it again one span later'; 0 skips.",
 		DefaultValueFactory = _ => MaximumChurnRounds,
-		CustomParser = result => ParseWhole(result, "--churn-rounds", 0, MaximumChurnRounds),
+		CustomParser = result => ToolCommandLine.ParseWhole(result, "--churn-rounds", 0, MaximumChurnRounds),
 	};
 
 	private static readonly Option<string?> _folder = new("--folder")
@@ -66,23 +56,9 @@ public static class BenchmarkCommand
 	{
 		return new BenchmarkOptions(
 			parsed.GetValue(_rows),
-			_models[parsed.GetValue(_device).ToString(CultureInfo.InvariantCulture)],
+			ToolCommandLine.ToSpectrometer(parsed.GetValue(_device)),
 			parsed.GetValue(_churnRounds),
 			parsed.GetValue(_folder),
 			parsed.GetValue(_keep));
-	}
-
-	private static int ParseWhole(ArgumentResult result, string name, int minimum, int maximum)
-	{
-		var text = result.Tokens[^1].Value;
-		if (!int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var value)
-			|| value < minimum
-			|| value > maximum)
-		{
-			result.AddError($"Option '{name}' expects a whole number from {minimum} to {maximum}, got '{text}'.");
-			return 0;
-		}
-
-		return value;
 	}
 }
