@@ -477,18 +477,18 @@ Repositories: OptoskyProj (commit `docs(readme): описать протокол
 - Modify: OptoskyProj `README.md`
 - Modify: SpectrumVisualizer `docs/architecture/board-protocol.md`
 
-- [ ] OptoskyProj `README.md`, in Russian: replace "отладка через ПК" at `README.md:29` with "кадры для
+- [x] OptoskyProj `README.md`, in Russian: replace "отладка через ПК" at `README.md:29` with "кадры для
   SpectrumVisualizer"; replace the USARTC0 debug section at `README.md:226-230` with a "Протокол плата → ПК"
   section: the channel, a link to #20 for the frame, the send rules (spectrum after each measurement, dark frame as an
   all-zero spectrum, heartbeat after 3 s, `seq`), and `pc_link.c` as the code
-- [ ] OptoskyProj `README.md`, in Russian: a "Проверка на ПК" subsection with the host build commands of Acceptance
+- [x] OptoskyProj `README.md`, in Russian: a "Проверка на ПК" subsection with the host build commands of Acceptance
   Evidence item 1 (Developer PowerShell and gcc forms), the rule that a changed `pc_link.c` regenerates
   `FirmwareFrames.txt` in SpectrumVisualizer, and the drift check of item 2 with `--ignore-cr-at-eol`; add `pc_link.c/h` and `HostTest/` to the structure tree at
   `README.md:65-90`
-- [ ] SpectrumVisualizer `board-protocol.md`: a short paragraph after the heartbeat example (`:60-65`) naming
+- [x] SpectrumVisualizer `board-protocol.md`: a short paragraph after the heartbeat example (`:60-65`) naming
   `FirmwareFrames.txt` as bytes produced by the firmware's `pc_link.c` and `FirmwareFrameTests` as the check of the C
   byte order; the frame contract itself does not change
-- [ ] run `dotnet test SpectrumVisualizer.slnx --filter "Area=Protocol"` once more after the docs commit
+- [x] run `dotnet test SpectrumVisualizer.slnx --filter "Area=Protocol"` once more after the docs commit
 
 ## Post-Completion
 *Items requiring manual intervention or external systems - no checkboxes, informational only*

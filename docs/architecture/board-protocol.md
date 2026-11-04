@@ -67,6 +67,13 @@ sync   len    st  seq crc16
 CRC-16/MODBUS: reflected polynomial 0xA001, initial value 0xFFFF, no final XOR (`Crc16Modbus`). ASCII `123456789`
 gives `0x4B37`.
 
+`SpectrumVisualizer.Tests.Unit/Core/Protocol/FirmwareFrames.txt` holds frames written by the firmware's own frame code,
+`pc_link.c` in OptoskyProj, built on the PC: the heartbeat above, an ATP-2000 spectrum, an ATP-8000 spectrum and an
+ATP-8000 dark frame, one per line as a name and the frame bytes in hex. `FirmwareFrameTests` decodes each line with
+`FrameDecoder` and compares it byte for byte with `FrameEncoder.Encode` of the same frame built in C#. The decoder and
+the encoder follow OptoskyProj#20, not the C code, so a byte order error in the firmware fails these tests. The
+OptoskyProj README describes how to regenerate the file after a change to `pc_link.c`.
+
 ## Model
 
 `BoardFrame` holds `State`, `Seq` and a `SpectrumMeasurement` that is null for a heartbeat. `SpectrumMeasurement`'s
