@@ -206,12 +206,12 @@ type is decided by `len` only.
 - Modify: `SpectrumVisualizer.slnx`, `SpectrumVisualizer/Directory.Packages.props` (pin `RJCP.SerialPortStream` 3.0.5 and
   `System.CommandLine` 2.0.2)
 
-- [ ] create the console project referencing Core, with the options of Solution Overview
-- [ ] implement `SpectrumGenerator` (Gaussian peak at the wavelength, flat floor, pixel count per device) and
+- [x] create the console project referencing Core, with the options of Solution Overview
+- [x] implement `SpectrumGenerator` (Gaussian peak at the wavelength, flat floor, pixel count per device) and
   `FrameSchedule` (which frame to send at a tick: spectrum at the rate, heartbeat after 3 s of silence, bad CRC every
   nth frame, `seq` per the rules)
-- [ ] write tests for both with a fake time source; the port write is not unit-tested
-- [ ] run `dotnet test SpectrumVisualizer.slnx` and `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator -- --help`
+- [x] write tests for both with a fake time source; the port write is not unit-tested
+- [x] run `dotnet test SpectrumVisualizer.slnx` and `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator -- --help`
 
 ### Task 7: Docs
 **Files:**
