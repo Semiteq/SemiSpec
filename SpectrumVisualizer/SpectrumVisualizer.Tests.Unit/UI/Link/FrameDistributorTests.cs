@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics.CodeAnalysis;
 using System.Reactive.Concurrency;
 using System.Threading.Channels;
 
@@ -25,6 +26,9 @@ public sealed class FrameDistributorTests : IAsyncLifetime
 {
 	private const int TestTimeoutMs = 10_000;
 
+	// A read Start began would reach the reader within this long; nothing waits on it in the passing case.
+	private static readonly TimeSpan _noReadWait = TimeSpan.FromMilliseconds(200);
+
 	private static readonly DateTimeOffset _receivedAt = new(2026, 11, 4, 9, 0, 0, TimeSpan.Zero);
 
 	private readonly Channel<ReceivedFrame> _channel = Channel.CreateBounded<ReceivedFrame>(
@@ -37,11 +41,13 @@ public sealed class FrameDistributorTests : IAsyncLifetime
 
 	private readonly MessagePanelViewModel _panel = new(TimeProvider.System);
 	private readonly FakeLogger<FrameDistributor> _logger = new();
+	private readonly CountingChannelReader _reader;
 	private readonly FrameDistributor _distributor;
 
 	public FrameDistributorTests()
 	{
-		_distributor = new FrameDistributor(_channel.Reader, _panel, ImmediateScheduler.Instance, _logger);
+		_reader = new CountingChannelReader(_channel.Reader);
+		_distributor = new FrameDistributor(_reader, _panel, ImmediateScheduler.Instance, _logger);
 	}
 
 	public ValueTask InitializeAsync()
@@ -159,7 +165,9 @@ public sealed class FrameDistributorTests : IAsyncLifetime
 		await _distributor.StopAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
 		_distributor.Start();
 		Write(Received(SpectrumFrame(Spectrometer.Atp2000, 2)));
+		await Task.Delay(_noReadWait, TestContext.Current.CancellationToken);
 
+		_reader.ReadAllCalls.Should().Be(1, "Start after a stop begins no second read");
 		_channel.Reader.Count.Should().Be(1);
 		seen.Should().HaveCount(1);
 		_logger.Collector.LatestRecord.Level.Should().Be(LogLevel.Debug);
@@ -168,14 +176,33 @@ public sealed class FrameDistributorTests : IAsyncLifetime
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
-	public void StopBeforeStartCompletesAtOnce()
+	public async Task StopBeforeStartCompletesAtOnce()
 	{
 		var stop = _distributor.StopAsync();
 
 		stop.IsCompletedSuccessfully.Should().BeTrue();
 		_distributor.Start();
 		Write(Received(SpectrumFrame(Spectrometer.Atp2000, 1)));
+		await Task.Delay(_noReadWait, TestContext.Current.CancellationToken);
+
+		_reader.ReadAllCalls.Should().Be(0, "Start after a stop begins no read");
+		_reader.WaitCalls.Should().Be(0);
 		_channel.Reader.Count.Should().Be(1);
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task AFailingReadIsLoggedAtErrorAndStopStillCompletes()
+	{
+		var failing = new CountingChannelReader(_channel.Reader, failWith: new InvalidOperationException("the read failed"));
+		var distributor = new FrameDistributor(failing, _panel, ImmediateScheduler.Instance, _logger);
+		distributor.Start();
+
+		await Waits.UntilAsync(() => _logger.Collector.GetSnapshot().Any(record => record.Message == "The frame distributor stopped"));
+		await distributor.StopAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
+
+		var error = _logger.Collector.GetSnapshot().Single(record => record.Level == LogLevel.Error);
+		error.Exception.Should().BeOfType<InvalidOperationException>();
+		distributor.Dispose();
 	}
 
 	private static ReceivedFrame Received(BoardFrame frame)
@@ -195,6 +222,35 @@ public sealed class FrameDistributorTests : IAsyncLifetime
 		foreach (var frame in frames)
 		{
 			_channel.Writer.TryWrite(frame).Should().BeTrue();
+		}
+	}
+
+	/// <summary>Forwards to a channel reader and counts the reads begun; with failWith every wait throws it.</summary>
+	private sealed class CountingChannelReader(ChannelReader<ReceivedFrame> inner, Exception? failWith = null)
+		: ChannelReader<ReceivedFrame>
+	{
+		private int _readAllCalls;
+		private int _waitCalls;
+
+		public int ReadAllCalls => Volatile.Read(ref _readAllCalls);
+
+		public int WaitCalls => Volatile.Read(ref _waitCalls);
+
+		public override bool TryRead([MaybeNullWhen(false)] out ReceivedFrame item)
+		{
+			return inner.TryRead(out item);
+		}
+
+		public override ValueTask<bool> WaitToReadAsync(CancellationToken cancellationToken = default)
+		{
+			Interlocked.Increment(ref _waitCalls);
+			return failWith is null ? inner.WaitToReadAsync(cancellationToken) : ValueTask.FromException<bool>(failWith);
+		}
+
+		public override IAsyncEnumerable<ReceivedFrame> ReadAllAsync(CancellationToken cancellationToken = default)
+		{
+			Interlocked.Increment(ref _readAllCalls);
+			return base.ReadAllAsync(cancellationToken);
 		}
 	}
 }

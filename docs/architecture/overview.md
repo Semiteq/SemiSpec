@@ -50,8 +50,8 @@ writes protocol frames to a serial port for manual runs.
 | `LinkError` and its five errors | UI | `PortBusyError`, `PortNotFoundError`, `PortLostError`, `BoardNotRespondingError`, `UnrecognisedDataError`, each with the port in its message |
 | `PortListError` | UI | Windows did not return the port list; no port name, the listing failure as its cause |
 | `FrameDistributor` | UI | The one reader of `SerialLink.Frames`: keeps the latest frame that carries a spectrum and hands every frame to each subscriber on its read task |
-| `DisplayedSpectrum`, `IDisplayedSpectrumSource` | UI | The spectrum the chart shows and its receive time; the source's `Current` and the `Changed` signal. The interface exists for two implementations: the live source now, and a historical source that shows a stored moment's spectrum in the intensity-trend slice |
-| `LiveSpectrumSource` | UI | The live `IDisplayedSpectrumSource`: `Current` is the distributor's latest spectrum frame, one instance per frame; `Changed` signals each spectrum frame and skips heartbeats |
+| `DisplayedSpectrum`, `IDisplayedSpectrumSource` | UI | The spectrum the chart shows and its receive time; the source's `Current` and the `Changed` signal. `LiveSpectrumSource` is its implementation |
+| `LiveSpectrumSource` | UI | The live `IDisplayedSpectrumSource`: `Current` wraps the distributor's latest spectrum frame in a new record on each read, around the frame's own measurement; `Changed` signals each spectrum frame and skips heartbeats |
 | `SpectrumProjection` | UI | Writes the displayed value of each pixel into a line's buffer: inverted over the frame's maximum, then `log10` floored at 1 on the log axis; reports the raw maximum and whether the frame is dark |
 | `SpectrumScale` | UI | The axis limits of the shown spectrum while following and after Stick to zero, as pure functions |
 | `SpectrumChartViewModel` | UI | Owns the ScottPlot `Plot`: one line per spectrometer, the window band, the centre line, the axis type and the follow or frozen scale; asks the view for a redraw |
@@ -97,7 +97,9 @@ no-op. The view models come from the container inside `AfterSetup` for this reas
 The window's `Opened` event refreshes the port list once and starts the frame distributor. The window's `Closing` event
 is where an operator close (the close button, File, Exit) stops both. `StopBackgroundServicesAsync` awaits
 `SerialLink.DisconnectAsync()`, then `FrameDistributor.StopAsync()`, both inside one 5 s limit of real time; a timeout
-logs a Warning. The link stops first, so no frame enters the channel after the distributor has stopped reading it.
+logs a Warning. The link stops first, so no frame enters the channel after the distributor has stopped reading it. The
+distributor stops even when the link's stop throws; any failure logs an Error, and the window closes anyway, because
+the stop task never faults.
 
 - When the stop has completed by the time the first `Closing` checks it, the close goes ahead. That happens only when
   neither ran, before `Opened`.
@@ -217,8 +219,10 @@ subscribers come and go on any thread, and the read task takes one snapshot per 
 subscribed and takes the frame from no other subscriber: the distributor reports the exception once through
 `TryReportFailure`, which logs it at Error, and the frame still reaches every later subscriber. The channel never
 completes, so the read task lives across link sessions and ends only on `StopAsync` or `Dispose`, with a Debug line at
-its start and its end. `Start` after a start or a stop does nothing; `StopAsync` completes at once when nothing runs.
-Subscribers own their scheduling and never block the read task.
+its start and its end. Any other exception from the channel read ends the loop with an Error line before the end line,
+so `StopAsync` still completes. `Start` after a start or a stop does nothing; `StopAsync` completes at once when nothing
+runs, and disposes the cancellation source once the read task has ended. Subscribers own their scheduling and never
+block the read task.
 
 `SpectrumViewModel` subscribes in its constructor with `Changed.ObserveOn(uiScheduler).StartWith(...)`, then a read of
 `source.Current`, `WhereNotNull` and `DistinctUntilChanged` on the measurement by reference, then `Show`. Signals queued

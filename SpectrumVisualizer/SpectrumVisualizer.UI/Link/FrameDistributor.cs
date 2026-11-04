@@ -73,13 +73,15 @@ public sealed class FrameDistributor : IDisposable
 	public async Task StopAsync()
 	{
 		_stopped = true;
-		if (_cancellation is null)
+		if (_cancellation is not { } cancellation)
 		{
 			return;
 		}
 
-		await _cancellation.CancelAsync().ConfigureAwait(false);
+		_cancellation = null;
+		await cancellation.CancelAsync().ConfigureAwait(false);
 		await _readLoop.ConfigureAwait(false);
+		cancellation.Dispose();
 	}
 
 	/// <summary>Cancels the read task without waiting, for the container's synchronous dispose.</summary>
@@ -107,6 +109,10 @@ public sealed class FrameDistributor : IDisposable
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 		{
 			// Stop and Dispose end the loop this way; the channel itself never completes.
+		}
+		catch (Exception exception)
+		{
+			_logger.LogError(exception, "The frame distributor stopped reading on a failure");
 		}
 
 		_logger.LogDebug("The frame distributor stopped");
@@ -136,22 +142,6 @@ public sealed class FrameDistributor : IDisposable
 		}
 	}
 
-	private IDisposable Subscribe(IObserver<ReceivedFrame> observer)
-	{
-		lock (_subscribersGate)
-		{
-			_subscribers = _subscribers.Add(observer);
-		}
-
-		return Disposable.Create(() =>
-		{
-			lock (_subscribersGate)
-			{
-				_subscribers = _subscribers.Remove(observer);
-			}
-		});
-	}
-
 	/// <summary>
 	/// Not Observable.Create: its wrapper unsubscribes an observer whose OnNext throws, and a throwing
 	/// subscriber here keeps receiving the next frames.
@@ -160,7 +150,18 @@ public sealed class FrameDistributor : IDisposable
 	{
 		public IDisposable Subscribe(IObserver<ReceivedFrame> observer)
 		{
-			return distributor.Subscribe(observer);
+			lock (distributor._subscribersGate)
+			{
+				distributor._subscribers = distributor._subscribers.Add(observer);
+			}
+
+			return Disposable.Create(() =>
+			{
+				lock (distributor._subscribersGate)
+				{
+					distributor._subscribers = distributor._subscribers.Remove(observer);
+				}
+			});
 		}
 	}
 }

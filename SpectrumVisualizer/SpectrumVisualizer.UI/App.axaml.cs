@@ -106,6 +106,7 @@ public class App : Application
 		}
 	}
 
+	/// <summary>Never faults, so the close that follows the stop always passes.</summary>
 	private static async Task StopBackgroundServicesAsync(ConfiguredServices services)
 	{
 		try
@@ -118,13 +119,25 @@ public class App : Application
 				"The link and the frame distributor did not stop within {Limit}; the window closes anyway",
 				_backgroundStopLimit);
 		}
+		catch (Exception exception)
+		{
+			services.Logger.LogError(
+				exception,
+				"Stopping the link and the frame distributor failed; the window closes anyway");
+		}
 	}
 
 	/// <summary>The link stops first, so no frame enters the channel after the distributor has stopped reading it.</summary>
 	private static async Task StopLinkThenDistributorAsync(ConfiguredServices services)
 	{
-		await services.SerialLink.DisconnectAsync();
-		await services.FrameDistributor.StopAsync();
+		try
+		{
+			await services.SerialLink.DisconnectAsync();
+		}
+		finally
+		{
+			await services.FrameDistributor.StopAsync();
+		}
 	}
 
 	/// <summary>

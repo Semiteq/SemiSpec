@@ -10,7 +10,7 @@ public sealed record DisplayedSpectrum(SpectrumMeasurement Measurement, DateTime
 /// <summary>Where the shown spectrum comes from.</summary>
 public interface IDisplayedSpectrumSource
 {
-	/// <summary>The spectrum to show; null until there is one.</summary>
+	/// <summary>The spectrum to show; null until there is one. One spectrum keeps one measurement instance.</summary>
 	DisplayedSpectrum? Current { get; }
 
 	/// <summary>Emits on any thread after Current changes; the reader reads Current after the signal.</summary>

@@ -81,7 +81,7 @@ public sealed class LiveSpectrumSourceTests : IAsyncLifetime
 
 		await Waits.UntilAsync(() => delivered.Count == 2);
 		Volatile.Read(ref changes).Should().Be(1);
-		_source.Current.Should().BeSameAs(before);
+		_source.Current!.Measurement.Should().BeSameAs(before!.Measurement);
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
@@ -102,7 +102,7 @@ public sealed class LiveSpectrumSourceTests : IAsyncLifetime
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
-	public async Task TwoReadsOfOneFrameReturnTheSameInstance()
+	public async Task TwoReadsOfOneFrameCarryTheSameMeasurement()
 	{
 		var delivered = CollectFrames();
 		_distributor.Start();
@@ -113,7 +113,7 @@ public sealed class LiveSpectrumSourceTests : IAsyncLifetime
 		var second = _source.Current;
 
 		first.Should().NotBeNull();
-		second.Should().BeSameAs(first);
+		second!.Measurement.Should().BeSameAs(first!.Measurement);
 	}
 
 	private static ReceivedFrame Received(BoardFrame frame)
