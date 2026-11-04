@@ -27,7 +27,7 @@ public sealed class MainWindowLayoutTests : MainWindowLayoutTestBase
 		["PortLabel", "PortList", "RefreshPorts", "Connect", "Disconnect"];
 
 	private static readonly string[] _statusSegments =
-		["LinkText", "PortText", "Atp2000Text", "Atp8000Text", "LostSpectraText"];
+		["LinkText", "PortText", "Atp2000Text", "Atp8000Text", "LostSpectraText", "DroppedFramesText"];
 
 	[AvaloniaFact]
 	public void BelowTheMinimumTheWindowStopsAtItAndEveryFixedControlKeepsItsWidth()

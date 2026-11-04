@@ -1,8 +1,12 @@
+using System.ComponentModel;
+using System.Threading.Channels;
+
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 
 using AwesomeAssertions;
 
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Reactive.Testing;
@@ -10,12 +14,14 @@ using Microsoft.Reactive.Testing;
 using ReactiveUI.Avalonia;
 
 using SpectrumVisualizer.Core.Protocol;
+using SpectrumVisualizer.Tests.Unit.Core.Store;
 using SpectrumVisualizer.Tests.Unit.UI.Link;
 using SpectrumVisualizer.Tests.Unit.UI.Messages;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
+using SpectrumVisualizer.UI.Store;
 
 using Xunit;
 
@@ -23,13 +29,22 @@ using static SpectrumVisualizer.Tests.Unit.Core.Protocol.ProtocolSamples;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.MainWindow;
 
-/// <summary>Drives a real link over the fake port, so the bar sees the statuses the session publishes.</summary>
+/// <summary>
+/// Drives a real link over the fake port and a real store on a temp file, so the bar sees what both publish. Nothing
+/// reads the link's frames, so its channel fills and drops.
+/// </summary>
 [Trait("Component", "UI")]
 [Trait("Area", "MainWindow")]
 [Trait("Category", "Unit")]
-public sealed class AppStatusBarViewModelTests : IDisposable
+public sealed class AppStatusBarViewModelTests : IAsyncDisposable
 {
 	private const string PortName = "COM3";
+	private const int LinkChannelCapacity = 64;
+	private const int LinkOverflow = 3;
+	private const byte FailingSeq = 99;
+
+	// A held store keeps its writer until StopAsync has closed the file.
+	private static readonly TimeSpan _storeStopLimit = TimeSpan.FromSeconds(10);
 
 	private readonly TestScheduler _linkScheduler = new();
 	private readonly FakeSerialPortProvider _portProvider = new(PortName);
@@ -37,13 +52,35 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
 	private readonly FakeLogger<AppStatusBarViewModel> _logger = new();
 	private readonly SerialLink _serialLink;
+	private readonly TempFolder _storeFolder = new();
+	private readonly Channel<ReceivedFrame> _storeFrames = Channel.CreateUnbounded<ReceivedFrame>();
+	private readonly FakeLogger<SpectrumStore> _storeLogger = new();
+	private readonly FrameDistributor _storeDistributor;
+	private readonly SpectrumStore _store;
 	private readonly AppStatusBarViewModel _viewModel;
 	private readonly List<(string Text, LinkTone Tone)> _shownStates = [];
 
 	public AppStatusBarViewModelTests()
 	{
 		_serialLink = new SerialLink(_portProvider, _linkScheduler, new FakeLogger<SerialLink>());
-		_viewModel = new AppStatusBarViewModel(_serialLink, _messagePanel, AvaloniaScheduler.Instance, _logger);
+		_storeDistributor = new FrameDistributor(
+			_storeFrames.Reader,
+			_messagePanel,
+			AvaloniaScheduler.Instance,
+			new FakeLogger<FrameDistributor>());
+		_store = new SpectrumStore(
+			_storeDistributor,
+			new StoreFile(StorePath),
+			_messagePanel,
+			AvaloniaScheduler.Instance,
+			TimeProvider.System,
+			_storeLogger);
+		_viewModel = new AppStatusBarViewModel(
+			_serialLink,
+			_store,
+			_messagePanel,
+			AvaloniaScheduler.Instance,
+			_logger);
 		_viewModel.PropertyChanged += (_, arguments) =>
 		{
 			var shown = (_viewModel.LinkText, _viewModel.LinkTone);
@@ -54,6 +91,8 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 			}
 		};
 	}
+
+	private string StorePath => _storeFolder.FileIn("spectra-1.db");
 
 	public static TheoryData<BoardState, string, string> SpectrometerStates => new()
 	{
@@ -220,6 +259,67 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 	}
 
 	[AvaloniaFact]
+	public void AFreshAppShowsZeroDroppedFramesNotTheNoValueDash()
+	{
+		_viewModel.DroppedFramesText.Should().Be(Resources.FormatStatusDroppedFramesFormat(0));
+		_viewModel.LostSpectraText.Should().Be(
+			Resources.FormatStatusLostSpectraFormat(Resources.StatusNoValue),
+			"only the lost count describes the current connection");
+	}
+
+	[AvaloniaFact]
+	public async Task TheDroppedSegmentSumsTheLinkAndTheStore()
+	{
+		await StartStoreAsync();
+		await FailOneStoreBatchAsync();
+		await ConnectAsync();
+
+		await OverflowTheLinkChannelAsync(1);
+
+		await Waits.UntilAsync(
+			() => _viewModel.DroppedFramesText == Resources.FormatStatusDroppedFramesFormat(LinkOverflow + 1),
+			pumpDispatcher: true);
+		_serialLink.Status.DroppedFrames.Should().Be(LinkOverflow);
+		_store.DroppedFrames.Should().Be(1);
+	}
+
+	[AvaloniaFact]
+	public async Task TheDroppedCountStaysAfterADisconnect()
+	{
+		await ConnectAsync();
+		await OverflowTheLinkChannelAsync(1);
+
+		await DisconnectAsync();
+
+		_viewModel.LinkText.Should().Be(Resources.StatusNotConnected);
+		_viewModel.DroppedFramesText.Should().Be(Resources.FormatStatusDroppedFramesFormat(LinkOverflow));
+	}
+
+	[AvaloniaFact]
+	public async Task AStoreDropOnAnotherThreadReachesTheTextOnTheUiScheduler()
+	{
+		var changedOnUiThread = new List<bool>();
+		void OnChanged(object? sender, PropertyChangedEventArgs arguments)
+		{
+			if (arguments.PropertyName == nameof(AppStatusBarViewModel.DroppedFramesText))
+			{
+				changedOnUiThread.Add(Dispatcher.UIThread.CheckAccess());
+			}
+		}
+
+		_viewModel.PropertyChanged += OnChanged;
+		await StartStoreAsync();
+
+		await FailOneStoreBatchAsync();
+
+		await Waits.UntilAsync(
+			() => _viewModel.DroppedFramesText == Resources.FormatStatusDroppedFramesFormat(1),
+			pumpDispatcher: true);
+		_viewModel.PropertyChanged -= OnChanged;
+		changedOnUiThread.Should().NotBeEmpty().And.OnlyContain(onUiThread => onUiThread);
+	}
+
+	[AvaloniaFact]
 	public async Task AThrowingPanelGoesToTheLog()
 	{
 		using var poison = ReportingTestDoubles.PoisonEntries(_messagePanel);
@@ -237,11 +337,16 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 		last.Exception.Should().BeOfType<PoisonedPanelException>();
 	}
 
-	public void Dispose()
+	public async ValueTask DisposeAsync()
 	{
 		_viewModel.Dispose();
+		await _storeDistributor.StopAsync().WaitAsync(Waits.Limit);
+		_storeDistributor.Dispose();
+		await _store.StopAsync().WaitAsync(_storeStopLimit);
+		_store.Dispose();
+		_storeFolder.Dispose();
 		_serialLink.Dispose();
-		_port.Dispose();
+		await _port.DisposeAsync();
 		_messagePanel.Dispose();
 	}
 
@@ -295,5 +400,40 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 	private Task SettleAsync()
 	{
 		return Waits.StatusBarSettledAsync(_viewModel, _serialLink);
+	}
+
+	/// <summary>Consecutive seq values, so the sequence tracker sees no gap; the channel drops the overflow.</summary>
+	private Task OverflowTheLinkChannelAsync(double seconds)
+	{
+		var frames = Enumerable.Range(1, LinkChannelCapacity + LinkOverflow)
+			.Select(seq => FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, (byte)seq)));
+		return AtAsync(seconds, port => port.PushBytes(Concat(frames)));
+	}
+
+	private async Task StartStoreAsync()
+	{
+		_store.Start();
+		_storeDistributor.Start();
+		await Waits.UntilAsync(
+			() => _storeLogger.Collector.GetSnapshot().Any(record => record.Level == LogLevel.Information));
+	}
+
+	/// <summary>A trigger rejects the frame, so its batch fails on the writer task and counts one drop there.</summary>
+	private async Task FailOneStoreBatchAsync()
+	{
+		using (var connection = new SqliteConnection(
+			new SqliteConnectionStringBuilder { DataSource = StorePath, Pooling = false }.ToString()))
+		{
+			connection.Open();
+			using var command = connection.CreateCommand();
+			command.CommandText = $"""
+				CREATE TRIGGER fail_seq_{FailingSeq} BEFORE INSERT ON spectrum WHEN NEW.seq = {FailingSeq}
+				BEGIN SELECT RAISE(ABORT, 'test'); END
+				""";
+			command.ExecuteNonQuery();
+		}
+
+		_storeFrames.Writer.TryWrite(StoreSamples.Spectrum(StoreSamples.Start, seq: FailingSeq)).Should().BeTrue();
+		await Waits.UntilAsync(() => _store.DroppedFrames == 1);
 	}
 }

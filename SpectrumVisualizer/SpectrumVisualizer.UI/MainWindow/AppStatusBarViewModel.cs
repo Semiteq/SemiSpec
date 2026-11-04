@@ -1,5 +1,7 @@
+using System.Reactive;
 using System.Reactive.Concurrency;
 using System.Reactive.Disposables;
+using System.Reactive.Linq;
 
 using FluentResults;
 
@@ -11,6 +13,7 @@ using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Messages;
+using SpectrumVisualizer.UI.Store;
 
 namespace SpectrumVisualizer.UI.MainWindow;
 
@@ -23,8 +26,8 @@ public enum LinkTone
 }
 
 /// <summary>
-/// The link's current state as the status bar shows it. The fault entries and the restored entry it writes go to
-/// the message panel.
+/// The link's current state and the run's dropped frames as the status bar shows them. The fault entries and the
+/// restored entry it writes go to the message panel.
 /// </summary>
 public sealed class AppStatusBarViewModel : ReactiveObject, IDisposable
 {
@@ -32,11 +35,13 @@ public sealed class AppStatusBarViewModel : ReactiveObject, IDisposable
 	private readonly MessagePanelViewModel _messagePanel;
 	private readonly IScheduler _uiScheduler;
 	private readonly ILogger<AppStatusBarViewModel> _logger;
+	private readonly ObservableAsPropertyHelper<string> _droppedFramesText;
 
 	private bool _hasSeenFault;
 
 	public AppStatusBarViewModel(
 		SerialLink serialLink,
+		SpectrumStore store,
 		MessagePanelViewModel messagePanel,
 		IScheduler uiScheduler,
 		ILogger<AppStatusBarViewModel> logger)
@@ -49,6 +54,9 @@ public sealed class AppStatusBarViewModel : ReactiveObject, IDisposable
 		_disposables.Add(serialLink
 			.StatusUpdates(uiScheduler)
 			.Subscribe(Apply, exception => _logger.LogError(exception, "The status bar stopped following the link")));
+		_disposables.Add(DroppedFramesOf(serialLink, store, uiScheduler)
+			.Select(dropped => Resources.FormatStatusDroppedFramesFormat(dropped.ToString(Resources.Culture)))
+			.ToProperty(this, bar => bar.DroppedFramesText, out _droppedFramesText));
 	}
 
 	public LinkStatus Status
@@ -94,11 +102,29 @@ public sealed class AppStatusBarViewModel : ReactiveObject, IDisposable
 	public string LostSpectraText => Resources.FormatStatusLostSpectraFormat(
 		IsDisconnected ? Resources.StatusNoValue : Status.LostSpectra.ToString(Resources.Culture));
 
+	/// <summary>The link's channel drops plus the store's; a number in every state, as both describe the run's history.</summary>
+	public string DroppedFramesText => _droppedFramesText.Value;
+
 	private bool IsDisconnected => Status.State == LinkState.Disconnected;
 
 	public void Dispose()
 	{
 		_disposables.Dispose();
+	}
+
+	private static IObservable<long> DroppedFramesOf(SerialLink serialLink, SpectrumStore store, IScheduler uiScheduler)
+	{
+		var linkDropped = serialLink
+			.StatusUpdates(uiScheduler)
+			.Select(status => status.DroppedFrames);
+		var storeDropped = store.DroppedFramesChanged
+			.ObserveOn(uiScheduler)
+			.StartWith(Unit.Default)
+			.Select(_ => store.DroppedFrames);
+
+		return linkDropped
+			.CombineLatest(storeDropped, (link, stored) => link + stored)
+			.DistinctUntilChanged();
 	}
 
 	private string SpectrometerText(Spectrometer device)

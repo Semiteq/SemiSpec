@@ -16,6 +16,7 @@ using Serilog.Extensions.Logging;
 using SpectrumVisualizer.Tests.Unit.UI.Link;
 using SpectrumVisualizer.Tests.Unit.UI.Logging;
 using SpectrumVisualizer.Tests.Unit.UI.Spectrum;
+using SpectrumVisualizer.Tests.Unit.UI.Store;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
@@ -37,6 +38,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 	private readonly SerilogLoggerFactory _loggerFactory;
 	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
 	private readonly SerialLink _serialLink;
+	private readonly UnstartedStore _store;
 	private readonly ConnectionBarViewModel _connectionBar;
 	private readonly AppStatusBarViewModel _statusBar;
 	private readonly FakeDisplayedSpectrumSource _spectrumSource = new();
@@ -58,8 +60,10 @@ public sealed class MainWindowViewModelTests : IDisposable
 			.WriteTo.Sink(_sink)
 			.CreateLogger();
 		_loggerFactory = new SerilogLoggerFactory(_serilogLogger);
+		_store = new UnstartedStore(_messagePanel);
 		_statusBar = new AppStatusBarViewModel(
 			_serialLink,
+			_store.Store,
 			_messagePanel,
 			ImmediateScheduler.Instance,
 			NullLogger<AppStatusBarViewModel>.Instance);
@@ -184,6 +188,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 		_connectionBar.Dispose();
 		_statusBar.Dispose();
 		_serialLink.Dispose();
+		_store.Dispose();
 		_messagePanel.Dispose();
 		_loggerFactory.Dispose();
 		_serilogLogger.Dispose();

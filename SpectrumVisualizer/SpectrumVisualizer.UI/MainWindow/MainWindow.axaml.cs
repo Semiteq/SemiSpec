@@ -9,7 +9,7 @@ public partial class MainWindow : Window
 	/// Holds the connection row, the status bar and the signal pane plus the chart floor; MainWindowTextFitTests
 	/// measures it.
 	/// </summary>
-	public const double MinimumWidth = 1048;
+	public const double MinimumWidth = 1256;
 
 	private IDisposable? _exitSubscription;
 

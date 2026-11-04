@@ -736,16 +736,25 @@ Data flow:
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/MainWindow/AppStatusBarViewModelTests.cs`,
   `MainWindowLayoutTests.cs`
 
-- [ ] add `StatusDroppedFramesFormat` to both resx sets
-- [ ] take `SpectrumStore` in the view model's constructor and add `DroppedFramesText` of Solution Overview as an
+- [x] add `StatusDroppedFramesFormat` to both resx sets
+- [x] take `SpectrumStore` in the view model's constructor and add `DroppedFramesText` of Solution Overview as an
   `ObservableAsPropertyHelper` with its subscription in `_disposables`
-- [ ] add a separator and `DroppedFramesText` after `LostSpectraText` (`AppStatusBar.axaml:71-77`; the grid gains two
+- [x] add a separator and `DroppedFramesText` after `LostSpectraText` (`AppStatusBar.axaml:71-77`; the grid gains two
   `Auto` columns)
-- [ ] write `TheDroppedSegmentSumsTheLinkAndTheStore`, `AFreshAppShowsZeroDroppedFramesNotTheNoValueDash`,
+- [x] write `TheDroppedSegmentSumsTheLinkAndTheStore`, `AFreshAppShowsZeroDroppedFramesNotTheNoValueDash`,
   `TheDroppedCountStaysAfterADisconnect`,
   `AStoreDropOnAnotherThreadReachesTheTextOnTheUiScheduler`; extend the realised-segment assertions in
   `MainWindowLayoutTests`
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] ➕ register `StoreFile` and `SpectrumStore` in `AddUi(LoggingSetup, AppDataPaths)` and pass the paths from
+  `Program.Main` and from the container tests (a per-instance temp root, nothing written there): the composition test
+  resolves every registered service, and the status bar now needs the store. Nothing starts the store yet; `App`,
+  `ConfiguredServices` and the close chain stay for Task 10
+- [x] ➕ the new separator alone broke `MainWindowTextFitTests` in Russian (1059.4 px over 1048), so the dropped segment
+  with `999999` joined the status sum and `MainWindow.MinimumWidth` became 1256 (Russian 1252.2 px rounded up to 8;
+  English 1085.2 px). `ChromeWidth` no longer asserts the stub-measured natural width against the opening width: the
+  stub's 14 px per character put the Russian bar at 1435 px, while the real widths are judged against the minimum
+  width. `MainWindowViewTests` checks the new segment's text too
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (607 of 607)
 
 ### Task 10: Store in the composition root and the window lifecycle
 **Files:**
@@ -770,6 +779,9 @@ Data flow:
 - [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 11: Status bar pre-handover checklist (`dev:desktop-ui`)
+Note: Task 9 already added the dropped segment to the status sum and set `MinimumWidth` to 1256 (measured Russian
+1252.2 px, English 1085.2 px); this task verifies and records them.
+
 **Files:**
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.UI/MainWindow/MainWindow.axaml.cs`
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/MainWindow/MainWindowTextFitTests.cs`

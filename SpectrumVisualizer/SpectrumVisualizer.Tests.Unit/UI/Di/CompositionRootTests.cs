@@ -13,8 +13,8 @@ using ReactiveUI.Avalonia;
 using Serilog;
 using Serilog.Events;
 
+using SpectrumVisualizer.Core;
 using SpectrumVisualizer.Tests.Unit.UI.Logging;
-
 using SpectrumVisualizer.UI;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
@@ -35,6 +35,9 @@ public sealed class CompositionRootTests : IDisposable
 	private readonly LogLevelControl _logLevelControl = new();
 	private readonly CollectingSink _sink = new();
 	private readonly LoggingSetup _logging;
+	// Nothing starts the store here, so no file is written under this root.
+	private readonly AppDataPaths _paths =
+		AppDataPaths.Under(Path.Combine(Path.GetTempPath(), $"spectrum-visualizer-di-{Guid.NewGuid():N}")).Value;
 
 	public CompositionRootTests()
 	{
@@ -48,7 +51,7 @@ public sealed class CompositionRootTests : IDisposable
 	[AvaloniaFact]
 	public void EveryRegisteredServiceResolves()
 	{
-		var services = new ServiceCollection().AddUi(_logging);
+		var services = new ServiceCollection().AddUi(_logging, _paths);
 		using var provider = services.BuildServiceProvider();
 
 		foreach (var descriptor in services.Where(descriptor => !descriptor.ServiceType.IsGenericTypeDefinition))
@@ -163,7 +166,7 @@ public sealed class CompositionRootTests : IDisposable
 
 	private ServiceProvider BuildContainer()
 	{
-		return new ServiceCollection().AddUi(_logging).BuildServiceProvider();
+		return new ServiceCollection().AddUi(_logging, _paths).BuildServiceProvider();
 	}
 
 	public void Dispose()

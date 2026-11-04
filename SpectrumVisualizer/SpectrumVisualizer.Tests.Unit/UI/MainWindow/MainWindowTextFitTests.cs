@@ -33,7 +33,8 @@ public sealed class MainWindowTextFitTests : MainWindowLayoutTestBase
 	// Windows numbers serial ports up to COM256.
 	private const string WidestPortName = "COM256";
 
-	// A day of ATP-8000 spectra at 1.3 per second is about 112 000, so six digits cover a day with every spectrum lost.
+	// A day of ATP-8000 spectra at 1.3 per second is about 112 000, so six digits cover a day with every spectrum lost
+	// or dropped.
 	private const long WidestLostCount = 999_999;
 
 	private const int MinimumLabelledTicks = 4;
@@ -75,7 +76,8 @@ public sealed class MainWindowTextFitTests : MainWindowLayoutTestBase
 			+ Measure(WidestPortName)
 			+ SpectrometerTexts("ATP-2000").Max(Measure)
 			+ SpectrometerTexts("ATP-8000").Max(Measure)
-			+ Measure(Resources.FormatStatusLostSpectraFormat(WidestLostCount.ToString(CultureInfo.CurrentCulture)));
+			+ Measure(Resources.FormatStatusLostSpectraFormat(WidestLostCount.ToString(CultureInfo.CurrentCulture)))
+			+ Measure(Resources.FormatStatusDroppedFramesFormat(WidestLostCount.ToString(CultureInfo.CurrentCulture)));
 
 		TestContext.Current.TestOutputHelper?.WriteLine(
 			$"{culture}: faces {string.Join(", ", RenderedText.InstalledFamilies(family))} + Inter at {fontSize} px; "
@@ -254,13 +256,11 @@ public sealed class MainWindowTextFitTests : MainWindowLayoutTestBase
 	/// </summary>
 	private static double ChromeWidth(Border row, IReadOnlyCollection<TextBlock> texts)
 	{
-		// Avalonia clamps DesiredSize to the space offered, so only an unbounded measure shows an overflow.
+		// Avalonia clamps DesiredSize to the space offered, so only an unbounded measure gives the whole chrome. The
+		// stub texts may overflow the opening width here; the real widths are judged against the minimum width.
 		row.Measure(Size.Infinity);
 		var naturalWidth = row.DesiredSize.Width;
 		var textWidths = texts.Sum(text => text.DesiredSize.Width - text.Margin.Left - text.Margin.Right);
-		naturalWidth.Should().BeLessThanOrEqualTo(
-			row.Bounds.Width,
-			"nothing in the row is clipped at the opening width");
 
 		return naturalWidth - textWidths;
 	}

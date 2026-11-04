@@ -10,6 +10,7 @@ using ReactiveUI.Avalonia;
 
 using SpectrumVisualizer.Tests.Unit.UI.Link;
 using SpectrumVisualizer.Tests.Unit.UI.Spectrum;
+using SpectrumVisualizer.Tests.Unit.UI.Store;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
@@ -56,6 +57,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 	protected MainWindowLayoutTestBase()
 	{
 		SerialLink = new SerialLink(PortProvider, LinkScheduler, NullLogger<SerialLink>.Instance);
+		Store = new UnstartedStore(MessagePanel);
 	}
 
 	protected TestScheduler LinkScheduler { get; } = new();
@@ -69,6 +71,8 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 	private protected FakeDisplayedSpectrumSource SpectrumSource { get; } = new();
 
 	protected MessagePanelViewModel MessagePanel { get; } = new(TimeProvider.System);
+
+	private protected UnstartedStore Store { get; }
 
 	protected AppStatusBarViewModel StatusBar =>
 		_statusBar ?? throw new InvalidOperationException("Realise the window first.");
@@ -85,6 +89,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 		_spectrum?.Dispose();
 		SpectrumSource.Dispose();
 		SerialLink.Dispose();
+		Store.Dispose();
 		Port.Dispose();
 		MessagePanel.Dispose();
 		GC.SuppressFinalize(this);
@@ -113,6 +118,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 			NullLogger<ConnectionBarViewModel>.Instance);
 		_statusBar = new AppStatusBarViewModel(
 			SerialLink,
+			Store.Store,
 			MessagePanel,
 			AvaloniaScheduler.Instance,
 			NullLogger<AppStatusBarViewModel>.Instance);

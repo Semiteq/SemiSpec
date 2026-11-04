@@ -7,17 +7,20 @@ using ReactiveUI.Avalonia;
 
 using Serilog;
 
+using SpectrumVisualizer.Core;
+using SpectrumVisualizer.Core.Store;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
 using SpectrumVisualizer.UI.Spectrum;
+using SpectrumVisualizer.UI.Store;
 
 namespace SpectrumVisualizer.UI;
 
 public static class UiServiceCollectionExtensions
 {
-	public static IServiceCollection AddUi(this IServiceCollection services, LoggingSetup logging)
+	public static IServiceCollection AddUi(this IServiceCollection services, LoggingSetup logging, AppDataPaths paths)
 	{
 		// Program owns the Serilog logger and flushes it after the container is gone.
 		services.AddLogging(builder => builder.AddSerilog(logging.Logger, dispose: false));
@@ -34,6 +37,8 @@ public static class UiServiceCollectionExtensions
 			provider.GetRequiredService<MessagePanelViewModel>(),
 			provider.GetRequiredService<IScheduler>(),
 			provider.GetRequiredService<ILogger<FrameDistributor>>()));
+		services.AddSingleton(new StoreFile(StoreFiles.InstanceFile(paths.StoreFolder, Environment.ProcessId)));
+		services.AddSingleton<SpectrumStore>();
 		services.AddSingleton<IDisplayedSpectrumSource, LiveSpectrumSource>();
 		services.AddSingleton<MessagePanelViewModel>();
 		services.AddSingleton<ConnectionBarViewModel>();

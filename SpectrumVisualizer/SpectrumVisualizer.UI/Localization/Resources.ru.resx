@@ -183,6 +183,9 @@
   <data name="StatusLostSpectraFormat" xml:space="preserve">
     <value>Потеряно спектров: {0}</value>
   </data>
+  <data name="StatusDroppedFramesFormat" xml:space="preserve">
+    <value>Отброшено кадров: {0}</value>
+  </data>
   <data name="StatusNoValue" xml:space="preserve">
     <value>-</value>
   </data>

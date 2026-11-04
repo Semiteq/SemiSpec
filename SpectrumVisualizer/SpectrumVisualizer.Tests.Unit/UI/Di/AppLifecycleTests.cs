@@ -11,10 +11,10 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 
 using Serilog;
 
+using SpectrumVisualizer.Core;
 using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Tests.Unit.UI.Link;
 using SpectrumVisualizer.Tests.Unit.UI.Logging;
-
 using SpectrumVisualizer.UI;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
@@ -39,6 +39,9 @@ public sealed class AppLifecycleTests : IDisposable
 	private readonly FakeSerialPortProvider _portProvider = new(PortName);
 	private readonly CollectingSink _sink = new();
 	private readonly LoggingSetup _logging;
+	// Nothing starts the store here, so no file is written under this root.
+	private readonly AppDataPaths _paths =
+		AppDataPaths.Under(Path.Combine(Path.GetTempPath(), $"spectrum-visualizer-di-{Guid.NewGuid():N}")).Value;
 
 	public AppLifecycleTests()
 	{
@@ -241,7 +244,7 @@ public sealed class AppLifecycleTests : IDisposable
 	private ServiceProvider BuildContainer()
 	{
 		return new ServiceCollection()
-			.AddUi(_logging)
+			.AddUi(_logging, _paths)
 			.Replace(ServiceDescriptor.Singleton<ISerialPortProvider>(_portProvider))
 			.BuildServiceProvider();
 	}

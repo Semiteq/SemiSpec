@@ -38,7 +38,7 @@ public static class Program
 			Log.Information("SpectrumVisualizer starting; log folder {LogFolder}", paths.Value.LogFolder);
 
 			using var serviceProvider = new ServiceCollection()
-				.AddUi(logging.Value)
+				.AddUi(logging.Value, paths.Value)
 				.BuildServiceProvider();
 			var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 

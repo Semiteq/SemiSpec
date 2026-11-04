@@ -15,6 +15,7 @@ using ReactiveUI.Avalonia;
 
 using SpectrumVisualizer.Tests.Unit.UI.Link;
 using SpectrumVisualizer.Tests.Unit.UI.Spectrum;
+using SpectrumVisualizer.Tests.Unit.UI.Store;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Logging;
@@ -35,6 +36,7 @@ public sealed class MainWindowViewTests : IDisposable
 {
 	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
 	private readonly SerialLink _serialLink;
+	private readonly UnstartedStore _store;
 	private readonly ConnectionBarViewModel _connectionBar;
 	private readonly AppStatusBarViewModel _statusBar;
 	private readonly FakeDisplayedSpectrumSource _spectrumSource = new();
@@ -52,8 +54,10 @@ public sealed class MainWindowViewTests : IDisposable
 			_messagePanel,
 			AvaloniaScheduler.Instance,
 			NullLogger<ConnectionBarViewModel>.Instance);
+		_store = new UnstartedStore(_messagePanel);
 		_statusBar = new AppStatusBarViewModel(
 			_serialLink,
+			_store.Store,
 			_messagePanel,
 			AvaloniaScheduler.Instance,
 			NullLogger<AppStatusBarViewModel>.Instance);
@@ -113,7 +117,7 @@ public sealed class MainWindowViewTests : IDisposable
 		dot.IsEffectivelyVisible.Should().BeTrue();
 		dot.Classes.Where(name => name.StartsWith("tone-", StringComparison.Ordinal)).Should().Equal("tone-neutral");
 
-		string[] segments = ["LinkText", "PortText", "Atp2000Text", "Atp8000Text", "LostSpectraText"];
+		string[] segments = ["LinkText", "PortText", "Atp2000Text", "Atp8000Text", "LostSpectraText", "DroppedFramesText"];
 		segments.Select(name => Named<TextBlock>(bar, name))
 			.Should().OnlyContain(segment => segment.IsEffectivelyVisible && segment.Bounds.Width > 0);
 		segments.Select(name => Named<TextBlock>(bar, name).Text).Should().Equal(
@@ -121,7 +125,8 @@ public sealed class MainWindowViewTests : IDisposable
 			Resources.StatusNoValue,
 			Resources.FormatStatusSpectrometerFormat("ATP-2000", Resources.StatusSpectrometerNoData),
 			Resources.FormatStatusSpectrometerFormat("ATP-8000", Resources.StatusSpectrometerNoData),
-			Resources.FormatStatusLostSpectraFormat(Resources.StatusNoValue));
+			Resources.FormatStatusLostSpectraFormat(Resources.StatusNoValue),
+			Resources.FormatStatusDroppedFramesFormat(0));
 	}
 
 	[AvaloniaFact]
@@ -198,6 +203,7 @@ public sealed class MainWindowViewTests : IDisposable
 		_connectionBar.Dispose();
 		_statusBar.Dispose();
 		_serialLink.Dispose();
+		_store.Dispose();
 		_messagePanel.Dispose();
 	}
 
