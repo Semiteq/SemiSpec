@@ -42,13 +42,13 @@ public sealed class SpectrumDatabase : IDisposable
 		INSERT INTO heartbeat (received_at, seq, state) VALUES ($received_at, $seq, $state)
 		""";
 
-	// Microsoft.Data.Sqlite counts the busy timeout in whole seconds and waits forever on 0, so 1 s is the shortest.
-	private const int ShortBusyTimeoutSeconds = 1;
-
 	private const string DeleteOlder = """
 		DELETE FROM spectrum WHERE received_at < $cutoff;
 		DELETE FROM heartbeat WHERE received_at < $cutoff;
 		""";
+
+	// Microsoft.Data.Sqlite counts the busy timeout in whole seconds and waits forever on 0, so 1 s is the shortest.
+	private const int ShortBusyTimeoutSeconds = 1;
 
 	private readonly SqliteConnection _connection;
 	private readonly SqliteCommand _insertSpectrum;
@@ -91,7 +91,7 @@ public sealed class SpectrumDatabase : IDisposable
 		catch (Exception ex) when (ex is SqliteException or IOException)
 		{
 			connection?.Dispose();
-			return Result.Fail(new ExceptionalError($"The spectrum store file '{path}' could not be opened", ex));
+			return Result.Fail(new ExceptionalError("SQLite refused the file or the schema", ex));
 		}
 	}
 
@@ -150,7 +150,7 @@ public sealed class SpectrumDatabase : IDisposable
 		try
 		{
 			using var command = _connection.CreateCommand();
-			command.CommandText = "PRAGMA wal_checkpoint(TRUNCATE)";
+			command.CommandText = StoreConnection.CheckpointTruncate;
 			using var reader = command.ExecuteReader();
 			reader.Read();
 			var busy = reader.GetInt32(0) != 0;

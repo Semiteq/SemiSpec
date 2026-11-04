@@ -1,0 +1,287 @@
+using System.Reactive.Concurrency;
+using System.Threading.Channels;
+
+using FluentResults;
+
+using Microsoft.Extensions.Logging;
+
+using SpectrumVisualizer.Core.Protocol;
+using SpectrumVisualizer.Core.Store;
+using SpectrumVisualizer.UI.Messages;
+
+namespace SpectrumVisualizer.UI.Store;
+
+/// <summary>
+/// The writer task of the spectrum store: drains the queue into the store file in batches, deletes rows older than a day
+/// once a minute and closes the file with a checkpoint; every frame it loses goes to countDropped.
+/// </summary>
+internal sealed class StoreWriter(
+	StoreFile storeFile,
+	ChannelReader<ReceivedFrame> queue,
+	Action<long> countDropped,
+	MessagePanelViewModel messagePanel,
+	IScheduler uiScheduler,
+	TimeProvider timeProvider,
+	ILogger logger)
+{
+	private const int BatchSize = 256;
+
+	private static readonly TimeSpan _retentionInterval = TimeSpan.FromMinutes(1);
+	private static readonly TimeSpan _retentionAge = TimeSpan.FromHours(24);
+
+	// Set by Stop on the UI thread, read by the writer task.
+	private volatile bool _stopped;
+
+	// Written by the writer task; read once it ended.
+	private bool _writeFailing;
+	private Result<WalCheckpoint>? _checkpoint;
+
+	public long StoredFrames { get; private set; }
+
+	/// <summary>The closing checkpoint as the stopped line names it: Skipped, Truncated, Busy or Failed.</summary>
+	public string CheckpointOutcome => _checkpoint switch
+	{
+		null => "Skipped",
+		{ IsFailed: true } => "Failed",
+		{ } closed => closed.Value.ToString(),
+	};
+
+	/// <summary>From now on no retention pass starts, and a statement gives up on a held lock after 1 s.</summary>
+	public void Stop()
+	{
+		_stopped = true;
+	}
+
+	/// <summary>Writes the queue until it completes; after a failure, or once cancelled, counts every frame as dropped.</summary>
+	public async Task RunAsync(CancellationToken cancellationToken, CancellationToken drainToken)
+	{
+		try
+		{
+			if (!await StoreAsync(cancellationToken, drainToken).ConfigureAwait(false))
+			{
+				await DiscardUntilCompletedAsync(cancellationToken).ConfigureAwait(false);
+			}
+		}
+		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+		{
+			// Dispose ends the writer this way; the file is already closed without a checkpoint.
+			countDropped(DiscardQueued());
+		}
+	}
+
+	/// <summary>Opens the file and writes the queue into it until the queue completes; false after a failure.</summary>
+	private async Task<bool> StoreAsync(CancellationToken cancellationToken, CancellationToken drainToken)
+	{
+		SpectrumDatabase? database = null;
+		try
+		{
+			var opened = OpenDatabase();
+			if (opened.IsFailed)
+			{
+				ReportOpenFailure(opened.Errors);
+				return false;
+			}
+
+			database = opened.Value;
+			logger.LogInformation("Spectrum store file {Path}", storeFile.Path);
+			await WriteQueuedAsync(database, cancellationToken, drainToken).ConfigureAwait(false);
+			CheckpointAndClose(database);
+			database = null;
+			return true;
+		}
+		catch (Exception exception)
+			when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+		{
+			if (database is null)
+			{
+				ReportOpenFailure([new ExceptionalError(exception)]);
+			}
+			else
+			{
+				messagePanel.TryReportFailure(new StoreStoppedError().CausedBy(exception), logger, uiScheduler);
+			}
+
+			return false;
+		}
+		finally
+		{
+			database?.Dispose();
+		}
+	}
+
+	private async Task DiscardUntilCompletedAsync(CancellationToken cancellationToken)
+	{
+		do
+		{
+			countDropped(DiscardQueued());
+		}
+		while (await queue.WaitToReadAsync(cancellationToken).ConfigureAwait(false));
+	}
+
+	private Result<SpectrumDatabase> OpenDatabase()
+	{
+		var path = storeFile.Path;
+		return StoreFiles.Prepare(path).Bind(sweep =>
+		{
+			LogSweep(sweep);
+			return SpectrumDatabase.Open(path);
+		});
+	}
+
+	private void LogSweep(StoreSweep sweep)
+	{
+		if (sweep.Failure is { } failure)
+		{
+			logger.LogWarning(
+				failure.Exception,
+				"The spectrum store sweep could not list the store folder; it deleted nothing");
+			return;
+		}
+
+		logger.LogDebug(
+			"The spectrum store sweep deleted {Deleted} files and kept {Kept} files of live instances",
+			sweep.DeletedFiles,
+			sweep.KeptFiles);
+	}
+
+	private void ReportOpenFailure(IEnumerable<IError> causes)
+	{
+		messagePanel.TryReportFailure(new StoreOpenError(storeFile.Path).CausedBy(causes), logger, uiScheduler);
+	}
+
+	private async Task WriteQueuedAsync(
+		SpectrumDatabase database, CancellationToken cancellationToken, CancellationToken drainToken)
+	{
+		var batch = new List<ReceivedFrame>(BatchSize);
+		using var retentionCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+		var retentionDue = Task.Delay(_retentionInterval, timeProvider, retentionCancellation.Token);
+		Task<bool>? readable = null;
+		try
+		{
+			while (true)
+			{
+				// Each pending wait is kept until it completes: the queue allows one reader wait at a time.
+				readable ??= queue.WaitToReadAsync(cancellationToken).AsTask();
+				await Task.WhenAny(readable, retentionDue).ConfigureAwait(false);
+				if (retentionDue.IsCompleted)
+				{
+					await retentionDue.ConfigureAwait(false);
+					if (!_stopped)
+					{
+						DeleteExpired(database);
+					}
+
+					retentionDue = Task.Delay(_retentionInterval, timeProvider, retentionCancellation.Token);
+				}
+
+				if (!readable.IsCompleted)
+				{
+					continue;
+				}
+
+				if (!await readable.ConfigureAwait(false))
+				{
+					return;
+				}
+
+				readable = null;
+				if (drainToken.IsCancellationRequested)
+				{
+					countDropped(DiscardQueued());
+					return;
+				}
+
+				WriteBatch(database, batch);
+			}
+		}
+		finally
+		{
+			await retentionCancellation.CancelAsync().ConfigureAwait(false);
+		}
+	}
+
+	private void WriteBatch(SpectrumDatabase database, List<ReceivedFrame> batch)
+	{
+		ShortenBusyTimeoutOnceStopped(database);
+		batch.Clear();
+		while (batch.Count < BatchSize && queue.TryRead(out var received))
+		{
+			batch.Add(received);
+		}
+
+		Result written;
+		try
+		{
+			written = database.Write(batch);
+		}
+		catch (Exception)
+		{
+			countDropped(batch.Count);
+			throw;
+		}
+
+		if (written.IsSuccess)
+		{
+			StoredFrames += batch.Count;
+			_writeFailing = false;
+			return;
+		}
+
+		countDropped(batch.Count);
+		if (_writeFailing)
+		{
+			logger.LogWarning(
+				ResultReporting.CauseOf(written.Errors),
+				"A batch of {Count} frames could not be written to the spectrum store",
+				batch.Count);
+			return;
+		}
+
+		_writeFailing = true;
+		messagePanel.TryReportFailure(new StoreWriteError().CausedBy(written.Errors), logger, uiScheduler);
+	}
+
+	private void DeleteExpired(SpectrumDatabase database)
+	{
+		var cutoff = timeProvider.GetUtcNow() - _retentionAge;
+		var deleted = database.DeleteBefore(cutoff);
+		if (deleted.IsFailed)
+		{
+			logger.LogWarning(
+				ResultReporting.CauseOf(deleted.Errors),
+				"The spectrum store rows received before {Cutoff:O} could not be deleted",
+				cutoff);
+		}
+	}
+
+	private long DiscardQueued()
+	{
+		var discarded = 0L;
+		while (queue.TryRead(out _))
+		{
+			discarded++;
+		}
+
+		return discarded;
+	}
+
+	/// <summary>Called right before each statement, so a statement started after the stop gives up after 1 s.</summary>
+	private void ShortenBusyTimeoutOnceStopped(SpectrumDatabase database)
+	{
+		if (_stopped)
+		{
+			database.ShortenBusyTimeout();
+		}
+	}
+
+	private void CheckpointAndClose(SpectrumDatabase database)
+	{
+		ShortenBusyTimeoutOnceStopped(database);
+		var closed = database.CheckpointAndClose();
+		_checkpoint = closed;
+		if (closed.IsFailed)
+		{
+			logger.LogWarning(ResultReporting.CauseOf(closed.Errors), "The spectrum store WAL could not be checkpointed");
+		}
+	}
+}

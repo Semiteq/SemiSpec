@@ -76,7 +76,7 @@ and reads.
 | `SpectrumViewModel` | UI | The spectrum screen: applies the source's latest spectrum to the chart and the signal pane, the Invert and Logarithmic checkboxes, Reset scale and Stick to zero |
 | `ChartPalette` | UI | Paints ScottPlot's figure, data area, grid and axes from the palette, and resolves the colours of the line, the band and the centre line |
 | `LogTickGenerator` | UI | ScottPlot's tick generator over `LogAxis`: the labels under the current culture, and a cache of the last two results keyed on the limits, the length and the culture |
-| `SpectrumStore`, `StoreFile` | UI | The background writer: enqueues every distributor frame, writes the queue to the instance file in batches, deletes rows older than 24 h once a minute and counts the frames it loses; `StoreFile` is the instance file's path (`UI/Store/`) |
+| `SpectrumStore`, `StoreWriter`, `StoreFile` | UI | The background writer: `SpectrumStore` enqueues every distributor frame, runs one `StoreWriter` task and counts the frames lost; `StoreWriter` writes the queue to the instance file in batches and deletes rows older than 24 h once a minute; `StoreFile` is the instance file's path (`UI/Store/`) |
 | `StoreOpenError`, `StoreWriteError`, `StoreStoppedError` | UI | The store file could not be prepared or opened; a batch could not be written; an unexpected failure after the open ended the writer (`UI/Store/`) |
 | `AppLogging` | UI | Creates the log folder and the Serilog logger: `spectrum-visualizer.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
@@ -96,7 +96,7 @@ and reads.
 Core holds every algorithm that needs no UI type: the projection and the scale rules under `Core/Spectrum/`, the log
 axis ticks under `Core/Chart/`, the store files, database, intensity rules and queries under `Core/Store/`. The UI keeps
 what touches ScottPlot or Avalonia: `LogTickGenerator`, `ChartPalette` and the chart view model; and what joins the app's
-lifecycle and message panel: `SpectrumStore` and its errors under `UI/Store/`. The store benchmark references Core only.
+lifecycle and message panel: `SpectrumStore`, `StoreWriter` and the store errors under `UI/Store/`. The store benchmark references Core only.
 
 ## Startup
 
@@ -230,8 +230,8 @@ latest `LinkStatus`; every text derives from it, and the dropped count adds the 
 Lost spectra are board spectra that never arrived, counted from `seq`. Dropped frames arrived but are missing from the
 stored history, so the count covers the run, not the connection. `DroppedFramesText` is an
 `ObservableAsPropertyHelper` over `CombineLatest` of `DroppedFrames` of the `Status` property, through `WhenAnyValue`,
-and `SpectrumStore.DroppedFrames`, read after each `DroppedFramesChanged` signal moved to the UI scheduler and once at
-construction, summed, with repeats dropped, and formatted with `Resources.Culture`.
+and the count each `SpectrumStore.DroppedFramesChanged` emission carries, moved to the UI scheduler and started with
+`SpectrumStore.DroppedFrames` at construction, summed, with repeats dropped, and formatted with `Resources.Culture`.
 
 The dot is `AppConnectionOkBrush` in Receiving, `AppConnectionFaultBrush` in PortUnavailable, NotResponding and
 OtherDevice, and `AppSecondaryForegroundBrush` otherwise. The link text always names the state, so colour never carries
@@ -448,30 +448,32 @@ returns a FluentResults `Result`, with a `SqliteException` or `IOException` as a
   queue, `Channel.CreateBounded<ReceivedFrame>(1024)` with `FullMode = Wait`, one writer and one reader. A full queue
   counts the frame as dropped. The subscriber never touches SQLite, never waits and never throws. 1024 frames hold
   about 6 min of ATP-2000 spectra at the port's cap of about 2.8 per second. Then `Start` runs the writer task.
-  `Start` after a start or a stop does nothing.
+  `Start` after a start or a stop does nothing. The writer task is a `StoreWriter`, which `Start` creates over the
+  queue's reader and the store's count of dropped frames, and which logs through the store's logger.
 - The writer task prepares and opens the file on the thread pool, so the UI thread does no file I/O; frames that
   arrive meanwhile wait in the queue. The log line "Spectrum store file <path>" names the opened file.
 - The loop waits for the queue or the next retention time, whichever comes first, takes up to 256 frames and writes
-  them as one batch. A failed batch counts its frames as dropped and logs at Error. The first failure after a success
-  reports one `StoreWriteError` through `TryReportFailure`; later failures stay quiet until a batch succeeds again, so
-  the panel gets one entry per incident.
+  them as one batch. A failed batch counts its frames as dropped. The first failure after a success reports one
+  `StoreWriteError` through `TryReportFailure`, which writes its one log line at Warning; each later failure logs one
+  Warning line with its cause and reaches no panel until a batch succeeds again, so the panel gets one entry per
+  incident.
 - Any other failure ends history for the run. A failed prepare or open, or any exception before the file is open,
-  logs at Error and reports one `StoreOpenError`; any exception after the open, outside a failed batch, logs at Error
-  and reports one `StoreStoppedError`. The writer closes the file without a checkpoint, keeps the subscription, and from
+  reports one `StoreOpenError`; any exception after the open, outside a failed batch, reports one `StoreStoppedError`.
+  The report writes the failure's one log line, at Error, with the original exception. The writer closes the file without a checkpoint, keeps the subscription, and from
   then on counts every frame still queued and every later frame as dropped, so "Dropped frames" keeps growing while
   nothing is stored.
 - Retention runs once a minute, also while no frame arrives: `DeleteBefore(now - 24 h)`, where the wait is
   `Task.Delay` on the `TimeProvider`, raced with `WaitToReadAsync`, and `now` is `TimeProvider.GetUtcNow()`, the same
   UTC wall clock as `ReceivedAt`. No `VACUUM` runs: the freed pages are reused, so the file stays at about one day of
   data. A failed retention pass or checkpoint logs a Warning and reaches no panel, because no data is lost.
-- `DroppedFrames` is an `Interlocked` count written by the distributor task and the writer task. `DroppedFramesChanged`
-  is a synchronized private subject exposed with `AsObservable()`, signalled after each increment; a reader reads the
-  count after the signal, because a value in the signal could arrive out of order from two threads.
+- `DroppedFrames` is a count written by the distributor task and the writer task. `DroppedFramesChanged` is a private
+  subject exposed with `AsObservable()` that carries the new count; the add and the emission share one lock, so the
+  counts of the two threads arrive in order.
 - The writer task alone owns the `SpectrumDatabase`: it opens it and closes it, with `CheckpointAndClose` after a
   normal end and a plain close after a failure or a cancellation. No other thread closes the connection, so no close
   lands inside a write, a retention pass or a checkpoint. The writer's last line, at Debug, names the stored and
-  dropped counts and the checkpoint: `Truncated`, `Busy` (a reader's snapshot kept the WAL, which the next start
-  deletes with the file), `Failed` or `Skipped`.
+  dropped counts and the checkpoint, kept as the `Result<WalCheckpoint>` of `CheckpointAndClose` or none: `Truncated`,
+  `Busy` (a reader's snapshot kept the WAL, which the next start deletes with the file), `Failed` or `Skipped`.
 - `StopAsync(drainToken)` disposes the subscription, completes the queue and awaits the writer, which writes what is
   still queued and checks the token between batches, never inside one. From the stop on, no retention pass starts,
   and the writer calls `ShortenBusyTimeout` right before each batch and the checkpoint, so a statement it starts
@@ -535,7 +537,8 @@ Every failure the operator should see goes to `MessagePanelViewModel` through on
 extensions:
 
 - `ReportFailure(IError, ILogger)` maps the error with `ErrorMessageMapper`, adds it to the panel, and writes one log
-  line at the level of its severity: Error, Warning or Information. The log line is written even when the panel throws.
+  line at the level of its severity: Error, Warning or Information. The line carries the deepest exception in the
+  error's reason chain, so a wrapped failure keeps its stack. The log line is written even when the panel throws.
 - `TryReportFailure(IError, ILogger, IScheduler)` moves the report to the UI scheduler and never throws there, for
   callers whose exception would end an Rx stream or a dispatcher job.
 

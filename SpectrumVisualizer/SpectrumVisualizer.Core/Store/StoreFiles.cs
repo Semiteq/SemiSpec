@@ -30,7 +30,7 @@ public static class StoreFiles
 		}
 		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 		{
-			return Result.Fail(new Error($"The spectrum store file '{instanceFile}' could not be prepared").CausedBy(ex));
+			return Result.Fail(new ExceptionalError($"The spectrum store file '{instanceFile}' could not be prepared", ex));
 		}
 
 		return Sweep(folder, instanceFile);
@@ -45,7 +45,8 @@ public static class StoreFiles
 		}
 		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 		{
-			return new StoreSweep(DeletedFiles: 0, KeptFiles: 0, ex);
+			var failure = new ExceptionalError($"The store folder '{folder}' could not be listed", ex);
+			return new StoreSweep(DeletedFiles: 0, KeptFiles: 0, failure);
 		}
 
 		var deleted = 0;
@@ -105,7 +106,8 @@ public static class StoreFiles
 		return int.TryParse(processId, NumberStyles.None, CultureInfo.InvariantCulture, out _) ? database : null;
 	}
 
-	private static void DeleteWithSidecars(string database)
+	/// <summary>Deletes the store file and its WAL and shared-memory sidecars; a missing file is no error.</summary>
+	public static void DeleteWithSidecars(string database)
 	{
 		File.Delete(database);
 		foreach (var suffix in _sidecarSuffixes)
@@ -132,4 +134,4 @@ public static class StoreFiles
 /// Counts of the other instances' store files the sweep deleted and the ones a live instance kept open; Failure is what
 /// stopped the sweep from listing the folder, null when it ran.
 /// </summary>
-public sealed record StoreSweep(int DeletedFiles, int KeptFiles, Exception? Failure = null);
+public sealed record StoreSweep(int DeletedFiles, int KeptFiles, ExceptionalError? Failure = null);

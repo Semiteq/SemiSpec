@@ -5,6 +5,9 @@ namespace SpectrumVisualizer.Core.Store;
 /// <summary>Opens a connection to a spectrum store file with the store's connection settings and pragmas.</summary>
 public static class StoreConnection
 {
+	/// <summary>Moves the WAL into the file and truncates it; its one row's first column is 1 when a reader kept it busy.</summary>
+	public const string CheckpointTruncate = "PRAGMA wal_checkpoint(TRUNCATE)";
+
 	private const int BusyTimeoutSeconds = 2;
 	private const string WriterPragmas = """
 		PRAGMA journal_mode=WAL;

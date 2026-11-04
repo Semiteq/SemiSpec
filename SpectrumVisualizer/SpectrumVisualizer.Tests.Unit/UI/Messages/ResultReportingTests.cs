@@ -57,6 +57,31 @@ public sealed class ResultReportingTests : IDisposable
 	}
 
 	[AvaloniaFact]
+	public void ReportFailureLogsTheExceptionOfAWrappedCause()
+	{
+		var logger = new FakeLogger();
+		var thrown = new IOException("the port list could not be read");
+
+		_panel.ReportFailure(new PortListError().CausedBy(new ExceptionalError(thrown.Message, thrown)), logger);
+
+		logger.Failures().Should().Equal(thrown);
+	}
+
+	[AvaloniaFact]
+	public void ReportFailureLogsTheDeepestExceptionOfTheReasonChain()
+	{
+		var logger = new FakeLogger();
+		var outer = new InvalidOperationException("the batch failed");
+		var inner = new IOException("the disk is full");
+		var error = new ExceptionalError(outer.Message, outer)
+			.CausedBy(new Error("the write failed").CausedBy(new ExceptionalError(inner.Message, inner)));
+
+		_panel.ReportFailure(error, logger);
+
+		logger.Failures().Should().Equal(inner);
+	}
+
+	[AvaloniaFact]
 	public void ReportFailureDropsARepeatOfTheNewestEntryToDebug()
 	{
 		var logger = new FakeLogger();

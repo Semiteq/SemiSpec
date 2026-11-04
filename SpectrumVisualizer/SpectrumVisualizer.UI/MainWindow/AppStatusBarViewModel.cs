@@ -1,4 +1,3 @@
-using System.Reactive;
 using System.Reactive.Concurrency;
 using System.Reactive.Disposables;
 using System.Reactive.Linq;
@@ -119,8 +118,7 @@ public sealed class AppStatusBarViewModel : ReactiveObject, IDisposable
 			.Select(status => status.DroppedFrames);
 		var storeDropped = store.DroppedFramesChanged
 			.ObserveOn(uiScheduler)
-			.StartWith(Unit.Default)
-			.Select(_ => store.DroppedFrames);
+			.StartWith(store.DroppedFrames);
 
 		return linkDropped
 			.CombineLatest(storeDropped, (link, stored) => link + stored)

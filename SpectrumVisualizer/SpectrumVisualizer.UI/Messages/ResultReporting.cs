@@ -24,12 +24,23 @@ public static class ResultReporting
 		{
 			logger.Log(
 				coalesced ? LogLevel.Debug : ToLogLevel(view.Severity),
-				(error as IExceptionalError)?.Exception,
+				CauseOf(error),
 				"{Title}. {Detail} {Remedy}",
 				view.Title,
 				view.Detail,
 				view.Remedy);
 		}
+	}
+
+	/// <summary>The deepest exception in the errors' reason chains, so a wrapped failure logs its original stack.</summary>
+	internal static Exception? CauseOf(IEnumerable<IError> errors)
+	{
+		return errors.Select(CauseOf).FirstOrDefault(cause => cause is not null);
+	}
+
+	private static Exception? CauseOf(IError error)
+	{
+		return CauseOf(error.Reasons) ?? (error as IExceptionalError)?.Exception;
 	}
 
 	private static LogLevel ToLogLevel(MessageSeverity severity)

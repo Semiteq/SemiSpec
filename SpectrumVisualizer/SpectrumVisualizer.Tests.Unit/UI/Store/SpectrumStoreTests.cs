@@ -159,7 +159,8 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 		entry.View.Title.Should().Be(Resources.StoreWriteTitle);
 		entry.View.Severity.Should().Be(MessageSeverity.Warning);
 		entry.RepeatCount.Should().Be(1);
-		_logger.Collector.GetSnapshot().Count(record => record.Level == LogLevel.Error).Should().Be(2);
+		BatchFailureTimes().Should().HaveCount(2, "the report writes the first batch's line and the store the repeat's");
+		_logger.Levels().Should().NotContain(LogLevel.Error);
 		_logger.Failures().Should().AllBeOfType<SqliteException>();
 	}
 
@@ -258,10 +259,7 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 		elapsed.Should().BeLessThan(_closeLimit);
 		(Count("spectrum") + Store.DroppedFrames).Should().Be(Fed);
 		LatestStoppedLine().Should().EndWith("checkpoint Busy");
-		var failedBatches = _logger.Collector.GetSnapshot()
-			.Where(record => record.Message.StartsWith("A batch of", StringComparison.Ordinal))
-			.Select(record => record.Timestamp)
-			.ToList();
+		var failedBatches = BatchFailureTimes();
 		failedBatches.Should().HaveCountGreaterThanOrEqualTo(2);
 		(failedBatches[^1] - failedBatches[^2]).Should().BeLessThan(
 			TimeSpan.FromSeconds(1.6), "a batch after the stop gives up after the 1 s busy timeout, not 2 s");
@@ -297,7 +295,7 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 		(Count("spectrum") + Store.DroppedFrames).Should().Be(Fed);
 		var retention = LogTimes("The spectrum store rows").Should().ContainSingle(
 			"no retention pass starts after the stop").Subject;
-		var firstFailedBatch = LogTimes("A batch of").Should().NotBeEmpty().And.Subject.First();
+		var firstFailedBatch = BatchFailureTimes().Should().NotBeEmpty().And.Subject.First();
 		(firstFailedBatch - retention).Should().BeLessThan(
 			TimeSpan.FromSeconds(1.6), "the batch after the stop gives up after the 1 s busy timeout, not 2 s");
 	}
@@ -545,6 +543,15 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 	{
 		return [.. _logger.Collector.GetSnapshot()
 			.Where(record => record.Message.StartsWith(messageStart, StringComparison.Ordinal))
+			.Select(record => record.Timestamp)];
+	}
+
+	/// <summary>The log times of failed batches: the reported first one of a run and the repeats the store logs itself.</summary>
+	private List<DateTimeOffset> BatchFailureTimes()
+	{
+		return [.. _logger.Collector.GetSnapshot()
+			.Where(record => record.Message.StartsWith(Resources.StoreWriteTitle, StringComparison.Ordinal)
+				|| record.Message.StartsWith("A batch of", StringComparison.Ordinal))
 			.Select(record => record.Timestamp)];
 	}
 
