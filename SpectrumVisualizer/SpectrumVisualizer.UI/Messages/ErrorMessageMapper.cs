@@ -24,7 +24,8 @@ public static class ErrorMessageMapper
 		return new MessageView(
 			Resources.FailureThrownTitle,
 			Resources.FormatFailureThrownDetail(error.Exception.GetType().Name, error.Exception.Message),
-			Resources.FailureThrownRemedy);
+			Resources.FailureThrownRemedy,
+			MessageSeverity.Error);
 	}
 
 	private static MessageView MapUnknown(IError error)
@@ -32,6 +33,7 @@ public static class ErrorMessageMapper
 		return new MessageView(
 			Resources.FailureUnknownTitle,
 			error.Message,
-			Resources.FailureUnknownRemedy);
+			Resources.FailureUnknownRemedy,
+			MessageSeverity.Error);
 	}
 }

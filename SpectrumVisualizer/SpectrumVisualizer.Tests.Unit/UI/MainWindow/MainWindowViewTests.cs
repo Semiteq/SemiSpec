@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Reactive.Linq;
 
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -119,11 +120,26 @@ public sealed class MainWindowViewTests : IDisposable
 	{
 		Realise();
 
-		_messagePanel.Report(new MessageView("title", "detail", string.Empty));
+		_messagePanel.Report(new MessageView("title", "detail", string.Empty, MessageSeverity.Error));
 		var entry = RealisedEntry(0);
 
 		EntryText(entry, "EntryRepeat").IsVisible.Should().BeFalse();
 		EntryText(entry, "EntryRemedy").IsVisible.Should().BeFalse();
+	}
+
+	[AvaloniaTheory]
+	[InlineData(MessageSeverity.Info, "severity-info")]
+	[InlineData(MessageSeverity.Warning, "severity-warning")]
+	[InlineData(MessageSeverity.Error, "severity-error")]
+	public void TheEntryDotCarriesTheClassOfItsSeverityOnly(MessageSeverity severity, string expected)
+	{
+		Realise();
+
+		_messagePanel.Report(new MessageView("title", "detail", "remedy", severity));
+		var dot = RealisedEntry(0).GetVisualDescendants().OfType<Ellipse>().Single(item => item.Name == "EntrySeverity");
+
+		dot.Classes.Where(name => name.StartsWith("severity-", StringComparison.Ordinal))
+			.Should().Equal(expected);
 	}
 
 	[AvaloniaFact]

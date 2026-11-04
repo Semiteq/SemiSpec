@@ -396,20 +396,21 @@ the same run do not.
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Messages/ErrorMessageMapperTests.cs`,
   `ResultReportingTests.cs`, `MessagePanelViewModelTests.cs`, `UI/AppResourcesTests.cs`
 
-- [ ] copy `MessageSeverity` and `SeverityMatchConverter` from SemiPlot
+- [x] copy `MessageSeverity` and `SeverityMatchConverter` from SemiPlot
   (`SemiPlot/SemiPlot.UI/Messages/MessageSeverity.cs:6-16`, `SeverityMatchConverter.cs:12-24`), renaming the namespace
-- [ ] add `Severity` as the fourth member of `MessageView` (`MessageView.cs:7-10`); both existing mapper arms
+- [x] add `Severity` as the fourth member of `MessageView` (`MessageView.cs:7-10`); both existing mapper arms
   (`ErrorMessageMapper.cs:22-36`) return `Error`
-- [ ] log at the severity's level in `ReportFailure` (`ResultReporting.cs:24-31`), Debug for a coalesced repeat, as in
+- [x] log at the severity's level in `ReportFailure` (`ResultReporting.cs:24-31`), Debug for a coalesced repeat, as in
   `SemiPlot/SemiPlot.UI/Messages/ResultReporting.cs:109-115`
-- [ ] give the entry dot the three severity classes (`MessagePanelView.axaml:44-49`,
+- [x] give the entry dot the three severity classes (`MessagePanelView.axaml:44-49`,
   `SemiPlot/SemiPlot.UI/Messages/MessagePanelView.axaml:15-21`, `:68-70`); add `AppSeverityWarningBrush`,
   `AppSeverityInfoBrush`, `AppConnectionOkBrush`, `AppConnectionFaultBrush` and `AppSubtleLineBrush` to both variants
   of `Palette.axaml` (after `:68` and `:127`) with SemiPlot's values
-- [ ] write tests: a Warning and an Info entry log at Warning and Information; a coalesced repeat logs at Debug; the
+- [x] write tests: a Warning and an Info entry log at Warning and Information; a coalesced repeat logs at Debug; the
   realised dot carries the class of its severity; entries that differ only in severity are two rows
-- [ ] extend `AppResourcesTests` with the five new palette keys under both variants
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+  (the Warning and Information log levels moved to Task 7: no mapped error is Warning or Info before the link errors)
+- [x] extend `AppResourcesTests` with the five new palette keys under both variants
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 2: UI scheduler in the container and dispatcher exceptions to the panel
 **Files:**
@@ -526,6 +527,8 @@ the same run do not.
   `LostSpectraAccumulateAcrossReopensAndResetOnConnect`, `EachFaultIsPublishedOnceAndRetriesStayQuiet`
 - [ ] write mapper tests: each link error gives its title, remedy and severity; no mapped detail contains the port
   name; two `PortLostError`s on different ports map to equal views
+- [ ] ➕ in `ResultReportingTests`, a reported `PortLostError` logs at Warning and its coalesced repeat at Debug (moved
+  from Task 1)
 - [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 8: Link composition and the window's start and stop
