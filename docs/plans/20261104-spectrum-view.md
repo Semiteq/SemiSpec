@@ -586,16 +586,16 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Spectrum/SpectrumScaleTests.cs`,
   `SpectrumProjectionTests.cs`
 
-- [ ] implement `SpectrumProjection.Fill` of Technical Details as a single pass to find the maximum and a second to
+- [x] implement `SpectrumProjection.Fill` of Technical Details as a single pass to find the maximum and a second to
   write, no LINQ (it runs per frame); it returns the raw maximum for the stick-to-zero rule
-- [ ] implement `SpectrumScale` as static functions returning an `AxisLimits`-like record of four doubles:
+- [x] implement `SpectrumScale` as static functions returning an `AxisLimits`-like record of four doubles:
   `Following(xs, ys, logarithmic, lastNonDarkY)` and `StuckToZero(xs, ys, rawMax, logarithmic)`, the rules of the
   scale table; `Following` takes the kept Y limits of the last non-dark frame (null when none) and returns them for a
   dark frame
-- [ ] write `SpectrumProjectionTests` and `SpectrumScaleTests` of Acceptance Evidence item 3 as table tests
+- [x] write `SpectrumProjectionTests` and `SpectrumScaleTests` of Acceptance Evidence item 3 as table tests
   (`Component=UI`, `Area=Spectrum`), including the all-zero spectrum in each mode with `double.IsFinite` on every
   limit, `ADarkFrameWhileFollowingKeepsTheLastNonDarkYLimits` and `ADarkFrameWithNoEarlierSpectrumTakesTheFlatRangeLimits`
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 7: Spectrum chart view model
 **Files:**
