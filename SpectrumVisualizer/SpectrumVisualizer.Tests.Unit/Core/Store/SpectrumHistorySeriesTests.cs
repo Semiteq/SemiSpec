@@ -37,7 +37,8 @@ public sealed class SpectrumHistorySeriesTests : SpectrumHistoryTestBase
 	{
 		var stamp = Start.AddSeconds(5);
 		Store(StoreSamples.Spectrum(stamp));
-		var query = Query(StoreSamples.SampleNm, StoreSamples.SampleDelta, Start, stamp.AddTicks(TimeSpan.TicksPerMillisecond / 2), 1);
+		var to = stamp.AddTicks(TimeSpan.TicksPerMillisecond / 2);
+		var query = Query(StoreSamples.SampleNm, StoreSamples.SampleDelta, Start, to, 1);
 
 		var series = (await History.IntensitySeriesAsync(query, Token)).Value;
 

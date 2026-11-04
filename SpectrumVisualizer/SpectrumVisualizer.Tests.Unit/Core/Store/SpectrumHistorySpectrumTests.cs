@@ -59,7 +59,8 @@ public sealed class SpectrumHistorySpectrumTests : SpectrumHistoryTestBase
 		first.ReceivedAt.Should().Be(Start);
 		first.Seq.Should().Be(42);
 		first.State.Should().Be(frame.Frame.State);
-		second.Measurement.Pixels.Should().NotBeSameAs(first.Measurement.Pixels, "each call rebuilds a new measurement");
+		second.Measurement.Pixels.Should().NotBeSameAs(
+			first.Measurement.Pixels, "each call rebuilds a new measurement");
 	}
 
 	[Fact]

@@ -258,9 +258,11 @@ stopping it. A failure of the abandoned dispose logs at Debug. Every open logs a
 
 `LinkStatus(State, PortName, Board, LostSpectra, Fault)` is what the link publishes. `Board` is the `state` byte of the
 latest frame; `LostSpectra` is the total since the operator's Connect, kept across reopens. The `init` member
-`DroppedFrames` is the count of frames the channel dropped since the application started (Frames out). Each loss logs at
-Information with the `seq` value. The session publishes Connecting first and Disconnected last. `StatusChanged` is
-raised on a thread-pool thread of the session task, never inside `Connect` or `DisconnectAsync`, and only when the
+`DroppedFrames` is the count of frames the channel dropped since the application started (Frames out); it stays out of
+the positional list, so the session and the tests build a status positionally with a 0 count, and `SerialLink.Publish`
+stamps the count on every published status with `with { DroppedFrames = ... }`. Each loss logs at Information with
+the `seq` value. The session publishes Connecting first and Disconnected last. `StatusChanged` is raised
+on a thread-pool thread of the session task, never inside `Connect` or `DisconnectAsync`, and only when the
 status differs from the last one with `Fault` left out of the comparison: a fault rides a state change.
 
 | State | Enters when | Fault on entry |

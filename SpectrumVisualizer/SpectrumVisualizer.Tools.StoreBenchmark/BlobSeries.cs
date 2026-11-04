@@ -5,10 +5,14 @@ using SpectrumVisualizer.Core.Store;
 
 namespace SpectrumVisualizer.Tools.StoreBenchmark;
 
-/// <summary>The pixel read the benchmark measures against SpectrumHistory's substr read, kept for measuring again.</summary>
+/// <summary>
+/// The pixel read the benchmark measures against SpectrumHistory's substr read, kept for measuring again.
+/// </summary>
 public static class BlobSeries
 {
-	/// <summary>Every row's window mean through a per-row SqliteBlob handle that reads the window's bytes only.</summary>
+	/// <summary>
+	/// Every row's window mean through a per-row SqliteBlob handle that reads the window's bytes only.
+	/// </summary>
 	public static IntensitySeries Read(SqliteConnection connection, IntensityQuery query, CancellationToken token)
 	{
 		var buckets = new IntensityBuckets(query);

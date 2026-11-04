@@ -117,7 +117,8 @@ public sealed class ErrorMessageMapperTests
 	{
 		const string StorePath = @"C:\Store987\spectra-987.db";
 
-		var view = ErrorMessageMapper.Map(new StoreOpenError(StorePath).CausedBy(new IOException("the folder is a file")));
+		var view = ErrorMessageMapper.Map(
+			new StoreOpenError(StorePath).CausedBy(new IOException("the folder is a file")));
 
 		view.Should().Be(new MessageView(
 			Resources.StoreOpenTitle,
@@ -142,7 +143,8 @@ public sealed class ErrorMessageMapperTests
 	[Fact]
 	public void MapGivesAStoppedStoreItsOwnTextAtError()
 	{
-		var view = ErrorMessageMapper.Map(new StoreStoppedError().CausedBy(new InvalidOperationException("the clock failed")));
+		var view = ErrorMessageMapper.Map(
+			new StoreStoppedError().CausedBy(new InvalidOperationException("the clock failed")));
 
 		view.Should().Be(new MessageView(
 			Resources.StoreStoppedTitle,

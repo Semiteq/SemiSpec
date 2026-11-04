@@ -15,8 +15,8 @@ namespace SpectrumVisualizer.UI.Store;
 public sealed record StoreFile(string Path);
 
 /// <summary>
-/// Stores every frame the distributor hands out: the subscriber only enqueues, one <see cref="StoreWriter"/> task drains
-/// the queue into the store file, and every frame lost on the way is counted.
+/// Stores every frame the distributor hands out: the subscriber only enqueues, one <see cref="StoreWriter"/> task
+/// drains the queue into the store file, and every frame lost on the way is counted.
 /// </summary>
 public sealed class SpectrumStore : IDisposable
 {
@@ -36,7 +36,7 @@ public sealed class SpectrumStore : IDisposable
 			SingleReader = true
 		});
 
-	// Counted by the distributor task and the writer task; the add and OnNext share the gate, so counts arrive in order.
+	// Counted on the distributor task and the writer task; add and OnNext share the gate, so counts arrive in order.
 	private readonly Lock _droppedGate = new();
 	private readonly Subject<long> _droppedFramesChanged = new();
 	private long _droppedFrames;
@@ -71,13 +71,17 @@ public sealed class SpectrumStore : IDisposable
 		DroppedFramesChanged = _droppedFramesChanged.AsObservable();
 	}
 
-	/// <summary>Frames lost to a full queue, a failed batch, a failed store or a stop past its budget, since the start.</summary>
+	/// <summary>
+	/// Frames lost to a full queue, a failed batch, a failed store or a stop past its budget, since the start.
+	/// </summary>
 	public long DroppedFrames => Interlocked.Read(ref _droppedFrames);
 
 	/// <summary>The new DroppedFrames after each change, on the thread that counted.</summary>
 	public IObservable<long> DroppedFramesChanged { get; }
 
-	/// <summary>Subscribes to the distributor and starts the writer task once; does nothing after a start or a stop.</summary>
+	/// <summary>
+	/// Subscribes to the distributor and starts the writer task once; does nothing after a start or a stop.
+	/// </summary>
 	public void Start()
 	{
 		if (_started || _stopped)
@@ -129,7 +133,9 @@ public sealed class SpectrumStore : IDisposable
 		}
 	}
 
-	/// <summary>Cancels the writer without waiting, for the container's synchronous dispose; the writer closes the file.</summary>
+	/// <summary>
+	/// Cancels the writer without waiting, for the container's synchronous dispose; the writer closes the file.
+	/// </summary>
 	public void Dispose()
 	{
 		_stopped = true;

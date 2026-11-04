@@ -28,7 +28,9 @@ public static class SpectrometerExtensions
 			_ => throw new ArgumentOutOfRangeException(nameof(device), device, "Unknown spectrometer."),
 		};
 
-		/// <summary>The wavelength the tools use when none is given: inside the device's firmware table range.</summary>
+		/// <summary>
+		/// The wavelength the tools use when none is given: inside the device's firmware table range.
+		/// </summary>
 		public ushort DefaultWavelengthNm => device switch
 		{
 			Spectrometer.Atp2000 => 650,

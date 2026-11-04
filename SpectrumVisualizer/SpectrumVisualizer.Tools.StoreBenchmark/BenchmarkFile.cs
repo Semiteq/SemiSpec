@@ -105,7 +105,9 @@ internal sealed class BenchmarkFile : IDisposable
 		return milliseconds;
 	}
 
-	/// <summary>Runs the read while a writer thread adds one spectrum every 500 ms; returns the WAL size after it.</summary>
+	/// <summary>
+	/// Runs the read while a writer thread adds one spectrum every 500 ms; returns the WAL size after it.
+	/// </summary>
 	public async Task<long> WalBytesAfterReadBesideWriterAsync(Action read)
 	{
 		Checkpoint();
@@ -124,7 +126,9 @@ internal sealed class BenchmarkFile : IDisposable
 		return WalBytes;
 	}
 
-	/// <summary>Moves the WAL into the file and truncates it, from a connection of its own while the writer idles.</summary>
+	/// <summary>
+	/// Moves the WAL into the file and truncates it, from a connection of its own while the writer idles.
+	/// </summary>
 	public void Checkpoint()
 	{
 		using var connection = StoreConnection.Open(Path);

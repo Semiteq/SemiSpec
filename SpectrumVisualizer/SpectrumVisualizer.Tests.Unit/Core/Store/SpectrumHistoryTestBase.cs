@@ -26,7 +26,9 @@ public abstract class SpectrumHistoryTestBase : IDisposable
 
 	protected static DateTimeOffset Start { get; } = StoreSamples.Start;
 
-	/// <summary>The busy timeout is 2 s; a read or a commit that waited on a lock would take at least that long.</summary>
+	/// <summary>
+	/// The busy timeout is 2 s; a read or a commit that waited on a lock would take at least that long.
+	/// </summary>
 	protected static TimeSpan WellUnderTheBusyTimeout { get; } = TimeSpan.FromSeconds(1);
 
 	private protected TempFolder Folder { get; } = new();

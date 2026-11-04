@@ -24,7 +24,9 @@ public sealed class IntensityBuckets
 		ColumnWidth = TimeSpan.FromMilliseconds(wholeMilliseconds);
 	}
 
-	/// <summary>The span of one column truncated to whole milliseconds, for drawing; the fold never divides by it.</summary>
+	/// <summary>
+	/// The span of one column truncated to whole milliseconds, for drawing; the fold never divides by it.
+	/// </summary>
 	public TimeSpan ColumnWidth { get; }
 
 	public void Add(DateTimeOffset receivedAt, double value)
@@ -85,7 +87,9 @@ public sealed class IntensityBuckets
 	}
 }
 
-/// <summary>A request for the intensity series at a wavelength and delta over [From, To) in a number of columns.</summary>
+/// <summary>
+/// A request for the intensity series at a wavelength and delta over [From, To) in a number of columns.
+/// </summary>
 public sealed record IntensityQuery
 {
 	private IntensityQuery(ushort wavelengthNm, byte delta, DateTimeOffset from, DateTimeOffset to, int columns)
@@ -107,7 +111,9 @@ public sealed record IntensityQuery
 
 	public int Columns { get; }
 
-	/// <summary>From in the stored Unix milliseconds, rounded down, so the SQL range keeps every row the fold keeps.</summary>
+	/// <summary>
+	/// From in the stored Unix milliseconds, rounded down, so the SQL range keeps every row the fold keeps.
+	/// </summary>
 	public long FromMilliseconds
 	{
 		get
@@ -117,7 +123,9 @@ public sealed record IntensityQuery
 		}
 	}
 
-	/// <summary>To in the stored Unix milliseconds, rounded up, so a row stamped in the millisecond To falls inside stays in.</summary>
+	/// <summary>
+	/// To in the stored Unix milliseconds, rounded up, so a row stamped in the millisecond To falls inside stays in.
+	/// </summary>
 	public long ToMilliseconds
 	{
 		get
@@ -128,7 +136,8 @@ public sealed record IntensityQuery
 	}
 
 	/// <summary>Builds the query, or fails for an empty range or fewer than one column.</summary>
-	public static Result<IntensityQuery> Create(ushort wavelengthNm, byte delta, DateTimeOffset from, DateTimeOffset to, int columns)
+	public static Result<IntensityQuery> Create(
+		ushort wavelengthNm, byte delta, DateTimeOffset from, DateTimeOffset to, int columns)
 	{
 		if (columns < 1)
 		{
@@ -144,8 +153,14 @@ public sealed record IntensityQuery
 	}
 }
 
-/// <summary>Column i holds the i-th of the equal spans of the query range; ColumnWidth is that span in whole milliseconds, at least 1.</summary>
+/// <summary>
+/// Column i holds the i-th of the equal spans of the query range; ColumnWidth is that span in whole milliseconds, at
+/// least 1.
+/// </summary>
 public sealed record IntensitySeries(DateTimeOffset From, TimeSpan ColumnWidth, IntensityColumn[] Columns);
 
-/// <summary>Min and max of the column's covered spectra, NaN when Count is 0; UncoveredCount counts spectra of a device that does not cover the wavelength.</summary>
+/// <summary>
+/// Min and max of the column's covered spectra, NaN when Count is 0; UncoveredCount counts spectra of a device that
+/// does not cover the wavelength.
+/// </summary>
 public readonly record struct IntensityColumn(double Min, double Max, int Count, int UncoveredCount);

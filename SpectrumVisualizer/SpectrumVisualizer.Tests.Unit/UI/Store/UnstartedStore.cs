@@ -10,7 +10,9 @@ using SpectrumVisualizer.UI.Store;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Store;
 
-/// <summary>A store nobody starts, for view models that only read its drop count: it opens no file and counts 0.</summary>
+/// <summary>
+/// A store nobody starts, for view models that only read its drop count: it opens no file and counts 0.
+/// </summary>
 internal sealed class UnstartedStore : IDisposable
 {
 	private readonly FrameDistributor _distributor;

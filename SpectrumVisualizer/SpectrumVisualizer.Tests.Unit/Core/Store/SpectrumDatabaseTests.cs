@@ -64,7 +64,8 @@ public sealed class SpectrumDatabaseTests : IDisposable
 			"SELECT received_at, device, wavelength_nm, delta, amplitude, snr, q, seq, state, pixels FROM spectrum");
 		reader.Read().Should().BeTrue();
 		reader.GetInt64(0).Should().Be(receivedAt.ToUnixTimeMilliseconds());
-		DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(0)).Should().Be(StoreSamples.Start.AddMilliseconds(123));
+		DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(0))
+			.Should().Be(StoreSamples.Start.AddMilliseconds(123));
 		reader.GetByte(1).Should().Be((byte)Spectrometer.Atp2000);
 		reader.GetInt32(2).Should().Be(650);
 		reader.GetByte(3).Should().Be(10);
@@ -121,7 +122,8 @@ public sealed class SpectrumDatabaseTests : IDisposable
 		{
 			Execute(
 				plain,
-				"CREATE TRIGGER fail_seq_99 BEFORE INSERT ON spectrum WHEN NEW.seq = 99 BEGIN SELECT RAISE(ABORT, 'test'); END");
+				"CREATE TRIGGER fail_seq_99 BEFORE INSERT ON spectrum WHEN NEW.seq = 99 "
+				+ "BEGIN SELECT RAISE(ABORT, 'test'); END");
 		}
 
 		var result = database.Write(
@@ -224,7 +226,8 @@ public sealed class SpectrumDatabaseTests : IDisposable
 
 			stopwatch.Stop();
 			result.Value.Should().Be(WalCheckpoint.Busy);
-			stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1), "the checkpoint does not wait out the 2 s busy timeout");
+			stopwatch.Elapsed.Should().BeLessThan(
+				TimeSpan.FromSeconds(1), "the checkpoint does not wait out the 2 s busy timeout");
 			Execute(reader, "COMMIT");
 		}
 

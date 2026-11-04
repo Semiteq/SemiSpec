@@ -4,7 +4,9 @@ using FluentResults;
 
 namespace SpectrumVisualizer.Core.Store;
 
-/// <summary>Names the spectrum store file of this process and clears the files earlier runs left in the store folder.</summary>
+/// <summary>
+/// Names the spectrum store file of this process and clears the files earlier runs left in the store folder.
+/// </summary>
 public static class StoreFiles
 {
 	private const string FilePrefix = "spectra-";
@@ -30,7 +32,8 @@ public static class StoreFiles
 		}
 		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 		{
-			return Result.Fail(new ExceptionalError($"The spectrum store file '{instanceFile}' could not be prepared", ex));
+			return Result.Fail(
+				new ExceptionalError($"The spectrum store file '{instanceFile}' could not be prepared", ex));
 		}
 
 		return Sweep(folder, instanceFile);
@@ -83,7 +86,9 @@ public static class StoreFiles
 		return new StoreSweep(deleted, kept);
 	}
 
-	/// <summary>The store file a file belongs to, itself or the file of its sidecar; null outside spectra-&lt;digits&gt;.db.</summary>
+	/// <summary>
+	/// The store file a file belongs to, itself or the file of its sidecar; null outside spectra-&lt;digits&gt;.db.
+	/// </summary>
 	private static string? DatabaseOf(string file)
 	{
 		var database = file;

@@ -37,7 +37,9 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 		StorePath = Folder.FileIn("spectra-1.db");
 	}
 
-	/// <summary>A held write lock costs a batch the 2 s busy timeout, 1 s once the stop began; the checkpoint never waits.</summary>
+	/// <summary>
+	/// A held write lock costs a batch the 2 s busy timeout, 1 s once the stop began; the checkpoint never waits.
+	/// </summary>
 	protected static TimeSpan StopLimit { get; } = TimeSpan.FromSeconds(10);
 
 	/// <summary>A copy of App.axaml.cs _backgroundStopLimit, the limit of the app's close chain.</summary>
@@ -46,7 +48,9 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 	/// <summary>A copy of App.axaml.cs _storeCloseReserve: the drain token fires this long before CloseLimit.</summary>
 	protected static TimeSpan CloseReserve { get; } = TimeSpan.FromSeconds(1.5);
 
-	/// <summary>A frame the store took would reach the file within this long; nothing waits on it in the passing case.</summary>
+	/// <summary>
+	/// A frame the store took would reach the file within this long; nothing waits on it in the passing case.
+	/// </summary>
 	protected static TimeSpan NoWriteWait { get; } = TimeSpan.FromMilliseconds(200);
 
 	private protected TempFolder Folder { get; } = new();
@@ -59,7 +63,8 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 
 	protected Channel<ReceivedFrame> LinkFrames { get; set; } = LinkChannel();
 
-	protected FrameDistributor Distributor => _distributor ?? throw new InvalidOperationException("No store was created.");
+	protected FrameDistributor Distributor =>
+		_distributor ?? throw new InvalidOperationException("No store was created.");
 
 	protected SpectrumStore Store => _store ?? throw new InvalidOperationException("No store was created.");
 
@@ -126,7 +131,8 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 
 	protected Task OpenedAsync()
 	{
-		return Waits.UntilAsync(() => Logger.Collector.GetSnapshot().Any(record => record.Level == LogLevel.Information));
+		return Waits.UntilAsync(
+			() => Logger.Collector.GetSnapshot().Any(record => record.Level == LogLevel.Information));
 	}
 
 	protected Task StopAsync()
@@ -153,7 +159,9 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 			.Select(record => record.Timestamp)];
 	}
 
-	/// <summary>The log times of failed batches: the reported first one of a run and the repeats the store logs itself.</summary>
+	/// <summary>
+	/// The log times of failed batches: the reported first one of a run and the repeats the store logs itself.
+	/// </summary>
 	protected List<DateTimeOffset> BatchFailureTimes()
 	{
 		return [.. Logger.Collector.GetSnapshot()
@@ -195,7 +203,9 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 		command.ExecuteNonQuery();
 	}
 
-	/// <summary>A second connection inside BEGIN IMMEDIATE: the writer's batches wait out the busy timeout and fail.</summary>
+	/// <summary>
+	/// A second connection inside BEGIN IMMEDIATE: the writer's batches wait out the busy timeout and fail.
+	/// </summary>
 	protected SqliteConnection HoldWriteLock()
 	{
 		var holder = OpenPlain();
@@ -231,14 +241,18 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 		return connection;
 	}
 
-	/// <summary>A FakeTimeProvider that counts its GetUtcNow calls and throws NowFailure from them once it is set.</summary>
+	/// <summary>
+	/// A FakeTimeProvider that counts its GetUtcNow calls and throws NowFailure from them once it is set.
+	/// </summary>
 	protected sealed class RetentionClock(DateTimeOffset start) : FakeTimeProvider(start)
 	{
 		private int _reads;
 
 		public Exception? NowFailure { get; set; }
 
-		/// <summary>The GetUtcNow calls so far; the store reads the clock only right before a retention delete.</summary>
+		/// <summary>
+		/// The GetUtcNow calls so far; the store reads the clock only right before a retention delete.
+		/// </summary>
 		public int Reads => Volatile.Read(ref _reads);
 
 		public override DateTimeOffset GetUtcNow()

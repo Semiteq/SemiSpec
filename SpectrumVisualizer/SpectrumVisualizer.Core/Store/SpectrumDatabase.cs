@@ -8,7 +8,9 @@ using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.Core.Store;
 
-/// <summary>The writer connection of a spectrum store file: schema, batched frame writes, retention and the closing checkpoint.</summary>
+/// <summary>
+/// The writer connection of a spectrum store file: schema, batched frame writes, retention and the closing checkpoint.
+/// </summary>
 public sealed class SpectrumDatabase : IDisposable
 {
 	private const string Schema = """
@@ -144,7 +146,9 @@ public sealed class SpectrumDatabase : IDisposable
 		}
 	}
 
-	/// <summary>Moves the WAL into the file and truncates it, then closes the connection whatever the outcome.</summary>
+	/// <summary>
+	/// Moves the WAL into the file and truncates it, then closes the connection whatever the outcome.
+	/// </summary>
 	public Result<WalCheckpoint> CheckpointAndClose()
 	{
 		try
@@ -225,7 +229,9 @@ public sealed class SpectrumDatabase : IDisposable
 	}
 }
 
-/// <summary>The outcome of the closing checkpoint: Busy when a reader's snapshot kept the WAL from being truncated.</summary>
+/// <summary>
+/// The outcome of the closing checkpoint: Busy when a reader's snapshot kept the WAL from being truncated.
+/// </summary>
 public enum WalCheckpoint
 {
 	Truncated,

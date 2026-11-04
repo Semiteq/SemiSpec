@@ -64,7 +64,8 @@ public static class BenchmarkRun
 	private static void WriteHeader(TextWriter output, BenchmarkOptions options, string folder)
 	{
 		output.Write(Invariant($"Store benchmark: {options.Rows} {options.Device.DisplayName} spectra 500 ms apart "));
-		output.Write(Invariant($"({SpanHours(options):0.##} h), {options.WavelengthNm} nm, delta {BenchmarkFile.Delta}, "));
+		output.Write(Invariant($"({SpanHours(options):0.##} h), {options.WavelengthNm} nm, "));
+		output.Write(Invariant($"delta {BenchmarkFile.Delta}, "));
 		output.Write(Invariant($"{options.ChurnRounds} churn rounds, {Columns} columns, "));
 		output.WriteLine(Invariant($"batches of {BenchmarkFile.BatchSize}. Folder {folder}."));
 		output.Write(Invariant(
@@ -176,9 +177,9 @@ public static class BenchmarkRun
 	{
 		var warm = milliseconds[1..];
 		Array.Sort(warm);
-		var median = warm[warm.Length / 2];
+		var (first, median, min, max) = (milliseconds[0], warm[warm.Length / 2], warm[0], warm[^1]);
 		measured.Output.WriteLine(Invariant(
-			$"| {measured.State} | {metric} | {milliseconds[0]:0.0} | {median:0.0} | {warm[0]:0.0} | {warm[^1]:0.0} |"));
+			$"| {measured.State} | {metric} | {first:0.0} | {median:0.0} | {min:0.0} | {max:0.0} |"));
 	}
 
 	private static void WriteValue(MeasuredState measured, string metric, double value, string format)
@@ -229,7 +230,9 @@ public static class BenchmarkRun
 		return text.ToString(CultureInfo.InvariantCulture);
 	}
 
-	/// <summary>What the rows of one file state share: the output, the state's name, the run and its mismatches.</summary>
+	/// <summary>
+	/// What the rows of one file state share: the output, the state's name, the run and its mismatches.
+	/// </summary>
 	private sealed record MeasuredState(
 		TextWriter Output,
 		string State,

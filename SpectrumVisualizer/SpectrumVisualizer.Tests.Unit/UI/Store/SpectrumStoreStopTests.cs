@@ -79,7 +79,8 @@ public sealed class SpectrumStoreStopTests : SpectrumStoreTestBase
 		using (HoldWriteLock())
 		{
 			// The due timer resumes the writer inline on the advancing thread, so the pass runs off the test thread.
-			var retentionPass = Task.Run(() => clock.Advance(TimeSpan.FromSeconds(61)), TestContext.Current.CancellationToken);
+			var retentionPass = Task.Run(
+				() => clock.Advance(TimeSpan.FromSeconds(61)), TestContext.Current.CancellationToken);
 			await Waits.UntilAsync(() => clock.Reads == 1);
 			await FeedAsync([.. Enumerable.Repeat(StoreSamples.Spectrum(StoreSamples.Start), Fed)]);
 			await Distributor.StopAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
@@ -87,10 +88,12 @@ public sealed class SpectrumStoreStopTests : SpectrumStoreTestBase
 			var stopwatch = Stopwatch.StartNew();
 			var stop = Store.StopAsync(drain.Token);
 			await Waits.UntilAsync(() => LogTimes("The spectrum store rows").Count == 1);
-			var nextRetention = Task.Run(() => clock.Advance(TimeSpan.FromSeconds(61)), TestContext.Current.CancellationToken);
+			var nextRetention = Task.Run(
+				() => clock.Advance(TimeSpan.FromSeconds(61)), TestContext.Current.CancellationToken);
 			await stop.WaitAsync(StopLimit, TestContext.Current.CancellationToken);
 			elapsed = stopwatch.Elapsed;
-			await Task.WhenAll(retentionPass, nextRetention).WaitAsync(StopLimit, TestContext.Current.CancellationToken);
+			await Task.WhenAll(retentionPass, nextRetention)
+				.WaitAsync(StopLimit, TestContext.Current.CancellationToken);
 		}
 
 		elapsed.Should().BeLessThan(CloseLimit);
@@ -177,7 +180,8 @@ public sealed class SpectrumStoreStopTests : SpectrumStoreTestBase
 		stopwatch.Elapsed.Should().BeLessThan(CloseLimit);
 		(Count("spectrum") + Store.DroppedFrames).Should().Be(Fed);
 		Store.DroppedFrames.Should().BeLessThanOrEqualTo(BatchSize, "only frames past the full queue are dropped");
-		Count("spectrum").Should().BeGreaterThanOrEqualTo(QueueCapacity, "the full queue drains before the drain token");
+		Count("spectrum").Should().BeGreaterThanOrEqualTo(
+			QueueCapacity, "the full queue drains before the drain token");
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]

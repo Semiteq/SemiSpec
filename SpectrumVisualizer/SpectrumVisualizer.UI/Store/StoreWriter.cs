@@ -12,8 +12,8 @@ using SpectrumVisualizer.UI.Messages;
 namespace SpectrumVisualizer.UI.Store;
 
 /// <summary>
-/// The writer task of the spectrum store: drains the queue into the store file in batches, deletes rows older than a day
-/// once a minute and closes the file with a checkpoint; every frame it loses goes to countDropped.
+/// The writer task of the spectrum store: drains the queue into the store file in batches, deletes rows older than a
+/// day once a minute and closes the file with a checkpoint; every frame it loses goes to countDropped.
 /// </summary>
 internal sealed class StoreWriter(
 	StoreFile storeFile,
@@ -52,7 +52,9 @@ internal sealed class StoreWriter(
 		_stopped = true;
 	}
 
-	/// <summary>Writes the queue until it completes; after a failure, or once cancelled, counts every frame as dropped.</summary>
+	/// <summary>
+	/// Writes the queue until it completes; after a failure, or once cancelled, counts every frame as dropped.
+	/// </summary>
 	public async Task RunAsync(CancellationToken cancellationToken, CancellationToken drainToken)
 	{
 		try
@@ -281,7 +283,9 @@ internal sealed class StoreWriter(
 		_checkpoint = closed;
 		if (closed.IsFailed)
 		{
-			logger.LogWarning(ResultReporting.CauseOf(closed.Errors), "The spectrum store WAL could not be checkpointed");
+			logger.LogWarning(
+				ResultReporting.CauseOf(closed.Errors),
+				"The spectrum store WAL could not be checkpointed");
 		}
 	}
 }

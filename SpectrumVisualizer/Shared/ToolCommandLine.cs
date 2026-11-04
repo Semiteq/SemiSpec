@@ -5,7 +5,9 @@ using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.Tools;
 
-/// <summary>The option parsing both tools share; each tool project compiles this file as its own internal copy.</summary>
+/// <summary>
+/// The option parsing both tools share; each tool project compiles this file as its own internal copy.
+/// </summary>
 internal static class ToolCommandLine
 {
 	/// <summary>The --device and --failed values: the spectrometer's model number.</summary>

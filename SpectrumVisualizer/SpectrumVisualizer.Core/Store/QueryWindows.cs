@@ -5,11 +5,15 @@ using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.Core.Store;
 
-/// <summary>The queried window of each device in the stored pixel blob, and whether the device covers the wavelength.</summary>
+/// <summary>
+/// The queried window of each device in the stored pixel blob, and whether the device covers the wavelength.
+/// </summary>
 public sealed class QueryWindows(ushort wavelengthNm, byte delta)
 {
-	private readonly PixelWindow _atp2000 = SpectrometerCalibration.For(Spectrometer.Atp2000).Window(wavelengthNm, delta);
-	private readonly PixelWindow _atp8000 = SpectrometerCalibration.For(Spectrometer.Atp8000).Window(wavelengthNm, delta);
+	private readonly PixelWindow _atp2000 =
+		SpectrometerCalibration.For(Spectrometer.Atp2000).Window(wavelengthNm, delta);
+	private readonly PixelWindow _atp8000 =
+		SpectrometerCalibration.For(Spectrometer.Atp8000).Window(wavelengthNm, delta);
 	private readonly bool _atp2000Covers = InFirmwareTable(Spectrometer.Atp2000, wavelengthNm);
 	private readonly bool _atp8000Covers = InFirmwareTable(Spectrometer.Atp8000, wavelengthNm);
 

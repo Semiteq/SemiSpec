@@ -101,7 +101,9 @@ public sealed class AppStatusBarViewModel : ReactiveObject, IDisposable
 	public string LostSpectraText => Resources.FormatStatusLostSpectraFormat(
 		IsDisconnected ? Resources.StatusNoValue : Status.LostSpectra.ToString(Resources.Culture));
 
-	/// <summary>The link's channel drops plus the store's; a number in every state, as both describe the run's history.</summary>
+	/// <summary>
+	/// The link's channel drops plus the store's; a number in every state, as both describe the run's history.
+	/// </summary>
 	public string DroppedFramesText => _droppedFramesText.Value;
 
 	private bool IsDisconnected => Status.State == LinkState.Disconnected;

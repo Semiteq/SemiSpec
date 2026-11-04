@@ -117,7 +117,10 @@ public sealed class MainWindowViewTests : IDisposable
 		dot.IsEffectivelyVisible.Should().BeTrue();
 		dot.Classes.Where(name => name.StartsWith("tone-", StringComparison.Ordinal)).Should().Equal("tone-neutral");
 
-		string[] segments = ["LinkText", "PortText", "Atp2000Text", "Atp8000Text", "LostSpectraText", "DroppedFramesText"];
+		string[] segments =
+		[
+			"LinkText", "PortText", "Atp2000Text", "Atp8000Text", "LostSpectraText", "DroppedFramesText",
+		];
 		segments.Select(name => Named<TextBlock>(bar, name))
 			.Should().OnlyContain(segment => segment.IsEffectivelyVisible && segment.Bounds.Width > 0);
 		segments.Select(name => Named<TextBlock>(bar, name).Text).Should().Equal(

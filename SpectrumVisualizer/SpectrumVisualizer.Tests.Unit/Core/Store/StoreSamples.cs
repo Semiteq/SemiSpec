@@ -44,7 +44,8 @@ internal static class StoreSamples
 	/// <summary>A dark frame: every pixel, the amplitude and the SNR zero.</summary>
 	public static ReceivedFrame Dark(DateTimeOffset receivedAt, Spectrometer device = Spectrometer.Atp8000)
 	{
-		var measurement = new SpectrumMeasurement(device, SampleNm, SampleDelta, 0f, 0f, 0f, new ushort[device.PixelCount]);
+		var pixels = new ushort[device.PixelCount];
+		var measurement = new SpectrumMeasurement(device, SampleNm, SampleDelta, 0f, 0f, 0f, pixels);
 		return new ReceivedFrame(new BoardFrame(device.ConnectedBit, 1, measurement), receivedAt);
 	}
 

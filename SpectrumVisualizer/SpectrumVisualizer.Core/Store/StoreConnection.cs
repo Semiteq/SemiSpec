@@ -5,7 +5,9 @@ namespace SpectrumVisualizer.Core.Store;
 /// <summary>Opens a connection to a spectrum store file with the store's connection settings and pragmas.</summary>
 public static class StoreConnection
 {
-	/// <summary>Moves the WAL into the file and truncates it; its one row's first column is 1 when a reader kept it busy.</summary>
+	/// <summary>
+	/// Moves the WAL into the file and truncates it; its one row's first column is 1 when a reader kept it busy.
+	/// </summary>
 	public const string CheckpointTruncate = "PRAGMA wal_checkpoint(TRUNCATE)";
 
 	private const int BusyTimeoutSeconds = 2;
@@ -17,7 +19,9 @@ public static class StoreConnection
 
 	private const string ReaderPragmas = "PRAGMA query_only=ON";
 
-	/// <summary>Opens the file for the writer, creating it when missing; throws SqliteException when SQLite refuses it.</summary>
+	/// <summary>
+	/// Opens the file for the writer, creating it when missing; throws SqliteException when SQLite refuses it.
+	/// </summary>
 	public static SqliteConnection Open(string path)
 	{
 		return Open(path, SqliteOpenMode.ReadWriteCreate, WriterPragmas);

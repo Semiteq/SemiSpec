@@ -8,7 +8,10 @@ using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.Core.Store;
 
-/// <summary>Reads a spectrum store file: a stored spectrum, the intensity series and the stored range; each call opens its own reader connection on the thread pool.</summary>
+/// <summary>
+/// Reads a spectrum store file: a stored spectrum, the intensity series and the stored range; each call opens its own
+/// reader connection on the thread pool.
+/// </summary>
 public sealed class SpectrumHistory(string path)
 {
 	/// <summary>How many rows a series read takes between two checks of its token.</summary>
@@ -25,7 +28,9 @@ public sealed class SpectrumHistory(string path)
 
 	private const string Range = "SELECT min(received_at), max(received_at) FROM spectrum";
 
-	/// <summary>The spectrum with the latest receive time at or before the moment, ties to the later row; null before the first.</summary>
+	/// <summary>
+	/// The spectrum with the latest receive time at or before the moment, ties to the later row; null before the first.
+	/// </summary>
 	public Task<Result<StoredSpectrum?>> SpectrumAtAsync(DateTimeOffset moment, CancellationToken token)
 	{
 		return ReadAsync(
@@ -69,18 +74,22 @@ public sealed class SpectrumHistory(string path)
 			token);
 	}
 
-	/// <summary>The series in one statement over the range: every row's window cut from its pixels with substr.</summary>
+	/// <summary>
+	/// The series in one statement over the range: every row's window cut from its pixels with substr.
+	/// </summary>
 	public static IntensitySeries ReadSeries(SqliteConnection connection, IntensityQuery query, CancellationToken token)
 	{
 		var buckets = new IntensityBuckets(query);
 		var windows = new QueryWindows(query.WavelengthNm, query.Delta);
 		var atp2000 = windows.For(Spectrometer.Atp2000);
 		var atp8000 = windows.For(Spectrometer.Atp8000);
+		var (atp2000Start, atp2000Count) = (QueryWindows.ByteStart(atp2000), QueryWindows.ByteCount(atp2000));
+		var (atp8000Start, atp8000Count) = (QueryWindows.ByteStart(atp8000), QueryWindows.ByteCount(atp8000));
 		using var command = connection.CreateCommand();
 		command.CommandText = $"""
 			SELECT received_at, device, CASE device
-				WHEN {(byte)Spectrometer.Atp2000} THEN substr(pixels, {QueryWindows.ByteStart(atp2000)}, {QueryWindows.ByteCount(atp2000)})
-				WHEN {(byte)Spectrometer.Atp8000} THEN substr(pixels, {QueryWindows.ByteStart(atp8000)}, {QueryWindows.ByteCount(atp8000)})
+				WHEN {(byte)Spectrometer.Atp2000} THEN substr(pixels, {atp2000Start}, {atp2000Count})
+				WHEN {(byte)Spectrometer.Atp8000} THEN substr(pixels, {atp8000Start}, {atp8000Count})
 				END
 			FROM spectrum WHERE {InQueryRange}
 			""";
@@ -153,7 +162,8 @@ public sealed class SpectrumHistory(string path)
 }
 
 /// <summary>A stored spectrum rebuilt as a new measurement, with the frame fields stored beside it.</summary>
-public sealed record StoredSpectrum(SpectrumMeasurement Measurement, DateTimeOffset ReceivedAt, byte Seq, BoardState State);
+public sealed record StoredSpectrum(
+	SpectrumMeasurement Measurement, DateTimeOffset ReceivedAt, byte Seq, BoardState State);
 
 /// <summary>The receive times of the first and last stored spectrum.</summary>
 public sealed record StoredRange(DateTimeOffset First, DateTimeOffset Last);

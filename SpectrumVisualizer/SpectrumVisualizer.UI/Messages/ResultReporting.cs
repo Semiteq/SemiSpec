@@ -32,7 +32,9 @@ public static class ResultReporting
 		}
 	}
 
-	/// <summary>The deepest exception in the errors' reason chains, so a wrapped failure logs its original stack.</summary>
+	/// <summary>
+	/// The deepest exception in the errors' reason chains, so a wrapped failure logs its original stack.
+	/// </summary>
 	internal static Exception? CauseOf(IEnumerable<IError> errors)
 	{
 		return errors.Select(CauseOf).FirstOrDefault(cause => cause is not null);
