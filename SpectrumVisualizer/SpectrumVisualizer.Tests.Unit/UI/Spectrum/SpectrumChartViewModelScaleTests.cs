@@ -258,6 +258,98 @@ public sealed class SpectrumChartViewModelScaleTests : IDisposable
 		_chart.ShouldSpanTheDeviceRange(Spectrometer.Atp8000);
 	}
 
+	[AvaloniaFact]
+	public void AHistoricalSpectrumDoesNotWriteLastNonDark()
+	{
+		var livePeak = Atp2000Peak;
+		_chart.Show(livePeak);
+		_chart.Show(Historical(TallPeak(Spectrometer.Atp2000)));
+
+		_chart.Show(Dark(Spectrometer.Atp2000));
+
+		ShouldFollow(livePeak, default);
+	}
+
+	[AvaloniaFact]
+	public void AToggleWhileAHistoricalSpectrumIsShownDoesNotWriteLastNonDark()
+	{
+		var livePeak = Atp2000Peak;
+		var display = new SpectrumDisplay(IsInverted: true, IsLogarithmic: false);
+		_chart.Show(livePeak);
+		_chart.Show(Historical(TallPeak(Spectrometer.Atp2000)));
+		_chart.SetDisplay(display);
+
+		_chart.Show(Dark(Spectrometer.Atp2000));
+
+		ShouldFollow(livePeak, display);
+	}
+
+	[AvaloniaFact]
+	public void AHistoricalDarkSpectrumUsesTheLiveReferenceOfItsDevice()
+	{
+		var livePeak = Atp2000Peak;
+		_chart.Show(livePeak);
+
+		_chart.Show(Historical(Dark(Spectrometer.Atp2000)));
+
+		ShouldFollow(livePeak, default);
+	}
+
+	[AvaloniaFact]
+	public void AHistoricalSpectrumOfTheFrozenDeviceKeepsTheFrozenLimits()
+	{
+		_chart.Show(Atp2000Peak);
+		_chart.Plot.Axes.SetLimits(500, 600, 0, 100);
+		_chart.TakeManualScale();
+
+		_chart.Show(Historical(TallPeak(Spectrometer.Atp2000)));
+		_chart.Show(Atp2000Peak);
+
+		_chart.IsFollowing.Should().BeFalse("live returns on the device the scale was frozen on");
+		ShouldHaveLimits(500, 600, 0, 100);
+	}
+
+	[AvaloniaFact]
+	public void AHistoricalSpectrumOfTheOtherDeviceReturnsToFollowing()
+	{
+		_chart.Show(Atp2000Peak);
+		_chart.Plot.Axes.SetLimits(500, 600, 0, 100);
+		_chart.TakeManualScale();
+
+		_chart.Show(Historical(Atp8000Peak));
+
+		_chart.IsFollowing.Should().BeTrue();
+		_chart.ShouldSpanTheDeviceRange(Spectrometer.Atp8000);
+	}
+
+	[AvaloniaFact]
+	public void BackToLiveOnTheOtherDeviceReturnsToFollowing()
+	{
+		_chart.Show(Atp2000Peak);
+		_chart.Plot.Axes.SetLimits(500, 600, 0, 100);
+		_chart.TakeManualScale();
+		_chart.Show(Historical(Atp2000Peak));
+
+		_chart.Show(Atp8000Peak);
+
+		_chart.IsFollowing.Should().BeTrue();
+		_chart.ShouldSpanTheDeviceRange(Spectrometer.Atp8000);
+	}
+
+	private static DisplayedSpectrum Historical(DisplayedSpectrum spectrum)
+	{
+		return spectrum with { IsHistorical = true };
+	}
+
+	/// <summary>The sample peak with its top pixel at twice the height, so its following limits differ.</summary>
+	private static DisplayedSpectrum TallPeak(Spectrometer device)
+	{
+		var peak = Peak(device, 400, 25);
+		var pixels = (ushort[])peak.Measurement.Pixels.Clone();
+		pixels[pixels.Length / 2] = 2 * PeakTop;
+		return peak with { Measurement = new SpectrumMeasurement(device, 400, 25, 60000f, 30f, 0f, pixels) };
+	}
+
 	/// <summary>The scale follows and its Y limits are the spectrum's following limits in the given display.</summary>
 	private void ShouldFollow(DisplayedSpectrum spectrum, SpectrumDisplay display)
 	{

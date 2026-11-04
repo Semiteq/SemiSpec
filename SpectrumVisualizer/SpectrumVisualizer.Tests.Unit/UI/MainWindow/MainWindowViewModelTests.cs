@@ -42,6 +42,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 	private readonly ConnectionBarViewModel _connectionBar;
 	private readonly AppStatusBarViewModel _statusBar;
 	private readonly FakeDisplayedSpectrumSource _spectrumSource = new();
+	private readonly SwitchingSpectrumSource _switchingSource;
 	private readonly SpectrumViewModel _spectrum;
 	private readonly MainWindowViewModel _viewModel;
 
@@ -67,8 +68,9 @@ public sealed class MainWindowViewModelTests : IDisposable
 			_messagePanel,
 			ImmediateScheduler.Instance,
 			NullLogger<AppStatusBarViewModel>.Instance);
+		_switchingSource = new SwitchingSpectrumSource(_spectrumSource);
 		_spectrum = new SpectrumViewModel(
-			_spectrumSource,
+			_switchingSource,
 			_messagePanel,
 			TimeProvider.System,
 			ImmediateScheduler.Instance,
@@ -184,6 +186,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 	{
 		_viewModel.Dispose();
 		_spectrum.Dispose();
+		_switchingSource.Dispose();
 		_spectrumSource.Dispose();
 		_connectionBar.Dispose();
 		_statusBar.Dispose();

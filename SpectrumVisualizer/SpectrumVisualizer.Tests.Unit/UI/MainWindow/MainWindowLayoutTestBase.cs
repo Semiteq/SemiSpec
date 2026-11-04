@@ -58,6 +58,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 	{
 		SerialLink = new SerialLink(PortProvider, LinkScheduler, NullLogger<SerialLink>.Instance);
 		Store = new UnstartedStore(MessagePanel);
+		SwitchingSource = new SwitchingSpectrumSource(SpectrumSource);
 	}
 
 	protected TestScheduler LinkScheduler { get; } = new();
@@ -69,6 +70,8 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 	protected SerialLink SerialLink { get; }
 
 	private protected FakeDisplayedSpectrumSource SpectrumSource { get; } = new();
+
+	protected SwitchingSpectrumSource SwitchingSource { get; }
 
 	protected MessagePanelViewModel MessagePanel { get; } = new(TimeProvider.System);
 
@@ -87,6 +90,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 		_connectionBar?.Dispose();
 		_statusBar?.Dispose();
 		_spectrum?.Dispose();
+		SwitchingSource.Dispose();
 		SpectrumSource.Dispose();
 		SerialLink.Dispose();
 		Store.Dispose();
@@ -123,7 +127,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 			AvaloniaScheduler.Instance,
 			NullLogger<AppStatusBarViewModel>.Instance);
 		_spectrum = new SpectrumViewModel(
-			SpectrumSource,
+			SwitchingSource,
 			MessagePanel,
 			TimeProvider.System,
 			AvaloniaScheduler.Instance,

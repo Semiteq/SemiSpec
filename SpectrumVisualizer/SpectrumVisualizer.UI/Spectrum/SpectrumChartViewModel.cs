@@ -36,6 +36,7 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		new double[Math.Max(Spectrometer.Atp2000.PixelCount, Spectrometer.Atp8000.PixelCount)];
 	private DisplayedSpectrum? _shown;
 	private SpectrumDisplay _display;
+	private Spectrometer? _frozenDevice;
 
 	public SpectrumChartViewModel()
 	{
@@ -66,15 +67,26 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 	/// <summary>One signal per redraw request, raised at once on the caller's thread; completes on dispose.</summary>
 	public IObservable<Unit> RedrawRequested => _redrawRequests.AsObservable();
 
-	/// <summary>Draws the spectrum; the frame's pixel array is read, never written.</summary>
+	/// <summary>
+	/// Draws the spectrum; the frame's pixel array is read, never written. A switch into or out of a historical spectrum
+	/// keeps a frozen scale only on the device it was frozen on.
+	/// </summary>
 	public void Show(DisplayedSpectrum spectrum)
 	{
+		var wasFollowing = IsFollowing;
 		lock (Plot.Sync)
 		{
+			var crossesHistory = spectrum.IsHistorical || _shown is { IsHistorical: true };
+			if (crossesHistory && spectrum.Measurement.Device != _frozenDevice)
+			{
+				IsFollowing = true;
+			}
+
 			_shown = spectrum;
 			Project();
 		}
 
+		RaiseIfFollowingChanged(wasFollowing);
 		HasSpectrum = true;
 		RequestRedraw();
 	}
@@ -188,14 +200,14 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 	/// <summary>Fills the shown line, the band and, if following, the limits; caller holds Plot.Sync.</summary>
 	private void Project()
 	{
-		if (_shown is not { Measurement: var measurement })
+		if (_shown is not { Measurement: var measurement, IsHistorical: var isHistorical })
 		{
 			return;
 		}
 
 		var line = LineFor(measurement.Device);
 		var projection = SpectrumProjection.Fill(measurement.Pixels, _display, line.Ys);
-		if (!projection.IsDark)
+		if (!projection.IsDark && !isHistorical)
 		{
 			line.LastNonDark = measurement;
 		}
@@ -246,21 +258,32 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		_redrawRequests.OnNext(Unit.Default);
 	}
 
-	/// <summary>Runs the change under Plot.Sync, then raises IsFollowing outside the lock and redraws.</summary>
+	/// <summary>
+	/// Runs the change under Plot.Sync and records the shown device when the scale ends frozen, then raises IsFollowing
+	/// outside the lock and redraws.
+	/// </summary>
 	private void ChangeScale(Action change)
 	{
 		var wasFollowing = IsFollowing;
 		lock (Plot.Sync)
 		{
 			change();
+			if (!IsFollowing)
+			{
+				_frozenDevice = _shown?.Measurement.Device;
+			}
 		}
 
+		RaiseIfFollowingChanged(wasFollowing);
+		RequestRedraw();
+	}
+
+	private void RaiseIfFollowingChanged(bool wasFollowing)
+	{
 		if (wasFollowing != IsFollowing)
 		{
 			this.RaisePropertyChanged(nameof(IsFollowing));
 		}
-
-		RequestRedraw();
 	}
 
 	private sealed class DeviceLine(SignalXY plottable, double[] xs, double[] ys)

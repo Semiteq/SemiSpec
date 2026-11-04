@@ -688,19 +688,20 @@ Data flow:
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Spectrum/SpectrumChartViewModelScaleTests.cs`,
   `SpectrumViewModelTests.cs`, `UI/Di/CompositionRootTests.cs`
 
-- [ ] add `IsHistorical` to `DisplayedSpectrum` (`IDisplayedSpectrumSource.cs:8`)
-- [ ] write `SwitchingSpectrumSource` over an `IDisplayedSpectrumSource` live source, with `ShowMoment`, `ReturnToLive`
+- [x] add `IsHistorical` to `DisplayedSpectrum` (`IDisplayedSpectrumSource.cs:8`)
+- [x] write `SwitchingSpectrumSource` over an `IDisplayedSpectrumSource` live source, with `ShowMoment`, `ReturnToLive`
   and `ShownMoment`; the mode subject is private and exposed with `AsObservable()`
-- [ ] in `SpectrumChartViewModel`: guard the `LastNonDark` write (`:198-201`) with `!IsHistorical`; record the frozen
+- [x] in `SpectrumChartViewModel`: guard the `LastNonDark` write (`:198-201`) with `!IsHistorical`; record the frozen
   device in `ChangeScale`; apply the device rule on a historical spectrum and on the first live one after it
-- [ ] `SpectrumViewModel` takes `SwitchingSpectrumSource`; adds `BackToLiveCommand` (`canExecute` from `ShownMoment`) and
+- [x] `SpectrumViewModel` takes `SwitchingSpectrumSource`; adds `BackToLiveCommand` (`canExecute` from `ShownMoment`) and
   `HistoricalText` (`SpectrumHistoricalFormat` over the local `HH:mm:ss` of `ShownMoment`, empty while live)
-- [ ] register `LiveSpectrumSource` as itself, `SwitchingSpectrumSource` over it, and `IDisplayedSpectrumSource` as
-  that switching instance, replacing `UiServiceCollectionExtensions.cs:42`, all singletons
-- [ ] write the tests of Acceptance Evidence item 3; existing view model tests build the switching source over
+- [x] register `LiveSpectrumSource` as itself, `SwitchingSpectrumSource` over it, and `IDisplayedSpectrumSource` as
+  that switching instance, replacing `UiServiceCollectionExtensions.cs:42`, all singletons. `SpectrumHistoricalFormat` is
+  added to both resx sets here, because `HistoricalText` reads it; the other keys stay with Task 8
+- [x] write the tests of Acceptance Evidence item 3; existing view model tests build the switching source over
   `FakeDisplayedSpectrumSource`; `CompositionRootTests` covers the three registrations and
   `IDisplayedSpectrumSourceResolvesToTheSwitchingSource`
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (766 of 766)
 
 ### Task 7: Envelope line and failure strip
 **Files:**

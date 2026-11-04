@@ -4,8 +4,14 @@ using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.UI.Spectrum;
 
-/// <summary>The spectrum the chart and the signal pane show, with the time the link received it.</summary>
-public sealed record DisplayedSpectrum(SpectrumMeasurement Measurement, DateTimeOffset ReceivedAt);
+/// <summary>
+/// The spectrum the chart and the signal pane show, with the time the link received it; historical when read back for
+/// a past moment.
+/// </summary>
+public sealed record DisplayedSpectrum(
+	SpectrumMeasurement Measurement,
+	DateTimeOffset ReceivedAt,
+	bool IsHistorical = false);
 
 /// <summary>Where the shown spectrum comes from.</summary>
 public interface IDisplayedSpectrumSource

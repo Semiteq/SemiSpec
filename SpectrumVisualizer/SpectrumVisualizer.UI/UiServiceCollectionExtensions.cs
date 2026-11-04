@@ -39,7 +39,11 @@ public static class UiServiceCollectionExtensions
 			provider.GetRequiredService<ILogger<FrameDistributor>>()));
 		services.AddSingleton(new StoreFile(StoreFiles.InstanceFile(paths.StoreFolder, Environment.ProcessId)));
 		services.AddSingleton<SpectrumStore>();
-		services.AddSingleton<IDisplayedSpectrumSource, LiveSpectrumSource>();
+		services.AddSingleton<LiveSpectrumSource>();
+		services.AddSingleton(provider =>
+			new SwitchingSpectrumSource(provider.GetRequiredService<LiveSpectrumSource>()));
+		services.AddSingleton<IDisplayedSpectrumSource>(provider =>
+			provider.GetRequiredService<SwitchingSpectrumSource>());
 		services.AddSingleton<MessagePanelViewModel>();
 		services.AddSingleton<ConnectionBarViewModel>();
 		services.AddSingleton<AppStatusBarViewModel>();

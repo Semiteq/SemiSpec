@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Reactive;
 using System.Reactive.Concurrency;
 using System.Reactive.Disposables;
@@ -10,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
 using SpectrumVisualizer.Core.Spectrum;
+using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Messages;
 
 namespace SpectrumVisualizer.UI.Spectrum;
@@ -17,13 +19,16 @@ namespace SpectrumVisualizer.UI.Spectrum;
 /// <summary>The spectrum screen: shows the source's latest spectrum on the chart and in the signal pane.</summary>
 public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 {
+	private const string MomentFormat = "HH:mm:ss";
+
 	private readonly CompositeDisposable _disposables = [];
 	private readonly MessagePanelViewModel _messagePanel;
 	private readonly IScheduler _uiScheduler;
 	private readonly ILogger<SpectrumViewModel> _logger;
+	private readonly ObservableAsPropertyHelper<string> _historicalText;
 
 	public SpectrumViewModel(
-		IDisplayedSpectrumSource source,
+		SwitchingSpectrumSource source,
 		MessagePanelViewModel messagePanel,
 		TimeProvider timeProvider,
 		IScheduler uiScheduler,
@@ -50,6 +55,11 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 				(inverted, logarithmic) => new SpectrumDisplay(inverted, logarithmic))
 			.Subscribe(Chart.SetDisplay, ReportPipelineFailure));
 
+		var shownMoment = source.WhenAnyValue(switching => switching.ShownMoment);
+		_disposables.Add(shownMoment
+			.Select(HistoricalTextOf)
+			.ToProperty(this, spectrum => spectrum.HistoricalText, out _historicalText, initialValue: string.Empty));
+
 		var canStickToZero = Chart.WhenAnyValue(chart => chart.HasSpectrum);
 		var canResetScale = Chart.WhenAnyValue(
 			chart => chart.HasSpectrum,
@@ -58,6 +68,9 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 
 		_disposables.Add(ResetScaleCommand = ReactiveCommand.Create(Chart.ResetScale, canResetScale));
 		_disposables.Add(StickToZeroCommand = ReactiveCommand.Create(Chart.StickToZero, canStickToZero));
+		_disposables.Add(BackToLiveCommand = ReactiveCommand.Create(
+			source.ReturnToLive,
+			shownMoment.Select(moment => moment is not null)));
 		_disposables.Add(Chart);
 	}
 
@@ -81,9 +94,22 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 
 	public ReactiveCommand<Unit, Unit> StickToZeroCommand { get; }
 
+	public ReactiveCommand<Unit, Unit> BackToLiveCommand { get; }
+
+	/// <summary>"Spectrum from HH:mm:ss" in local time while a past moment is shown; empty while live.</summary>
+	public string HistoricalText => _historicalText.Value;
+
 	public void Dispose()
 	{
 		_disposables.Dispose();
+	}
+
+	private static string HistoricalTextOf(DateTimeOffset? moment)
+	{
+		return moment is { } shown
+			? Resources.FormatSpectrumHistoricalFormat(
+				shown.ToLocalTime().ToString(MomentFormat, CultureInfo.InvariantCulture))
+			: string.Empty;
 	}
 
 	/// <summary>A failed read is reported and skipped, so the next signal reads again.</summary>

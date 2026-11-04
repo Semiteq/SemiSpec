@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Windows.Input;
@@ -16,6 +17,7 @@ using ScottPlot.TickGenerators;
 
 using SpectrumVisualizer.Tests.Unit.UI.Messages;
 using SpectrumVisualizer.UI.Chart;
+using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Messages;
 using SpectrumVisualizer.UI.Spectrum;
 
@@ -32,12 +34,20 @@ namespace SpectrumVisualizer.Tests.Unit.UI.Spectrum;
 [Trait("Category", "Unit")]
 public sealed class SpectrumViewModelTests : IDisposable
 {
+	private static readonly DateTimeOffset _moment = new(2026, 11, 4, 8, 30, 15, TimeSpan.Zero);
+
 	private readonly FakeDisplayedSpectrumSource _source = new();
+	private readonly SwitchingSpectrumSource _switching;
 	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
 	private readonly FakeLogger<SpectrumViewModel> _logger = new();
 	private SpectrumViewModel? _viewModel;
 
-	private SpectrumViewModel ViewModel => _viewModel ??= NewViewModel(_source);
+	public SpectrumViewModelTests()
+	{
+		_switching = new SwitchingSpectrumSource(_source);
+	}
+
+	private SpectrumViewModel ViewModel => _viewModel ??= NewViewModel(_switching);
 
 	[AvaloniaFact]
 	public void ThreeQueuedSignalsApplyTheLatestSpectrumOnce()
@@ -182,7 +192,8 @@ public sealed class SpectrumViewModelTests : IDisposable
 	public void AThrowingCurrentOnALaterSignalReportsAndThePipelineGoesOn()
 	{
 		using var failing = new FailingSpectrumSource();
-		_viewModel = NewViewModel(failing);
+		using var switching = new SwitchingSpectrumSource(failing);
+		_viewModel = NewViewModel(switching);
 		Dispatcher.UIThread.RunJobs();
 
 		failing.Fails = true;
@@ -210,9 +221,46 @@ public sealed class SpectrumViewModelTests : IDisposable
 		_source.HasSubscribers.Should().BeFalse();
 	}
 
+	[AvaloniaFact]
+	public async Task BackToLiveIsEnabledOnlyWhileHistorical()
+	{
+		var live = Atp2000Peak;
+		_source.Current = live;
+		SignalAndRun();
+		CanExecute(ViewModel.BackToLiveCommand).Should().BeFalse("the live spectrum is shown");
+
+		_switching.ShowMoment(Atp8000Peak.Measurement, _moment);
+		Dispatcher.UIThread.RunJobs();
+		CanExecute(ViewModel.BackToLiveCommand).Should().BeTrue();
+		ViewModel.SignalInfo.Spectrum!.IsHistorical.Should().BeTrue();
+
+		await ViewModel.BackToLiveCommand.Execute();
+		Dispatcher.UIThread.RunJobs();
+
+		CanExecute(ViewModel.BackToLiveCommand).Should().BeFalse();
+		_switching.ShownMoment.Should().BeNull();
+		ViewModel.SignalInfo.Spectrum.Should().BeSameAs(live);
+	}
+
+	[AvaloniaFact]
+	public void TheHistoricalLineShowsTheMomentInLocalTime()
+	{
+		ViewModel.HistoricalText.Should().BeEmpty("the live spectrum is shown");
+
+		_switching.ShowMoment(Atp8000Peak.Measurement, _moment);
+
+		var localTime = _moment.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+		ViewModel.HistoricalText.Should().Be(Resources.FormatSpectrumHistoricalFormat(localTime));
+
+		_switching.ReturnToLive();
+
+		ViewModel.HistoricalText.Should().BeEmpty();
+	}
+
 	public void Dispose()
 	{
 		_viewModel?.Dispose();
+		_switching.Dispose();
 		_source.Dispose();
 		_messagePanel.Dispose();
 	}
@@ -222,7 +270,7 @@ public sealed class SpectrumViewModelTests : IDisposable
 		return command.CanExecute(null);
 	}
 
-	private SpectrumViewModel NewViewModel(IDisplayedSpectrumSource source)
+	private SpectrumViewModel NewViewModel(SwitchingSpectrumSource source)
 	{
 		return new SpectrumViewModel(source, _messagePanel, TimeProvider.System, AvaloniaScheduler.Instance, _logger);
 	}

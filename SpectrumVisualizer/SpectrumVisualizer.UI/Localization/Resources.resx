@@ -207,6 +207,9 @@
   <data name="SpectrumEmpty" xml:space="preserve">
     <value>No spectrum yet. Connect to the board in the row above.</value>
   </data>
+  <data name="SpectrumHistoricalFormat" xml:space="preserve">
+    <value>Spectrum from {0}</value>
+  </data>
   <data name="SignalTitle" xml:space="preserve">
     <value>Signal</value>
   </data>
