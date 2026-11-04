@@ -192,11 +192,11 @@ type is decided by `len` only.
 - Create: `SpectrumVisualizer.Tests.Unit/Core/Calibration/FirmwarePixelTables.cs` (the two firmware tables from OptoskyProj
   `df5201f` `main.c:166` and `:169`, as test data)
 
-- [ ] write tests first: ATP-2000 `PixelFor` equals `PixelOrder_2000` for all 840 entries; ATP-8000 within 1 pixel of
+- [x] write tests first: ATP-2000 `PixelFor` equals `PixelOrder_2000` for all 840 entries; ATP-8000 within 1 pixel of
   `PixelOrder_8000` for all 1564; wavelengths below and above the table range clamp; `Window` is inclusive and clamped
   to `0…P-1`; pixel 0 of ATP-2000 is 185.89856 nm
-- [ ] implement `SpectrometerCalibration` with the coefficients from `SpectrumCalc.cs:6-7` and the table ranges
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] implement `SpectrometerCalibration` with the coefficients from `SpectrumCalc.cs:6-7` and the table ranges
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 6: Board emulator tool
 **Files:**
