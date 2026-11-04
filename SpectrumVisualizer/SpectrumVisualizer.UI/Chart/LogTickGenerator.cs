@@ -3,9 +3,11 @@ using System.Globalization;
 
 using ScottPlot;
 
+using SpectrumVisualizer.Core.Chart;
+
 namespace SpectrumVisualizer.UI.Chart;
 
-/// <summary>Ticks of a log10 axis whose limits are in decades; a major reads its value under the current culture.</summary>
+/// <summary>Ticks of a log10 axis whose limits are in decades; major labels use the current culture.</summary>
 public sealed class LogTickGenerator : ITickGenerator
 {
 	private const string LabelFormat = "0.###";
@@ -28,7 +30,6 @@ public sealed class LogTickGenerator : ITickGenerator
 
 		Ticks = ticks;
 	}
-
 
 	private static Tick[] Generate(TickKey key)
 	{

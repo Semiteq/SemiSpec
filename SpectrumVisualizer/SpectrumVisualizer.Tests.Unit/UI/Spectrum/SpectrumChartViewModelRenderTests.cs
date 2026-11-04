@@ -5,6 +5,7 @@ using AwesomeAssertions;
 using ScottPlot;
 
 using SpectrumVisualizer.Core.Protocol;
+using SpectrumVisualizer.Core.Spectrum;
 using SpectrumVisualizer.UI.Spectrum;
 
 using Xunit;
@@ -46,7 +47,7 @@ public sealed class SpectrumChartViewModelRenderTests : IDisposable
 	[AvaloniaFact]
 	public void ADarkFrameRendersOnTheLogAxisAtTheFloorWithFiniteLimits()
 	{
-		_chart.SetDisplay(inverted: false, logarithmic: true);
+		_chart.SetDisplay(new SpectrumDisplay(IsInverted: false, IsLogarithmic: true));
 		_chart.Show(Dark(Spectrometer.Atp8000));
 
 		var limits = RenderedLimits();
@@ -65,7 +66,7 @@ public sealed class SpectrumChartViewModelRenderTests : IDisposable
 	[AvaloniaFact]
 	public void AnInvertedDarkFrameOnTheLogAxisRenders()
 	{
-		_chart.SetDisplay(inverted: true, logarithmic: true);
+		_chart.SetDisplay(new SpectrumDisplay(IsInverted: true, IsLogarithmic: true));
 
 		_chart.Show(Dark(Spectrometer.Atp2000));
 

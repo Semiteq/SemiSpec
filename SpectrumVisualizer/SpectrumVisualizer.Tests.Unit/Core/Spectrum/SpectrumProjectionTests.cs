@@ -1,12 +1,12 @@
 using AwesomeAssertions;
 
-using SpectrumVisualizer.UI.Spectrum;
+using SpectrumVisualizer.Core.Spectrum;
 
 using Xunit;
 
-namespace SpectrumVisualizer.Tests.Unit.UI.Spectrum;
+namespace SpectrumVisualizer.Tests.Unit.Core.Spectrum;
 
-[Trait("Component", "UI")]
+[Trait("Component", "Core")]
 [Trait("Area", "Spectrum")]
 [Trait("Category", "Unit")]
 public sealed class SpectrumProjectionTests
@@ -39,7 +39,7 @@ public sealed class SpectrumProjectionTests
 	{
 		var ys = new double[pixels.Length];
 
-		var projected = SpectrumProjection.Fill(pixels, inverted, logarithmic, ys);
+		var projected = SpectrumProjection.Fill(pixels, new SpectrumDisplay(inverted, logarithmic), ys);
 
 		ys.Should().Equal(expectedYs, (actual, expected) => Math.Abs(actual - expected) < Tolerance);
 		projected.Should().Be(new ProjectedSpectrum(expectedRawMax, expectedDark));

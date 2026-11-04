@@ -189,7 +189,10 @@ public sealed class SerialLinkPortLossTests : SerialLinkTestBase
 		await LoseAsync(Port, 1);
 		await ReopenAsync(reopened, 2);
 
-		await AtAsync(reopened, 3, port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 57))));
+		await AtAsync(
+			reopened,
+			3,
+			port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 57))));
 
 		TakeFrames().Should().Equal(SpectrumFrame(Spectrometer.Atp8000, 5), SpectrumFrame(Spectrometer.Atp8000, 57));
 		Link.Status.State.Should().Be(LinkState.Receiving);

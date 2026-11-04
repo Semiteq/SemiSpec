@@ -11,9 +11,6 @@ namespace SpectrumVisualizer.UI.Spectrum;
 
 public partial class SpectrumChartView : UserControl
 {
-	// ScottPlot 5.1.59 MouseDragPan and MouseDragZoomRectangle ignore a held move shorter than this from the press.
-	private const double DragThreshold = 5.0;
-
 	private IDisposable? _redrawSubscription;
 	private SpectrumChartViewModel? _viewModel;
 	private int _frameSequence;
@@ -25,7 +22,7 @@ public partial class SpectrumChartView : UserControl
 		InitializeComponent();
 		DataContextChanged += OnDataContextChanged;
 
-		// A read-only viewer: ScottPlot's autoscale and keyboard responses would move the limits behind the scale state.
+		// A read-only viewer: ScottPlot's autoscale and keyboard responses would move the limits behind the scale.
 		PlotControl.UserInputProcessor.UserActionResponses.RemoveAll(response => response
 			is DoubleClickBenchmark
 			or SingleClickAutoscale
@@ -157,10 +154,7 @@ public partial class SpectrumChartView : UserControl
 
 	private void OnPlotPointerWheelChanged(object? sender, PointerWheelEventArgs eventArgs)
 	{
-		if (DataContext is SpectrumChartViewModel chart)
-		{
-			chart.TakeManualScale();
-		}
+		_viewModel?.TakeManualScale();
 	}
 
 	private void OnPlotPointerPressed(object? sender, PointerPressedEventArgs eventArgs)
@@ -173,25 +167,16 @@ public partial class SpectrumChartView : UserControl
 		_pressPosition = null;
 	}
 
-	/// <summary>A held move freezes the scale once it is far enough from the press for ScottPlot to pan or zoom.</summary>
 	private void OnPlotPointerMoved(object? sender, PointerEventArgs eventArgs)
 	{
-		if (DataContext is not SpectrumChartViewModel { IsFollowing: true } chart || _pressPosition is not { } press)
+		if (_viewModel is null || _pressPosition is not { } press)
 		{
 			return;
 		}
 
 		var point = eventArgs.GetCurrentPoint(PlotControl);
 		var buttons = point.Properties;
-		if (!buttons.IsLeftButtonPressed && !buttons.IsRightButtonPressed && !buttons.IsMiddleButtonPressed)
-		{
-			return;
-		}
-
-		var distance = Math.Max(Math.Abs(point.Position.X - press.X), Math.Abs(point.Position.Y - press.Y));
-		if (distance >= DragThreshold)
-		{
-			chart.TakeManualScale();
-		}
+		var isButtonHeld = buttons.IsLeftButtonPressed || buttons.IsRightButtonPressed || buttons.IsMiddleButtonPressed;
+		_viewModel.OnHeldMove(press, point.Position, isButtonHeld);
 	}
 }

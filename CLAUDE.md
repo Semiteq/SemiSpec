@@ -66,7 +66,8 @@ then builds and tests the old app.
 .githooks/                       pre-commit hook
 .github/workflows/               CI
 SpectrumVisualizer/              new app: build props, .editorconfig, projects below
-  SpectrumVisualizer.Core/       UI-free code: paths, board protocol, wavelength calibration
+  SpectrumVisualizer.Core/       UI-free code: paths, board protocol, wavelength calibration,
+                                 spectrum projection and scale, log axis ticks
   SpectrumVisualizer.UI/         Avalonia WinExe: startup, logging, serial link, main window, spectrum chart,
                                  messages, styles, resx text
   SpectrumVisualizer.Tools.BoardEmulator/

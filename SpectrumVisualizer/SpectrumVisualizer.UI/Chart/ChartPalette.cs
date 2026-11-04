@@ -11,7 +11,9 @@ namespace SpectrumVisualizer.UI.Chart;
 /// <summary>Colours of the spectrum plottables: the line, the window band fill and the centre line.</summary>
 public readonly record struct ChartColors(Color Line, Color BandFill, Color CentreLine);
 
-/// <summary>Paints the five ScottPlot surfaces the library draws from its own defaults, and resolves the plottable colours.</summary>
+/// <summary>
+/// Paints the five ScottPlot surfaces the library draws from its own defaults, and resolves the plottable colours.
+/// </summary>
 public static class ChartPalette
 {
 	private const string FigureBackgroundKey = "AppPanelBackgroundBrush";

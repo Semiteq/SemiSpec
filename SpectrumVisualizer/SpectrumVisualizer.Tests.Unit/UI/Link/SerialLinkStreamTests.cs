@@ -17,7 +17,8 @@ public sealed class SerialLinkStreamTests : SerialLinkTestBase
 	[Fact(Timeout = TestTimeoutMs)]
 	public async Task FramesInRandomChunksReachTheChannel()
 	{
-		BoardFrame[] frames = [SpectrumFrame(Spectrometer.Atp2000, 1), SpectrumFrame(Spectrometer.Atp8000, 2), Heartbeat(2)];
+		BoardFrame[] frames =
+			[SpectrumFrame(Spectrometer.Atp2000, 1), SpectrumFrame(Spectrometer.Atp8000, 2), Heartbeat(2)];
 		var bytes = Concat(frames.Select(FrameEncoder.Encode));
 		await ConnectAsync();
 

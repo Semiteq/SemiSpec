@@ -20,13 +20,32 @@ using MainWindowView = SpectrumVisualizer.UI.MainWindow.MainWindow;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.MainWindow;
 
-/// <summary>A shown main window over a real link and the fake port, for the desktop UI checklist.</summary>
+/// <summary>A shown main window over a real link and the fake port, with the signal pane's parts and insets.</summary>
 public abstract class MainWindowLayoutTestBase : IDisposable
 {
 	protected const string PortName = "COM3";
 
 	/// <summary>The narrowest chart whose ATP-8000 wavelength axis still carries four labelled ticks.</summary>
 	protected const int ChartFloorWidth = 400;
+
+	protected const double LargeWidth = 2560;
+
+	protected const double PaneBorder = 1;
+	protected const double PanePadding = 16;
+	protected const double RowSpacing = 8;
+	protected const double LabelToField = 12;
+	protected const double SectionHeaderAbove = 16;
+
+	protected static readonly string[] PaneLabels =
+		["DeviceLabel", "WavelengthLabel", "WindowLabel", "AmplitudeLabel", "SnrLabel", "QLabel", "UpdatedLabel"];
+
+	protected static readonly string[] PaneValues =
+		["DeviceValue", "WavelengthValue", "WindowValue", "AmplitudeValue", "SnrValue", "QValue", "UpdatedValue"];
+
+	protected static readonly string[] PaneHeaders = ["SignalHeader", "ChartHeader"];
+
+	protected static readonly string[] PaneControls =
+		["InvertSpectrum", "LogarithmicScale", "ResetScale", "StickToZero"];
 
 	private ConnectionBarViewModel? _connectionBar;
 	private AppStatusBarViewModel? _statusBar;
@@ -56,7 +75,6 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 
 	protected SpectrumViewModel Spectrum =>
 		_spectrum ?? throw new InvalidOperationException("Realise the window first.");
-
 
 	public void Dispose()
 	{

@@ -1,4 +1,4 @@
-namespace SpectrumVisualizer.UI.Chart;
+namespace SpectrumVisualizer.Core.Chart;
 
 /// <summary>A tick on a log10 axis; the position is in decades.</summary>
 public readonly record struct LogTick(double Position, bool IsMajor);
@@ -14,7 +14,6 @@ public static class LogAxis
 	private static readonly double[] _skippedByOneTwoFive = [3.0, 4.0, 6.0, 7.0, 8.0, 9.0];
 	private static readonly double[] _insideDecade = [2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
 	private static readonly double[] _strideMantissas = [1.0, 2.0, 3.0, 5.0];
-
 
 	public static IReadOnlyList<LogTick> Ticks(double minLog, double maxLog, double pixelLength)
 	{

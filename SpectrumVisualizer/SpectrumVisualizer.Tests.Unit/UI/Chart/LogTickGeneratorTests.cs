@@ -2,6 +2,7 @@ using AwesomeAssertions;
 
 using ScottPlot;
 
+using SpectrumVisualizer.Core.Chart;
 using SpectrumVisualizer.UI.Chart;
 
 using Xunit;

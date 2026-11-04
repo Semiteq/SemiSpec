@@ -77,7 +77,9 @@ public class App : Application
 		return window;
 	}
 
-	/// <summary>Holds an operator close until the link and the frame distributor have stopped, at most for the stop limit.</summary>
+	/// <summary>
+	/// Holds an operator close until the link and the frame distributor have stopped, at most for the stop limit.
+	/// </summary>
 	private async void OnMainWindowClosing(ConfiguredServices services, object? sender, WindowClosingEventArgs e)
 	{
 		try
@@ -127,7 +129,9 @@ public class App : Application
 		}
 	}
 
-	/// <summary>The link stops first, so no frame enters the channel after the distributor has stopped reading it.</summary>
+	/// <summary>
+	/// The link stops first, so no frame enters the channel after the distributor has stopped reading it.
+	/// </summary>
 	private static async Task StopLinkThenDistributorAsync(ConfiguredServices services)
 	{
 		try

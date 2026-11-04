@@ -39,24 +39,11 @@ public sealed class MainWindowTextFitTests : MainWindowLayoutTestBase
 	private const int MinimumLabelledTicks = 4;
 
 	private const double NumberFieldWidth = 120;
-	private const double PanePadding = 16;
-	private const double LabelToField = 12;
 	private const double FieldSlack = 24;
-	private const double PaneBorder = 1;
 
 	// The widest G6 float: sign, six significant digits, a two-digit negative exponent.
 	private const float WidestBoardValue = -1.23457E-38f;
 	private const string WidestUpdateTime = "23:59:59.999";
-
-	private static readonly string[] _paneLabels =
-		["DeviceLabel", "WavelengthLabel", "WindowLabel", "AmplitudeLabel", "SnrLabel", "QLabel", "UpdatedLabel"];
-
-	private static readonly string[] _paneValues =
-		["DeviceValue", "WavelengthValue", "WindowValue", "AmplitudeValue", "SnrValue", "QValue", "UpdatedValue"];
-
-	private static readonly string[] _paneHeaders = ["SignalHeader", "ChartHeader"];
-
-	private static readonly string[] _paneControls = ["InvertSpectrum", "LogarithmicScale", "ResetScale", "StickToZero"];
 
 	[AvaloniaTheory]
 	[InlineData("en")]
@@ -143,7 +130,7 @@ public sealed class MainWindowTextFitTests : MainWindowLayoutTestBase
 			"a label, a value, a checkbox or a button never takes a second line");
 
 		var sample = Named<TextBlock>(pane, "DeviceLabel");
-		_paneLabels.Concat(_paneValues).Select(name => Named<TextBlock>(pane, name)).Should().OnlyContain(
+		PaneLabels.Concat(PaneValues).Select(name => Named<TextBlock>(pane, name)).Should().OnlyContain(
 			text => text.FontFamily == sample.FontFamily && text.FontSize == sample.FontSize,
 			"every label and value is measured in the first label's face");
 		double Measure(string text)
@@ -151,25 +138,29 @@ public sealed class MainWindowTextFitTests : MainWindowLayoutTestBase
 			return RenderedText.Width(text, sample.FontFamily, sample.FontSize);
 		}
 
-		var labelColumn = _paneLabels.Max(name => Measure(Named<TextBlock>(pane, name).Text!));
+		var labelColumn = PaneLabels.Max(name => Measure(Named<TextBlock>(pane, name).Text!));
 		var valueColumn = WidestValues().Max(Measure);
-		var controlWidths = _paneControls.Select(name => RealWidth(Named<ContentControl>(pane, name))).ToList();
+		var controlWidths = PaneControls.Select(name => RealWidth(Named<ContentControl>(pane, name))).ToList();
 		var controlColumn = controlWidths.Max();
 		var fieldColumn = new[] { NumberFieldWidth, valueColumn, controlColumn }.Max();
-		var headerWidth = _paneHeaders.Select(name => Named<TextBlock>(pane, name))
+		var headerWidth = PaneHeaders.Select(name => Named<TextBlock>(pane, name))
 			.Max(header => RenderedText.Width(header.Text!, header.FontFamily, header.FontSize, header.FontWeight));
 		var required = PaneBorder + PanePadding + labelColumn + LabelToField + fieldColumn + PanePadding + FieldSlack;
 
+		var controls = string.Join(
+			" / ",
+			controlWidths.Select(width => width.ToString("0.#", CultureInfo.CurrentCulture)));
 		TestContext.Current.TestOutputHelper?.WriteLine(
-			$"{culture}: labels {labelColumn:0.#} px, values {valueColumn:0.#} px, "
-			+ $"controls {string.Join(" / ", controlWidths.Select(width => width.ToString("0.#", CultureInfo.CurrentCulture)))} px, "
+			$"{culture}: labels {labelColumn:0.#} px, values {valueColumn:0.#} px, controls {controls} px, "
 			+ $"field column {fieldColumn:0.#} px, headers {headerWidth:0.#} px; pane needs {required:0.#} px, "
 			+ $"rounded {RoundUpTo8(required)} px, set {SpectrumPanel.PaneWidth} px");
 		pane.Bounds.Width.Should().Be(SpectrumPanel.PaneWidth);
 		SpectrumPanel.PaneWidth.Should().BeGreaterThanOrEqualTo(
 			RoundUpTo8(required),
 			"the pane is padding, label column, gap, field column, padding and slack");
-		headerWidth.Should().BeLessThanOrEqualTo(labelColumn + LabelToField + fieldColumn, "a header spans both columns");
+		headerWidth.Should().BeLessThanOrEqualTo(
+			labelColumn + LabelToField + fieldColumn,
+			"a header spans both columns");
 	}
 
 	[AvaloniaFact]
@@ -197,7 +188,8 @@ public sealed class MainWindowTextFitTests : MainWindowLayoutTestBase
 		window.Width = 400;
 		Dispatcher.UIThread.RunJobs();
 
-		MainWindowView.MinimumWidth.Should().BeGreaterThanOrEqualTo(RoundUpTo8(SpectrumPanel.PaneWidth + ChartFloorWidth));
+		MainWindowView.MinimumWidth.Should()
+			.BeGreaterThanOrEqualTo(RoundUpTo8(SpectrumPanel.PaneWidth + ChartFloorWidth));
 		Named<Border>(window, "SpectrumPane").Bounds.Width.Should().BeGreaterThanOrEqualTo(ChartFloorWidth);
 		Named<Border>(window, "SignalPane").Bounds.Width.Should().Be(SpectrumPanel.PaneWidth);
 	}
@@ -216,7 +208,7 @@ public sealed class MainWindowTextFitTests : MainWindowLayoutTestBase
 		];
 	}
 
-	/// <summary>A checkbox or a button in real faces: its realised chrome plus its text measured in its own face.</summary>
+	/// <summary>A checkbox or a button in real faces: its realised chrome plus its text in its own face.</summary>
 	private static double RealWidth(ContentControl control)
 	{
 		control.Measure(Size.Infinity);

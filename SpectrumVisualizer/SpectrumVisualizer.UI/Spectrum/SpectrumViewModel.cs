@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 
 using ReactiveUI;
 
+using SpectrumVisualizer.Core.Spectrum;
 using SpectrumVisualizer.UI.Messages;
 
 namespace SpectrumVisualizer.UI.Spectrum;
@@ -43,8 +44,11 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 			.Subscribe(Show, ReportPipelineFailure));
 
 		_disposables.Add(this
-			.WhenAnyValue(spectrum => spectrum.IsInverted, spectrum => spectrum.IsLogarithmic)
-			.Subscribe(display => Chart.SetDisplay(display.Item1, display.Item2), ReportPipelineFailure));
+			.WhenAnyValue(
+				spectrum => spectrum.IsInverted,
+				spectrum => spectrum.IsLogarithmic,
+				(inverted, logarithmic) => new SpectrumDisplay(inverted, logarithmic))
+			.Subscribe(Chart.SetDisplay, ReportPipelineFailure));
 
 		var canStickToZero = Chart.WhenAnyValue(chart => chart.HasSpectrum);
 		var canResetScale = Chart.WhenAnyValue(

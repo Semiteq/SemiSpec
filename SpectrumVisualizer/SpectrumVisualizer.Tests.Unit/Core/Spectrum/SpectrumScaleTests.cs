@@ -2,13 +2,13 @@ using AwesomeAssertions;
 
 using SpectrumVisualizer.Core.Calibration;
 using SpectrumVisualizer.Core.Protocol;
-using SpectrumVisualizer.UI.Spectrum;
+using SpectrumVisualizer.Core.Spectrum;
 
 using Xunit;
 
-namespace SpectrumVisualizer.Tests.Unit.UI.Spectrum;
+namespace SpectrumVisualizer.Tests.Unit.Core.Spectrum;
 
-[Trait("Component", "UI")]
+[Trait("Component", "Core")]
 [Trait("Area", "Spectrum")]
 [Trait("Category", "Unit")]
 public sealed class SpectrumScaleTests
@@ -43,7 +43,7 @@ public sealed class SpectrumScaleTests
 		double expectedBottom,
 		double expectedTop)
 	{
-		var limits = SpectrumScale.Following(_xs, ys, logarithmic);
+		var limits = SpectrumScale.Following(_xs, ys, Display(logarithmic));
 
 		limits.X.Should().Be(new AxisRange(400.0, 600.0));
 		limits.Y.Min.Should().BeApproximately(expectedBottom, Tolerance);
@@ -52,9 +52,12 @@ public sealed class SpectrumScaleTests
 
 	[Theory]
 	[MemberData(nameof(StuckRows))]
-	public void StuckToZeroRunsFromZeroToTheHeadroomOverTheRawMaximum(double rawMax, bool logarithmic, double expectedTop)
+	public void StuckToZeroRunsFromZeroToTheHeadroomOverTheRawMaximum(
+		double rawMax,
+		bool logarithmic,
+		double expectedTop)
 	{
-		var limits = SpectrumScale.StuckToZero(_xs, rawMax, logarithmic);
+		var limits = SpectrumScale.StuckToZero(_xs, rawMax, Display(logarithmic));
 
 		limits.X.Should().Be(new AxisRange(400.0, 600.0));
 		limits.Y.Min.Should().Be(0.0);
@@ -70,12 +73,13 @@ public sealed class SpectrumScaleTests
 	{
 		var xs = Wavelengths(Spectrometer.Atp2000);
 		var ys = new double[xs.Length];
-		var projected = SpectrumProjection.Fill(new ushort[xs.Length], inverted, logarithmic, ys);
+		var display = new SpectrumDisplay(inverted, logarithmic);
+		var projected = SpectrumProjection.Fill(new ushort[xs.Length], display, ys);
 
 		SpectrumLimits[] all =
 		[
-			SpectrumScale.Following(xs, ys, logarithmic),
-			SpectrumScale.StuckToZero(xs, projected.RawMax, logarithmic),
+			SpectrumScale.Following(xs, ys, display),
+			SpectrumScale.StuckToZero(xs, projected.RawMax, display),
 		];
 
 		foreach (var limits in all)
@@ -84,6 +88,11 @@ public sealed class SpectrumScaleTests
 			values.Should().OnlyContain(value => double.IsFinite(value));
 			limits.Y.Max.Should().BeGreaterThan(limits.Y.Min);
 		}
+	}
+
+	private static SpectrumDisplay Display(bool logarithmic)
+	{
+		return new SpectrumDisplay(IsInverted: false, logarithmic);
 	}
 
 	private static double[] Wavelengths(Spectrometer device)

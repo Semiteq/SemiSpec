@@ -1,12 +1,12 @@
 using AwesomeAssertions;
 
-using SpectrumVisualizer.UI.Chart;
+using SpectrumVisualizer.Core.Chart;
 
 using Xunit;
 
-namespace SpectrumVisualizer.Tests.Unit.UI.Chart;
+namespace SpectrumVisualizer.Tests.Unit.Core.Chart;
 
-[Trait("Component", "UI")]
+[Trait("Component", "Core")]
 [Trait("Area", "Chart")]
 [Trait("Category", "Unit")]
 public sealed class LogAxisTests
@@ -17,7 +17,6 @@ public sealed class LogAxisTests
 	private const double RelativeValueTolerance = 1e-9;
 	private const double GapTolerance = 1e-6;
 	private static readonly TimeSpan _ticksDeadline = TimeSpan.FromSeconds(5);
-
 
 	[Fact]
 	public void TicksSixDecadesOver400PixelsPutMajorsOnDecadesAndMinorsInside()

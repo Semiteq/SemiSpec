@@ -193,11 +193,13 @@ public sealed class FrameDistributorTests : IAsyncLifetime
 	[Fact(Timeout = TestTimeoutMs)]
 	public async Task AFailingReadIsLoggedAtErrorAndStopStillCompletes()
 	{
-		var failing = new CountingChannelReader(_channel.Reader, failWith: new InvalidOperationException("the read failed"));
+		var failure = new InvalidOperationException("the read failed");
+		var failing = new CountingChannelReader(_channel.Reader, failWith: failure);
 		var distributor = new FrameDistributor(failing, _panel, ImmediateScheduler.Instance, _logger);
 		distributor.Start();
 
-		await Waits.UntilAsync(() => _logger.Collector.GetSnapshot().Any(record => record.Message == "The frame distributor stopped"));
+		await Waits.UntilAsync(() => _logger.Collector.GetSnapshot()
+			.Any(record => record.Message == "The frame distributor stopped"));
 		await distributor.StopAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
 
 		var error = _logger.Collector.GetSnapshot().Single(record => record.Level == LogLevel.Error);
@@ -244,7 +246,9 @@ public sealed class FrameDistributorTests : IAsyncLifetime
 		public override ValueTask<bool> WaitToReadAsync(CancellationToken cancellationToken = default)
 		{
 			Interlocked.Increment(ref _waitCalls);
-			return failWith is null ? inner.WaitToReadAsync(cancellationToken) : ValueTask.FromException<bool>(failWith);
+			return failWith is null
+				? inner.WaitToReadAsync(cancellationToken)
+				: ValueTask.FromException<bool>(failWith);
 		}
 
 		public override IAsyncEnumerable<ReceivedFrame> ReadAllAsync(CancellationToken cancellationToken = default)

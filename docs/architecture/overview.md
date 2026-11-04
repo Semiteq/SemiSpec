@@ -39,6 +39,10 @@ writes protocol frames to a serial port for manual runs.
 | `FrameReader` | Core | Yields the frames of a `PipeReader`, or decodes what is buffered without a wait, and counts the dropped bytes |
 | `SequenceTracker` | Core | Counts the spectra lost between frames from `seq` |
 | `SpectrometerCalibration` | Core | Per device: the wavelength of each pixel, the pixel for a wavelength, the pixel window for a wavelength and `delta` |
+| `SpectrumDisplay` | Core | How the spectrum is drawn: inverted or not, linear or log axis (`Core/Spectrum/`) |
+| `SpectrumProjection` | Core | Writes the displayed value of each pixel into a line's buffer: inverted over the frame's maximum, then `log10` floored at 1 on the log axis; reports the raw maximum and whether the frame is dark (`Core/Spectrum/`) |
+| `SpectrumScale` | Core | The axis limits of the shown spectrum while following and after Stick to zero, as pure functions (`Core/Spectrum/`) |
+| `LogAxis` | Core | The ticks of an axis that runs in decades: major and minor positions for the limits and the axis length (`Core/Chart/`) |
 | `FrameSchedule`, `SpectrumGenerator` | Tools.BoardEmulator | Which frame the emulated board sends at a tick and its `state`, and the synthetic and dark spectra |
 | `EmulatorCommand` | Tools.BoardEmulator | Parses and range-checks the command line into an `EmulatorOptions` record; rejects `--failed` for the other spectrometer without `--both-connected` |
 | `Program` (emulator) | Tools.BoardEmulator | Opens the port, checks every 10 ms which frame is due and writes it, until Ctrl+C |
@@ -52,13 +56,11 @@ writes protocol frames to a serial port for manual runs.
 | `FrameDistributor` | UI | The one reader of `SerialLink.Frames`: keeps the latest frame that carries a spectrum and hands every frame to each subscriber on its read task |
 | `DisplayedSpectrum`, `IDisplayedSpectrumSource` | UI | The spectrum the chart shows and its receive time; the source's `Current` and the `Changed` signal. `LiveSpectrumSource` is its implementation |
 | `LiveSpectrumSource` | UI | The live `IDisplayedSpectrumSource`: `Current` wraps the distributor's latest spectrum frame in a new record on each read, around the frame's own measurement; `Changed` signals each spectrum frame and skips heartbeats |
-| `SpectrumProjection` | UI | Writes the displayed value of each pixel into a line's buffer: inverted over the frame's maximum, then `log10` floored at 1 on the log axis; reports the raw maximum and whether the frame is dark |
-| `SpectrumScale` | UI | The axis limits of the shown spectrum while following and after Stick to zero, as pure functions |
 | `SpectrumChartViewModel` | UI | Owns the ScottPlot `Plot`: one line per spectrometer, the window band, the centre line, the axis type and the follow or frozen scale; asks the view for a redraw |
 | `SignalInfoViewModel` | UI | The seven signal pane texts of the shown spectrum |
 | `SpectrumViewModel` | UI | The spectrum screen: applies the source's latest spectrum to the chart and the signal pane, the Invert and Logarithmic checkboxes, Reset scale and Stick to zero |
 | `ChartPalette` | UI | Paints ScottPlot's figure, data area, grid and axes from the palette, and resolves the colours of the line, the band and the centre line |
-| `LogAxis`, `LogTickGenerator` | UI | The ticks of an axis that runs in decades, their labels under the current culture, and a cache of the last two results keyed on the limits, the length and the culture |
+| `LogTickGenerator` | UI | ScottPlot's tick generator over `LogAxis`: the labels under the current culture, and a cache of the last two results keyed on the limits, the length and the culture |
 | `AppLogging` | UI | Creates the log folder and the Serilog logger: `spectrum-visualizer.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
 | `AddUi(LoggingSetup)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, `LiveSpectrumSource` as the `IDisplayedSpectrumSource`, the message panel, the connection row, the status bar, the spectrum view model and the main window view model, all singletons |
@@ -73,6 +75,10 @@ writes protocol frames to a serial port for manual runs.
 | `UnhandledErrorObserver` | UI | ReactiveUI's last-resort exception handler and the dispatcher's unhandled-exception handler |
 
 `board-protocol.md` describes the link's read loop, health rules, drain, reopen and channel.
+
+Core holds every algorithm that needs no UI type: the projection and the scale rules under `Core/Spectrum/`, the log
+axis ticks under `Core/Chart/`. The UI keeps what touches ScottPlot or Avalonia: `LogTickGenerator`, `ChartPalette` and
+the chart view model.
 
 ## Startup
 
@@ -140,6 +146,12 @@ widest of Inter and every installed family of Semi's font chain; on Windows the 
 YaHei. Both rows stay left-aligned at any width above the minimum, and no link state changes the set of rows or a row's
 height.
 
+The Verbose logging item reads `IsVerboseLogging` one-way and writes only through `ToggleVerboseLoggingCommand`, so the
+command is the level's single writer. `LogLevelControl` raises no notification; the command raises
+`IsVerboseLogging` after it flips the switch. The level resets to Information at every start. Each toggle writes
+an Information line with the new minimum level and a Debug line; the Debug line reaches the log file only when the
+toggle turned verbose logging on, so the operator sees the switch take effect in the file.
+
 ### Content row
 
 The chart is the one element that stretches. `SpectrumPane` holds the chart edge to edge with no padding, because
@@ -161,12 +173,6 @@ shares.
 
 The message panel row takes its height from the content row: the chart and the pane lose that height and keep their
 width, and the window keeps its size. No spectrum state changes the window size or either pane's bounds.
-
-The Verbose logging item reads `IsVerboseLogging` one-way and writes only through `ToggleVerboseLoggingCommand`, so the
-command is the level's single writer. `LogLevelControl` raises no notification; the command raises
-`IsVerboseLogging` after it flips the switch. The level resets to Information at every start. Each toggle writes
-an Information line with the new minimum level and a Debug line; the Debug line reaches the log file only when the
-toggle turned verbose logging on, so the operator sees the switch take effect in the file.
 
 ### Connection row
 
@@ -267,7 +273,9 @@ sets them, so a flat range has a defined answer and no limit is NaN.
 
 The reference is the spectrum the Y limits come from: the shown spectrum, or, while a dark frame is shown, the last
 non-dark measurement, projected again in the current inversion and axis mode. A dark frame is one whose raw pixels are
-all zero. With no earlier non-dark frame the dark frame is its own reference and takes the flat range. So a dark frame
+all zero. The chart keeps one last non-dark measurement and reuses it only for a dark frame of the same device. With
+no earlier non-dark frame, or when the last one came from the other device, the dark frame is its own reference and
+takes the flat range: the other device's intensities say nothing about this one. So a dark frame
 while following keeps the Y limits of the spectrum before it, Stick to zero on a dark frame takes that spectrum's
 `rawMax`, and a log or inversion toggle during a dark frame shows that spectrum's limits in the new mode; X follows the
 dark frame's device in every case. On the log axis the dark line lies at 0 decades, below a range kept from a spectrum
@@ -278,10 +286,13 @@ The scale follows from the start, after Reset scale and after a log or inversion
 freezes on a wheel step over the plot, on a pointer move with a button held 5 px or more from the press, and after
 Stick to zero. Before the first spectrum neither input freezes it, so the first spectrum sets the limits. Tunnel
 handlers for `PointerWheelChanged`, `PointerPressed`, `PointerMoved` and `PointerReleased` on `AvaPlot` record the
-press and call `TakeManualScale()`; they run before ScottPlot's class handler, which marks the wheel event handled. The
-5 px is ScottPlot 5.1.59's own floor: `MouseDragPan` and `MouseDragZoomRectangle` ignore a held move shorter than
-that, so a shorter move would freeze limits ScottPlot never moved. `MouseDragZoom` (right button) has no floor, so a
-right drag under 5 px zooms a little and the next frame sets the limits back. ScottPlot's `MouseDragPan` also restores
+press and forward to the chart: a wheel step calls `TakeManualScale()`, and a move calls `OnHeldMove(press, current,
+isButtonHeld)`, which decides the freeze from the held button and the larger of the X and Y distances. The handlers run
+before ScottPlot's class handler, which marks the wheel event handled. The 5 px is ScottPlot 5.1.59's own floor:
+`MouseDragPan` and `MouseDragZoomRectangle` ignore a held move shorter than that, so a shorter move would freeze limits
+ScottPlot never moved. ScottPlot still applies that short pan on release, and `MouseDragZoom` (right button) has no
+floor, so a right drag under 5 px zooms a little; while following, the next spectrum sets the limits back in both
+cases. ScottPlot's `MouseDragPan` also restores
 the press-time limits on release before it applies the drag, so a press held across a frame ends on limits panned from
 the press-time view, not from the last frame. A bare click and a key press keep the scale following. While frozen, a
 frame from the other device keeps the frozen limits, and its line can lie outside them until Reset scale. Reset scale

@@ -82,8 +82,14 @@ public sealed class SerialLinkSessionTests : SerialLinkTestBase
 		await AtAsync(1, port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 3))));
 		await LoseAsync(Port, 2);
 		await ReopenAsync(reopened, 3);
-		await AtAsync(reopened, 4, port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 10))));
-		await AtAsync(reopened, 5, port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 12))));
+		await AtAsync(
+			reopened,
+			4,
+			port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 10))));
+		await AtAsync(
+			reopened,
+			5,
+			port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 12))));
 		Link.Status.LostSpectra.Should().Be(2);
 
 		await Link.DisconnectAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);

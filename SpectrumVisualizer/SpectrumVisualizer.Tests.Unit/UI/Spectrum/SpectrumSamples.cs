@@ -3,7 +3,7 @@ using SpectrumVisualizer.UI.Spectrum;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Spectrum;
 
-/// <summary>Displayed spectra shaped like the emulator's: a peak of 30000 over a floor of 1000, or a dark frame.</summary>
+/// <summary>Displayed spectra like the emulator's: a peak of 30000 over a floor of 1000, or a dark frame.</summary>
 internal static class SpectrumSamples
 {
 	public const ushort Floor = 1000;

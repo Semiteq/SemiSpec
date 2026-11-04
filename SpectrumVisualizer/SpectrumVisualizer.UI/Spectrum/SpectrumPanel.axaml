@@ -97,7 +97,7 @@
                    FontWeight="Bold"
                    Margin="0,8,0,0" />
 
-        <!-- A text block, not string content: Semi's template wraps a string, and the pane style keeps this one NoWrap. -->
+        <!-- A text block, not string content: Semi's template wraps a string; the pane style keeps this NoWrap. -->
         <CheckBox Grid.Row="9"
                   Grid.Column="1"
                   Name="InvertSpectrum"
