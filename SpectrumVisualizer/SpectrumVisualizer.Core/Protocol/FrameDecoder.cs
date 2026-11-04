@@ -62,7 +62,7 @@ public static class FrameDecoder
 		}
 	}
 
-	/// <summary>Checks the sync, the length and whether the whole frame is buffered; the CRC comes later.</summary>
+	/// <summary>The CRC is not checked here.</summary>
 	private static Candidate CheckHeader(ReadOnlySequence<byte> buffer, out int frameSize, out Spectrometer? device)
 	{
 		frameSize = 0;

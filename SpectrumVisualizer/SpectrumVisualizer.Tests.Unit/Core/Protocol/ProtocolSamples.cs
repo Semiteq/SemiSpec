@@ -44,7 +44,6 @@ internal static class ProtocolSamples
 			== CrcOf(frameBytes);
 	}
 
-	/// <summary>Rewrites the CRC after a test patched the frame bytes.</summary>
 	public static void RecomputeCrc(byte[] frameBytes)
 	{
 		BinaryPrimitives.WriteUInt16LittleEndian(frameBytes.AsSpan(frameBytes.Length - CrcSize), CrcOf(frameBytes));
