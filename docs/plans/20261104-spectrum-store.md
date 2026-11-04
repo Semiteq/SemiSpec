@@ -326,8 +326,8 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   becomes an `ExceptionalError`. `Write` computes `intensity` from the frame's own wavelength and `delta` through
   `SpectrumIntensity`. `wal_checkpoint(TRUNCATE)` invokes no busy handler: when a reader holds a snapshot it returns
   at once with its `busy` column set to 1 (ASSUMPTION, pinned by `ACheckpointBesideAnOpenReaderReturnsBusyAtOnce`).
-  `CheckpointAndClose` logs that at Debug and closes anyway; the WAL stays, and the next start deletes it with the
-  file.
+  `CheckpointAndClose` returns `WalCheckpoint.Busy` and closes anyway (Core has no logger; `SpectrumStore` logs a busy
+  checkpoint at Debug); the WAL stays, and the next start deletes it with the file.
 - **Background writer.** `SpectrumStore` (UI) is a singleton:
   - `SpectrumStore(FrameDistributor, StoreFile, MessagePanelViewModel, IScheduler uiScheduler, TimeProvider,
     ILogger<SpectrumStore>)`, where `StoreFile(string Path)` is the instance file registered by `AddUi`.
@@ -553,27 +553,30 @@ Data flow:
 
 ### Task 3: Database: schema, batched writes, retention, checkpoint
 **Files:**
-- Create: `SpectrumVisualizer/SpectrumVisualizer.Core/Store/SpectrumDatabase.cs`, `SpectrumIntensity.cs`
+- Create: `SpectrumVisualizer/SpectrumVisualizer.Core/Store/SpectrumDatabase.cs`, `SpectrumIntensity.cs`,
+  `StoreConnection.cs` (the connection string and pragmas, shared with the reader connections of Task 6)
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Store/SpectrumDatabaseTests.cs`,
   `SpectrumIntensityTests.cs`, `StoreSamples.cs`
 
-- [ ] implement `SpectrumIntensity.Covers(Spectrometer, ushort nm)` and `Mean(ReadOnlySpan<ushort>, PixelWindow)` of
+- [x] implement `SpectrumIntensity.Covers(Spectrometer, ushort nm)` and `Mean(ReadOnlySpan<ushort>, PixelWindow)` of
   Technical Details
-- [ ] implement `SpectrumDatabase` of Solution Overview: connection string, the three pragmas, the schema, `Write`
+- [x] implement `SpectrumDatabase` of Solution Overview: connection string, the three pragmas, the schema, `Write`
   with two reused parameterised commands inside one `BEGIN IMMEDIATE` transaction and one reused `byte[]` per device
   size for the pixels, `DeleteBefore` in its own `BEGIN IMMEDIATE` transaction, `CheckpointAndClose` reading the
-  checkpoint's `busy` column and logging a busy checkpoint at Debug; NaN floats bind as `DBNull`
-- [ ] write `AWriteAgainstAHeldLockFailsAfterTheDefaultTimeout` (a `Stopwatch` around `Write` while a second
+  checkpoint's `busy` column and logging a busy checkpoint at Debug; NaN floats bind as `DBNull`. Done with one change:
+  `CheckpointAndClose` returns `Result<WalCheckpoint>` (`Truncated` or `Busy`) and the caller logs a busy checkpoint
+  at Debug, because Core has no logger. Added `TheOwnWindowMeanIsNullWhenTheDeviceDoesNotCoverItsWavelength`.
+- [x] write `AWriteAgainstAHeldLockFailsAfterTheDefaultTimeout` (a `Stopwatch` around `Write` while a second
   connection holds `BEGIN IMMEDIATE`: failed `Result`, 1.9 to 2.5 s) and
   `ACheckpointBesideAnOpenReaderReturnsBusyAtOnce` (a second connection inside a read transaction: busy reported,
   under 100 ms, the connection closed)
-- [ ] write `StoreSamples` (spectra at given times, wavelengths, devices and dark, heartbeats) over `ProtocolSamples`
-- [ ] write the `SpectrumIntensityTests` and `SpectrumDatabaseTests` of Acceptance Evidence item 1, reading rows back
+- [x] write `StoreSamples` (spectra at given times, wavelengths, devices and dark, heartbeats) over `ProtocolSamples`
+- [x] write the `SpectrumIntensityTests` and `SpectrumDatabaseTests` of Acceptance Evidence item 1, reading rows back
   with plain SQL on a second connection
-- [ ] write `ABatchIsOneTransaction`: a second connection creates `CREATE TRIGGER fail_seq_99 BEFORE INSERT ON
+- [x] write `ABatchIsOneTransaction`: a second connection creates `CREATE TRIGGER fail_seq_99 BEFORE INSERT ON
   spectrum WHEN NEW.seq = 99 BEGIN SELECT RAISE(ABORT, 'test'); END`, the batch ends with a frame of `seq` 99,
   `Write` returns a failed `Result`, and no row of the batch exists
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (536 of 536)
 
 ### Task 4: Series fold
 **Files:**
