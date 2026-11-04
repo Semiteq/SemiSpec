@@ -560,22 +560,24 @@ the same run do not.
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/MainWindow/MainWindowViewTests.cs`,
   `MainWindowViewModelTests.cs` (both construct `MainWindowViewModel`, whose constructor gains the connection row)
 
-- [ ] load the `dev:desktop-ui` skill before writing the AXAML; take every inset and width from its tables
-- [ ] implement `ConnectionBarViewModel(ISerialPortProvider, SerialLink, IScheduler uiScheduler)`: `Ports`,
+- [x] load the `dev:desktop-ui` skill before writing the AXAML; take every inset and width from its tables
+- [x] implement `ConnectionBarViewModel(ISerialPortProvider, SerialLink, IScheduler uiScheduler)`: `Ports`,
   `SelectedPort`, `RefreshCommand`, `ConnectCommand`, `DisconnectCommand` (`CreateFromTask`), `IsIdle` through
   `ToProperty` over `StatusChanged` seeded with `StartWith(link.Status)`; `canExecute` observables from `IsIdle` and
-  `SelectedPort`
-- [ ] lay out the row of Solution Overview: `Border` with `Padding="16,8"` (as the status bar row,
+  `SelectedPort` (the seed sits after `ObserveOn`, so `IsIdle` is right from construction; the placeholder text is a
+  view model property, empty while ports are listed)
+- [x] lay out the row of Solution Overview: `Border` with `Padding="16,8"` (as the status bar row,
   `MainWindow.axaml:49`), a bottom border in `AppBorderBrush`, a horizontal `StackPanel` with `Spacing="8"`, the label
   with `Margin="0,0,4,0"` so label to field is 12, the combo box `Width="240"` with the placeholder
-- [ ] add the row to `MainWindow.axaml` (`:18` becomes `Auto,Auto,*,Auto,Auto`); expose the view model on
+- [x] add the row to `MainWindow.axaml` (`:18` becomes `Auto,Auto,*,Auto,Auto`); expose the view model on
   `MainWindowViewModel`; register it in `AddUi`; refresh the port list from the window's `Opened` in `App`
-- [ ] write view model tests: refresh fills the list and keeps a still-present selection; Connect is disabled with no
+- [x] write view model tests: refresh fills the list and keeps a still-present selection; Connect is disabled with no
   selection and while the link is active; Disconnect is enabled in every state but Disconnected; Connect and
   Disconnect reach the link; the initial `IsIdle` comes from `link.Status`
-- [ ] update `MainWindowViewTests` (`:35-42` construction, row order) and `MainWindowViewModelTests`; add a
+- [x] update `MainWindowViewTests` (`:35-42` construction, row order) and `MainWindowViewModelTests`; add a
   realised-row test: label, combo box with its placeholder when empty, three buttons
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] ➕ `AppLifecycleTests.OpeningTheWindowFillsThePortList` covers the `Opened` hook
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 10: Status bar bound to the link
 **Files:**

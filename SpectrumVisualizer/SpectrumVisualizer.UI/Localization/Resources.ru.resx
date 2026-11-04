@@ -108,4 +108,19 @@
   <data name="LinkRestoredDetail" xml:space="preserve">
     <value>Данные от платы восстановлены: верные кадры снова приходят.</value>
   </data>
+  <data name="ConnectionPortLabel" xml:space="preserve">
+    <value>Порт</value>
+  </data>
+  <data name="ConnectionPortPlaceholder" xml:space="preserve">
+    <value>Порты не найдены</value>
+  </data>
+  <data name="ConnectionRefresh" xml:space="preserve">
+    <value>Обновить</value>
+  </data>
+  <data name="ConnectionConnect" xml:space="preserve">
+    <value>Подключить</value>
+  </data>
+  <data name="ConnectionDisconnect" xml:space="preserve">
+    <value>Отключить</value>
+  </data>
 </root>

@@ -108,4 +108,19 @@
   <data name="LinkRestoredDetail" xml:space="preserve">
     <value>Data from the board restored: valid frames arrive again.</value>
   </data>
+  <data name="ConnectionPortLabel" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="ConnectionPortPlaceholder" xml:space="preserve">
+    <value>No ports found</value>
+  </data>
+  <data name="ConnectionRefresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="ConnectionConnect" xml:space="preserve">
+    <value>Connect</value>
+  </data>
+  <data name="ConnectionDisconnect" xml:space="preserve">
+    <value>Disconnect</value>
+  </data>
 </root>

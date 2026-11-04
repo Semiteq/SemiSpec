@@ -71,6 +71,7 @@ public class App : Application
 		}
 
 		var window = new MainWindow.MainWindow { DataContext = viewModel };
+		window.Opened += (_, _) => viewModel.ConnectionBar.RefreshPorts();
 		window.Closing += OnMainWindowClosing;
 
 		return window;

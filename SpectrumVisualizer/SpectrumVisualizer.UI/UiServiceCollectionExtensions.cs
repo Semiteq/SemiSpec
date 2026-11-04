@@ -29,6 +29,7 @@ public static class UiServiceCollectionExtensions
 			DefaultScheduler.Instance,
 			provider.GetRequiredService<ILogger<SerialLink>>()));
 		services.AddSingleton<MessagePanelViewModel>();
+		services.AddSingleton<ConnectionBarViewModel>();
 		services.AddSingleton<AppStatusBarViewModel>();
 		services.AddSingleton<MainWindowViewModel>();
 

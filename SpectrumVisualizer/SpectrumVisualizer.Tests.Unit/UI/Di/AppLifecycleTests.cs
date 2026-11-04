@@ -15,6 +15,7 @@ using SpectrumVisualizer.Tests.Unit.UI.Logging;
 using SpectrumVisualizer.UI;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
+using SpectrumVisualizer.UI.MainWindow;
 
 using Xunit;
 
@@ -80,6 +81,16 @@ public sealed class AppLifecycleTests : IDisposable
 		window.Close();
 
 		closed.Should().BeTrue();
+	}
+
+	[AvaloniaFact]
+	public void OpeningTheWindowFillsThePortList()
+	{
+		using var provider = BuildContainer();
+		var window = ShowMainWindow(provider);
+
+		provider.GetRequiredService<ConnectionBarViewModel>().Ports.Should().Equal(PortName);
+		window.Close();
 	}
 
 	private ServiceProvider BuildContainer()

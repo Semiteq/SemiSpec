@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 
 using Avalonia.Controls;
@@ -13,6 +14,10 @@ using FluentResults;
 
 using Microsoft.Extensions.Logging.Abstractions;
 
+using ReactiveUI.Avalonia;
+
+using SpectrumVisualizer.Tests.Unit.UI.Link;
+using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
@@ -30,13 +35,19 @@ namespace SpectrumVisualizer.Tests.Unit.UI.MainWindow;
 public sealed class MainWindowViewTests : IDisposable
 {
 	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
+	private readonly SerialLink _serialLink;
+	private readonly ConnectionBarViewModel _connectionBar;
 	private readonly MainWindowViewModel _viewModel;
 	private readonly MainWindowView _window;
 
 	public MainWindowViewTests()
 	{
+		var portProvider = new FakeSerialPortProvider();
+		_serialLink = new SerialLink(portProvider, ImmediateScheduler.Instance, NullLogger<SerialLink>.Instance);
+		_connectionBar = new ConnectionBarViewModel(portProvider, _serialLink, AvaloniaScheduler.Instance);
 		_viewModel = new MainWindowViewModel(
 			_messagePanel,
+			_connectionBar,
 			new AppStatusBarViewModel(),
 			new LogLevelControl(),
 			NullLogger<MainWindowViewModel>.Instance);
@@ -66,19 +77,42 @@ public sealed class MainWindowViewTests : IDisposable
 	}
 
 	[AvaloniaFact]
-	public void TheRowsStandTopToBottomAsMenuContentMessagePanelAndStatusBar()
+	public void TheRowsStandTopToBottomAsMenuConnectionRowContentMessagePanelAndStatusBar()
 	{
 		Realise();
 
 		new Control[]
 			{
 				Named<AppMenuBar>(_window, "MenuBar"),
+				Named<Border>(_window, "ConnectionRow"),
 				Named<Border>(_window, "ContentArea"),
 				Named<Border>(_window, "MessagePanel"),
 				Named<Border>(_window, "StatusBar"),
 			}
 			.Select(Grid.GetRow)
-			.Should().Equal(0, 1, 2, 3);
+			.Should().Equal(0, 1, 2, 3, 4);
+	}
+
+	[AvaloniaFact]
+	public void TheConnectionRowShowsTheLabelTheEmptyPortListAndThreeButtons()
+	{
+		Realise();
+
+		var connectionRow = Named<Border>(_window, "ConnectionRow");
+		connectionRow.IsEffectivelyVisible.Should().BeTrue();
+		var bar = connectionRow.Child.Should().BeOfType<ConnectionBar>().Which;
+
+		Named<TextBlock>(bar, "PortLabel").Text.Should().Be(Resources.ConnectionPortLabel);
+		var portList = Named<ComboBox>(bar, "PortList");
+		portList.Width.Should().Be(240);
+		portList.PlaceholderText.Should().Be(Resources.ConnectionPortPlaceholder);
+		portList.IsEnabled.Should().BeTrue("the link is idle");
+
+		Named<Button>(bar, "RefreshPorts").Content.Should().Be(Resources.ConnectionRefresh);
+		Named<Button>(bar, "Connect").Content.Should().Be(Resources.ConnectionConnect);
+		Named<Button>(bar, "Disconnect").Content.Should().Be(Resources.ConnectionDisconnect);
+		Named<Button>(bar, "Connect").IsEffectivelyEnabled.Should().BeFalse("no port is selected");
+		Named<Button>(bar, "Disconnect").IsEffectivelyEnabled.Should().BeFalse("the link is idle");
 	}
 
 	[AvaloniaFact]
@@ -186,6 +220,8 @@ public sealed class MainWindowViewTests : IDisposable
 	{
 		_window.Close();
 		_viewModel.Dispose();
+		_connectionBar.Dispose();
+		_serialLink.Dispose();
 		_messagePanel.Dispose();
 	}
 
