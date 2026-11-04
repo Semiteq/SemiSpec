@@ -55,11 +55,4 @@ public sealed class SpectrumIntensityTests
 		SpectrumIntensity.Mean(pixels, window).Should().Be(pixels[calibration.PixelFor(650)]);
 	}
 
-	[Fact]
-	public void TheOwnWindowMeanIsNullWhenTheDeviceDoesNotCoverItsWavelength()
-	{
-		var frame = StoreSamples.Spectrum(StoreSamples.Start, Spectrometer.Atp2000, nm: 1310);
-
-		SpectrumIntensity.OfOwnWindow(frame.Frame.Measurement!).Should().BeNull();
-	}
 }

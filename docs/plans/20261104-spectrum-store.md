@@ -145,8 +145,7 @@ Automatable (baseline 505 of 505 at `12bef84`):
      `AWriteAgainstAHeldLockFailsAfterTheDefaultTimeout` (a second connection holds `BEGIN IMMEDIATE`; `Write`
      returns a failed `Result` after 1.9 to 2.5 s); `ACheckpointBesideAnOpenReaderReturnsBusyAtOnce` (a reader holds
      a read transaction; `CheckpointAndClose` returns within 100 ms with busy reported and the connection closed);
-     `TheIntensityColumnHoldsTheMeanOfTheOwnWindow` (NULL when the device does not cover its own wavelength), unless
-     Task 5 removes the column.
+     `TheIntensityColumnHoldsTheMeanOfTheOwnWindow` is gone: Task 5 removed the `intensity` column.
    - `SpectrumIntensityTests`: `CoversFollowsTheFirmwareTableRange` (ATP-2000 189 and 1028 in, 188 and 1029 out;
      ATP-8000 898 and 2461 in); `MeanAveragesTheInclusiveWindow`; `ADarkSpectrumHasMeanZero`; `ADeltaOfZeroTakesOnePixel`.
    - `IntensityBucketsTests`: `ARowLandsInTheColumnOfItsTime` (half-open columns, a row at `To` excluded);
@@ -176,8 +175,9 @@ Automatable (baseline 505 of 505 at `12bef84`):
      connects in one file); `StopDrainsTheQueueThenCheckpoints`; `StopBeforeStartCompletesAtOnce`;
      `AFailedOpenReportsOneErrorAndStoresNothing` (the store folder path is a file).
    - `StoreBenchmarkCommandTests` and `StoreBenchmarkRunTests.ASmallRunPrintsEveryMeasurementAndTheStrategiesAgree`
-     (`--rows 2000 --change-at 0.5 --churn-rounds 2`: exit code 0, every metric row printed, the three read strategies
-     and the merged mixed-wavelength read give equal means per column to 1e-9).
+     (`--rows 2000 --change-at 0.5 --churn-rounds 2`: exit code 0, every metric row printed fresh and churned, the
+     `substr` and `SqliteBlob` reads give equal min, max and counts per column to 1e-9; the precomputed and merged
+     reads left the tool with the column in Task 5).
 2. `dotnet test SpectrumVisualizer.slnx --filter "Area=Link"` passes, including `SerialLinkDropTests`:
    `AChannelDropCountsInTheStatus` (a reader that does not read, 64 + 3 frames written, `Status.DroppedFrames` = 3
    after the next health publish), `TheDropCountSurvivesAReconnect`, `TheDisconnectedStatusCarriesTheDropCount`,
@@ -204,20 +204,31 @@ Automatable (baseline 505 of 505 at `12bef84`):
    "delete the oldest hour, insert one more hour", so the file reaches the steady state of a day-long run, with
    freed pages reused. Each series row is measured before and after the churn; the budgets are judged on the churned
    number. "Warm" is the median of 5 runs after one discarded run, printed with the run-to-run spread (min and max of
-   the 5). The targets below are ASSUMPTION until Task 5 and Task 6 record the measured values next to them:
+   the 5). Measured 2026-11-04 on the working tree of Task 5 on top of `372813d` (the tool still held the precomputed
+   and merged reads then); Intel Core i7-1355U, 32 GB RAM, Micron MTFDKBA1T0QFM 1 TB NVMe SSD, Windows 11. The OS
+   file cache holds the whole 765 MB file in 32 GB, so every warm number is a cached read; the operator PC run
+   (Post-Completion) decides the cold numbers. Cells read "warm median (min to max), first run"; F is the fresh
+   file, C the churned one, and the budgets are judged on C:
 
-   | Metric | Target |
-   | --- | --- |
-   | Insert throughput, batches of 256 | at least 2 000 spectra/s |
-   | File size per 1000 ATP-2000 spectra, after checkpoint | at most 5 MB (ASSUMPTION: about 4.6 MB, one 4 KB overflow page per row plus an eighth of a leaf page) |
-   | File size for 24 h, before and after the churn | recorded; ASSUMPTION: about 800 MB at 2 per second, 1.1 GB at the 2.8 per second port cap (`board-protocol.md:334-335`); the churn adds under 10 % |
-   | Series, 10 min (1 200 rows) to 1 000 columns, pixel strategies (`substr`, `SqliteBlob`), warm | at most 50 ms for the kept pixel strategy |
-   | Series, 24 h (172 800 rows) to 1 000 columns, every row at the queried wavelength: precomputed, `substr`, `SqliteBlob`, warm | at most 10 s for the kept pixel strategy; at most 500 ms for the precomputed read |
-   | Series, 24 h, wavelength changed 3 h ago, query at the new wavelength: merged read (precomputed for 3 h, pixels for 21 h) against pixels only, warm | recorded; feeds the decision rule |
-   | `SpectrumHistory.IntensitySeriesAsync`, 10 min and 24 h, warm | within 10 % of its strategy's row |
-   | `SpectrumHistory.SpectrumAtAsync`, warm | at most 5 ms |
-   | One retention pass over a minute of rows (120) | at most 50 ms |
-   | WAL size after a 24 h series read beside a running writer at 2 spectra/s | recorded; at most 16 MB, or the series gains slicing (Solution Overview) |
+   | Metric | Target | Measured | Verdict |
+   | --- | --- | --- | --- |
+   | Insert throughput, batches of 256 | at least 2 000 spectra/s | F 44 473, C 51 859 spectra/s | pass |
+   | File size per 1000 ATP-2000 spectra, after checkpoint | at most 5 MB | F 4.428 MB, C 4.428 MB; ATP-8000 (`--device 8000`): F 1.338 MB, C 1.339 MB | pass |
+   | File size for 24 h, before and after the churn | recorded | ATP-2000: F 765.1 MB, C 765.2 MB (the churn adds 0.01 %); ATP-8000: F 231.3 MB, C 231.3 MB. Measured with the `intensity` column and the five-column index, which Task 5 then removed | recorded |
+   | Series, 10 min (1 200 rows) to 1 000 columns, warm | at most 50 ms for the kept pixel strategy | `substr` F 5.3 (5.2 to 5.8), 10.2; C 5.1 (5.0 to 5.3), 5.2 ms. `SqliteBlob` F 6.3 (6.0 to 6.5), 7.8; C 6.5 (6.2 to 7.3), 6.0 ms | pass (`substr`) |
+   | Series, 24 h (172 800 rows) to 1 000 columns, every row at the queried wavelength, warm | at most 10 s for the kept pixel strategy; at most 500 ms for the precomputed read | precomputed F 54.0 (52.9 to 64.6), 66.6; C 64.3 (62.5 to 66.9), 61.9 ms. `substr` F 520.7 (515.9 to 523.7), 554.8; C 647.3 (630.3 to 772.2), 622.7 ms. `SqliteBlob` F 559.9 (558.1 to 564.3), 576.0; C 709.1 (694.1 to 805.4), 703.8 ms | pass (`substr`) |
+   | Series, 24 h, wavelength changed 3 h ago, query at the new wavelength, warm | recorded; feeds the decision rule | merged with `substr` F 476.1 (474.8 to 477.5), 475.8; C 585.8 (578.5 to 593.8), 567.8 ms. Merged with `SqliteBlob` F 520.8 (519.1 to 587.7), 526.8; C 647.8 (639.2 to 702.8), 653.6 ms. Pixels only `substr` F 631.4 (623.7 to 634.8), 625.3; C 634.6 (630.8 to 681.9), 635.6 ms. Pixels only `SqliteBlob` F 805.4 (711.8 to 866.2), 958.6; C 715.4 (698.3 to 737.1), 713.0 ms | recorded |
+   | `SpectrumHistory.IntensitySeriesAsync`, 10 min and 24 h, warm | within 10 % of its strategy's row | Task 6 | |
+   | `SpectrumHistory.SpectrumAtAsync`, warm | at most 5 ms | Task 6 | |
+   | One retention pass over a minute of rows (120) | at most 50 ms | F 0.3 (0.3 to 0.8), 2.2; C 0.3 (0.2 to 0.4), 15.7 ms | pass |
+   | WAL size after a 24 h series read beside a running writer at 2 spectra/s | at most 16 MB, or the series gains slicing | F 0.035 MB, C 0.035 MB (`substr` pixel read) | pass, no slicing |
+
+   Decision, applied on the churned numbers by the rules of Solution Overview:
+   - Pixel path: `SqliteBlob` 709.1 ms against `substr` 647.3 ms; `SqliteBlob` is slower, so `substr` stays.
+   - Precomputed column: the all-match read holds (64.3 ms is at most half of 647.3 ms, ratio 0.10), the merged read
+     fails (585.8 ms against 634.6 ms pixels only, ratio 0.92, above 0.5). The column and the index's last four
+     columns are removed; `spectrum_time` indexes `received_at` only, and the series runs the `substr` read alone.
+   - WAL: 0.035 MB, under 16 MB, so the series stays one statement with no slicing.
 
    The decision rules of Task 5 pick the kept strategies from these numbers. A target the kept strategy misses is a
    blocker recorded with ⚠️ in Task 5 or Task 6, not a silent pass.
@@ -290,9 +301,8 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
       amplitude REAL, snr REAL, q REAL,   -- NULL stores NaN
       seq INTEGER NOT NULL,
       state INTEGER NOT NULL,
-      intensity REAL,                 -- mean of the own window; NULL when the device does not cover its wavelength
       pixels BLOB NOT NULL);          -- 2 x P bytes, little-endian u16, pixel 0 first
-  CREATE INDEX spectrum_time ON spectrum (received_at, device, wavelength_nm, delta, intensity);
+  CREATE INDEX spectrum_time ON spectrum (received_at);
   CREATE TABLE heartbeat (
       id INTEGER PRIMARY KEY,
       received_at INTEGER NOT NULL,
@@ -324,7 +334,7 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   lock at one explicit point, the start of the transaction, so a held lock fails the batch there after the busy
   timeout and never halfway through it. Each returns a FluentResults `Result`; a `SqliteException` or `IOException`
   becomes an `ExceptionalError`. `Write` computes `intensity` from the frame's own wavelength and `delta` through
-  `SpectrumIntensity`. `wal_checkpoint(TRUNCATE)` invokes no busy handler: when a reader holds a snapshot it returns
+  `SpectrumIntensity`; Task 5 removed the `intensity` column, so `Write` computes nothing per row. `wal_checkpoint(TRUNCATE)` invokes no busy handler: when a reader holds a snapshot it returns
   at once with its `busy` column set to 1 (ASSUMPTION, pinned by `ACheckpointBesideAnOpenReaderReturnsBusyAtOnce`).
   `CheckpointAndClose` returns `WalCheckpoint.Busy` and closes anyway (Core has no logger; `SpectrumStore` logs a busy
   checkpoint at Debug); the WAL stays, and the next start deletes it with the file.
@@ -393,11 +403,9 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
     spectrum in `[From, To)` it takes the mean of the pixels in `SpectrometerCalibration.Window(nm, delta)` of the
     row's device, dark frames included, and folds it into the column of its time. A row whose device does not cover
     the wavelength (`FirstNm <= nm <= LastNm` fails) counts as uncovered and adds no value.
-  - Mixed wavelengths: SCADA can change the wavelength mid-run, which is why every row keeps its full pixels. While
-    the precomputed column stays, the series runs two statements over the range and folds both into one
-    `IntensityBuckets`: an index-only read of `intensity` for rows `WHERE wavelength_nm = $nm AND delta = $delta`,
-    and the kept pixel read for rows `WHERE NOT (wavelength_nm = $nm AND delta = $delta)`. The fold is
-    order-independent (min, max, count), so the two reads need no merge by time.
+  - Mixed wavelengths: SCADA can change the wavelength mid-run, which is why every row keeps its full pixels. The
+    series reads every row's window from its pixels with `substr`, whatever wavelength the row was stored at, in one
+    statement over the range (Task 5 decision: no precomputed column, no second read).
   - `StoredRangeAsync(CancellationToken)` returns `Result<StoredRange?>` with the first and last spectrum's
     `ReceivedAt`, the extent of the 24 h overview.
   - Cancellation throws `OperationCanceledException`, never a failed result, as SemiPlot's provider does
@@ -438,6 +446,11 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
 
   The tool keeps all three strategies as raw SQL of its own, so the numbers can be measured again; `SpectrumHistory`
   holds the kept ones only.
+
+  Final state after Task 5 (numbers in Acceptance Evidence item 8): `substr` is the kept pixel strategy, the
+  `intensity` column and the precomputed read are gone, and the series runs the `substr` read alone. The tool keeps
+  the two pixel strategies (`substr`, `SqliteBlob`) on one file; the precomputed and merged reads left it with the
+  column, because the schema has no column for them to read.
 - **Lifecycle.** `Opened` starts the store before the distributor, so the store's subscription exists before the
   first frame is read. The close chain becomes link, then distributor, then store, each in a `finally` of the one
   before, all inside the existing 5 s limit, with the store's drain token of the stop budget above. A full queue of
@@ -607,30 +620,36 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Tools/StoreBenchmarkCommandTests.cs`, `StoreBenchmarkRunTests.cs`
 - Modify (by the decision): `SpectrumVisualizer/SpectrumVisualizer.Core/Store/SpectrumDatabase.cs`, this plan
 
-- [ ] create the tool project in the shape of the board emulator (`SpectrumVisualizer.Tools.BoardEmulator.csproj:1-16`,
+- [x] create the tool project in the shape of the board emulator (`SpectrumVisualizer.Tools.BoardEmulator.csproj:1-16`,
   `EmulatorCommand.cs:84`), referencing Core and System.CommandLine; add it to `SpectrumVisualizer.slnx` and to the
   test project's references
-- [ ] implement the options of Technical Details with range checks (`--rows` at least 1 200, so the 10 min series has
+- [x] implement the options of Technical Details with range checks (`--rows` at least 1 200, so the 10 min series has
   data; `--change-at` in 0..1; `--churn-rounds` 0..24), the fill and the churn through `SpectrumDatabase`, and in
   `ReadStrategies` as raw SQL: the precomputed read, `substr`, the `SqliteBlob` partial read, and the merged
   mixed-wavelength read (precomputed for matching rows plus a pixel strategy for the rest), each folding through
-  `IntensityBuckets`
-- [ ] measure and print, for the fresh and the churned file: insert throughput, file size per 1000 spectra, 24 h file
+  `IntensityBuckets`. `--device 8000` fills 1550 nm, then 1600 nm, because ATP-8000 does not cover 650 and 700 nm.
+  The all-match case and the changed case were two files (`all-match.db`, `changed.db`) for the measurement; after
+  the decision the tool fills one file, since the pixel reads cost the same at any stored wavelength. The fill and
+  churn helpers live in a sixth file, `BenchmarkFile.cs`.
+- [x] measure and print, for the fresh and the churned file: insert throughput, file size per 1000 spectra, 24 h file
   size, the 10 min and 24 h series per strategy for the all-match case, the 24 h mixed case (merged read against
   pixels only), one retention pass, and the WAL size after a 24 h series read beside a writer thread at 2 spectra/s;
   every timing as first run, warm median and warm min/max
-- [ ] write `StoreBenchmarkCommandTests` (defaults, a rejected `--rows 10`, a rejected `--change-at 1.5`,
+- [x] write `StoreBenchmarkCommandTests` (defaults, a rejected `--rows 10`, a rejected `--change-at 1.5`,
   `--device 8000`) and `StoreBenchmarkRunTests.ASmallRunPrintsEveryMeasurementAndTheStrategiesAgree`
   (`Component=Tools`, `Area=Store`)
-- [ ] run `dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark -- --rows
+- [x] run `dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark -- --rows
   172800 --change-at 0.875` and record every number in Acceptance Evidence item 8 (fresh and churned) with the date,
   the machine (CPU, disk) and the commit; also run `--device 8000` once and record its file size per 1000 spectra
-- [ ] apply the decision rules of Solution Overview on the churned numbers: `SqliteBlob` replaces `substr` only when
+- [x] apply the decision rules of Solution Overview on the churned numbers: `SqliteBlob` replaces `substr` only when
   faster by more than the larger spread, and a tie keeps `substr`; the `intensity` column stays only when both the
   all-match and the "changed 3 h ago" merged read take at most half their pixel-only time; if it goes, remove it and
   the index columns from the schema and from `SpectrumDatabaseTests`. If the WAL row passes 16 MB, add time slicing
-  to the series and record why. Record the decisions in Solution Overview as the final state
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+  to the series and record why. Record the decisions in Solution Overview as the final state. Done: `substr` kept,
+  the column removed (merged ratio 0.92), no slicing (WAL 0.035 MB). Removed with the column:
+  `SpectrumIntensity.OfOwnWindow` (no caller left), `SpectrumDatabaseTests.TheIntensityColumnHoldsTheMeanOfTheOwnWindow`
+  and `SpectrumIntensityTests.TheOwnWindowMeanIsNullWhenTheDeviceDoesNotCoverItsWavelength`.
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (573 of 573)
 
 ### Task 6: Query service
 **Files:**

@@ -23,16 +23,4 @@ public static class SpectrumIntensity
 
 		return (double)sum / (window.Last - window.First + 1);
 	}
-
-	/// <summary>The mean of the measurement's own window, or null when its device does not cover its wavelength.</summary>
-	public static double? OfOwnWindow(SpectrumMeasurement measurement)
-	{
-		if (!Covers(measurement.Device, measurement.WavelengthNm))
-		{
-			return null;
-		}
-
-		var window = SpectrometerCalibration.For(measurement.Device).Window(measurement.WavelengthNm, measurement.Delta);
-		return Mean(measurement.Pixels, window);
-	}
 }

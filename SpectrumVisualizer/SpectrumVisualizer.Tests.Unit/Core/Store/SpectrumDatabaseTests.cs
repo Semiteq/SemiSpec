@@ -7,7 +7,6 @@ using FluentResults;
 
 using Microsoft.Data.Sqlite;
 
-using SpectrumVisualizer.Core.Calibration;
 using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Core.Store;
 using SpectrumVisualizer.Tests.Unit.Core.Protocol;
@@ -215,22 +214,6 @@ public sealed class SpectrumDatabaseTests : IDisposable
 
 		var deleteTheFile = () => File.Delete(_path);
 		deleteTheFile.Should().NotThrow("the checkpoint closed the writer connection");
-	}
-
-	[Fact]
-	public void TheIntensityColumnHoldsTheMeanOfTheOwnWindow()
-	{
-		var covered = StoreSamples.Spectrum(StoreSamples.Start, Spectrometer.Atp8000, seq: 1);
-		var uncovered = StoreSamples.Spectrum(StoreSamples.Start, Spectrometer.Atp2000, seq: 2);
-		var window = SpectrometerCalibration.For(Spectrometer.Atp8000).Window(StoreSamples.SampleNm, StoreSamples.SampleDelta);
-		var expected = SpectrumIntensity.Mean(covered.Frame.Measurement!.Pixels, window);
-		using var database = OpenDatabase();
-
-		database.Write([covered, uncovered]).IsSuccess.Should().BeTrue();
-
-		using var plain = OpenPlain();
-		Scalar(plain, "SELECT intensity FROM spectrum WHERE seq = 1").Should().Be(expected);
-		Scalar(plain, "SELECT intensity FROM spectrum WHERE seq = 2").Should().Be(DBNull.Value);
 	}
 
 	private SpectrumDatabase OpenDatabase()

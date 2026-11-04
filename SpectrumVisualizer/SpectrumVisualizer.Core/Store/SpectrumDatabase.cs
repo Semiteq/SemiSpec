@@ -23,9 +23,8 @@ public sealed class SpectrumDatabase : IDisposable
 			q REAL,
 			seq INTEGER NOT NULL,
 			state INTEGER NOT NULL,
-			intensity REAL,
 			pixels BLOB NOT NULL);
-		CREATE INDEX spectrum_time ON spectrum (received_at, device, wavelength_nm, delta, intensity);
+		CREATE INDEX spectrum_time ON spectrum (received_at);
 		CREATE TABLE heartbeat (
 			id INTEGER PRIMARY KEY,
 			received_at INTEGER NOT NULL,
@@ -35,8 +34,8 @@ public sealed class SpectrumDatabase : IDisposable
 		""";
 
 	private const string InsertSpectrum = """
-		INSERT INTO spectrum (received_at, device, wavelength_nm, delta, amplitude, snr, q, seq, state, intensity, pixels)
-		VALUES ($received_at, $device, $wavelength_nm, $delta, $amplitude, $snr, $q, $seq, $state, $intensity, $pixels)
+		INSERT INTO spectrum (received_at, device, wavelength_nm, delta, amplitude, snr, q, seq, state, pixels)
+		VALUES ($received_at, $device, $wavelength_nm, $delta, $amplitude, $snr, $q, $seq, $state, $pixels)
 		""";
 
 	private const string InsertHeartbeat = """
@@ -68,7 +67,6 @@ public sealed class SpectrumDatabase : IDisposable
 			("$q", SqliteType.Real),
 			("$seq", SqliteType.Integer),
 			("$state", SqliteType.Integer),
-			("$intensity", SqliteType.Real),
 			("$pixels", SqliteType.Blob));
 		_insertHeartbeat = CreateCommand(
 			InsertHeartbeat,
@@ -189,7 +187,6 @@ public sealed class SpectrumDatabase : IDisposable
 		parameters["$q"].Value = NullForNaN(measurement.Q);
 		parameters["$seq"].Value = received.Frame.Seq;
 		parameters["$state"].Value = (byte)received.Frame.State;
-		parameters["$intensity"].Value = (object?)SpectrumIntensity.OfOwnWindow(measurement) ?? DBNull.Value;
 		parameters["$pixels"].Value = pixels;
 		_insertSpectrum.ExecuteNonQuery();
 	}
