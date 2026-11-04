@@ -769,17 +769,19 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.UI/Trend/TrendChartView.axaml`, `TrendChartView.axaml.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Trend/TrendChartViewTests.cs`, `TrendChartViewTestBase.cs`
 
-- [ ] load the `dev:desktop-ui` skill before writing the AXAML
-- [ ] lay out the view as `SpectrumChartView.axaml:14-30` plus SemiPlot's overlay canvas
+- [x] load the `dev:desktop-ui` skill before writing the AXAML
+- [x] lay out the view as `SpectrumChartView.axaml:14-30` plus SemiPlot's overlay canvas
   (`SemiPlot/SemiPlot.UI/Chart/TrendChartView.axaml:82-96`): the cached `PlotLayer`, the empty-state line, the hover
   line and the readout border, `IsHitTestVisible="False"`
-- [ ] copy the frame-paced redraw and theme repaint from `SpectrumChartView.axaml.cs`; disable ScottPlot's input
+- [x] copy the frame-paced redraw and theme repaint from `SpectrumChartView.axaml.cs`; disable ScottPlot's input
   processor and wheel handling; copy the wheel, press, move, release (tunnel), capture-lost and exit handlers of
   `TrendChartView.axaml.cs:422-472`, `:597-723`, `:757` without markers, delta mode and pen picks; a release inside
-  4 px calls `TrendViewModel.ShowMoment`
-- [ ] place the overlay with a copy of `ChartCursorOverlay.Project`; hide it while dragging and on exit
-- [ ] write `TrendChartViewTests` of Acceptance Evidence item 1 with headless mouse events
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+  4 px calls `TrendViewModel.ShowMoment`. The view binds to `TrendViewModel` (the plot is `Chart.Plot`); the hover
+  time and the drag stay in the code-behind as overlay state, and the wheel routing is inlined (no pen or axis arms)
+- [x] place the overlay with a copy of `ChartCursorOverlay.Project`; hide it while dragging and on exit;
+  `Project` is a private method of the view, as the view is its only caller
+- [x] write `TrendChartViewTests` of Acceptance Evidence item 1 with headless mouse events
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (856 of 856)
 
 ### Task 11: Overview band
 **Files:**
