@@ -466,7 +466,7 @@ SNR has no unit, because the board sends a ratio. The update time is `ReceivedAt
    each refresh.
 4. A key change, throttled at 500 ms, snapshots the visible window on the UI thread and starts one re-read on the
    thread pool: the plan's ranges through `SpectrumHistory.IntensityPointsAsync`, each chunk landed in the cache. A
-   newer key change, or a return to the previous key, cancels it.
+   newer key change cancels it.
 5. A click on the trend reads the spectrum of that moment, from the cache's recent spectra or the store, and shows it
    through `SwitchingSpectrumSource`.
 
@@ -517,7 +517,13 @@ rules use the link's silence limit, `LinkTiming.SilenceLimit`, and they measure 
 | more than 10 s after the previous frame of any kind | `SequenceTracker.Reset()`; this frame is the new baseline, so the `seq` step across the silence is no loss |
 | up to 10 s after the previous frame, the tracker counts k > 0 lost | a Loss break at this frame with k lost |
 | a spectrum more than 10 s after the previous spectrum | a NoSpectra break at this spectrum with 0 lost, besides the above, whatever heartbeats came between |
-| a measurement-failed bit of either device in the frame's `state` | a failure mark at this frame with only the failed bits |
+| the measuring device's measurement-failed bit in the frame's `state` | a failure mark at this frame with only that bit |
+
+The measuring device is the device of this spectrum, or of the last spectrum before a heartbeat; before the first
+spectrum no device has measured and no bit marks. The board measures with one spectrometer, chosen by the wavelength
+(below 904 nm the ATP-2000, from 904 nm the ATP-8000), and keeps the idle device's failed bit until that device
+measures again, so the idle bit rides every frame of the other device. The store keeps each frame's `state`
+unchanged; only the trend's marks drop the idle bit.
 
 A reconnect, an unplug, an emulator restart after 10 s and a stopped board all fall under the reset. A board restart
 inside 10 s shows as a Loss break with the link's count (`board-protocol.md`, Sequence counter), and a frame the link's
@@ -534,30 +540,17 @@ heartbeat table has no reader in the app.
 
 ### Key change and re-read
 
-A spectrum with another key raises the key generation and moves the points older than the recent spectra aside. The
-cache recomputes the recent spectra at the new key at once and raises `ReReadRequested(generation, key, recentStart,
-ReadsHistory: true)`, so the store is asked only for rows older than `recentStart`, the start of the recent spectra.
+A spectrum with another key raises the key generation and drops the points older than the recent spectra. The cache
+recomputes the recent spectra at the new key at once and raises `ReReadRequested(generation, key, recentStart)`, so
+the store is asked only for rows older than `recentStart`, the start of the recent spectra.
 The store writes in batches behind its queue, so the newest rows may not be in the file yet; 120 s covers the writer's
 normal lag. `recentStart` and the recent spectra share the millisecond stamps, so the store's `received_at <
 recentStart` and the recent set meet with no double point. The feed logs each key change at Debug with the new key
-and the generation, which counts the key changes.
-
-A return to the previous key restores that key's older points without a read, and raises a request with `ReadsHistory`
-false, which only cancels the pending read, when all of these hold:
-
-- the outgoing key's history was complete: it was the first key, a key a return restored, or a key whose re-read
-  landed every planned range, so a key whose re-read was still pending comes back through a read instead of partial;
-- no chunk of the current generation has landed yet;
-- the return comes at most 240 s after the kept points' end, the start of the recent spectra at the change, so about
-  120 s after the change. While the previous key's points are kept, the recent spectra are not evicted below their
-  end, so the return recomputes every spectrum from that end with no hole; past 240 s the kept points are dropped.
-
-Any other return asks for a read like any change.
+and the generation, which counts the key changes. A return to the previous key is a change like any other and
+re-reads; the 500 ms throttle joins fast changes into one read.
 
 `LandHistory(generation, chunk)` inserts a chunk's points in time order when its generation is current and ignores it
 otherwise. Chunks never overlap each other or the recent spectra, because every planned range ends at `recentStart`.
-After the last planned range lands, the feed calls `CompleteHistory(generation)`, which marks the key's history
-complete while the generation is current.
 Frames the store never wrote (a full queue, a failed batch, both counted as dropped) are absent from the history after
 a re-read, although the live trend showed them; the dropped-frames count in the status bar already reports them.
 
@@ -582,7 +575,7 @@ scheduler and its logger.
   `ReadHistory` is `Observable.Create` with a cancellation token that runs the plan's ranges one after another on the
   thread pool and lands each chunk; the read sees only the snapshot, and nothing reads the navigation model off the UI
   thread. A newer request disposes the read in flight, which cancels its token, and `IntensityPointsAsync` checks it
-  every 256 rows. A request with `ReadsHistory` false maps to an empty observable, so it only cancels. A failed range
+  every 256 rows. A failed range
   reports one `TrendHistoryError` (Warning) through `TryReportFailure` and ends that read; the trend keeps only the
   data since the change. A read that ends after the stop reports nothing.
 - The moment pipeline is `Select(ReadMomentFrom)`, each read hopping with `ObserveOn(uiScheduler)`, then `Switch()`,
@@ -626,9 +619,11 @@ An empty column with nothing else is left out, so the path connects across colum
 and a stretch of more than 10 s without spectra breaks only through its NoSpectra break. A gap column has NaN values,
 and `EnvelopePath` breaks the line there; a break in a column that also holds values cuts the connector into that
 column at every zoom, so at the 24 h width one lost spectrum shows as a one-column cut. The envelope line is 1 px in
-`AppAccentBrush`. A column with a failure mark draws the strip, 4 px high at the bottom of the data area in
-`AppSeverityErrorBrush` and at least 1 px wide, so one failed spectrum shows at 24 h; failed columns less than 5 s
-apart join into one span, so a steady failure draws one bar instead of dashes. The readout names the failure, so
+`AppAccentBrush`. A value column between two gaps with one value is a lone vertex, which a stroke cannot draw, so
+`EnvelopeLine` fills a 3 px square there in the same colour; spectra more than 10 s apart, as the angle and zone
+trigger modes send them, show as a row of squares. A column with a failure mark draws the strip, 4 px high at the
+bottom of the data area in `AppSeverityErrorBrush` and at least 1 px wide, so one failed spectrum shows at 24 h;
+failed columns less than 5 s apart join into one span, so a steady failure draws one bar instead of dashes. The readout names the failure, so
 colour never carries it alone.
 
 The Y limits pad the drawn values by 5 % of their span, `v - 1 .. v + 1` when they are flat, and stay unchanged when
@@ -676,7 +671,7 @@ redraw. The readout sits right of the line, and left of it when it would run pas
 
 The text comes from the column under the pointer in the last fold (`TrendReadout`): the column's start in local time
 as `HH:mm:ss`, then one value or "min – max" in `G6` under the current culture with "Spectra: {n}", or the gap reason,
-then one "Measurement failed: {device}" line per failed device. The gap reasons are "No data", "{n} spectra lost",
+then one "Measurement failed: {device}" line per failed device, the measuring device only (Continuity). The gap reasons are "No data", "{n} spectra lost",
 "No spectra" and "Spectrometer does not cover {nm} nm". An empty column between drawn columns reads as the line there:
 the gap reason of the column that ends the gap, or else the values of the column the line comes from, with the
 failures of the whole empty run, so a NoSpectra gap names a failure a heartbeat inside it carried. A value column
@@ -687,7 +682,7 @@ readout.
 ### The overview
 
 `OverviewView` is a 36 px strip in `AppContentBackgroundBrush`. `OverviewBand` draws the band in `AppAccentBrush` at
-opacity 0.35; the window highlight is `AppAccentFillBrush` with an `AppAccentBrush` border and at least 6 px wide; a
+opacity 0.35, with its centre line at full opacity; a column between two breaks draws at least a 3 px square; the window highlight is `AppAccentFillBrush` with an `AppAccentBrush` border and at least 6 px wide; a
 hover line in `AppSecondaryForegroundBrush` follows the pointer. A left press, and a move with the button held, centre
 the trend window on the time under the pointer, clamped at the first point, and stop following.
 

@@ -75,6 +75,12 @@ public static class EnvelopePath
 		}
 	}
 
+	/// <summary>True for a vertex that opens a segment no next vertex continues.</summary>
+	public static bool IsLone(IReadOnlyList<EnvelopePoint> points, int index)
+	{
+		return points[index].StartsSegment && (index + 1 == points.Count || points[index + 1].StartsSegment);
+	}
+
 	private static int FirstAtOrAfter(IReadOnlyList<EnvelopeColumn> columns, double x)
 	{
 		var low = 0;

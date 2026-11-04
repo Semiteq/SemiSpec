@@ -26,6 +26,8 @@ public sealed class OverviewViewTests : TrendChartTestBase
 	private const int WindowWidth = 900;
 	private const double StripHeight = 36.0;
 	private const double MinimumHighlightWidth = 6.0;
+	private const double LoneMarkSize = 3.0;
+	private const double Tolerance = 1e-9;
 
 	private readonly OverviewViewModel _overview;
 	private readonly OverviewView _view;
@@ -147,6 +149,34 @@ public sealed class OverviewViewTests : TrendChartTestBase
 		_window.MouseMove(new Point(inside.X, 0.0));
 
 		HoverLine.IsVisible.Should().BeFalse();
+	}
+
+	[AvaloniaFact]
+	public void SpectraFifteenSecondsApartWithHeartbeatsBetweenShowAMarkEach()
+	{
+		const int Spectra = 20;
+		Realise();
+		for (var spectrum = 0; spectrum < Spectra; spectrum++)
+		{
+			var second = spectrum * 15.0;
+			AddFlat(second, (ushort)(100 + (10 * spectrum)));
+			for (var beat = 1; beat < 5; beat++)
+			{
+				AddHeartbeat(second + (3 * beat));
+			}
+		}
+
+		Sample();
+		Refold();
+
+		BandLayer.Figures.Should().HaveCount(Spectra, "every spectrum stands alone between NoSpectra breaks");
+		BandLayer.Figures.Should().AllSatisfy(figure =>
+		{
+			var xs = figure.Outline.Select(point => point.X).ToList();
+			var ys = figure.Outline.Select(point => point.Y).ToList();
+			(xs.Max() - xs.Min()).Should().BeApproximately(LoneMarkSize, Tolerance);
+			(ys.Max() - ys.Min()).Should().BeApproximately(LoneMarkSize, Tolerance, "one value still fills a square");
+		});
 	}
 
 	protected override void Dispose(bool disposing)

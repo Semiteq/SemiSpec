@@ -16,9 +16,6 @@ public sealed class IntensityCache : IDisposable
 	/// <summary>The span of spectrum frames a key change recomputes; it covers the store writer's normal lag.</summary>
 	private const long RecentSpanMs = 120_000;
 
-	/// <summary>How long after a key change a return to the previous key restores its points without a read.</summary>
-	private const long ReturnSpanMs = 120_000;
-
 	private static readonly long _retentionMs = (long)TimeSpan.FromDays(1).TotalMilliseconds;
 
 	private readonly TimeProvider _timeProvider;
@@ -31,11 +28,6 @@ public sealed class IntensityCache : IDisposable
 	private TrendKey? _key;
 	private QueryWindows? _windows;
 	private int _generation;
-
-	/// <summary>True while the timeline holds every spectrum of the run at the key.</summary>
-	private bool _historyComplete;
-
-	private KeyBlock? _previous;
 	private bool _disposed;
 
 	// All emit after _gate is released, one at a time under _emitGate: _changed from the distributor task and re-read
@@ -61,7 +53,7 @@ public sealed class IntensityCache : IDisposable
 	/// <summary>Signals after a history chunk of the current generation landed, just before its Changed.</summary>
 	public IObservable<Unit> HistoryLanded { get; }
 
-	/// <summary>Raised on a key change; a request with ReadsHistory false only cancels the pending read.</summary>
+	/// <summary>Raised on every key change.</summary>
 	public IObservable<ReReadRequest> ReReadRequested { get; }
 
 	/// <summary>Null before the first spectrum.</summary>
@@ -112,24 +104,11 @@ public sealed class IntensityCache : IDisposable
 			}
 
 			_timeline.Land(chunk);
-			_previous = null;
 			DropExpired();
 		}
 
 		Emit(_historyLanded, Unit.Default);
 		Emit(_changed, Unit.Default);
-	}
-
-	/// <summary>Marks the generation's history read in full, so a later change keeps its points for a return.</summary>
-	public void CompleteHistory(int generation)
-	{
-		lock (_gate)
-		{
-			if (generation == _generation)
-			{
-				_historyComplete = true;
-			}
-		}
 	}
 
 	/// <summary>Folds the points, breaks and failure marks of the query's range; its key is not checked.</summary>
@@ -206,88 +185,35 @@ public sealed class IntensityCache : IDisposable
 	{
 		var unixMs = received.ReceivedAt.ToUnixTimeMilliseconds();
 		_recent.Add(received);
-		DropOldRecentSpectra(unixMs);
+		_recent.DropBefore(unixMs - RecentSpanMs);
 
 		var key = new TrendKey(measurement.WavelengthNm, measurement.Delta);
 		if (_key is null || _windows is null)
 		{
 			_key = key;
 			_windows = new QueryWindows(key.WavelengthNm, key.Delta);
-			_historyComplete = true;
 		}
 		else if (key != _key)
 		{
-			return _previous?.Key == key ? ReturnToPrevious() : ChangeKey(key);
+			return ChangeKey(key);
 		}
 
 		_timeline.Insert(new TrendPoint(unixMs, RecentSpectra.IntensityOf(_windows, measurement)));
 		return null;
 	}
 
-	/// <summary>Keeps RecentSpanMs of spectra, and all since the last change while a return can restore them.</summary>
-	private void DropOldRecentSpectra(long newestMs)
-	{
-		var cutoffMs = newestMs - RecentSpanMs;
-		if (_previous is { } previous)
-		{
-			if (newestMs - previous.EndMs > RecentSpanMs + ReturnSpanMs)
-			{
-				_previous = null;
-			}
-			else
-			{
-				cutoffMs = Math.Min(cutoffMs, previous.EndMs);
-			}
-		}
-
-		_recent.DropBefore(cutoffMs);
-	}
-
 	private ReReadRequest ChangeKey(TrendKey key)
 	{
 		var recentStartMs = _recent.StartMs!.Value;
-		_previous = _historyComplete
-			? new KeyBlock(_key!.Value, _windows!, _timeline.PointsBefore(recentStartMs), recentStartMs)
-			: null;
-
 		_key = key;
 		_windows = new QueryWindows(key.WavelengthNm, key.Delta);
-		_historyComplete = false;
 		_timeline.ReplacePoints(_recent.PointsAt(_windows));
-		return NextRequest(key, recentStartMs, readsHistory: true);
-	}
-
-	/// <summary>Restores the previous key's older points; the recent spectra still reach back to their end.</summary>
-	private ReReadRequest ReturnToPrevious()
-	{
-		var previous = _previous!;
-		_previous = null;
-
-		_key = previous.Key;
-		_windows = previous.Windows;
-		_historyComplete = true;
-		previous.Points.AddRange(_recent.PointsAt(_windows));
-		_timeline.ReplacePoints(previous.Points);
-		return NextRequest(previous.Key, previous.EndMs, readsHistory: false);
-	}
-
-	private ReReadRequest NextRequest(TrendKey key, long recentStartMs, bool readsHistory)
-	{
 		_generation++;
-		return new ReReadRequest(
-			_generation, key, DateTimeOffset.FromUnixTimeMilliseconds(recentStartMs), readsHistory);
+		return new ReReadRequest(_generation, key, DateTimeOffset.FromUnixTimeMilliseconds(recentStartMs));
 	}
 
 	private void DropExpired()
 	{
-		var cutoffMs = _timeProvider.GetUtcNow().ToUnixTimeMilliseconds() - _retentionMs;
-		_timeline.DropBefore(cutoffMs);
-		if (_previous is { } previous)
-		{
-			TimeOrdered.DropBefore(previous.Points, cutoffMs, TrendTimeline.TimeOf);
-		}
+		_timeline.DropBefore(_timeProvider.GetUtcNow().ToUnixTimeMilliseconds() - _retentionMs);
 	}
-
-	/// <summary>The previous key's points older than EndMs, the recent spectra start at that change.</summary>
-	private sealed record KeyBlock(TrendKey Key, QueryWindows Windows, List<TrendPoint> Points, long EndMs);
 }

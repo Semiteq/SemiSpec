@@ -50,12 +50,6 @@ internal sealed class TrendTimeline
 		_points.InsertRange(TimeOrdered.LowerBound(_points, chunk.From.ToUnixTimeMilliseconds(), TimeOf), chunk.Points);
 	}
 
-	/// <summary>A copy of the points received before the time.</summary>
-	public List<TrendPoint> PointsBefore(long unixMs)
-	{
-		return _points.GetRange(0, TimeOrdered.LowerBound(_points, unixMs, TimeOf));
-	}
-
 	/// <summary>Makes the list the points of a new key; the timeline owns it from here on.</summary>
 	public void ReplacePoints(List<TrendPoint> points)
 	{
@@ -98,7 +92,7 @@ internal sealed class TrendTimeline
 		return buckets.ToSeries();
 	}
 
-	public static long TimeOf(TrendPoint point)
+	private static long TimeOf(TrendPoint point)
 	{
 		return point.UnixMs;
 	}

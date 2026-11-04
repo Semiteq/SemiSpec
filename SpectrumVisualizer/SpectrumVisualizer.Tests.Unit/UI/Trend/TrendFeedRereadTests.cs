@@ -136,40 +136,4 @@ public sealed class TrendFeedRereadTests : TrendFeedTestBase
 		PointsCalls.Should().OnlyContain(call => call.WavelengthNm == ThirdNm);
 		RangesOf(PointsCalls).Should().Equal(plan);
 	}
-
-	[AvaloniaFact]
-	public async Task AReturnToThePreviousKeyCancelsThePendingReadAndStartsNone()
-	{
-		Feed.Start();
-		ChangeKeyAfterTwentyMinutes(OtherNm);
-		HoldPoints();
-		PassThrottle();
-		await Waits.UntilAsync(() => PointsCalls.Count == 1);
-		var held = PointsCalls.Single();
-
-		AddAt(1201, SampleNm);
-		PassThrottle();
-
-		Requests[^1].ReadsHistory.Should().BeFalse();
-		held.Token.IsCancellationRequested.Should().BeTrue();
-		ReleasePoints();
-		await Feed.StopAsync().WaitAsync(Waits.Limit);
-		PointsCalls.Should().ContainSingle();
-	}
-
-	[AvaloniaFact]
-	public async Task AReadThatLandsEveryRangeLetsAReturnRestoreTheKeyWithoutARead()
-	{
-		Feed.Start();
-		ChangeKeyAfterTwentyMinutes(OtherNm);
-		var plan = PlanFor(Chart.From, Chart.To);
-		PassThrottle();
-		await Waits.UntilAsync(() => PointsCalls.Count == plan.Count);
-		await Feed.StopAsync().WaitAsync(Waits.Limit);
-
-		AddAt(1201, ThirdNm);
-		AddAt(1202, OtherNm);
-
-		Requests.Select(request => request.ReadsHistory).Should().Equal(true, true, false);
-	}
 }

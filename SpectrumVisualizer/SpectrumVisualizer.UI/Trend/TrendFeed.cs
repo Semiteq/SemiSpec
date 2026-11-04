@@ -129,14 +129,12 @@ public sealed class TrendFeed(
 
 	private IObservable<Unit> ReadHistory(HistoryRead read)
 	{
-		return read.Request.ReadsHistory
-			? Observable.Create<Unit>((_, token) =>
-			{
-				var task = Task.Run(() => ReadHistoryAsync(read, token), CancellationToken.None);
-				Track(task);
-				return task;
-			})
-			: Observable.Empty<Unit>();
+		return Observable.Create<Unit>((_, token) =>
+		{
+			var task = Task.Run(() => ReadHistoryAsync(read, token), CancellationToken.None);
+			Track(task);
+			return task;
+		});
 	}
 
 	/// <summary>Never throws: the first failed range reports once and ends the read; a cancel ends it.</summary>
@@ -158,8 +156,6 @@ public sealed class TrendFeed(
 
 				cache.LandHistory(request.Generation, chunk.Value);
 			}
-
-			cache.CompleteHistory(request.Generation);
 		}
 		catch (OperationCanceledException) when (token.IsCancellationRequested)
 		{

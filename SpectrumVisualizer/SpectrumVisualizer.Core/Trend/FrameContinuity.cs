@@ -8,11 +8,15 @@ namespace SpectrumVisualizer.Core.Trend;
 /// </summary>
 public sealed class FrameContinuity
 {
-	private const BoardState FailureBits = BoardState.Atp2000MeasurementFailed | BoardState.Atp8000MeasurementFailed;
-
 	private readonly SequenceTracker _tracker = new();
 	private DateTimeOffset? _lastFrameAt;
 	private DateTimeOffset? _lastSpectrumAt;
+
+	/// <summary>
+	/// The board measures with one spectrometer at a time and keeps the idle one's failed bit until that one measures
+	/// again, so only the measuring device's bit marks a failure.
+	/// </summary>
+	private Spectrometer? _measuringDevice;
 
 	public Continuity Observe(ReceivedFrame received)
 	{
@@ -37,9 +41,10 @@ public sealed class FrameContinuity
 			}
 
 			_lastSpectrumAt = receivedAt;
+			_measuringDevice = frame.Measurement.Device;
 		}
 
-		var failedBits = frame.State & FailureBits;
+		var failedBits = _measuringDevice is { } device ? frame.State & device.FailedBit : BoardState.None;
 		TrendFailure? failure = failedBits == BoardState.None ? null : new TrendFailure(unixMs, failedBits);
 
 		return new Continuity(loss, noSpectra, failure);
@@ -54,5 +59,7 @@ public readonly record struct Continuity(TrendBreak? Loss, TrendBreak? NoSpectra
 /// </summary>
 public readonly record struct TrendBreak(long UnixMs, int Lost);
 
-/// <summary>A frame whose state carried measurement-failed bits; State holds only those bits.</summary>
+/// <summary>
+/// A frame whose state carried the failed bit of the device that measured the latest spectrum; State holds that bit.
+/// </summary>
 public readonly record struct TrendFailure(long UnixMs, BoardState State);

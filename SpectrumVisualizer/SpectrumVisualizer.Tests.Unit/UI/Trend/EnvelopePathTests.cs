@@ -127,6 +127,22 @@ public sealed class EnvelopePathTests
 		tail.Skip(1).Should().Equal(whole.Where(point => point.X >= 2.0).Skip(1));
 	}
 
+	[Fact]
+	public void OnlyADegenerateColumnBetweenGapsIsLone()
+	{
+		var points = Build(
+		[
+			new EnvelopeColumn(0.0, 4.0, 4.0, 4.0),
+			new EnvelopeColumn(1.0, double.NaN, double.NaN, double.NaN),
+			new EnvelopeColumn(2.0, 1.0, 2.0, 1.5),
+			new EnvelopeColumn(3.0, double.NaN, double.NaN, double.NaN),
+			new EnvelopeColumn(4.0, 5.0, 5.0, 5.0)
+		]);
+
+		Enumerable.Range(0, points.Count).Select(index => EnvelopePath.IsLone(points, index))
+			.Should().Equal(true, false, false, false, true);
+	}
+
 	private static List<EnvelopePoint> Build(IReadOnlyList<EnvelopeColumn> columns)
 	{
 		var points = new List<EnvelopePoint>();

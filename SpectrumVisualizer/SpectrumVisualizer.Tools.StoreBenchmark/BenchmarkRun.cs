@@ -158,9 +158,8 @@ public static class BenchmarkRun
 			request = null;
 			var stopwatch = Stopwatch.StartNew();
 			cache.Add(frame);
-			var reRead = request is { ReadsHistory: true } asked
-				? asked
-				: throw new InvalidOperationException(
+			var reRead = request
+				?? throw new InvalidOperationException(
 					$"{measured.State}: the key change to {wavelengthNm} nm asked no read");
 			var ranges = TrendHistoryPlan.For(
 				frame.ReceivedAt - _tenMinutes, frame.ReceivedAt, frame.ReceivedAt, reRead.RecentStart);

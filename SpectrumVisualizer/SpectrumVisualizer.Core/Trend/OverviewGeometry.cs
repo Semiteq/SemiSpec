@@ -6,7 +6,7 @@ namespace SpectrumVisualizer.Core.Trend;
 public static class OverviewGeometry
 {
 	private const double FlatBandPadding = 1.0;
-	private const double LoneColumnWidth = 2.0;
+	private const double LoneColumnSize = 3.0;
 
 	/// <summary>The window as fractions of the extent; an empty extent yields the full strip.</summary>
 	public static (double Start, double Width) WindowFraction(
@@ -192,14 +192,20 @@ public static class OverviewGeometry
 		return TrendColumns.OpensGap(column) && column.Count > 0;
 	}
 
+	/// <summary>At least a 3 px square, so a column of one value shows as a mark rather than a line of no height.</summary>
 	private static BandFigure LoneColumn(IntensityColumn column, BandScale scale)
 	{
 		var center = scale.X(column.Start);
-		var left = SpanLeftWithin(center - (LoneColumnWidth / 2.0), LoneColumnWidth, scale.Width);
-		var right = Math.Min(scale.Width, left + LoneColumnWidth);
+		var left = SpanLeftWithin(center - (LoneColumnSize / 2.0), LoneColumnSize, scale.Width);
+		var right = Math.Min(scale.Width, left + LoneColumnSize);
+		var middle = scale.Y(column.Last);
 		var top = scale.Y(column.Max);
 		var bottom = scale.Y(column.Min);
-		var middle = scale.Y(column.Last);
+		if (bottom - top < LoneColumnSize)
+		{
+			top = SpanLeftWithin(((top + bottom) / 2.0) - (LoneColumnSize / 2.0), LoneColumnSize, scale.Height);
+			bottom = Math.Min(scale.Height, top + LoneColumnSize);
+		}
 
 		return new BandFigure(
 			[

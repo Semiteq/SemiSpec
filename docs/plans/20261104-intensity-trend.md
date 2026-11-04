@@ -168,19 +168,16 @@ Automatable (baseline: verified 2026-11-04, `dotnet test SpectrumVisualizer.slnx
      Loss); `HeartbeatsOnlyForOverTenSecondsBreakAtTheNextSpectrum` (spectra stop, heartbeats every 3 s for 15 s, then a
      spectrum: one NoSpectra break at it, the heartbeats' `seq` still counted);
      `ASpectrumExactlyTenSecondsAfterTheLastBreaksNothing`; `ASeqGapExactlyTenSecondsAfterTheLastFrameCountsTheLoss`
-     (seq 7 at 0 s, seq 9 at 10.0 s: Loss 1, no NoSpectra); `AFailedBitMarksAFailure` (either device's bit, in a
-     heartbeat or a spectrum frame); `ABoardRestartInsideTenSecondsBreaksWithTheLinksLossCount` (seq 55 then 1: 201 lost).
+     (seq 7 at 0 s, seq 9 at 10.0 s: Loss 1, no NoSpectra); `TheMeasuringDevicesFailedBitMarksAFailure` (either
+     device, in a heartbeat or a spectrum frame); `TheIdleDevicesFailedBitMarksNothing`;
+     `AFailedBitBeforeTheFirstSpectrumMarksNothing`; `ASpectrumOfTheOtherDeviceMovesTheFailureToItsBit`; `ABoardRestartInsideTenSecondsBreaksWithTheLinksLossCount` (seq 55 then 1: 201 lost).
    - `IntensityCachePointTests`, `IntensityCacheKeyChangeTests`, `IntensityCacheHistoryTests` and
      `IntensityCacheDisposeTests`: `ASpectrumAddsOnePointAtTheFrameMean` (equals `QueryWindows.MeanOf` of the window);
      `ADarkSpectrumAddsAPointAtZero`; `ASpectrumOfADeviceThatDoesNotCoverTheWavelengthAddsAnUncoveredPoint`;
      `AHeartbeatAddsNoPoint`; `TheFirstSpectrumSetsTheKeyWithoutAReRead`;
      `AKeyChangeRecomputesTheRecentSpectraAndAsksForAReRead` (wavelength or `delta`);
      `AKeyChangeDropsThePointsOlderThanTheRecentSpectraAndKeepsEveryBreakAndMark`;
-     `AReturnToThePreviousKeyBeforeAChunkLandsRestoresItsPointsWithoutAReRead`;
-     `AReturnAfterAChunkLandedAsksForAReRead`; `AReturnToAKeyWhoseHistoryWasReadInFullRestoresItWithoutARead`;
-     `AReturnAtTheEndOfTheReturnWindowRestoresTheKeyWithoutARead` and
-     `AReturnPastTheReturnWindowAsksForAReReadOfThePointsBeforeTheRecentSpectra` (change at 200 s, return at 320 s and
-     321 s); `AfterTheDisposeFramesAndChunksAreIgnored`; `FoldingWhileFramesAndChunksLandDoesNotThrow`;
+     `AReturnToThePreviousKeyAsksForAReReadLikeAnyChange`; `AfterTheDisposeFramesAndChunksAreIgnored`; `FoldingWhileFramesAndChunksLandDoesNotThrow`;
      `PointsBreaksAndMarksOlderThanADayBeforeNowAreDropped` (a `FakeTimeProvider`);
      `AFoldOfADayCountsOnlyThePointsOfItsRange` (the counts of a 10 min and a 24 h fold over a day of points; the
      benchmark's 10 min fold row guards the cost of the binary search);
@@ -202,23 +199,26 @@ Automatable (baseline: verified 2026-11-04, `dotnet test SpectrumVisualizer.slnx
      `TrendColumnsTests` (Core): `TheColumnWidthIsWholeMilliseconds` (span over pixels, 256 to 2048 columns, ceiling to
      1 ms); `FailedColumnsLessThanFiveSecondsApartJoinIntoOneRange`.
    - `EnvelopePathTests` copied (`VisibleRangeKeepsOneColumnBeyondEachEdgeOfTheWindow`, `BuildDegenerateColumnIsOnePoint`,
-     `BuildColumnBelowThePreviousPointEntersAtItsMax`, `AGapColumnBreaksThePath`).
+     `BuildColumnBelowThePreviousPointEntersAtItsMax`, `AGapColumnBreaksThePath`) and
+     `OnlyADegenerateColumnBetweenGapsIsLone`; `EnvelopeLineTests.ALoneColumnWithOneValueDrawsAMark`.
    - `TrendChartViewModelNavigationTests` and `TrendChartViewModelDisplayTests`: `TheDefaultWindowIsTenMinutesAndFollowsLive`; `ANewFrameMovesTheWindowWhileFollowing`;
      `APanIntoThePastStopsFollowingAndANewFrameKeepsTheWindow`; `FollowLiveReturnsToTheNewestFrame`;
      `AWheelStepZoomsAroundTheCursorTime`; `ThePresetSetsTheWidthAndKeepsFollowing`;
      `FollowingLeavesAnEmptySpanBeforeTheFirstPoint` (10 min window, 2 min of points: `From` = now - 10 min);
      `APanStopsAtTheFirstPoint`; `AZoomOutStopsAtTheFirstPoint`; `TheYAxisLabelNamesTheKey`; `TheYLimitsPadTheVisibleEnvelope`;
-     `AFlatVisibleRangeTakesPlusMinusOne`; `TheShownMomentDrawsAMarker`; `AFailureColumnDrawsTheStrip`.
+     `AFlatVisibleRangeTakesPlusMinusOne`; `TheShownMomentDrawsAMarker`; `AFailureColumnDrawsTheStrip`;
+     `OnlyTheFailedBitOfTheMeasuringDeviceDrawsTheStrip` (ATP-2000 spectra carrying the ATP-8000 bit draw no strip and
+     no failure line; their own bit draws both); `SpectraFifteenSecondsApartWithHeartbeatsBetweenDrawAMarkEach`.
    - `TrendChartViewModelRenderTests`: `ARangeWithGapsRendersWithFiniteLimits`; `AnAllGapRangeRendersTheEmptyAxes`.
    - `TrendReadoutTests`: the time in local `HH:mm:ss`; one value; a min-max range; "No data"; "{n} spectra lost",
      also 201 after a board restart; "No spectra" for a NoSpectra gap, with "Measurement failed: ATP-8000" under it when
      a heartbeat in the gap carried the bit; "Spectrometer does not cover {nm} nm"; every text from `Resources`.
    - `TrendFeedRereadTests`, `TrendFeedMomentTests` and `TrendFeedFailureTests`: `TheFeedFillsTheCacheFromTheDistributor`; `AKeyChangeReadsTheVisibleRangeFirst`;
      `ASecondKeyChangeCancelsTheReadInFlight`; `KeyChangesInsideTheThrottleReadOnce`;
-     `AReturnToThePreviousKeyCancelsThePendingReadAndStartsNone`; `AFailedReadReportsOnceAndKeepsTheLivePart`;
+     `AFailedReadReportsOnceAndKeepsTheLivePart`;
      `AReadUsesTheWindowFromBeforeItsFirstRangeNotALaterPan` (a pan before the UI dispatch moves the read's window, a
      pan during the read changes no range); `EveryKeyChangeLogsAtDebugWithItsRunningCount`;
-     `AReadThatLandsEveryRangeLetsAReturnRestoreTheKeyWithoutARead`; `BackToLiveCancelsTheMomentReadInFlight`;
+     `BackToLiveCancelsTheMomentReadInFlight`;
      `AReadThatFailsAfterTheStopReportsNothing`; `StopCancelsTheReadsAndAwaitsThem` (a re-read and a click read both
      held at a gate). The feed tests run the feed's UI hops on the headless dispatcher.
    - `TrendChartViewTests`: `ThePlotIsCachedThroughItsOnlyAncestor`; `ABurstOfRedrawRequestsJoinsOneFrame`;
@@ -227,7 +227,8 @@ Automatable (baseline: verified 2026-11-04, `dotnet test SpectrumVisualizer.slnx
      `TheHoverOverlayHidesWhileDragging`; `TheEmptyStateShowsUntilTheFirstPoint`.
    - `OverviewViewModelTests` and `OverviewViewTests`: the band spans the cache extent; the highlight shows the window
      and keeps 6 px; a press navigates the trend to that time and stops following; the band refreshes after a history
-     chunk lands.
+     chunk lands; spectra 15 s apart show a 3 px mark each
+     (`SpectraFifteenSecondsApartWithHeartbeatsBetweenShowAMarkEach`).
 2. `dotnet test SpectrumVisualizer.slnx --filter "Area=Store"` passes, with `SpectrumHistoryPointsTests`:
    `PointsCarryTheWindowMeanPerSpectrum`; `PointsOfAnUncoveredDeviceAreNaN`; `ACorruptRowIsNaN`;
    `PointsComeInReceiveOrder`; `ACancelledReadThrowsOperationCanceled`; and the existing series tests unchanged over the
@@ -340,12 +341,12 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
     `--device 2000 --wavelength 950`: both devices cover 950 nm, so after the break at the restart the line resumes
     with no uncovered gap.
 11. Restart with `--device 2000 --dark-every 3`: every third point drops to 0.
-12. Restart with `--device 2000 --both-connected --failed 8000`: the failure strip shows under the line while the
-    spectra carry the bit; the strip is one bar, not dashes; the readout names "Measurement failed: ATP-8000".
-    (The ATP-2000 spectra carry the ATP-8000 bit; at `--rate 1` the emulator sends no heartbeats. Only the emulated
-    device's own bit shows in heartbeats only, `board-protocol.md:360`.) Then run
-    `--device 2000 --rate 0 --failed 2000` for 15 s and back to `--device 2000`: the strip covers the heartbeat-only
-    stretch, and hovering its gap reads "No spectra" with "Measurement failed: ATP-2000" under it.
+12. Restart with `--device 2000 --both-connected --failed 8000`: no failure strip shows and the readout has no
+    "Measurement failed" line. The ATP-2000 spectra carry the ATP-8000 bit, the idle device's, and the trend marks only
+    the measuring device's bit; at `--rate 1` the emulator sends no heartbeats. Only the emulated device's own bit
+    shows in heartbeats only (`board-protocol.md:360`). Then run `--device 2000 --rate 0 --failed 2000` for 15 s and
+    back to `--device 2000`: the strip covers the heartbeat-only stretch as one bar, not dashes, and hovering its gap
+    reads "No spectra" with "Measurement failed: ATP-2000" under it.
 13. Pick the 24 h preset after several minutes: the whole history shows without delay. Pick the 1 min or 10 min preset
     and press in the overview: the trend window moves to that time and stops following.
 14. Resize the window to its 1256 px minimum and to full screen: the side pane keeps 392 px, the charts take the spare
@@ -380,8 +381,10 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   count of spectra and heartbeats alike, and a count above 0 emits a Loss break with it. A board restart inside 10 s
   shows as a Loss break with the link's count (`board-protocol.md:144`), for example "199 spectra lost"; the readout
   accepts that number. A spectrum that comes more than 10 s after the previous spectrum emits a NoSpectra break,
-  whatever heartbeats came between, so a heartbeat-only stretch breaks the line. Any measurement-failed bit in a frame's
-  state, heartbeat or spectrum, emits a Failure mark. A frame the link channel dropped leaves a `seq` gap in the
+  whatever heartbeats came between, so a heartbeat-only stretch breaks the line. The measuring device's measurement-failed bit
+  in a frame's state, heartbeat or spectrum, emits a Failure mark. The measuring device is the device of the spectrum,
+  or of the last spectrum before a heartbeat; before the first spectrum no bit marks. The board keeps the idle
+  device's bit until that device measures again (`main.c:502`, `:1064`). A frame the link channel dropped leaves a `seq` gap in the
   distributor stream, so it breaks the line too.
 - **Breaks belong to the run, not to the key.** Breaks and marks come from `seq`, time and `state`, never from the
   wavelength or `delta`. The instance file is wiped at open (`StoreFiles.cs:24-30`) and the trend feed subscribes before
@@ -394,15 +397,10 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   time, references only; the pixel arrays are immutable) and a `TimeProvider`. `Add(ReceivedFrame)` passes every frame
   to the continuity rule and keeps its breaks and marks, then for a spectrum:
   - the first spectrum sets the key and asks for nothing;
-  - a spectrum with another wavelength or `delta` bumps the key generation, moves the points older than the recent
-    spectra aside as the previous key's block, recomputes the recent spectra's values at the new key, and raises
+  - a spectrum with another wavelength or `delta`, a return to the previous key included, bumps the key generation,
+    drops the points older than the recent spectra, recomputes the recent spectra's values at the new key, and raises
     `ReReadRequested(generation, key, recentStart)`; the feed logs the change at Debug with the generation, which
     counts the key changes;
-  - a spectrum that returns to the previous key swaps that block back, recomputes the recent spectra, and raises a
-    request with no read, so the feed cancels the pending read and starts none, when the outgoing key's history was
-    complete (the first key, a key a return restored, or a key whose re-read landed every range and called
-    `CompleteHistory`), no chunk of the current generation has landed, and the return comes at most 240 s after the
-    kept points' end; any other return asks for a read like any change;
   - otherwise it adds one point: `QueryWindows.MeanOf` over the frame's window bytes when the device covers the
     wavelength, NaN otherwise.
   After each add it drops points, breaks and marks older than 24 h before `TimeProvider.GetUtcNow()`, the store's
@@ -574,7 +572,7 @@ Continuity rule (`FrameContinuity.Observe(ReceivedFrame) -> Continuity`):
 | up to 10 s, `SequenceTracker.Observe` returns k > 0 | Loss break at this frame with k lost |
 | up to 10 s, k = 0 | nothing |
 | a spectrum more than 10 s after the previous spectrum | NoSpectra break, 0 lost, at this spectrum, besides the above |
-| state has `Atp2000MeasurementFailed` or `Atp8000MeasurementFailed` | a failure mark at this frame, besides the above |
+| state has the measuring device's failed bit (`Atp2000MeasurementFailed` or `Atp8000MeasurementFailed`) | a failure mark at this frame with that bit, besides the above |
 
 Cache key: `(WavelengthNm, Delta)` of the latest spectrum frame. Recent spectra: 120 s by ms-truncated receive time.
 Retention: 24 h before now. Throttle of re-reads: 500 ms. Cache `Changed` sample: 100 ms.
@@ -633,8 +631,8 @@ Data flow:
 3. `Changed`, sampled at 100 ms, and a 1 s tick while following reach `TrendChartViewModel.Refresh` and the
    overview on the UI thread; the navigation model moves the window's right edge to now while sticky.
 4. A key change, throttled at 500 ms, snapshots the visible window on the UI thread and starts one read on the pool:
-   the plan's ranges through `IntensityPointsAsync`, each chunk's points landed in the cache; a newer key change, or a
-   return to the previous key, cancels it.
+   the plan's ranges through `IntensityPointsAsync`, each chunk's points landed in the cache; a newer key change
+   cancels it.
 5. A click reads the moment and switches the spectrum source; the spectrum view model shows it.
 
 ## What Goes Where
@@ -649,7 +647,11 @@ Data flow:
   10 s a `seq` step above one is loss, heartbeats included; a board restart inside 10 s shows the link's loss count.
 - More than 10 s since the last spectrum breaks the line as "No spectra", heartbeats or not.
 - Lost spectra, a stretch without spectra and uncovered spectra break the line; a measurement-failed bit marks a strip,
-  not a break.
+  not a break, and only the measuring device's bit marks: the device of the spectra in that column, or of the last
+  spectrum before a heartbeat-only stretch. The store keeps every frame's `state` unchanged.
+- A value column with one value between two gaps draws a 3 px square on the trend and at least a 3 px square in the
+  overview band, so spectra more than 10 s apart (the angle and zone trigger modes, `main.c:1514-1519`) stay visible
+  while each still stands between NoSpectra breaks.
 - Breaks and marks belong to the run and survive a key change; a key change recomputes point values only, and the
   store read returns points only. The heartbeat table has no reader in the app and stays written, for diagnostics.
 - The cache holds one point per spectrum (time and mean), not columns, so zoom into any part of the day needs no
@@ -658,10 +660,8 @@ Data flow:
   their start, which covers the writer's normal lag. Frames the store did not write are absent after a re-read.
 - The store read returns points through the series' own statement and row loop.
 - Cache retention is 24 h before now, the store's rule. The fold starts by binary search.
-- The feed logs every key change at Debug with the generation as the running count. A return to the previous key
-  restores the kept points and starts no read when the outgoing key's history was complete (the first key, a key a
-  return restored, or a key whose re-read landed every planned range), no chunk of the new key has landed, and the
-  return comes at most 240 s after the kept points' end, about 120 s after the change.
+- The feed logs every key change at Debug with the generation as the running count. Every key change re-reads, a
+  return to the previous key included; the 500 ms throttle joins fast changes into one read.
 - The feed snapshots the visible window on the UI thread at trigger time; the read on the pool gets that value only.
 - The plan reads the visible window first, then the rest of the day newest first in 1 h chunks; a newer key change
   cancels the read through `Select(Read).Switch()`; key changes are throttled at 500 ms.
@@ -727,7 +727,8 @@ the types named in Solution Overview, Folders.
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Core/Trend/IntensityCache.cs`, `TrendHistoryPlan.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Trend/IntensityCacheTests.cs`, `TrendHistoryPlanTests.cs`
 
-- [x] write `IntensityCache` as Solution Overview describes: one lock, key and generation, the previous key's block,
+- [x] write `IntensityCache` as Solution Overview describes (the post-slice check cut the previous key's block,
+  `CompleteHistory` and the no-read request named here): one lock, key and generation, the previous key's block,
   recent spectra, breaks and marks kept for the cache's life, retention against a `TimeProvider`, `Add`,
   `Fold(IntensityQuery)` with a binary-searched start, `FoldCurrent`, `Extent`, `LandHistory`, `CompleteHistory`,
   `SpectrumAt`, `Changed`, `HistoryLanded`, `ReReadRequested` (with a no-read request for a return to the previous
@@ -860,7 +861,8 @@ the types named in Solution Overview, Folders.
   and `Func<DateTimeOffset, CancellationToken, Task<Result<StoredSpectrum?>>>`, bound to `SpectrumHistory` in the
   container, so tests pass gated fakes without an interface
 - [x] at each trigger, take the `TimeRange(From, To)` snapshot on the UI scheduler and pass only that value to the
-  read on the thread pool; a no-read request maps to `Observable.Empty`
+  read on the thread pool; a no-read request maps to `Observable.Empty` (cut with the return path in the post-slice
+  check)
 - [x] write `TrendViewModel`: owns `TrendChartViewModel` and the overview view model, the presets and the selected
   preset, `FollowLiveCommand` (`canExecute` = not following), `ShowMoment`, which hands the moment to the feed's
   moment pipeline. The overview view model joins in Task 11, where it is written; `TrendViewModel` takes the chart
@@ -1011,7 +1013,8 @@ the types named in Solution Overview, Folders.
   `ADarkSpectrumAddsAPointAtZero`; envelope `AColumnWithValuesBecomesAnEnvelopeColumnAtItsCentre`, `EnvelopePathTests`;
   gaps: loss `ASeqStepOfThreeBreaksWithTwoLost`, silence `AGapOverTenSecondsWithoutAnyFrameBreaksAndIgnoresTheSeqStep`,
   uncovered `AnUncoveredEmptyColumnBecomesAGap`, break in a value column `ABreakInAColumnWithValuesPutsAGapBeforeIt`;
-  failure strip `AFailedBitMarksAFailure`, `AFailureColumnDrawsTheStrip`; live follow
+  failure strip `TheMeasuringDevicesFailedBitMarksAFailure` (renamed in the post-slice check),
+  `AFailureColumnDrawsTheStrip`; live follow
   `ANewFrameMovesTheWindowWhileFollowing`, `FollowLiveReturnsToTheNewestFrame`; zoom
   `AWheelStepZoomsAroundTheCursorTime`; pan `ADragPastFourPixelsPansAndStopsFollowing`; presets
   `ThePresetSetsTheWidthAndKeepsFollowing`, `ThePresetsAreFiveWidthsWithTenMinutesSelected`; overview
@@ -1025,7 +1028,7 @@ the types named in Solution Overview, Folders.
   file exists reports once; a day-old point leaves the cache; both devices alternating at a covered wavelength draw one
   line; a heartbeat-only stretch adds no point and, past 10 s since the last spectrum, breaks the line at the next
   spectrum with "No spectra" (`HeartbeatsOnlyForOverTenSecondsBreakAtTheNextSpectrum`); a return to the previous key
-  inside the throttle starts no read. Tests: `ASecondKeyChangeCancelsTheReadInFlight`;
+  inside the throttle starts no read (the post-slice check cut this rule and its test). Tests: `ASecondKeyChangeCancelsTheReadInFlight`;
   ➕ `AClickDuringARereadShowsTheMomentAndLeavesTheRereadRunning`; ➕
   `ARereadBeforeTheStoreFileExistsReportsOnceAndCreatesNoFile` (the real `SpectrumHistory` over a missing path);
   `PointsBreaksAndMarksOlderThanADayBeforeNowAreDropped`; ➕ `BothDevicesAlternatingAtAWavelengthBothCoverDrawOneLine`;
@@ -1068,17 +1071,27 @@ the types named in Solution Overview, Folders.
 ## Post-Completion
 **Manual verification:**
 - the smoke checklist of Acceptance Evidence over a com0com pair, during the owner's final assembly check.
-- the real board after the firmware-frame-sender slice: the same checklist against the board, with an eye on the
-  key. ASSUMPTION: both spectrometers' frames carry SCADA's one wavelength and `delta`, so the key changes only when
-  SCADA changes it; if the two devices carried different wavelengths, every device switch would re-read the history,
-  and the owner decides on a per-device key.
+- the real board after the firmware-frame-sender slice: the same checklist against the board. The device-alternation
+  ASSUMPTION is resolved: the firmware picks the device from the wavelength (`main.c:394-402`, `SelectedDevice = wave
+  < 904 ? DEV_2000 : DEV_8000`), so both devices never alternate at one key; a PLC device select (`main.c:1351`) sets
+  a new wavelength and is an ordinary key change; `main.c:1194-1195` clamps `WavePLC` to 189-2460 nm and `delta` to
+  0-100.
+- ask Optosky whether the idle spectrometer's measurement-failed bit should clear when the other device is selected
+  (OptoskyProj#20 follow-up): the firmware sets it at `main.c:502` and clears it only on that device's own successful
+  spectrum at `main.c:1064`. The trend shows only the measuring device's bit; no firmware change in this slice.
+- the operator PC's display scaling: at 125 % on 1366 x 768 the window's 688 DIP `MinHeight` and 1256 DIP
+  `MinimumWidth` exceed the screen; the owner decides the floors once the scaling is known.
+- the trend collapses to the last 2 min for about 0.5 s on every SCADA key change, until the visible chunk lands (the
+  500 ms throttle plus the first read); the owner judges whether that is acceptable.
+- a PLC-triggered dark frame pins the Y axis to 0 while it is in the window, because dark points draw at zero; the
+  owner accepted dark points on the trend.
 - the store benchmark on the operator PC (cold disk): the four trend rows against their targets.
 - the owner judges the 3 : 2 split of the spectrum and trend rows and the 120 px data floor of each chart on the
   site's monitors (smoke step 15).
 - the owner judges the date every time tick repeats (at 10 min each label reads date over time, for example
   "04.11.2026" over "22:10") and decides whether the trend should show it once.
-- correct the dark-spectrum sentence of Semiteq/SpectrumVisualizer#3 before the PR closes it: dark measurements show
-  on the trend as a point at zero, as the roadmap resolved.
+- correct the dark-spectrum sentence of Semiteq/SpectrumVisualizer#3 before the PR closes it: the issue still says dark
+  spectra are not drawn, but dark measurements show on the trend as a point at zero, as the roadmap resolved.
 
 **PR body note:**
 - Closes Semiteq/SpectrumVisualizer#3
@@ -1114,12 +1127,15 @@ machine has no com0com pair. The app start was checked through its log only, bec
 - Core references System.Reactive and no logging package; `IntensityCache(TimeProvider)` exposes `Changed`,
   `HistoryLanded` and `ReReadRequested`, and `TrendFeed` logs each key change at Debug. All three emit through one
   `_emitGate`, which `Dispose` also takes, so no signal leaves a disposed cache.
-- `TrendTimeline` holds the points, breaks and marks and the fold; `IntensityCache` keeps the key, the previous key's
-  block and the recent spectra. `Extent` and `FoldCurrent(queryFor)` replace separate first and newest reads, so the
+- `TrendTimeline` holds the points, breaks and marks and the fold; `IntensityCache` keeps the key and the recent
+  spectra. `Extent` and `FoldCurrent(queryFor)` replace separate first and newest reads, so the
   chart builds its query under the cache lock.
-- A return to the previous key restores without a read only when the outgoing key's history was complete (the first
-  key, a restored key, or a key whose re-read called `CompleteHistory`). While a previous-key block exists the recent
-  spectra are kept back to its end for at most 240 s in total.
+- The post-slice check cut the return-to-previous-key path (`KeyBlock`, `ReturnToPrevious`, `CompleteHistory`,
+  `ReReadRequest.ReadsHistory`): every key change re-reads, and the recent spectra always hold 120 s.
+- `FrameContinuity` remembers the device of the last spectrum and masks a frame's state to that device's failed bit;
+  a failed heartbeat before the first spectrum marks nothing, because no device has measured.
+- `EnvelopeLine` fills a 3 px square at a lone vertex (`EnvelopePath.IsLone`) in the line's colour;
+  `OverviewGeometry`'s lone column is at least 3 px square, centred on its values and kept inside the band.
 - The benchmark cache runs on `FixedTimeProvider` stopped at the newest row, because churned rows lie one span ahead
   of the real clock. Each re-read run changes the key once, stored + 50 nm and + 100 nm in turn.
 - `TrendNavigationModel` has no `SetWindow` and no argument guards. `SetWidth` while following keeps the right edge
@@ -1174,9 +1190,9 @@ machine has no com0com pair. The app start was checked through its log only, bec
 Automated, from the repo root on branch `intensity-trend`:
 
 1. `dotnet build SpectrumVisualizer.slnx -c Release` gives 0 warnings, 0 errors.
-2. `dotnet test SpectrumVisualizer.slnx` passes 921 of 921. Per area with `--filter "Area=X"`: Trend 227,
+2. `dotnet test SpectrumVisualizer.slnx` passes 923 of 923. Per area with `--filter "Area=X"`: Trend 229,
    Spectrum 123, Store 121, MainWindow 96, Link 80, Protocol 56, Emulator 56, Chart 52, Messages 41, Di 30,
-   Calibration 15, Resources 9, Paths 8, Logging 7; the areas sum to 921.
+   Calibration 15, Resources 9, Paths 8, Logging 7; the areas sum to 923.
 3. `dotnet format SpectrumVisualizer.slnx --verify-no-changes`, then `dotnet tool restore` and
    `dotnet terse SpectrumVisualizer`; both gates exit 0.
 4. `dotnet build SpectrumVisualizer.sln` gives 0 errors, and `dotnet test SpectrumVisualizer.Tests` passes 13 of 13.
@@ -1188,7 +1204,7 @@ Automated, from the repo root on branch `intensity-trend`:
 6. The trend is pinned by these test classes:
    - `FrameContinuityTests`: the 10 s session reset, Loss and NoSpectra breaks, failure marks.
    - `IntensityCachePointTests`, `IntensityCacheKeyChangeTests`, `IntensityCacheHistoryTests`,
-     `IntensityCacheDisposeTests`: points, the key change and return rules, landed chunks, the fold equal to the
+     `IntensityCacheDisposeTests`: points, the key change rule, landed chunks, the fold equal to the
      store series, retention, dispose.
    - `TrendHistoryPlanTests`, `SpectrumHistoryPointsTests`: the read order and the store's points read.
    - `TrendNavigationModelFollowTests`, `TrendNavigationModelWidthTests`, `TrendNavigationModelZoomTests`: follow,
@@ -1217,7 +1233,7 @@ the emulator on `COM10` and the app on `COM11`:
    and the visible history redraws at 400 nm, older history after.
 3. Step 6: click a moment; the spectrum chart shows it with "Spectrum from HH:mm:ss" ("Спектр от HH:mm:ss") and a
    marker on the trend; Back to live returns to the latest spectrum.
-4. Steps 9 and 12: `--bad-crc-every 5` gives "1 spectra lost" breaks; `--both-connected --failed 8000` shows one
-   failure strip and "Measurement failed: ATP-8000".
+4. Steps 9 and 12: `--bad-crc-every 5` gives "1 spectra lost" breaks; `--device 2000 --both-connected --failed 8000`
+   shows no failure strip; `--device 2000 --rate 0 --failed 2000` shows one strip and "Measurement failed: ATP-2000".
 5. Steps 14 and 15: on a 1366 x 768 screen, maximised with the message panel shown, both charts keep a readable data
    area, the side pane scrolls and the status bar stays inside the window.

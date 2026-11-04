@@ -126,6 +126,62 @@ public sealed class TrendChartViewModelDisplayTests : TrendChartTestBase
 		StrokeProbe.IsRed(pixels, stripRow, cleanX).Should().BeFalse("a column without a failure stays clear");
 	}
 
+	[AvaloniaTheory]
+	[InlineData(BoardState.Atp8000MeasurementFailed, false)]
+	[InlineData(BoardState.Atp2000MeasurementFailed, true)]
+	public void OnlyTheFailedBitOfTheMeasuringDeviceDrawsTheStrip(BoardState failedBit, bool marks)
+	{
+		for (var second = 0; second < 60; second++)
+		{
+			var spectrum = StoreSamples.Spectrum(At(second), Spectrometer.Atp2000, nm: 650, seq: NextSeq());
+			Add(spectrum with { Frame = spectrum.Frame with { State = spectrum.Frame.State | failedBit } });
+		}
+
+		Sample();
+		Chart.ApplyPalette(Palette(strip: Colors.Red));
+		Chart.SetDataAreaWidth(256);
+
+		using var image = Chart.Plot.GetImage(800, 400);
+		var pixels = image.GetArrayRGB();
+		var stripRow = (int)Math.Floor(Chart.Plot.RenderManager.LastRender.Layout.DataRect.Bottom) - 2;
+		StrokeProbe.IsRed(pixels, stripRow, PixelColumnAt(30)).Should().Be(marks);
+		Chart.ReadoutAt(At(30))!.Split('\n').Any(line => line.StartsWith(
+			Resources.FormatTrendReadoutFailedFormat(string.Empty), StringComparison.Ordinal))
+			.Should().Be(marks, "the readout names a failure only where the strip shows one");
+	}
+
+	[AvaloniaFact]
+	public void SpectraFifteenSecondsApartWithHeartbeatsBetweenDrawAMarkEach()
+	{
+		const int Spectra = 20;
+		for (var spectrum = 0; spectrum < Spectra; spectrum++)
+		{
+			var second = spectrum * 15.0;
+			AddFlat(second, (ushort)(100 + (10 * spectrum)));
+			for (var beat = 1; beat < 5; beat++)
+			{
+				AddHeartbeat(second + (3 * beat));
+			}
+		}
+
+		Sample();
+		Chart.ApplyPalette(Palette(strip: Colors.Blue, envelope: Colors.Red));
+		Chart.SetDataAreaWidth(256);
+
+		using var image = Chart.Plot.GetImage(800, 400);
+		var pixels = image.GetArrayRGB();
+		var dataRect = Chart.Plot.RenderManager.LastRender.Layout.DataRect;
+		for (var spectrum = 0; spectrum < Spectra; spectrum++)
+		{
+			var x = PixelColumnAt(spectrum * 15.0);
+			Enumerable.Range(x - 2, 5).Any(column => StrokeProbe.ColumnCarriesRed(pixels, dataRect, column))
+				.Should().BeTrue($"the spectrum at {spectrum * 15} s stands alone between NoSpectra breaks");
+		}
+
+		StrokeProbe.ColumnCarriesRed(pixels, dataRect, PixelColumnAt(7.5))
+			.Should().BeFalse("a NoSpectra break still cuts the line between two spectra");
+	}
+
 	[AvaloniaFact]
 	public void TheReadoutReadsTheColumnUnderTheMoment()
 	{
@@ -175,8 +231,13 @@ public sealed class TrendChartViewModelDisplayTests : TrendChartTestBase
 		redraws.Should().Be(2);
 	}
 
-	private static ChartColors Palette(Color strip)
+	private static ChartColors Palette(Color strip, Color? envelope = null)
 	{
-		return new ChartColors(Colors.Blue, Colors.Blue, Colors.Green, Colors.Blue, Colors.Green, strip);
+		return new ChartColors(Colors.Blue, Colors.Blue, Colors.Green, envelope ?? Colors.Blue, Colors.Green, strip);
+	}
+
+	private int PixelColumnAt(double second)
+	{
+		return (int)Math.Round(Chart.Plot.GetPixel(new Coordinates(LocalTimeAxis.ToAxis(At(second)), 0)).X);
 	}
 }

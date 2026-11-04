@@ -84,6 +84,12 @@ public abstract class TrendChartTestBase : IDisposable
 		Add(StoreSamples.Spectrum(At(second), device, pixels, seq: NextSeq()));
 	}
 
+	/// <summary>A heartbeat repeating the last seq, so it counts no loss.</summary>
+	protected void AddHeartbeat(double second)
+	{
+		Add(new ReceivedFrame(new BoardFrame(BoardState.Atp8000Connected, _seq, null), At(second)));
+	}
+
 	protected void AddFailedHeartbeat(double second)
 	{
 		var state = BoardState.Atp8000Connected | BoardState.Atp8000MeasurementFailed;

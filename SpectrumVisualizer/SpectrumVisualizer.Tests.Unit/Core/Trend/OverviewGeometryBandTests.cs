@@ -43,7 +43,7 @@ public sealed class OverviewGeometryBandTests : OverviewGeometryTestBase
 	}
 
 	[Fact]
-	public void ALoneColumnBetweenBreaksDrawsAFigureTwoPixelsWide()
+	public void ALoneColumnBetweenBreaksDrawsAFigureThreePixelsWide()
 	{
 		var band = Band(
 			(0.0, 1.0, 3.0, 2.0),
@@ -55,8 +55,8 @@ public sealed class OverviewGeometryBandTests : OverviewGeometryTestBase
 		var figures = OverviewGeometry.BandFigures(band, First, First.AddDays(4), BandWidth, BandHeight);
 
 		figures.Should().HaveCount(2);
-		figures[1].Outline.Select(point => point.X).Should().Equal(299.0, 301.0, 301.0, 299.0);
-		figures[1].CenterLine.Select(point => point.X).Should().Equal(299.0, 301.0);
+		figures[1].Outline.Select(point => point.X).Should().Equal(298.5, 301.5, 301.5, 298.5);
+		figures[1].CenterLine.Select(point => point.X).Should().Equal(298.5, 301.5);
 	}
 
 	[Fact]

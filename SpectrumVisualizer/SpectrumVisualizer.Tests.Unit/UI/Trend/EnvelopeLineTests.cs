@@ -24,6 +24,8 @@ public sealed class EnvelopeLineTests
 	private const int ResumeIndex = 350;
 	// Distance from the gap's edges to the columns that must still carry the line, in samples.
 	private const int ProbeOffsetSamples = 100;
+	private const int LoneColumnCount = 5;
+	private const double LoneColumnSpacing = 20.0;
 	// Half the band each column spans around its value, so every column strokes a vertical run.
 	private const double ColumnSpread = 2.0;
 	private const double AxisMin = 0.0;
@@ -91,6 +93,39 @@ public sealed class EnvelopeLineTests
 			.Should().BeTrue("the segment before the gap is drawn");
 		StrokeProbe.ColumnCarriesRed(pixels, dataRect, PixelColumnAt(plot, ResumeIndex + ProbeOffsetSamples))
 			.Should().BeTrue("the segment after the gap is drawn");
+	}
+
+	// Spectra more than 10 s apart: every value column stands alone between gaps and holds one value.
+	[Fact]
+	public void ALoneColumnWithOneValueDrawsAMark()
+	{
+		var line = new EnvelopeLine();
+		line.Recolor(Colors.Red);
+		using var plot = new Plot();
+		plot.Add.Plottable(line);
+		List<EnvelopeColumn> columns = [];
+		for (var index = 0; index < LoneColumnCount; index++)
+		{
+			var x = index * LoneColumnSpacing;
+			columns.Add(new EnvelopeColumn(x - 1.0, double.NaN, double.NaN, double.NaN));
+			columns.Add(new EnvelopeColumn(x, 50.0, 50.0, 50.0));
+		}
+
+		line.ReplaceColumns(columns);
+		plot.Axes.SetLimits(-LoneColumnSpacing, LoneColumnCount * LoneColumnSpacing, AxisMin, AxisMax);
+
+		using var image = plot.GetImage(PlotWidth, PlotHeight);
+		var pixels = image.GetArrayRGB();
+		var dataRect = plot.RenderManager.LastRender.Layout.DataRect;
+
+		for (var index = 0; index < LoneColumnCount; index++)
+		{
+			StrokeProbe.ColumnCarriesRed(pixels, dataRect, PixelColumnAt(plot, index * LoneColumnSpacing))
+				.Should().BeTrue($"the lone column {index} is marked");
+		}
+
+		StrokeProbe.ColumnCarriesRed(pixels, dataRect, PixelColumnAt(plot, LoneColumnSpacing / 2.0))
+			.Should().BeFalse("the gaps still break the line between the marks");
 	}
 
 	private static List<EnvelopeColumn> Columns(int count)
