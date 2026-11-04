@@ -596,6 +596,18 @@ Repositories: OptoskyProj (commit `docs(readme): описать протокол
 - Merge: no PRs are open in OptoskyProj. A revived `fix/watchdog` or `fix/dma-fault-reset` branch conflicts in two
   lines around the `PcSenderInit` call after `sei()` (`main.c:1647`, `:1648`); `fix/encoder-i2c-timeout` touches `main.c:1367`.
 
+**Owner items:**
+- At merge, tag OptoskyProj and attach the built `.hex` to that release. The SpectrumVisualizer 3.0.0 release notes
+  say "flash first, then install" and name that tag.
+- Known gap for the PR body: nothing enforces golden-file drift automatically. OptoskyProj has no CI, and
+  `FirmwareFrameTests` pass against the committed `FirmwareFrames.txt`.
+- Board session prep: `winget install SQLite.SQLite` for the `sqlite3` CLI that the store query needs.
+- RAMPZ check in the built `.lss` (the cproj enables it): look in the `TCC0_OVF_vect` and `USARTC0_RXC_vect`
+  prologues for `in r0, 0x3b` and `out 0x3b, r1`. If they are absent, the far-read window under interrupts that
+  existed before this change is real; the fix is `_far_mem_enter_ISR` (`SRC/ebi_driver.h:113`) in a separate issue.
+- Step 4 note: an ATP-2000 frame measures about 358-360 ms, because service requests (`SERVICE_PERIOD_MS` 500,
+  `main.c:152`) run during a frame. A value well above that is the starvation signal.
+
 **Follow-up question for the owner:**
 - The idle spectrometer's fault bit (`SpectrumFault[d]`, set at `main.c:501` and `:964`, cleared only by that device's
   next good spectrum at `:1032`) stays set while the PLC measures on the other device, so heartbeats keep reporting an
