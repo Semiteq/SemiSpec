@@ -170,7 +170,8 @@ Automatable (baseline: verified 2026-11-04, `dotnet test SpectrumVisualizer.slnx
      `ASpectrumExactlyTenSecondsAfterTheLastBreaksNothing`; `ASeqGapExactlyTenSecondsAfterTheLastFrameCountsTheLoss`
      (seq 7 at 0 s, seq 9 at 10.0 s: Loss 1, no NoSpectra); `AFailedBitMarksAFailure` (either device's bit, in a
      heartbeat or a spectrum frame); `ABoardRestartInsideTenSecondsBreaksWithTheLinksLossCount` (seq 55 then 1: 201 lost).
-   - `IntensityCacheTests`: `ASpectrumAddsOnePointAtTheFrameMean` (equals `QueryWindows.MeanOf` of the window);
+   - `IntensityCachePointTests`, `IntensityCacheKeyChangeTests`, `IntensityCacheHistoryTests` and
+     `IntensityCacheDisposeTests`: `ASpectrumAddsOnePointAtTheFrameMean` (equals `QueryWindows.MeanOf` of the window);
      `ADarkSpectrumAddsAPointAtZero`; `ASpectrumOfADeviceThatDoesNotCoverTheWavelengthAddsAnUncoveredPoint`;
      `AHeartbeatAddsNoPoint`; `TheFirstSpectrumSetsTheKeyWithoutAReRead`;
      `AKeyChangeRecomputesTheRecentSpectraAndAsksForAReRead` (wavelength or `delta`);
@@ -192,25 +193,27 @@ Automatable (baseline: verified 2026-11-04, `dotnet test SpectrumVisualizer.slnx
    - `TrendHistoryPlanTests`: `TheVisibleRangeComesFirst`; `TheRestFollowsNewestFirstInHourChunks`;
      `EveryRangeEndsAtTheRecentSpectraStart`; `AVisibleRangeInsideTheRecentSpectraReadsNothingFirst`;
      `TheRangesCoverTheDayWithoutOverlap`.
-   - `TrendNavigationModelTests` copied from SemiPlot (`OnLiveEdgeWhenStickyAdvancesWindowAndKeepsWidth`,
+   - `TrendNavigationModelFollowTests`, `TrendNavigationModelWidthTests` and `TrendNavigationModelZoomTests`, copied
+     from SemiPlot (`OnLiveEdgeWhenStickyAdvancesWindowAndKeepsWidth`,
      `PanPastLiveEdgeIntoThePastAutoDetachesSticky`, `PanWhileLiveEdgeStaysInsideWindowKeepsSticky`, the zoom anchor and
      the left clamp) with the widths 10 s to 24 h.
-   - `TrendColumnsTests`: `AColumnWithValuesBecomesAnEnvelopeColumnAtItsCentre`; `AnEmptyColumnWithoutABreakIsLeftOut`;
-     `AnUncoveredEmptyColumnBecomesAGap`; `ABreakInAColumnWithValuesPutsAGapBeforeIt`; `TheColumnWidthIsWholeMilliseconds`
-     (span over pixels, 256 to 2048 columns, ceiling to 1 ms).
+   - `EnvelopeColumnTests` (UI): `AColumnWithValuesBecomesAnEnvelopeColumnAtItsCentre`;
+     `AnEmptyColumnWithoutABreakIsLeftOut`; `AnUncoveredEmptyColumnBecomesAGap`; `ABreakInAColumnWithValuesPutsAGapBeforeIt`.
+     `TrendColumnsTests` (Core): `TheColumnWidthIsWholeMilliseconds` (span over pixels, 256 to 2048 columns, ceiling to
+     1 ms); `FailedColumnsLessThanFiveSecondsApartJoinIntoOneRange`.
    - `EnvelopePathTests` copied (`VisibleRangeKeepsOneColumnBeyondEachEdgeOfTheWindow`, `BuildDegenerateColumnIsOnePoint`,
      `BuildColumnBelowThePreviousPointEntersAtItsMax`, `AGapColumnBreaksThePath`).
-   - `TrendChartViewModelTests`: `TheDefaultWindowIsTenMinutesAndFollowsLive`; `ANewFrameMovesTheWindowWhileFollowing`;
+   - `TrendChartViewModelNavigationTests` and `TrendChartViewModelDisplayTests`: `TheDefaultWindowIsTenMinutesAndFollowsLive`; `ANewFrameMovesTheWindowWhileFollowing`;
      `APanIntoThePastStopsFollowingAndANewFrameKeepsTheWindow`; `FollowLiveReturnsToTheNewestFrame`;
      `AWheelStepZoomsAroundTheCursorTime`; `ThePresetSetsTheWidthAndKeepsFollowing`;
-     `FollowingLeavesAnEmptySpanBeforeTheFirstPoint` (10 min window, 2 min of points: `From` = newest - 10 min);
+     `FollowingLeavesAnEmptySpanBeforeTheFirstPoint` (10 min window, 2 min of points: `From` = now - 10 min);
      `APanStopsAtTheFirstPoint`; `AZoomOutStopsAtTheFirstPoint`; `TheYAxisLabelNamesTheKey`; `TheYLimitsPadTheVisibleEnvelope`;
      `AFlatVisibleRangeTakesPlusMinusOne`; `TheShownMomentDrawsAMarker`; `AFailureColumnDrawsTheStrip`.
    - `TrendChartViewModelRenderTests`: `ARangeWithGapsRendersWithFiniteLimits`; `AnAllGapRangeRendersTheEmptyAxes`.
    - `TrendReadoutTests`: the time in local `HH:mm:ss`; one value; a min-max range; "No data"; "{n} spectra lost",
      also 201 after a board restart; "No spectra" for a NoSpectra gap, with "Measurement failed: ATP-8000" under it when
      a heartbeat in the gap carried the bit; "Spectrometer does not cover {nm} nm"; every text from `Resources`.
-   - `TrendFeedTests`: `TheFeedFillsTheCacheFromTheDistributor`; `AKeyChangeReadsTheVisibleRangeFirst`;
+   - `TrendFeedRereadTests`, `TrendFeedMomentTests` and `TrendFeedFailureTests`: `TheFeedFillsTheCacheFromTheDistributor`; `AKeyChangeReadsTheVisibleRangeFirst`;
      `ASecondKeyChangeCancelsTheReadInFlight`; `KeyChangesInsideTheThrottleReadOnce`;
      `AReturnToThePreviousKeyCancelsThePendingReadAndStartsNone`; `AFailedReadReportsOnceAndKeepsTheLivePart`;
      `AReadUsesTheWindowFromBeforeItsFirstRangeNotALaterPan` (a pan before the UI dispatch moves the read's window, a
@@ -232,10 +235,10 @@ Automatable (baseline: verified 2026-11-04, `dotnet test SpectrumVisualizer.slnx
 3. `dotnet test SpectrumVisualizer.slnx --filter "Area=Spectrum"` passes, including `SwitchingSpectrumSourceTests`
    (`LiveByDefault`; `ShowMomentSwitchesCurrentAndSignals`; `LiveFramesWhileHistoricalKeepTheMoment`;
    `ReturnToLiveShowsTheLatestLiveSpectrum`; `EveryShownMomentCarriesANewMeasurement`) and in
-   `SpectrumChartViewModelScaleTests`: `AHistoricalSpectrumDoesNotWriteLastNonDark`,
+   `SpectrumChartViewModelHistoricalScaleTests`: `AHistoricalSpectrumDoesNotWriteLastNonDark`,
    `AToggleWhileAHistoricalSpectrumIsShownDoesNotWriteLastNonDark`, `AHistoricalDarkSpectrumUsesTheLiveReferenceOfItsDevice`,
    `AHistoricalSpectrumOfTheFrozenDeviceKeepsTheFrozenLimits`, `AHistoricalSpectrumOfTheOtherDeviceReturnsToFollowing`,
-   `BackToLiveOnTheOtherDeviceReturnsToFollowing`; `SpectrumViewModelTests.BackToLiveIsEnabledOnlyWhileHistorical`,
+   `BackToLiveOnTheOtherDeviceReturnsToFollowing`; `SpectrumViewModelCommandTests.BackToLiveIsEnabledOnlyWhileHistorical`,
    `TheHistoricalLineShowsTheMomentInLocalTime`.
 4. `dotnet test SpectrumVisualizer.slnx --filter "Area=MainWindow"` passes, including `MainWindowTrendLayoutTests`
    (rows of the content area; the trend under the spectrum chart, the overview under the trend, the side pane across
@@ -248,12 +251,16 @@ Automatable (baseline: verified 2026-11-04, `dotnet test SpectrumVisualizer.slnx
    area and its window has no frame, so only the clamp of a 2000 px window to 1280 px shows there; the frame allowance
    and the floor at `MinHeight` wait for the smoke run on a 1366 x 768 screen, step 14).
 5. `dotnet test SpectrumVisualizer.slnx --filter "Area=Di"` passes: the cache, the history, the feed, the switching
-   source and the trend view models resolve as singletons; `IDisplayedSpectrumSource` resolves to the
-   `SwitchingSpectrumSource`; `AppLifecycleTrendTests.OpeningTheWindowStartsTheTrendFeedBeforeTheDistributor` and
+   source and the trend view models resolve as singletons (`CompositionRootTests.TheTrendPartsAreOneInstanceEach`,
+   `TheTrendViewModelSharesTheContainersChartAndOverview`, `TheMainWindowShowsTheContainersTrendViewModel`). The
+   container registers `SwitchingSpectrumSource` over `LiveSpectrumSource` and has no `IDisplayedSpectrumSource`
+   registration; `SpectrumViewModel`, `TrendChartViewModel` and `TrendFeed` take `SwitchingSpectrumSource`.
+   `AppLifecycleTrendTests.OpeningTheWindowStartsTheTrendFeedBeforeTheDistributor` and
    `ClosingTheWindowWaitsForTheTrendFeedsReadBeforeTheStoreStops` (a re-read held at a gate: the store's stop line
    comes only after the gate opens).
 6. `dotnet test SpectrumVisualizer.slnx --filter "Area=Resources"` passes with every new resx key in the Russian set.
-7. `dotnet test SpectrumVisualizer.slnx` passes 635 plus every test this slice adds, none skipped.
+7. `dotnet test SpectrumVisualizer.slnx` passes 635 plus every test this slice adds, none skipped: 921 of 921 at the
+   end of the run.
 8. `dotnet build SpectrumVisualizer.slnx -c Release` 0 warnings; `dotnet format SpectrumVisualizer.slnx
    --verify-no-changes` and `dotnet terse SpectrumVisualizer` exit 0; `dotnet build SpectrumVisualizer.sln` and
    `dotnet test SpectrumVisualizer.Tests` pass 13 of 13.
@@ -273,6 +280,25 @@ Automatable (baseline: verified 2026-11-04, `dotnet test SpectrumVisualizer.slnx
     `IntensityPointsAsync` against the churned file at a wavelength other than the stored one, so every row reads its
     pixels as after a SCADA change. `StoreBenchmarkRunTests.ASmallRunPrintsEveryMeasurementAndDeletesItsFile` holds
     the new rows on 2 000 rows.
+
+    Measured on the dev laptop: Intel Core i7-1355U, 32 GB RAM, Micron MTFDKBA1T0QFM 1 TB NVMe SSD, Windows 11; the OS
+    file cache is not dropped, so every number is a cached read. 172 800 ATP-2000 rows, re-read at 700 and 750 nm. The
+    Task 4 run (2026-11-04, Task 4 working tree) gives churned warm medians. The re-run (2026-11-04, at `ea86598`)
+    followed the review phases, which changed the fold's call path (`TrendTimeline`, `FoldCurrent`); cells read
+    "first; warm median (min to max)" of 5, F the fresh file, C the churned one. The run used `--folder` in the
+    session scratchpad, and that folder was removed after it.
+
+    | Row | Target (warm median, churned) | Task 4, C | Re-run at `ea86598` | Verdict |
+    | --- | --- | --- | --- | --- |
+    | Cache fold, 24 h, 2048 columns | at most 20 ms | 1.3 ms | F 1.2; 1.1 (1.0 to 1.1) ms. C 1.4; 1.4 (1.4 to 1.5) ms | met |
+    | Cache fold, 10 min, 2048 columns | at most 2 ms | 0.1 ms | F 0.1; 0.1 (0.1 to 0.1) ms. C 0.1; 0.1 (0.1 to 0.1) ms | met |
+    | Re-read, visible 10 min, to its landing | at most 100 ms | 4.6 ms | F 9.5; 4.2 (3.6 to 8.5) ms. C 5.2; 4.4 (4.3 to 4.5) ms | met |
+    | Re-read, whole day, to the last chunk | at most 2 000 ms | 698.6 ms | F 604.8; 812.3 (569.6 to 847.3) ms. C 718.8; 720.4 (694.7 to 754.9) ms | met |
+
+    The fresh whole-day row spreads from 569.6 to 847.3 ms, and its median lies above its first run; that spread is
+    run-to-run noise on one machine, not a regression. The churned rows moved by at most 0.1 ms on the folds and by
+    21.8 ms (3 %) on the whole day against the Task 4 run, inside the same kind of spread. Cold-cache numbers on the
+    operator PC are unmeasured.
 
 Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `COM10`, the app on `COM11`; `emu` stands
 for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator --`):
@@ -337,10 +363,15 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
 
 ## Solution Overview
 - **Folders.** `SpectrumVisualizer.Core/Trend/` holds every rule that needs no UI type: the continuity rule, the
-  intensity cache, the history plan, the navigation model, the column mapping, the overview geometry. The benchmark
-  tool references Core only, so it times the same cache and plan the app runs. `SpectrumVisualizer.UI/Trend/` holds
-  the ScottPlot and Avalonia pieces: the envelope plottable, the failure strip, the trend chart view model and view,
-  the overview, the feed and the trend view model. The switching source sits in `UI/Spectrum/` beside the seam it
+  intensity cache and its `TrendTimeline`, the history plan, the navigation model, the column width and query
+  (`TrendColumns`), the overview geometry. The store's point records, `TrendPoint` and `IntensityChunk`, sit in
+  `Core/Store/` beside the read that returns them. The 10 s silence limit is `LinkTiming.SilenceLimit` in
+  `Core/Protocol/`, shared by the link health rules and the continuity rule. The benchmark tool references Core only,
+  so it times the same cache and plan the app runs. `SpectrumVisualizer.UI/Trend/` holds the ScottPlot and Avalonia
+  pieces: `EnvelopeColumn` with the column mapping, the envelope plottable, the failure strip, `TrendPlotLayers`, the
+  trend chart view model and view with `TrendCursorOverlay`, the overview, the feed and the trend view model.
+  `ChartFrames` in `UI/Chart/` paces the redraws of both chart views; `ClockText.TimeOfDay` in `UI/Localization/`
+  formats the readout time and the historical line. The switching source sits in `UI/Spectrum/` beside the seam it
   implements.
 - **Continuity rule** (`FrameContinuity`, Core). It sees every frame in time order, spectra and heartbeats, and owns a
   `SequenceTracker`. Session rule: when more than 10 s pass without any frame (the link's silence limit), it calls
@@ -356,7 +387,8 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   wavelength or `delta`. The instance file is wiped at open (`StoreFiles.cs:24-30`) and the trend feed subscribes before
   the distributor starts, so every stored frame passed through the cache first. The cache therefore keeps its breaks
   and marks for its whole life, and a key change recomputes point values only; the store read returns points only.
-- **Intensity cache** (`IntensityCache`, Core, one lock). Points are `(UnixMs, Value)` with NaN for an uncovered
+- **Intensity cache** (`IntensityCache`, Core, one lock; the time-ordered points, breaks and marks and their fold live in
+  `TrendTimeline`, which the cache calls under that lock). Points are `(UnixMs, Value)` with NaN for an uncovered
   spectrum, plus breaks `(UnixMs, Lost)`, 0 lost for a NoSpectra break, and failure marks `(UnixMs, BoardState)`. The cache owns the key, the
   `QueryWindows` of the key, a `FrameContinuity`, the recent spectra (the last 120 s of spectrum frames by receive
   time, references only; the pixel arrays are immutable) and a `TimeProvider`. `Add(ReceivedFrame)` passes every frame
@@ -413,17 +445,19 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   change; a read that ends after the stop reports nothing. The click reads of `TrendViewModel` run through the feed as
   well, and Back to live cancels the click read in flight. `StopAsync()` disposes the subscription and both read pipelines and
   awaits their tasks; `Dispose()` cancels without waiting.
-- **Trend chart model** (`TrendChartViewModel`, UI). Owns the `Plot`, one `EnvelopeLine`, one `TrendMarkerStrip`
-  for failure columns, one `VerticalLine` for the shown moment, the bottom axis with `DateTimeAutomatic` over local
-  OADate (`LocalTimeAxis`), and a `TrendNavigationModel`. `Refresh()` on the UI thread builds an `IntensityQuery` for
-  the window at one column per pixel of the data area (`TrendColumns.MinimumColumns` to `MaximumColumns`) through
-  `cache.FoldCurrent`, maps the columns with `TrendColumns`, and replaces the envelope's columns under
+- **Trend chart model** (`TrendChartViewModel`, UI). Owns the `Plot` with its `TrendPlotLayers` (one `EnvelopeLine`,
+  one `TrendMarkerStrip` for failure columns, one `VerticalLine` for the shown moment, the bottom axis with
+  `DateTimeAutomatic` over local OADate through `LocalTimeAxis`), and a `TrendNavigationModel`. `Refresh()` on the UI
+  thread builds an `IntensityQuery` for the window at one column per pixel of the data area
+  (`TrendColumns.MinimumColumns` to `MaximumColumns`) through `cache.FoldCurrent`, and `TrendPlotLayers.Draw` maps the
+  columns with `EnvelopeColumn.Map` and replaces the envelope's columns under
   `lock (Plot.Sync)`, the lock every ScottPlot render holds; the plottables take no lock of their own. It sets the Y limits
   from the envelope: `min - 5 % .. max + 5 %`, `v - 1 .. v + 1` for a flat range, unchanged when nothing is visible.
   Cache changes reach it through `cache.Changed.Sample(100 ms, uiScheduler)`, a 1 s tick refreshes it while
-  following, and navigation changes refresh at once. Every refresh requests one redraw; the view serves it in the next
-  display frame as the spectrum chart does.
-- **Gaps** (`TrendColumns`, Core). A column with values becomes `EnvelopeColumn(centre time, Min, Max, Last)`. An
+  following, and navigation changes refresh at once. While following, the window's right edge is now, not the newest
+  point. Every refresh requests one redraw; the view serves it in the next display frame through `ChartFrames`, the
+  same redraw pacing as the spectrum chart view.
+- **Gaps** (`EnvelopeColumn.Map`, UI). A column with values becomes `EnvelopeColumn(centre time, Min, Max, Last)`. An
   empty column with no break and no uncovered spectrum is left out, so the path connects across columns narrower than
   the frame period, and a stretch of more than 10 s without spectra breaks only through its NoSpectra break. An
   empty column with an uncovered spectrum, or any column with a break, adds a NaN gap column at its start before its
@@ -448,8 +482,10 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   AvaPlot 5.1.59 works in DIPs on a canvas Avalonia already scaled, so the hover, the zoom anchor and the click moment
   hold at 125 % (decompiled, no fix needed).
 - **Hover readout.** The overlay is SemiPlot's: a `Canvas` over the cached plot with a vertical line and a readout
-  `Border`, placed by `TrendChartView.ProjectOverlay` (a copy of SemiPlot's `ChartCursorOverlay.Project`), hidden while dragging and on pointer exit. It moves without a plot
-  redraw. Its text comes from the column under the pointer in the last fold: the local time `HH:mm:ss` of the column,
+  `Border`, placed by `TrendCursorOverlay.ShowAt` (after SemiPlot's `ChartCursorOverlay.Project`) and hidden by its
+  `Hide` while dragging and on pointer exit. It moves without a plot redraw, and flips left of the line at the plot's
+  right edge. Its text comes from the column under the pointer in the last fold: the local time `HH:mm:ss` of the
+  column (`ClockText.TimeOfDay`),
   then one value or "min – max" in `G6` under the current culture and the spectrum count, or the gap reason ("No
   data", "{0} spectra lost", "No spectra", "Spectrometer does not cover {0} nm"), then "Measurement failed: {device}"
   lines, also inside a NoSpectra gap when a heartbeat there carried the bit. A value column with a break shows the
@@ -460,10 +496,12 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   awaits it. A found spectrum goes to `SwitchingSpectrumSource.ShowMoment` on the UI
   thread; none (before the first row) changes nothing and logs at Debug; a failure reports one `TrendMomentError`
   (Warning).
-- **Switching source** (`SwitchingSpectrumSource`, UI, `ReactiveObject`). It wraps the live source and replaces the
-  `LiveSpectrumSource` registration as the `IDisplayedSpectrumSource`. `Current` is the historical spectrum while one is
-  shown, the live `Current` otherwise. `Changed` merges the live `Changed` with a private subject that emits on each
-  mode change. `ShowMoment(measurement, receivedAt)` and `ReturnToLive()` run on the UI thread and set `ShownMoment`
+- **Switching source** (`SwitchingSpectrumSource`, UI, `ReactiveObject`, implements `IDisplayedSpectrumSource`). It
+  wraps `LiveSpectrumSource`; the container registers both as themselves and has no `IDisplayedSpectrumSource`
+  registration, and `SpectrumViewModel`, `TrendChartViewModel` and `TrendFeed` take `SwitchingSpectrumSource`.
+  `Current` is the historical spectrum while one is shown, the live `Current` otherwise. `CurrentChanged` merges the
+  live `CurrentChanged` with a private subject that emits on each mode change; the name keeps it apart from
+  `ReactiveObject.Changed`. `ShowMoment(measurement, receivedAt)` and `ReturnToLive()` run on the UI thread and set `ShownMoment`
   (`DateTimeOffset?`). Every shown moment carries a new `SpectrumMeasurement` built around the row's pixels:
   `ShowMoment` copies the measurement it gets into a new instance that shares the immutable pixel array, so
   `DistinctUntilChanged` by reference shows every click. While a moment is shown, live signals read the same
@@ -541,7 +579,7 @@ Continuity rule (`FrameContinuity.Observe(ReceivedFrame) -> Continuity`):
 Cache key: `(WavelengthNm, Delta)` of the latest spectrum frame. Recent spectra: 120 s by ms-truncated receive time.
 Retention: 24 h before now. Throttle of re-reads: 500 ms. Cache `Changed` sample: 100 ms.
 
-Column mapping (`TrendColumns.Map(IntensitySeries)`), per column:
+Column mapping (`EnvelopeColumn.Map(series, toAxis)`, UI), per column:
 
 | Column | Envelope output |
 | --- | --- |
@@ -550,10 +588,10 @@ Column mapping (`TrendColumns.Map(IntensitySeries)`), per column:
 | `Count = 0`, `BreakCount > 0` or `UncoveredCount > 0` | gap at `Start` |
 | `Count = 0`, nothing else | none |
 
-Column width: `ceil(span / clamp(dataAreaPixels, 256, 2048))` in whole ms, at least 1 ms. X values are local OADate
-through `LocalTimeAxis.ToAxis`.
+Column width (`TrendColumns.ColumnWidth`, Core): `ceil(span / clamp(dataAreaPixels, 256, 2048))` in whole ms, at
+least 1 ms. X values are local OADate through `LocalTimeAxis.ToAxis`.
 
-Store read result: `IntensityChunk(DateTimeOffset From, TrendPoint[] Points)`; `TrendPoint(long UnixMs, double
+Store read result (`Core/Store/IntensityChunk.cs`): `IntensityChunk(DateTimeOffset From, TrendPoint[] Points)`; `TrendPoint(long UnixMs, double
 Value)`, NaN for uncovered or corrupt. Cache-only types: `TrendBreak(long UnixMs, int Lost)`, 0 lost for NoSpectra;
 `TrendFailure(long UnixMs, BoardState State)`; `TrendExtent(TrendKey Key, DateTimeOffset First, DateTimeOffset
 Newest)` and `TrendFold(TrendExtent Extent, IntensityQuery Query, IntensitySeries Series)`.
@@ -646,6 +684,10 @@ Data flow:
   reader holds a snapshot at the store's checkpoint.
 
 ## Implementation Steps
+The task file lists name the files as each task wrote them. Review phase 2 split the large test classes over
+abstract bases (`IntensityCacheTests`, `TrendFeedTests`, `TrendChartViewModelTests`, `TrendNavigationModelTests`,
+`OverviewGeometryTests`, `SpectrumViewModelTests`; the parts are listed under Decisions made autonomously) and moved
+the types named in Solution Overview, Folders.
 
 ### Task 1: Continuity rule and bucket extensions
 **Files:**
@@ -655,10 +697,10 @@ Data flow:
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Store/IntensityBucketsTests.cs`
 
 - [x] write `FrameContinuity` with a `SequenceTracker`, the 10 s session reset and the 10 s NoSpectra rule of
-  Technical Details; `TrendBreak`, `BreakKind` and `TrendFailure` live in the same file as the closed type family they
-  form
+  Technical Details; `TrendBreak` and `TrendFailure` live in the same file as the closed type family they form
+  (review phase 1 dropped `BreakKind`: a break with 0 lost is a NoSpectra break)
 - [x] add `AddBreak`, `AddFailure` and `Last` to `IntensityBuckets`; extend `IntensityColumn` with `Last`,
-  `BreakCount`, `LostCount`, `Failed`
+  `BreakCount`, `LostCount`, `NoSpectraCount`, `Failed`
 - [x] write `FrameContinuityTests` of Acceptance Evidence item 1
 - [x] extend the bucket tests: `Last` is the latest value of the column; breaks and failures fold into their columns
   and outside-range moments are ignored; the store series columns stay equal apart from the new fields
@@ -667,7 +709,8 @@ Data flow:
 ### Task 2: Store points read
 **Files:**
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Core/Store/SpectrumHistory.cs`
-- Create: `SpectrumVisualizer/SpectrumVisualizer.Core/Trend/IntensityChunk.cs`
+- Create: `SpectrumVisualizer/SpectrumVisualizer.Core/Store/IntensityChunk.cs` (written in `Core/Trend/`, moved to
+  `Core/Store/` in review phase 2)
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Store/SpectrumHistoryPointsTests.cs`
 
 - [x] extract the row loop of `ReadSeries` (`SpectrumHistory.cs:79-109`) into one private loop over
@@ -686,10 +729,10 @@ Data flow:
 
 - [x] write `IntensityCache` as Solution Overview describes: one lock, key and generation, the previous key's block,
   recent spectra, breaks and marks kept for the cache's life, retention against a `TimeProvider`, `Add`,
-  `Fold(IntensityQuery)` with a binary-searched start, `LandHistory`, `SpectrumAt`, `FirstPointAt`, `NewestAt`,
-  `Changed`, `ReReadRequested` (with a no-read request for a return to the previous key), the Debug line per key change
-  with its running count through an injected `ILogger`; the mean goes through `QueryWindows.MeanOf` over
-  `MemoryMarshal.AsBytes` of the window's pixels
+  `Fold(IntensityQuery)` with a binary-searched start, `FoldCurrent`, `Extent`, `LandHistory`, `CompleteHistory`,
+  `SpectrumAt`, `Changed`, `HistoryLanded`, `ReReadRequested` (with a no-read request for a return to the previous
+  key); the constructor takes the `TimeProvider` only, and `TrendFeed` writes the Debug line per key change with its
+  running count; the mean goes through `QueryWindows.MeanOf` over `MemoryMarshal.AsBytes` of the window's pixels
 - [x] write `TrendHistoryPlan.For(visibleFrom, visibleTo, newest, recentStart)`
 - [x] write `IntensityCacheTests` of Acceptance Evidence item 1; `TheFoldEqualsTheStoreSeriesOverTheSameFrames` and
   `AReReadAtANewKeyKeepsTheLiveBreaks` over a temporary store file
@@ -730,9 +773,10 @@ Data flow:
 - [x] copy `TrendNavigationModel` (`SemiPlot/SemiPlot.Core/Trends/TrendNavigationModel.cs`) with widths 10 s .. 24 h,
   on `DateTimeOffset` in UTC. `SetWindow` (the stripped calendar form) and the argument guards are left out;
   `SetWidth` while sticky keeps the right edge with no clamp, so a preset keeps following like `OnLiveEdge`
-- [x] write `TrendColumns.Map` and `ColumnWidth` per Technical Details; `EnvelopeColumn` moves to Core here, as a
-  record struct with no UI type. `Map` takes the time-to-X conversion as a `Func<DateTimeOffset, double>`, because
-  `LocalTimeAxis` lands in the UI project in Task 7; Task 8 passes `LocalTimeAxis.ToAxis`
+- [x] write the column mapping and `ColumnWidth` per Technical Details. The mapping takes the time-to-X conversion
+  as a `Func<DateTimeOffset, double>`, and the chart passes `LocalTimeAxis.ToAxis`. Review phase 2 moved
+  `EnvelopeColumn` and the mapping to `UI/Trend/EnvelopeColumn.cs` as `EnvelopeColumn.Map`, since chart X is a UI
+  concern; `TrendColumns` in Core keeps `ColumnWidth` and `QueryThrough`
 - [x] copy the parts of `MinimapGeometry` the overview uses (`WindowFraction`, `FractionAt`, `TimeAtFraction`, band
   figures over `IntensitySeries`) without markers and pens; `MarkerSpan` (the 6 px window highlight) is copied as
   `HighlightSpan` with `SpanLeftWithin`; the band takes column `Start` as X and `Last` as the centre
@@ -757,12 +801,13 @@ Data flow:
   device in `ChangeScale`; apply the device rule on a historical spectrum and on the first live one after it
 - [x] `SpectrumViewModel` takes `SwitchingSpectrumSource`; adds `BackToLiveCommand` (`canExecute` from `ShownMoment`) and
   `HistoricalText` (`SpectrumHistoricalFormat` over the local `HH:mm:ss` of `ShownMoment`, empty while live)
-- [x] register `LiveSpectrumSource` as itself, `SwitchingSpectrumSource` over it, and `IDisplayedSpectrumSource` as
-  that switching instance, replacing `UiServiceCollectionExtensions.cs:42`, all singletons. `SpectrumHistoricalFormat` is
-  added to both resx sets here, because `HistoricalText` reads it; the other keys stay with Task 8
+- [x] register `LiveSpectrumSource` as itself and `SwitchingSpectrumSource` over it, both singletons, replacing
+  `UiServiceCollectionExtensions.cs:42`. Review phase 2 removed the `IDisplayedSpectrumSource` registration, because
+  no consumer resolves the interface. `SpectrumHistoricalFormat` is added to both resx sets here, because
+  `HistoricalText` reads it; the other keys stay with Task 8
 - [x] write the tests of Acceptance Evidence item 3; existing view model tests build the switching source over
-  `FakeDisplayedSpectrumSource`; `CompositionRootTests` covers the three registrations and
-  `IDisplayedSpectrumSourceResolvesToTheSwitchingSource`
+  `FakeDisplayedSpectrumSource`; `CompositionRootTests.TheDistributorAndTheSpectrumSourcesAreOneInstanceEach` covers
+  the registrations
 - [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (766 of 766)
 
 ### Task 7: Envelope line and failure strip
@@ -814,7 +859,7 @@ Data flow:
   are two delegates, `Func<ushort, byte, DateTimeOffset, DateTimeOffset, CancellationToken, Task<Result<IntensityChunk>>>`
   and `Func<DateTimeOffset, CancellationToken, Task<Result<StoredSpectrum?>>>`, bound to `SpectrumHistory` in the
   container, so tests pass gated fakes without an interface
-- [x] at each trigger, take the `TrendWindow(From, To)` snapshot on the UI scheduler and pass only that value to the
+- [x] at each trigger, take the `TimeRange(From, To)` snapshot on the UI scheduler and pass only that value to the
   read on the thread pool; a no-read request maps to `Observable.Empty`
 - [x] write `TrendViewModel`: owns `TrendChartViewModel` and the overview view model, the presets and the selected
   preset, `FollowLiveCommand` (`canExecute` = not following), `ShowMoment`, which hands the moment to the feed's
@@ -840,8 +885,8 @@ Data flow:
   `TrendChartView.axaml.cs:422-472`, `:597-723`, `:757` without markers, delta mode and pen picks; a release inside
   4 px calls `TrendViewModel.ShowMoment`. The view binds to `TrendViewModel` (the plot is `Chart.Plot`); the hover
   time and the drag stay in the code-behind as overlay state, and the wheel routing is inlined (no pen or axis arms)
-- [x] place the overlay with a copy of `ChartCursorOverlay.Project`; hide it while dragging and on exit;
-  `Project` is a private method of the view, as the view is its only caller
+- [x] place the overlay with a copy of `ChartCursorOverlay.Project`; hide it while dragging and on exit; written as
+  a private method of the view, then moved to `TrendCursorOverlay` (`ShowAt`, `Hide`) in review phase 2
 - [x] write `TrendChartViewTests` of Acceptance Evidence item 1 with headless mouse events
 - [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (856 of 856)
 
@@ -958,7 +1003,9 @@ Data flow:
   predate the slice (no diff under `SpectrumVisualizer.Uart`, `SpectrumVisualizer.Tests` or the `.sln` since
   `9070dfb`), `dotnet test SpectrumVisualizer.Tests` 13 of 13. Benchmark: a short run (`--rows 20000 --churn-rounds 2`)
   prints the four trend rows (churned warm medians: fold 2.78 h 0.2 ms, fold 10 min 0.1 ms, visible landing 3.6 ms,
-  whole plan 74.7 ms) and deletes its files; the 24 h numbers of Task 4 stand, all four targets met
+  whole plan 74.7 ms) and deletes its files; the 24 h numbers of Task 4 stand, all four targets met. At `ea86598`,
+  after the review phases (2026-11-04): Area=Trend 227, Store 121, Spectrum 123, MainWindow 96, Di 30, Resources 9;
+  full suite 921 of 921; old solution 13 of 13; the 24 h re-run is in Acceptance Evidence item 10
 - [x] verify every Overview item maps to a named passing test: intensity at the key
   `ASpectrumAddsOnePointAtTheFrameMean`, `TheFoldEqualsTheStoreSeriesOverTheSameFrames`; dark frames at zero
   `ADarkSpectrumAddsAPointAtZero`; envelope `AColumnWithValuesBecomesAnEnvelopeColumnAtItsCentre`, `EnvelopePathTests`;
@@ -1040,3 +1087,137 @@ Data flow:
 - firmware-frame-sender: the OptoskyProj#20 frame sender in the board firmware, verified on the board against the app.
 - release-3-0: the 3.0.0 installer over the self-contained publish folder, the release workflow, and removal of the old
   app.
+
+**Executed by exec:**
+- branch: intensity-trend
+
+Run note: 30 commits on `intensity-trend` (`9cedb6c`..`ea86598`) before this record, stacked on `spectrum-store` at
+`9070dfb`; 21 of them add or revise this plan. Review phase 1 (5 agents) found 0 critical, 4 major and about 49 minor
+findings, all fixed in fix iteration 1 (`f521a51`, `a13cb54`, `25f6c32`, `450c88f`, `7fcabee`); a second-agent fact
+check of the docs then corrected 7 plan mismatches in `d69cccb`. Its critical re-check found 1 critical and 1 major
+finding: a moment read could still land after Back to live, and a zoom or pan while following detached on the window
+drawn up to a second ago. Both were fixed in `8568185`. Phase 2 (smells) fixed 18 minor findings in `556a4bf`,
+`1c694fa` and `5e57846`. Phase 3 (codex) was skipped because codex is not installed. Phase 3b (comments) fixed 3 major
+and 18 minor comment findings in `ea86598`. Phase 4 (critical) found nothing at `ea86598`. Final state at `ea86598`:
+921/921 tests in `SpectrumVisualizer.slnx`, 13/13 in `SpectrumVisualizer.sln`, Release build 0 warnings, format and
+terse clean, the 24 h benchmark re-run meets all four trend targets. The com0com smoke checklist was not run: this
+machine has no com0com pair. The app start was checked through its log only, because a screenshot was not permitted.
+
+**Decisions made autonomously:**
+- `FrameContinuity` returns a `Continuity` record struct with separate Loss, NoSpectra and Failure slots, so one
+  spectrum after a heartbeat-only stretch carries both breaks. A break with 0 lost is a NoSpectra break; there is no
+  `BreakKind`. The 10 s limit is `LinkTiming.SilenceLimit` (`Core/Protocol`), shared with `LinkHealth`.
+- `IntensityColumn` gains `Last`, `BreakCount`, `LostCount`, `NoSpectraCount` and `Failed`, appended without defaults.
+  `Failed` is the state masked to the two measurement-failed bits. `Last` is the value with the latest receive time.
+- The store's shared row loop is a lazy iterator of `TrendPoint`; `ReadSeries` folds it and maps a NaN point to
+  `AddUncovered`. `TrendPoint` and `IntensityChunk` live in `Core/Store/IntensityChunk.cs`.
+- Core references System.Reactive and no logging package; `IntensityCache(TimeProvider)` exposes `Changed`,
+  `HistoryLanded` and `ReReadRequested`, and `TrendFeed` logs each key change at Debug. All three emit through one
+  `_emitGate`, which `Dispose` also takes, so no signal leaves a disposed cache.
+- `TrendTimeline` holds the points, breaks and marks and the fold; `IntensityCache` keeps the key, the previous key's
+  block and the recent spectra. `Extent` and `FoldCurrent(queryFor)` replace separate first and newest reads, so the
+  chart builds its query under the cache lock.
+- A return to the previous key restores without a read only when the outgoing key's history was complete (the first
+  key, a restored key, or a key whose re-read called `CompleteHistory`). While a previous-key block exists the recent
+  spectra are kept back to its end for at most 240 s in total.
+- The benchmark cache runs on `FixedTimeProvider` stopped at the newest row, because churned rows lie one span ahead
+  of the real clock. Each re-read run changes the key once, stored + 50 nm and + 100 nm in turn.
+- `TrendNavigationModel` has no `SetWindow` and no argument guards. `SetWidth` while following keeps the right edge
+  with no clamp. While following, the window ends at now, refreshed by a 1 s tick; `ZoomAt` and `PanBy` first snap the
+  drawn window onto now and shift the zoom anchor by the snap. A zoom or pan that leaves now outside stops following.
+- `EnvelopeColumn`, `EnvelopeColumn.Map` and `VerticalRange` live in `UI/Trend/`; `TrendColumns` in Core keeps
+  `ColumnWidth` and `QueryThrough`. `LocalTimeAxis` works on `DateTimeOffset`.
+- `EnvelopeLine.ReplaceColumns` replaces the whole list and sets line width 1, since ScottPlot's default is 0.
+  `TrendMarkerStrip` draws a span narrower than a pixel 1 px wide; failed columns under 5 s apart join into one span.
+- `SwitchingSpectrumSource.ShowMoment` copies the measurement with `with { }` around the same pixel array. The
+  interface event is `CurrentChanged`, so a caller on the concrete type cannot bind to `ReactiveObject.Changed` by
+  mistake. The container has no `IDisplayedSpectrumSource` registration.
+- The frozen scale records its device whenever `ChangeScale` ends frozen. `HistoricalText` lives on
+  `SpectrumChartViewModel`, written by `SpectrumViewModel` from `ShownMoment`, because the chart view binds to the
+  chart view model.
+- `TrendChartViewModel` takes the cache, the switching source, the message panel, a `TimeProvider`, the UI scheduler
+  and a logger. `cache.Changed.Sample(100 ms, uiScheduler)` needs no `ObserveOn`. The fold query ends at `To` + 1 ms.
+  Y limits pad 5 %, take v +/- 1 when flat and start at 0..1.
+- `TrendPlotLayers` owns the plot layers, `TrendCursorOverlay` the hover line and readout, `ChartFrames` the redraw
+  pacing of both chart views, `DeviceLine` one spectrometer's spectrum line, `ClockText.TimeOfDay` the readout time.
+- `TrendReadout.For(series, index, key)`: an empty column reads the gap reason of the column that ends the gap, or of
+  the column the line comes from, with the failures of the whole empty run.
+- `TrendPresets.All` builds its labels per read, so they follow the current culture. `SelectedPreset` is an OAPH
+  derived from `Chart.Width`; its setter only calls `SetWidth`.
+- `TrendFeed` takes a separate throttle scheduler (`DefaultScheduler.Instance` in the container). Each moment read hops
+  to the UI scheduler before `Switch`, and a `_requestedMoment` guard drops a read that lands after Back to live. Back
+  to live reaches the feed through `ShownMoment` turning null. `StopAsync` awaits every read still running, superseded
+  ones included. The feed logs its start and stop at Debug for the lifecycle tests.
+- `TrendViewModel(chart, overview, feed)` takes all three from the container; `TrendChartViewModel` and
+  `OverviewViewModel` are singletons.
+- The overview band applies the trend's gap rule through `OverviewGeometry.Connected`, refreshes its fractions on
+  `RedrawRequested`, and refolds after a landed chunk, after a key change and on its cadence. `CentreOn` moves the
+  trend window and stops following. The overview's 1 px top border belongs to `OverviewPane`.
+- Chart rows `MinHeight` 192 and 208 keep a 120 px data floor; the window's `MinimumHeight` is 688; the message list
+  caps at 64 px. The opening size is clamped to the screen's work area in `OnOpened`. The side pane shares one label
+  column across `SpectrumPanel` and `TrendPanel` through `SharedSizeGroup`.
+- `TrendAxisIntensityFormat` breaks after "Intensity". The hover readout flips left of the line at the plot's right
+  edge.
+- Russian texts: `TrendReadoutUncoveredFormat` is "{0} нм вне диапазона спектрометра"; `SpectrumHistoricalFormat` is
+  "Спектр от {0}". `TrendHistoryError` has no remedy key, because `AppResourcesTests` rejects an empty value; the
+  mapper passes an empty remedy.
+- ScottPlot.Avalonia 5.1.59 works in DIPs on an Avalonia-scaled canvas (decompiled), so hover, zoom anchor and click
+  hold at 125 % with no fix.
+- Large test classes split over abstract bases: `IntensityCache{Point,KeyChange,History,Dispose}Tests`,
+  `TrendFeed{Reread,Moment,Failure}Tests`, `TrendChartViewModel{Navigation,Display}Tests`,
+  `TrendNavigationModel{Follow,Width,Zoom}Tests`, `OverviewGeometry{Band,Window}Tests`,
+  `SpectrumViewModel{Command,Signal}Tests`. Feed tests run their hops on the headless dispatcher;
+  `TrendStand` gives the main window tests an idle trend graph.
+
+## Verify it yourself
+
+Automated, from the repo root on branch `intensity-trend`:
+
+1. `dotnet build SpectrumVisualizer.slnx -c Release` gives 0 warnings, 0 errors.
+2. `dotnet test SpectrumVisualizer.slnx` passes 921 of 921. Per area with `--filter "Area=X"`: Trend 227,
+   Spectrum 123, Store 121, MainWindow 96, Link 80, Protocol 56, Emulator 56, Chart 52, Messages 41, Di 30,
+   Calibration 15, Resources 9, Paths 8, Logging 7; the areas sum to 921.
+3. `dotnet format SpectrumVisualizer.slnx --verify-no-changes`, then `dotnet tool restore` and
+   `dotnet terse SpectrumVisualizer`; both gates exit 0.
+4. `dotnet build SpectrumVisualizer.sln` gives 0 errors, and `dotnet test SpectrumVisualizer.Tests` passes 13 of 13.
+5. `dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark` fills 24 h of
+   ATP-2000 spectra, runs the churn and prints one table; it runs for minutes. Key churned trend numbers on the dev
+   laptop at `ea86598` (Acceptance Evidence item 10): cache fold 24 h 1.4 ms and 10 min 0.1 ms, re-read to the visible
+   landing 4.4 ms and to the last chunk 720.4 ms. The OS cache held the file, so every number is warm. Cold-cache
+   numbers on the operator PC are unmeasured: run the tool there. `--rows 2000 --churn-rounds 2` is a quick run.
+6. The trend is pinned by these test classes:
+   - `FrameContinuityTests`: the 10 s session reset, Loss and NoSpectra breaks, failure marks.
+   - `IntensityCachePointTests`, `IntensityCacheKeyChangeTests`, `IntensityCacheHistoryTests`,
+     `IntensityCacheDisposeTests`: points, the key change and return rules, landed chunks, the fold equal to the
+     store series, retention, dispose.
+   - `TrendHistoryPlanTests`, `SpectrumHistoryPointsTests`: the read order and the store's points read.
+   - `TrendNavigationModelFollowTests`, `TrendNavigationModelWidthTests`, `TrendNavigationModelZoomTests`: follow,
+     widths, zoom and the first-point clamp.
+   - `TrendColumnsTests`, `EnvelopeColumnTests`, `EnvelopePathTests`, `EnvelopeLineTests`, `TrendMarkerStripTests`:
+     column width, gaps, the envelope path and the failure strip.
+   - `TrendChartViewModelNavigationTests`, `TrendChartViewModelDisplayTests`, `TrendChartViewModelRenderTests`,
+     `TrendReadoutTests`: the window, the Y limits, the marker and the readout texts.
+   - `TrendFeedRereadTests`, `TrendFeedMomentTests`, `TrendFeedFailureTests`, `TrendViewModelTests`: re-reads and
+     their cancellation, click reads, Back to live, failure reports, the stop.
+   - `TrendChartViewTests`, `OverviewViewModelTests`, `OverviewViewTests`, `OverviewGeometryBandTests`,
+     `OverviewGeometryWindowTests`: input, hover, the overview band and its navigation.
+   - `SwitchingSpectrumSourceTests`, `SpectrumChartViewModelHistoricalScaleTests`, `SpectrumViewModelCommandTests`:
+     the historical spectrum and its scale rules.
+   - `MainWindowTrendLayoutTests`, `MainWindowChartHeightTests`, `MainWindowTextFitTests`: rows, floors and text fit.
+   - `AppLifecycleTrendTests`, `CompositionRootTests`: start before the distributor, stop before the store, one
+     instance each.
+   - `StoreBenchmarkRunTests`: the four trend rows on a small run.
+
+By hand: run the manual smoke checklist in Acceptance Evidence over the com0com pair. The highest-value checks, with
+the emulator on `COM10` and the app on `COM11`:
+
+1. Steps 2 and 8: a point per second at the right edge, the window ending at now; a 15 s stop leaves an empty span
+   that becomes a "No spectra" break.
+2. Step 7: restart the emulator with `--wavelength 400 --delta 25`; within about 1 s the Y label reads 400 nm ±25 nm
+   and the visible history redraws at 400 nm, older history after.
+3. Step 6: click a moment; the spectrum chart shows it with "Spectrum from HH:mm:ss" ("Спектр от HH:mm:ss") and a
+   marker on the trend; Back to live returns to the latest spectrum.
+4. Steps 9 and 12: `--bad-crc-every 5` gives "1 spectra lost" breaks; `--both-connected --failed 8000` shows one
+   failure strip and "Measurement failed: ATP-8000".
+5. Steps 14 and 15: on a 1366 x 768 screen, maximised with the message panel shown, both charts keep a readable data
+   area, the side pane scrolls and the status bar stays inside the window.
