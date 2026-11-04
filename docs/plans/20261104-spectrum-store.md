@@ -118,8 +118,9 @@
   `Component=Tools, Area=Store` for the benchmark tool; `Area=Link` for the link's drop counter; `Area=MainWindow`
   for the status bar segment and widths; `Area=Di` for composition and lifecycle; `Area=Resources` for the keys.
 - Time: the writer reads the wall clock and builds its retention wait on a `TimeProvider`
-  (`Task.Delay(delay, timeProvider, token)`). Tests pass a private `ManualClock : TimeProvider` that overrides
-  `GetUtcNow` and `CreateTimer`; its timers fire when the test calls `Advance(TimeSpan)`. Every wait on the writer
+  (`Task.Delay(delay, timeProvider, token)`). Tests pass `RetentionClock`, a `FakeTimeProvider`
+  (Microsoft.Extensions.TimeProvider.Testing) that also counts and can throw from `GetUtcNow`; its timers fire when
+  the test calls `Advance(TimeSpan)`. Every wait on the writer
   has a 5 s real-time limit (`Waits`, `UI/Waits.cs:11`).
 - A slow store is made with real SQLite, not a test hook: a second connection on the same file holds
   `BEGIN IMMEDIATE`, so the writer's batch waits for the busy timeout and fails, and the queue fills behind it.
@@ -391,26 +392,28 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   - The writer task runs `StoreFiles.Prepare` and `SpectrumDatabase.Open` on the thread pool, so the UI thread does
     no file I/O. Frames that arrive meanwhile wait in the queue.
   - One failure path ends history for the run: a failed prepare or open, or any exception before the file is open,
-    logs at Error and reports one `StoreOpenError`; any exception after the open, outside a failed batch, logs at
-    Error and reports one `StoreStoppedError`. The writer closes the file without a checkpoint, keeps the subscription
+    reports one `StoreOpenError`; any exception after the open, outside a failed batch, reports one
+    `StoreStoppedError`. The report writes the one log line, at Error, with the deepest exception of the cause chain. The writer closes the file without a checkpoint, keeps the subscription
     and counts every frame still queued and every later frame as dropped, so "Dropped frames" keeps growing while
     history is off.
   - Loop: wait for the queue or the next retention time, whichever comes first; take up to 256 frames with `TryRead`
-    and write them as one batch. A failed batch adds its frame count to the drop count and logs at Error. The first
-    failure after a success reports one `StoreWriteError` (Warning) through `TryReportFailure`; later failures stay
-    quiet until a batch succeeds again, as the link's one entry per incident (`board-protocol.md:275-277`).
+    and write them as one batch. A failed batch adds its frame count to the drop count. The first failure after a
+    success reports one `StoreWriteError` (Warning) through `TryReportFailure`, which writes its log line; each later
+    failure logs one Warning line and reaches no panel until a batch succeeds again, as the link's one entry per incident (`board-protocol.md:275-277`).
   - Retention: once a minute, also while no frame arrives, `DeleteBefore(now - 24 h)`. The wait is
     `Task.Delay(untilNextRetention, timeProvider, token)` raced with `WaitToReadAsync`, and `now` is
     `timeProvider.GetUtcNow()`, so a test drives both through one `TimeProvider`. The
     cutoff uses the same wall clock as `ReceivedAt` (`DefaultScheduler.Now` and `TimeProvider.System` both read UTC
     wall time). No `VACUUM`: the freed pages are reused, so the file stays at about one day of data.
-  - Drop count: `long DroppedFrames` (an `Interlocked` counter written by the distributor task and the writer task)
-    and `IObservable<Unit> DroppedFramesChanged`, a private `Subject<Unit>` behind `Synchronize()`, exposed with
-    `AsObservable()`, signalled after each increment. A reader reads `DroppedFrames` after the signal, the shape of
-    `IDisplayedSpectrumSource` (`overview.md:57`); a value in the signal could arrive out of order from two threads.
+  - Drop count: `long DroppedFrames`, written by the distributor task and the writer task, and
+    `IObservable<long> DroppedFramesChanged`, a private `Subject<long>` exposed with `AsObservable()` that carries the
+    new count; the add and the emission share one lock, so the counts of the two threads arrive in order.
+  - The writer task is a `StoreWriter` (`UI/Store/`), which `Start` creates; `SpectrumStore` keeps the queue, the
+    cancellation gate and the drop count.
   - The writer task alone owns the `SpectrumDatabase` and its `SqliteConnection`: it opens it, and it closes it, with
     `CheckpointAndClose()` on a normal end and a plain close after a failure or a cancellation. Its stopped line at
-    Debug names the stored and dropped counts and the checkpoint: `Truncated`, `Busy`, `Failed` or `Skipped`. No other thread
+    Debug names the stored and dropped counts and the checkpoint, the `Result<WalCheckpoint>` of `CheckpointAndClose` or
+    none: `Truncated`, `Busy`, `Failed` or `Skipped`. No other thread
     closes or disposes the connection, so no close can land while the writer is inside a write, a retention pass or a
     checkpoint.
   - `StopAsync(CancellationToken drainToken)`: dispose the subscription (no more enqueues), complete the queue's
@@ -443,7 +446,7 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   link's count plus the store's. It shows a number in every state, also while disconnected, because both counts
   describe the run's stored history, not the current connection. `DroppedFramesText` is an `ObservableAsPropertyHelper`
   over `CombineLatest(this.WhenAnyValue(bar => bar.Status).Select(s => s.DroppedFrames),
-  store.DroppedFramesChanged.ObserveOn(uiScheduler).StartWith(Unit.Default).Select(_ => store.DroppedFrames))`, summed
+  store.DroppedFramesChanged.ObserveOn(uiScheduler).StartWith(store.DroppedFrames))`, summed
   and formatted with `Resources.Culture` as `LostSpectraText` is (`AppStatusBarViewModel.cs:94-95`). Its subscription
   joins `_disposables`. Lost spectra keep their meaning: board spectra that never arrived.
 - **Query service.** `SpectrumHistory(string path)` (Core) opens a reader connection per call on the thread pool:
