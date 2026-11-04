@@ -108,6 +108,24 @@
   <data name="UnrecognisedDataRemedy" xml:space="preserve">
     <value>Проверьте, что к этому порту подключена плата спектрометра и она передаёт на скорости 115200 бод.</value>
   </data>
+  <data name="StoreOpenTitle" xml:space="preserve">
+    <value>История спектров отключена</value>
+  </data>
+  <data name="StoreOpenDetail" xml:space="preserve">
+    <value>Приложение не смогло создать файл истории спектров. Спектр отображается, но не сохраняется.</value>
+  </data>
+  <data name="StoreOpenRemedy" xml:space="preserve">
+    <value>Перезапустите приложение. Если ошибка повторится, отправьте файл журнала разработчику.</value>
+  </data>
+  <data name="StoreWriteTitle" xml:space="preserve">
+    <value>Не удалось записать историю спектров</value>
+  </data>
+  <data name="StoreWriteDetail" xml:space="preserve">
+    <value>Принятые кадры не записались в файл истории; они учтены как отброшенные.</value>
+  </data>
+  <data name="StoreWriteRemedy" xml:space="preserve">
+    <value>Проверьте свободное место на системном диске. Приложение продолжает попытки.</value>
+  </data>
   <data name="LinkRestoredTitle" xml:space="preserve">
     <value>Идёт приём данных</value>
   </data>

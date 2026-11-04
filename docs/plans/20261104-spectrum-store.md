@@ -692,28 +692,29 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Store/SpectrumStoreTests.cs`
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Messages/ErrorMessageMapperTests.cs`
 
-- [ ] implement `SpectrumStore` of Solution Overview: queue, enqueue-only subscriber, writer loop with batches of 256,
+- [x] implement `SpectrumStore` of Solution Overview: queue, enqueue-only subscriber, writer loop with batches of 256,
   retention on `Task.Delay(delay, timeProvider, token)` raced with `WaitToReadAsync`, the drop counter and
   `DroppedFramesChanged`, `Start`, `StopAsync(drainToken)` checking the token between batches and counting the
   undrained frames as dropped, `Dispose` that only cancels; the writer task alone opens and closes the connection,
   in its own `finally`; log the file path at Information on open, the sweep result at Debug, the stop with the
   stored and dropped totals at Debug
-- [ ] write the private `ManualClock : TimeProvider` (overrides `GetUtcNow` and `CreateTimer`; `Advance` moves the
+- [x] write the private `ManualClock : TimeProvider` (overrides `GetUtcNow` and `CreateTimer`; `Advance` moves the
   clock and fires the due timers) for `RetentionRunsOnceAMinuteAlsoWithoutFrames`
-- [ ] add `StoreOpenError` and `StoreWriteError`, their mapping (Error, Warning) and the six `Store*` resx keys of
+- [x] add `StoreOpenError` and `StoreWriteError`, their mapping (Error, Warning) and the six `Store*` resx keys of
   Technical Details in both sets
-- [ ] write the `SpectrumStoreTests` of Acceptance Evidence item 1 (`Component=UI`, `Area=Store`) over a
+- [x] write the `SpectrumStoreTests` of Acceptance Evidence item 1 (`Component=UI`, `Area=Store`) over a
   `FrameDistributor` on a test channel with the link's options (as `FrameDistributorTests` does) and a real
   `MessagePanelViewModel`
-- [ ] write `TheSubscriberOnlyEnqueues` and `AFullQueueCountsEachDroppedFrame` with a second connection holding
+- [x] write `TheSubscriberOnlyEnqueues` and `AFullQueueCountsEachDroppedFrame` with a second connection holding
   `BEGIN IMMEDIATE` on the instance file; `AFullQueueCountsEachDroppedFrame` feeds the distributor through an
   unbounded test channel, because a 64-slot `DropOldest` channel would drop before the store queue fills, and this
   test counts the store's drops, not the link's. It asserts stored + dropped = fed after the lock is released and
-  `StopAsync` has drained, never an exact drop count
-- [ ] write `DisposeOnlyCancelsAndTheWriterClosesTheConnection` and
+  `StopAsync` has drained, never an exact drop count. `DataStaysAcrossLinkSessions` feeds two runs of `seq` from 0
+  through the distributor, since the store sees no link session
+- [x] write `DisposeOnlyCancelsAndTheWriterClosesTheConnection` and
   `AStopPastItsBudgetCountsTheUndrainedFramesAsDropped`
-- [ ] write `ErrorMessageMapperTests` rows for both errors (severity, title, no path in the detail)
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] write `ErrorMessageMapperTests` rows for both errors (severity, title, no path in the detail)
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (599 of 599)
 
 ### Task 8: Link drop counter
 **Files:**

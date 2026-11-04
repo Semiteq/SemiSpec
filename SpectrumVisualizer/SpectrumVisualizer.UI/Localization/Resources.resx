@@ -108,6 +108,24 @@
   <data name="UnrecognisedDataRemedy" xml:space="preserve">
     <value>Check that the spectrometer board is connected to this port and sends at 115200 baud.</value>
   </data>
+  <data name="StoreOpenTitle" xml:space="preserve">
+    <value>Spectrum history is off</value>
+  </data>
+  <data name="StoreOpenDetail" xml:space="preserve">
+    <value>The application could not create its spectrum history file. The spectrum view works; nothing is stored.</value>
+  </data>
+  <data name="StoreOpenRemedy" xml:space="preserve">
+    <value>Restart the application. If the failure repeats, send the log file to the developer.</value>
+  </data>
+  <data name="StoreWriteTitle" xml:space="preserve">
+    <value>Spectrum history write failed</value>
+  </data>
+  <data name="StoreWriteDetail" xml:space="preserve">
+    <value>Received frames could not be written to the history file; they count as dropped frames.</value>
+  </data>
+  <data name="StoreWriteRemedy" xml:space="preserve">
+    <value>Check the free space on the system drive. The application keeps trying.</value>
+  </data>
   <data name="LinkRestoredTitle" xml:space="preserve">
     <value>Receiving data</value>
   </data>
