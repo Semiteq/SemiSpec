@@ -8,17 +8,20 @@ connection row and connects; the serial link reads the board's frames, reopens t
 status bar shows the link state, both spectrometers' bits, the spectra lost since Connect and the frames dropped since
 the start. Link faults, reported failures, ReactiveUI's unhandled exceptions and exceptions that escape a dispatcher job
 reach the message panel. The frame distributor reads the decoded frames, and the content row shows the latest spectrum
-over wavelength on a ScottPlot chart, with the board's signal values and the chart controls in a pane on its right. The
-spectrum store writes every received frame to a SQLite file of the running instance and keeps the last 24 h; its query
-service reads a stored spectrum and the intensity series at a wavelength. Two console tools support manual runs: the
-board emulator writes protocol frames to a serial port, and the store benchmark measures the store file's writes, size
-and reads.
+over wavelength on a ScottPlot chart, with the board's signal values and the chart controls in a pane on its right.
+Under the spectrum chart the trend shows the intensity at the board's wavelength over time, from an in-memory cache
+of the last 24 h, with an overview strip of that whole history under it; a click on the trend shows the spectrum of
+that moment on the spectrum chart until the operator returns to live. The spectrum store writes every received frame
+to a SQLite file of the running instance and keeps the last 24 h; its query service reads a stored spectrum, the
+intensity series and the intensity points at a wavelength. Two console tools support manual runs: the board emulator
+writes protocol frames to a serial port, and the store benchmark measures the store file's writes, size and reads and
+the trend's folds and re-reads.
 
 ## Stack
 
 - .NET 10, C# 14, Windows (`net10.0`, published win-x64 self-contained).
 - Avalonia 12.0.5 with Win32, Skia and HarfBuzz; Semi.Avalonia 12.0.3; ReactiveUI.Avalonia 12.0.3; System.Reactive 6.1.0.
-- ScottPlot.Avalonia 5.1.59 for the spectrum chart.
+- ScottPlot.Avalonia 5.1.59 for the spectrum chart and the trend chart.
 - Microsoft.Extensions.DependencyInjection for the composition root.
 - Serilog with the file sink, bridged to `Microsoft.Extensions.Logging` through Serilog.Extensions.Logging.
 - FluentResults 4.0.0 for failures returned as values.
@@ -27,6 +30,8 @@ and reads.
   store queue.
 - RJCP.SerialPortStream 3.0.5 for the serial port, in the UI and the board emulator.
 - Microsoft.Data.Sqlite 10.0.14 for the spectrum store, in Core.
+- Core also references System.Reactive and Microsoft.Extensions.Logging.Abstractions 10.0.8: the intensity cache
+  exposes its signals as `IObservable` streams and logs its key changes.
 - The console tools only: System.CommandLine 2.0.2.
 
 `SpectrumVisualizer/Directory.Packages.props` holds every version.
@@ -53,14 +58,21 @@ and reads.
 | `StoreConnection` | Core | Opens the writer's connection to a store file, creating it, with the store's connection string and pragmas; `OpenReader` opens an existing file only, with `query_only` (`Core/Store/`) |
 | `SpectrumDatabase` | Core | The writer connection: the schema, a batch of frames in one transaction, the deletion of rows older than a cutoff, and the closing checkpoint (`Core/Store/`) |
 | `QueryWindows` | Core | The queried window of each device as byte offsets in the stored pixels, whether the device covers the wavelength, and the mean of a window's pixels (`Core/Store/`) |
-| `IntensityQuery`, `IntensityBuckets`, `IntensitySeries` | Core | The validated series request with its epoch-aligned column grid, the fold of window means into min/max columns on that grid, and its result (`Core/Store/`) |
-| `SpectrumHistory` | Core | The query service: the stored spectrum at a moment, the intensity series and the stored range, each on its own reader connection (`Core/Store/`) |
+| `IntensityQuery`, `IntensityBuckets`, `IntensitySeries` | Core | The validated series request with its epoch-aligned column grid, the fold of window means, breaks and failure marks into columns on that grid (min, max, last value, counts, the OR of the failure bits), and its result (`Core/Store/`) |
+| `SpectrumHistory` | Core | The query service: the stored spectrum at a moment, the intensity series, the intensity points and the stored range, each on its own reader connection (`Core/Store/`) |
+| `FrameContinuity` | Core | Turns spectra and heartbeats, in receive order, into the trend's Loss and NoSpectra breaks and failure marks (`Core/Trend/`) |
+| `IntensityCache` | Core | One intensity point per spectrum at the key of the latest spectrum frame, with the run's breaks and failure marks, for the last 24 h; the recent spectra, the key change and its re-read request, the landing of stored chunks, the fold and the moment lookup (`Core/Trend/`) |
+| `TrendHistoryPlan` | Core | The store ranges a re-read runs, in order: the visible window, then the rest of the day in hour chunks, newest first (`Core/Trend/`) |
+| `IntensityChunk`, `TrendPoint` | Core | The result of the store's points read: its range and one `(UnixMs, Value)` point per spectrum (`Core/Trend/`) |
+| `TrendNavigationModel` | Core | The trend's visible window in UTC: width 10 s to 24 h, follow, pan, zoom around an anchor, set width, the pan floor at the first point (`Core/Trend/`) |
+| `TrendColumns`, `EnvelopeColumn` | Core | The column width for a data area and the mapping of folded columns to envelope columns and gaps (`Core/Trend/`) |
+| `OverviewGeometry` | Core | Places the trend window, the pointer and the band along the overview strip, and applies the trend's gap rule to the band (`Core/Trend/`) |
 | `FrameSchedule`, `SpectrumGenerator` | Tools.BoardEmulator | Which frame the emulated board sends at a tick and its `state`, and the synthetic and dark spectra |
 | `EmulatorCommand` | Tools.BoardEmulator | Parses and range-checks the command line into an `EmulatorOptions` record; rejects `--failed` for the other spectrometer without `--both-connected` |
 | `Program` (emulator) | Tools.BoardEmulator | Opens the port, checks every 10 ms which frame is due and writes it, until Ctrl+C |
 | `BenchmarkCommand` | Tools.StoreBenchmark | Parses and range-checks the command line into a `BenchmarkOptions` record |
 | `ToolCommandLine` | both tools | The model numbers of `--device` and `--failed` and the whole-number option parser; one source file under `SpectrumVisualizer/Shared/` that each tool project compiles as its own internal copy, since the two tools share no project but Core |
-| `BenchmarkRun`, `BenchmarkFile` | Tools.StoreBenchmark | Fills a store file through `SpectrumDatabase`, churns it, measures inserts, size, series reads, `SpectrumHistory`, retention and WAL growth, and prints one table |
+| `BenchmarkRun`, `BenchmarkFile` | Tools.StoreBenchmark | Fills a store file through `SpectrumDatabase`, churns it, measures inserts, size, series reads, `SpectrumHistory`, retention, WAL growth, the trend cache's folds and the trend's re-reads, and prints one table |
 | `ISerialPortProvider`, `RjcpSerialPortProvider` | UI | Lists the COM ports and opens one for the link, mapping open failures to typed errors |
 | `SerialLink` | UI | The link's surface: Connect, Disconnect, the published status and the bounded frame channel |
 | `LinkSession` | UI | One Connect: opens, reads, decodes, judges the health, drains, reopens and publishes every status, in one task |
@@ -69,21 +81,32 @@ and reads.
 | `LinkError` and its five errors | UI | `PortBusyError`, `PortNotFoundError`, `PortLostError`, `BoardNotRespondingError`, `UnrecognisedDataError`, each with the port in its message |
 | `PortListError` | UI | Windows did not return the port list; no port name, the listing failure as its cause |
 | `FrameDistributor` | UI | The one reader of `SerialLink.Frames`: keeps the latest frame that carries a spectrum and hands every frame to each subscriber on its read task |
-| `DisplayedSpectrum`, `IDisplayedSpectrumSource` | UI | The spectrum the chart shows and its receive time; the source's `Current` and the `Changed` signal. `LiveSpectrumSource` is its implementation |
+| `DisplayedSpectrum`, `IDisplayedSpectrumSource` | UI | The spectrum the chart shows, its receive time and whether it is historical; the source's `Current` and the `Changed` signal. `LiveSpectrumSource` and `SwitchingSpectrumSource` implement it |
 | `LiveSpectrumSource` | UI | The live `IDisplayedSpectrumSource`: `Current` wraps the distributor's latest spectrum frame in a new record on each read, around the frame's own measurement; `Changed` signals each spectrum frame and skips heartbeats |
-| `SpectrumChartViewModel` | UI | Owns the ScottPlot `Plot`: one line per spectrometer, the window band, the centre line, the axis type and the follow or frozen scale; asks the view for a redraw |
+| `SwitchingSpectrumSource` | UI | The `IDisplayedSpectrumSource` the app reads: the live source's spectrum, or the spectrum of a past moment until the operator returns to live; `ShownMoment` is that moment's receive time (`UI/Spectrum/`) |
+| `SpectrumChartViewModel` | UI | Owns the ScottPlot `Plot`: one line per spectrometer, the window band, the centre line, the axis type and the follow or frozen scale; holds the historical line's text; asks the view for a redraw |
 | `SignalInfoViewModel` | UI | The seven signal pane texts of the shown spectrum |
-| `SpectrumViewModel` | UI | The spectrum screen: applies the source's latest spectrum to the chart and the signal pane, the Invert and Logarithmic checkboxes, Reset scale and Stick to zero |
-| `ChartPalette` | UI | Paints ScottPlot's figure, data area, grid and axes from the palette, and resolves the colours of the line, the band and the centre line |
+| `SpectrumViewModel` | UI | The spectrum screen: applies the source's latest spectrum to the chart and the signal pane, the Invert and Logarithmic checkboxes, Reset scale, Stick to zero and Back to live; writes the chart's historical line from `ShownMoment` |
+| `ChartPalette` | UI | Paints ScottPlot's figure, data area, grid and axes from the palette, and resolves the colours of the spectrum line, the band, the centre line, the trend's envelope, the shown-moment line and the failure strip |
 | `LogTickGenerator` | UI | ScottPlot's tick generator over `LogAxis`: the labels under the current culture, and a cache of the last two results keyed on the limits, the length and the culture |
+| `EnvelopeLine`, `EnvelopePath` | UI | The trend's ScottPlot plottable: the min/max envelope path over the envelope columns, broken at each gap column, under its own lock (`UI/Trend/`) |
+| `TrendMarkerStrip` | UI | A 4 px bar along the bottom of the trend's data area over each column with a failure mark (`UI/Trend/`) |
+| `LocalTimeAxis` | UI | Converts a `DateTimeOffset` to the trend's X value, local-time OADate, and back (`UI/Trend/`) |
+| `TrendChartViewModel` | UI | Owns the trend's `Plot`: folds the cache over the navigation window at one column per data-area pixel, the Y limits, the Y label, the failure strip, the shown-moment line, navigation and the hover text (`UI/Trend/`) |
+| `TrendReadout` | UI | The hover text of one folded column: local time, value or gap reason, failures (`UI/Trend/`) |
+| `TrendPresets` | UI | The time window presets 1 min, 10 min, 1 h, 6 h and 24 h, 10 min by default (`UI/Trend/`) |
+| `TrendFeed` | UI | Fills the cache from the distributor, runs the re-read after a key change and the read of a clicked moment, each as a pipeline where a newer request cancels the read in flight (`UI/Trend/`) |
+| `TrendViewModel` | UI | The trend section: the chart, the overview, the presets, Follow live and the click to a moment (`UI/Trend/`) |
+| `OverviewViewModel`, `OverviewBand` | UI | The overview strip: the whole cache folded to 250 columns, the window's place along it, and the press that moves the trend there; the band control draws it (`UI/Trend/`) |
+| `TrendHistoryError`, `TrendMomentError` | UI | The stored points at a new key could not be read; the stored spectrum of a clicked moment could not be read (`UI/Trend/`) |
 | `SpectrumStore`, `StoreWriter`, `StoreRetention`, `StoreFile` | UI | The background writer: `SpectrumStore` enqueues every distributor frame, runs one `StoreWriter` task and counts the frames lost; `StoreWriter` writes the queue to the instance file in batches and runs `StoreRetention` once a minute, which deletes rows older than 24 h and sweeps other instances' files once an hour; `StoreFile` is the instance file's path (`UI/Store/`) |
 | `StoreOpenError`, `StoreWriteError`, `StoreStoppedError` | UI | The store file could not be prepared or opened; a batch could not be written; an unexpected failure after the open ended the writer (`UI/Store/`) |
 | `AppLogging` | UI | Creates the log folder and the Serilog logger: `spectrum-visualizer.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
-| `AddUi(LoggingSetup, AppDataPaths)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` of this process under the store folder, `SpectrumStore`, `LiveSpectrumSource` as the `IDisplayedSpectrumSource`, the message panel, the connection row, the status bar, the spectrum view model and the main window view model, all singletons |
+| `AddUi(LoggingSetup, AppDataPaths)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` of this process under the store folder, `SpectrumStore`, `SpectrumHistory` over the `StoreFile`, `IntensityCache`, `LiveSpectrumSource`, `SwitchingSpectrumSource` over it, which is also the `IDisplayedSpectrumSource`, the message panel, the connection row, the status bar, the spectrum view model, `TrendChartViewModel`, `OverviewViewModel`, `TrendFeed` built over `SpectrumHistory.IntensityPointsAsync` and `SpectrumAtAsync` with `DefaultScheduler.Instance` for its throttle, `TrendViewModel` and the main window view model, all singletons |
 | `Program` | UI | Entry point: paths, logging, container, `App.Run` with the logger for unhandled exceptions |
-| `App` | UI | Builds the Avalonia app with the exception handler, subscribes dispatcher exceptions, sets Semi's control strings to the UI culture, creates the main window from the container, refreshes the port list and starts the spectrum store, then the frame distributor, when the window opens, and stops the link, the distributor and the store, in that order, before it closes |
-| `MainWindowViewModel` | UI | Exit request, the verbose-logging command, and the panel, connection row, status bar and spectrum view models; it disposes none of them, the container owns them |
+| `App` | UI | Builds the Avalonia app with the exception handler, subscribes dispatcher exceptions, sets Semi's control strings to the UI culture, creates the main window from the container, refreshes the port list and starts the spectrum store, the trend feed and then the frame distributor when the window opens, and stops the link, the distributor, the trend feed and the store, in that order, before it closes |
+| `MainWindowViewModel` | UI | Exit request, the verbose-logging command, and the panel, connection row, status bar, spectrum and trend view models; it disposes none of them, the container owns them |
 | `ConnectionBarViewModel` | UI | The port list, the selection and the Refresh, Connect and Disconnect commands; reports a failed listing to the panel |
 | `AppStatusBarViewModel` | UI | The status bar texts and dot tone from `SerialLink.Status`, and the dropped-frames text from the link's and the store's counts; reports each fault and the restored entry to the panel |
 | `MessagePanelViewModel` | UI | The bounded, newest-first list of messages the operator reads |
@@ -94,9 +117,12 @@ and reads.
 `board-protocol.md` describes the link's read loop, health rules, drain, reopen and channel.
 
 Core holds every algorithm that needs no UI type: the projection and the scale rules under `Core/Spectrum/`, the log
-axis ticks under `Core/Chart/`, the store files, database, intensity rules and queries under `Core/Store/`. The UI keeps
-what touches ScottPlot or Avalonia: `LogTickGenerator`, `ChartPalette` and the chart view model; and what joins the app's
-lifecycle and message panel: `SpectrumStore`, `StoreWriter` and the store errors under `UI/Store/`. The store benchmark references Core only.
+axis ticks under `Core/Chart/`, the store files, database, intensity rules and queries under `Core/Store/`, and the
+trend's continuity rule, cache, history plan, navigation, column mapping and overview geometry under `Core/Trend/`.
+The UI keeps what touches ScottPlot or Avalonia: `LogTickGenerator`, `ChartPalette`, the chart view models, the
+envelope plottable and the failure strip; and what joins the app's lifecycle and message panel: `SpectrumStore`,
+`StoreWriter` and the store errors under `UI/Store/`, `TrendFeed` and the trend errors under `UI/Trend/`. The store
+benchmark references Core only, so it times the same cache and plan the app runs.
 
 ## Startup
 
@@ -110,8 +136,8 @@ lifecycle and message panel: `SpectrumStore`, `StoreWriter` and the store errors
 4. `App.Run` receives a logger from the container's `ILoggerFactory`, which writes to that logger, builds the
    `UnhandledErrorObserver` with the container's `IScheduler` and builds the Avalonia app. In `AfterSetup` it subscribes
    `Dispatcher.UIThread.UnhandledException`, which exists only once the platform is set up, and `App.Configure`
-   resolves `MainWindowViewModel`, `MessagePanelViewModel`, `SerialLink`, `FrameDistributor`, `SpectrumStore` and the
-   app's logger.
+   resolves `MainWindowViewModel`, `MessagePanelViewModel`, `SerialLink`, `FrameDistributor`, `TrendFeed`,
+   `SpectrumStore` and the app's logger.
    `OnFrameworkInitializationCompleted` shows `MainWindow` with that view model as its `DataContext`.
 
 A failure in step 1 or 2 ends with exit code 1 and shows nothing, because there is no log to write to. A failure after
@@ -121,23 +147,24 @@ No ReactiveUI object is constructed before `AppBuilder.Setup()`. ReactiveUI take
 use, so a command or property helper built earlier would make the handler that `BuildAvaloniaApp` installs a silent
 no-op. The view models come from the container inside `AfterSetup` for this reason.
 
-The window's `Opened` event refreshes the port list once, starts the spectrum store and then the frame distributor, so
-the store's subscription exists before the first frame is read. The window's `Closing` event is where an operator close
-(the close button, File, Exit) stops all three. `StopBackgroundServicesAsync` awaits `SerialLink.DisconnectAsync()`,
-then `FrameDistributor.StopAsync()`, then `SpectrumStore.StopAsync(drainToken)`, all inside one 5 s limit of real time;
-a timeout logs a Warning. The link stops first, so no frame enters the channel after the distributor has stopped
-reading it, and the distributor stops before the store, so no frame reaches the store after its queue has closed. Each
-stop runs in a `finally` of the one before, so the distributor and the store stop even when an earlier stop throws;
-any failure logs an Error, and the window closes anyway, because the stop task never faults. The store's drain token
-fires 1.5 s before the 5 s limit ends. From the store's stop on it starts no retention pass, and a held lock fails
-each statement it starts after about 1.15 s (the 1 s busy timeout of the stop plus Microsoft.Data.Sqlite's 150 ms
-retry step); a statement already running when the store's stop begins, at most 2 s into the close, keeps up to 2.15 s.
-After the drain token the store starts no batch, counts what is still queued as dropped and checkpoints, which never
-waits. Worst case a batch starts just before the drain token at 3.5 s and ends at about 4.65 s, so the store's close
-ends about 0.35 s inside the limit.
+The window's `Opened` event refreshes the port list once, starts the spectrum store, then the trend feed, then the
+frame distributor, so the store's and the feed's subscriptions exist before the first frame is read. The window's
+`Closing` event is where an operator close (the close button, File, Exit) stops all four.
+`StopBackgroundServicesAsync` awaits `SerialLink.DisconnectAsync()`, then `FrameDistributor.StopAsync()`, then
+`TrendFeed.StopAsync()`, then `SpectrumStore.StopAsync(drainToken)`, all inside one 5 s limit of real time; a timeout
+logs a Warning. The link stops first, so no frame enters the channel after the distributor has stopped reading it, and
+the distributor stops before the store, so no frame reaches the store after its queue has closed. The trend feed
+stops in between, so no trend read holds a reader snapshot when the store checkpoints. Each stop runs in a `finally`
+of the one before, so the later services stop even when an earlier stop throws; any failure logs an Error, and the
+window closes anyway, because the stop task never faults. The store's drain token fires 1.5 s before the 5 s limit
+ends. From the store's stop on it starts no retention pass, and a held lock fails each statement it starts after about
+1.15 s (the 1 s busy timeout of the stop plus Microsoft.Data.Sqlite's 150 ms retry step); a statement already running
+when the store's stop begins, at most 2 s into the close, keeps up to 2.15 s. After the drain token the store starts
+no batch, counts what is still queued as dropped and checkpoints, which never waits. Worst case a batch starts just
+before the drain token at 3.5 s and ends at about 4.65 s, so the store's close ends about 0.35 s inside the limit.
 
 - When the stop has completed by the time the first `Closing` checks it, the close goes ahead. That happens only when
-  neither ran, before `Opened`.
+  none ran, before `Opened`.
 - Otherwise that `Closing` cancels the close, awaits the stop and closes the window again. After `Opened` this is every
   close: the distributor's read task ends on the thread pool, and an active link's `DisconnectAsync` cancels through
   `CancelAsync` and the session finishes there too. A close that arrives while the stop runs stays cancelled and
@@ -145,11 +172,11 @@ ends about 0.35 s inside the limit.
 - An OS shutdown closes the window through the same event, but a window cannot prevent it, so the stop is best-effort
   there.
 
-The container's dispose after `App.Run` returns calls `SerialLink.Dispose()`, `FrameDistributor.Dispose()` and
-`SpectrumStore.Dispose()`, which cancel what still runs without waiting for it; the store's writer then closes its file
-without a checkpoint. After a 5 s timeout the session can outlive the window: `Program` then
-calls `Log.CloseAndFlush()` while the session may still write its last lines (the port close, "The link on port ...
-stopped"), and those lines are not guaranteed to reach the log file. The process exits regardless.
+The container's dispose after `App.Run` returns calls `SerialLink.Dispose()`, `FrameDistributor.Dispose()`,
+`TrendFeed.Dispose()` and `SpectrumStore.Dispose()`, which cancel what still runs without waiting for it; the store's
+writer then closes its file without a checkpoint. After a 5 s timeout the session can outlive the window: `Program`
+then calls `Log.CloseAndFlush()` while the session may still write its last lines (the port close, "The link on port
+... stopped"), and those lines are not guaranteed to reach the log file. The process exits regardless.
 
 ## Main window
 
@@ -159,8 +186,8 @@ stopped"), and those lines are not guaranteed to reach the log file. The process
 | --- | --- | --- |
 | Menu | `Auto` | `AppMenuBar`: File, Exit; View, Verbose logging |
 | Connection row | `Auto` | `ConnectionBar`: label "Port", a 240 px port list, Refresh, Connect, Disconnect |
-| Content | `*` | `ContentArea`, columns `*,Auto`: `SpectrumPane` with `SpectrumChartView`, and the 392 px `SignalPane` with `SpectrumPanel` |
-| Message panel | `Auto` | `MessagePanelView`; the row is hidden while the list is empty |
+| Content | `*` | `ContentArea`, columns `*,Auto` and rows `3*,2*,Auto`: `SpectrumPane` with `SpectrumChartView`, `TrendPane` with `TrendChartView` and `OverviewPane` with `OverviewView` in the left column, and the 392 px `SignalPane` with `SpectrumPanel` and `TrendPanel` across all three rows |
+| Message panel | `Auto` | `MessagePanelView`; the row is hidden while the list is empty, and its list scrolls past 64 px |
 | Status bar | `Auto` | `AppStatusBar`: dot and link text, port, ATP-2000, ATP-8000, lost spectra, dropped frames |
 
 The window opens centred at `MainWindow.OpeningWidth` 1280 by 800. Exit is view work: the view model emits on
@@ -170,12 +197,24 @@ The window opens centred at `MainWindow.OpeningWidth` 1280 by 800. Exit is view 
 the content row's floor, rounded up to the 8 px grid: the Russian status bar with `COM256`, six-digit lost and dropped
 counts and "Порт недоступен, переподключение" measures 1252.2 px (English 1085.2 px), the connection row 654.9 px
 in Russian (English 595.4 px), and the signal pane plus a 400 px chart floor 792 px. At 400 px an ATP-8000 spectrum
-keeps at least four labelled wavelength ticks; the measured axis shows eight, 1000 to 2400 nm. The headless text stub
-gives no real widths, so `MainWindowTextFitTests` adds the realised row chrome to each text measured through SkiaSharp
-at 14 px in the widest of Inter and every installed family of Semi's font chain; on Windows the app resolves that
-chain to Microsoft YaHei. The same test holds `MinimumWidth` at or under `OpeningWidth` and checks that the realised window opens
-`OpeningWidth` wide, so the window opens with every row whole. Both rows stay left-aligned at any width above the
-minimum, and no link state changes the set of rows or a row's height.
+keeps at least four labelled wavelength ticks; the measured axis shows eight, 1000 to 2400 nm. The charts never get
+less than 864 px (1256 minus the 392 px pane), where 10 min of trend keep at least four labelled time ticks. The
+headless text stub gives no real widths, so `MainWindowTextFitTests` adds the realised row chrome to each text measured
+through SkiaSharp at 14 px in the widest of Inter and every installed family of Semi's font chain; on Windows the app
+resolves that chain to Microsoft YaHei. The same test holds `MinimumWidth` at or under `OpeningWidth` and checks that
+the realised window opens `OpeningWidth` wide, so the window opens with every row whole. Both rows stay left-aligned at
+any width above the minimum, and no link state changes the set of rows or a row's height.
+
+`MainWindow.MinimumHeight` is 688 px, the window's `MinHeight`. A maximised window on a 1366 x 768 screen, under a 31 px
+title bar and over a 48 px taskbar, gives a client height of 689 px, and every row fits there with the message panel shown: the menu 32 px, the
+connection row 49 px, the spectrum row at its floor `SpectrumRowMinHeight` 192 px (67 px of ScottPlot axis margins
+over a 120 px data area), the trend row at its floor `TrendRowMinHeight` 208 px (the pane's 1 px border and 83 px of
+margins, since the time ticks take two lines, over a 120 px data area), the overview 37 px, the message panel at most
+133 px and the status bar 35.6 px in the tallest real face, 686.6 px in all. The data floor is 120 px because two
+200 px floors would need 705 px of client height before the message panel. Above their floors the spectrum and trend
+rows split the content row 3 : 2; the spectrum takes the larger share because it is the primary live view.
+`MainWindowChartHeightTests` measures the rows at 1280 x 800, 1366 x 768 and 1280 x 1024, with and without the
+message panel, and at the minimum.
 
 The Verbose logging item reads `IsVerboseLogging` one-way and writes only through `ToggleVerboseLoggingCommand`, so the
 command is the level's single writer. `LogLevelControl` raises no notification; the command raises
@@ -185,13 +224,25 @@ toggle turned verbose logging on, so the operator sees the switch take effect in
 
 ### Content row
 
-The chart is the one element that stretches. `SpectrumPane` holds the chart edge to edge with no padding, because
-ScottPlot draws its own axis margins over the panel background. `SignalPane` is a `Border` with a 1 px left border and
-`Padding="16"`, `SpectrumPanel.PaneWidth` wide, holding one form grid: a label column, a 12 px gap and a field column of
-at least 120 px, the number width, with 8 px between rows. The "Signal" header comes first, then seven label and value
-rows; the "Chart" header sits 16 px below them, then the "Invert spectrum" and "Logarithmic scale" checkboxes and the
-Reset scale and Stick to zero buttons, one per row in the field column with an empty label cell. The buttons carry
-`HorizontalAlignment="Left"`, because Semi's button otherwise centres in the column.
+The charts are the elements that stretch. `SpectrumPane` and `TrendPane` hold their charts edge to edge with no
+padding, because ScottPlot draws its own axis margins over the panel background. `TrendPane` and `OverviewPane` each
+carry a 1 px top border in `AppBorderBrush`; the overview is a 36 px strip, so its row is 37 px.
+
+`SignalPane` is a `Border` with a 1 px left border and `Padding="16"`, `SpectrumPanel.PaneWidth` wide, across the three
+rows. Inside it a `ScrollViewer` (`SidePaneScroll`) scrolls vertically only, so a short window or the shown message
+panel scrolls the pane instead of clipping it, and no row ever disappears; its scrollbar overlays the pane's 24 px
+slack. The `ScrollViewer` holds `SpectrumPanel` and `TrendPanel` in one `StackPanel` with `Grid.IsSharedSizeScope`.
+Each panel is one form grid: a label column in the shared size group `SidePaneLabel`, so both forms keep one field
+edge, a 12 px gap and a field column of at least 120 px, the number width, with 8 px between rows.
+
+- The "Signal" header comes first, then seven label and value rows.
+- The "Chart" header sits 16 px below them, then the "Invert spectrum" and "Logarithmic scale" checkboxes and the
+  Reset scale, Stick to zero and Back to live buttons, one per row in the field column with an empty label cell. Back
+  to live is enabled only while a moment is shown.
+- The "Trend" header sits 16 px below them, then the "Time window" label with the preset `ComboBox`, 120 px wide, and
+  the Follow live button in the field column.
+
+The buttons carry `HorizontalAlignment="Left"`, because Semi's button otherwise centres in the column.
 
 Every text in the pane stays on one line. A pane-scoped style sets `NoWrap` on every `TextBlock`, and each checkbox
 holds a `TextBlock` instead of a string, because Semi's `CheckBox` template wraps string content at template priority,
@@ -200,10 +251,10 @@ padding and 24 px slack, rounded up to the 8 px grid. Russian sets it: labels 11
 column 198.9 px for "Логарифмическая шкала", 385.4 px in all (English 91.0 and 140.6 px, 300.6 px). The longest values
 ("-1,23457E-38", "65535 nm", "±255 nm", "23:59:59.999") measure at most 92.1 px and fit the 120 px floor.
 `MainWindowTextFitTests` measures them the same way as the status bar, in the labels' face, which every label and value
-shares.
+shares, together with the Trend section's label, Back to live, Follow live and the widest preset label in its box.
 
-The message panel row takes its height from the content row: the chart and the pane lose that height and keep their
-width, and the window keeps its size. No spectrum state changes the window size or either pane's bounds.
+The message panel row takes its height from the content row: the charts and the pane lose that height and keep their
+width, and the window keeps its size. No spectrum or trend state changes the window size or a pane's bounds.
 
 ### Connection row
 
@@ -249,8 +300,10 @@ flag, so the first Receiving after a fault-free Connect adds none. A throw insid
 
 1. The link writes each `ReceivedFrame` to its channel (session task).
 2. `FrameDistributor` reads it. For a frame that carries a measurement it publishes `LatestSpectrum` with
-   `Volatile.Write`; then it calls each subscriber's `OnNext` inside its own try/catch (distributor task).
-3. `LiveSpectrumSource` passes spectrum frames on as `Changed` (distributor task).
+   `Volatile.Write`; then it calls each subscriber's `OnNext` inside its own try/catch (distributor task). The
+   subscribers are `LiveSpectrumSource`, the spectrum store and the trend feed.
+3. `LiveSpectrumSource` passes spectrum frames on as `Changed`, and `SwitchingSpectrumSource` passes them on unchanged
+   (distributor task).
 4. `SpectrumViewModel` moves the signal to the UI scheduler, reads `Current`, drops a repeat of the same measurement,
    calls `Chart.Show` and sets `SignalInfo.Spectrum` (UI thread).
 5. `Chart.Show` fills the line's buffer and the limits under `lock (Plot.Sync)` and requests a redraw.
@@ -278,6 +331,23 @@ construction shows at once. A throw from the `Current` read or from `Show` goes 
 spectrum only; the next signal reads and shows again. Only a failure of `Changed` itself ends the subscription, through
 the same report. The Invert and Logarithmic subscription reports a failure the same way. The view model is a container
 singleton, so the subscriptions live for the process.
+
+### A past moment
+
+`SwitchingSpectrumSource` wraps the live source and is the `IDisplayedSpectrumSource` the container hands out.
+`Current` is the historical spectrum while one is shown, the same record on every read, and the live `Current`
+otherwise. `Changed` merges the live `Changed` with a private subject that emits on each mode change.
+`ShowMoment(measurement, receivedAt)` and `ReturnToLive()` run on the UI thread and set `ShownMoment`, a
+`DateTimeOffset?` that raises its change. `ShowMoment` copies the measurement with `with { }`, so every shown moment
+carries a new `SpectrumMeasurement` around the same immutable pixel array, and `DistinctUntilChanged` by reference
+shows every click, also a second click on the same moment. While a moment is shown, live signals read the same
+historical record and `DistinctUntilChanged` drops them. `ReturnToLive` while live does nothing.
+
+`SpectrumViewModel` maps `ShownMoment` to "Spectrum from HH:mm:ss" in local time, or an empty string while live, and
+binds it to `SpectrumChartViewModel.HistoricalText`, which has no other writer; the line sits over the spectrum chart
+in `AppSecondaryForegroundBrush` while it is not empty. `BackToLiveCommand` calls `ReturnToLive` and is enabled only
+while `ShownMoment` is set. The Updated row of the signal pane shows the shown spectrum's receive time, so it shows
+the moment's time too. The trend reads the same `ShownMoment` and draws a line at it (Trend).
 
 ### The chart
 
@@ -320,6 +390,13 @@ dark frame's device in every case. On the log axis the dark line lies at 0 decad
 whose minimum is above 1, so the data area is empty for that frame. `rawMax` is the reference's largest displayed value
 before the log step, after inversion.
 
+Only a live spectrum writes the last non-dark measurement, also when a toggle or Reset scale projects a historical one
+again, so a moment from the past never becomes the dark-frame reference; a historical dark spectrum takes the live
+reference of its device, or the flat range without one. Each change that ends with the scale frozen records the shown
+spectrum's device as the frozen device. A historical spectrum, and the first live spectrum after it, keep the frozen
+limits when their device is the frozen device and return the scale to following otherwise, so a moment of the other
+device never leaves the plot blank, and the operator compares moments of one device at one zoom.
+
 The scale follows from the start, after Reset scale and after a log or inversion toggle. Once a spectrum is shown it
 freezes on a wheel step over the plot, on a pointer move with a button held 5 px or more from the press, and after
 Stick to zero. Before the first spectrum neither input freezes it, so the first spectrum sets the limits. Tunnel
@@ -333,9 +410,9 @@ floor, so a right drag under 5 px zooms a little; while following, the next spec
 cases. ScottPlot's `MouseDragPan` also restores
 the press-time limits on release before it applies the drag, so a press held across a frame ends on limits panned from
 the press-time view, not from the last frame. A bare click and a key press keep the scale following. While frozen, a
-frame from the other device keeps the frozen limits, and its line can lie outside them until Reset scale. Reset scale
-is enabled only while a spectrum is shown and the scale is frozen, so the button also shows the frozen state; Stick to
-zero is enabled once a spectrum is shown. `IsFollowing` raises its change after `Plot.Sync` is released, so no
+live frame from the other device keeps the frozen limits, and its line can lie outside them until Reset scale. Reset
+scale is enabled only while a spectrum is shown and the scale is frozen, so the button also shows the frozen state;
+Stick to zero is enabled once a spectrum is shown. `IsFollowing` raises its change after `Plot.Sync` is released, so no
 subscriber runs under the plot lock.
 
 ScottPlot's input processor stays on with five responses: `MouseInteractWithPlottables`, `MouseDragZoomRectangle`,
@@ -359,7 +436,8 @@ while the operator drags or zooms. The view repaints the plot from the palette o
 the surfaces and the series colours, so no render sees one without the other.
 
 Until the first spectrum a line over the plot reads "No spectrum yet. Connect to the board in the row above." After a
-Disconnect the last spectrum stays and its update time tells its age; a new Connect does not clear it.
+Disconnect the last spectrum stays and its update time tells its age; a new Connect does not clear it. While a moment
+is shown, the historical line sits at the top of the plot.
 
 ### The signal pane
 
@@ -368,6 +446,227 @@ compares by reference: spectrometer, wavelength (`{0} nm`), window (`±{0} nm`),
 time. Amplitude, SNR and Q are the board's values in `G6` under the current culture; a NaN or infinite value reads "-".
 SNR has no unit, because the board sends a ratio. The update time is `ReceivedAt` in the `TimeProvider`'s local zone as
 `HH:mm:ss.fff`. Before the first spectrum every row reads "-", so every row exists in every state.
+
+## Trend
+
+### Data flow
+
+1. The distributor hands every frame to the store's queue and to `TrendFeed` (distributor task).
+2. `TrendFeed` calls `IntensityCache.Add`: a point, a break, a failure mark, or a key change that raises
+   `ReReadRequested`.
+3. `IntensityCache.Changed`, sampled every 100 ms on the UI scheduler, refreshes `TrendChartViewModel`; while
+   following, the window moves to the newest point. The overview places the window after each refresh.
+4. A key change, throttled at 500 ms, snapshots the visible window on the UI thread and starts one re-read on the
+   thread pool: the plan's ranges through `SpectrumHistory.IntensityPointsAsync`, each chunk landed in the cache. A
+   newer key change, or a return to the previous key, cancels it.
+5. A click on the trend reads the spectrum of that moment, from the cache's recent spectra or the store, and shows it
+   through `SwitchingSpectrumSource`.
+
+The trend's intensity of a spectrum is the mean of its pixels in the `SpectrometerCalibration.Window(nm, delta)` of its
+device, dark frames included, the value the store's series computes. The key is the `(WavelengthNm, Delta)` of the
+latest spectrum frame.
+
+### The intensity cache
+
+`IntensityCache` holds, under one lock, the points `(UnixMs, Value)` in time order, one per spectrum, NaN for a
+spectrum whose device does not cover the wavelength; the run's breaks `(UnixMs, Kind, Lost)` and failure marks
+`(UnixMs, State)`; the key and its `QueryWindows`; a `FrameContinuity`; and the recent spectra, the spectrum frames of
+the last 120 s by millisecond receive time, held by reference, since the pixel arrays are immutable.
+
+`Add(ReceivedFrame)` passes every frame to the continuity rule and keeps its breaks and marks, then for a spectrum:
+
+- the first spectrum sets the key and asks for nothing;
+- a spectrum at the key adds one point: `QueryWindows.MeanOf` over the frame's window when the device covers the
+  wavelength, NaN otherwise;
+- a spectrum with another wavelength or `delta` changes the key (below).
+
+After each add, and after each landed chunk, it drops the points, breaks and marks older than 24 h before
+`TimeProvider.GetUtcNow()`, the store's retention rule. `Changed` signals after every added frame and every landed
+chunk; `HistoryLanded` signals after a landed chunk, just before its `Changed`. Both are private subjects behind
+`Subject.Synchronize`, exposed with `AsObservable()`, and every emission happens after the lock is released.
+
+`Fold(IntensityQuery)` finds the first point, break and mark at or after `From` by binary search and feeds the range
+into `IntensityBuckets`, so the cache and the store fold one way on the same epoch grid, and a 10 min fold costs the
+points of 10 min. Every fold the trend and the overview take sits on that grid, so two folds of one width share their
+full columns. `SpectrumAt(moment)` answers from the recent spectra: the spectrum at or before the moment as a new
+measurement around the same pixels, or null before the oldest recent spectrum. At 2 spectra per second a day of
+points takes about 3 MB.
+
+### Continuity
+
+`FrameContinuity` sees every frame in receive order, spectra and heartbeats, and owns a `SequenceTracker`. Two 10 s
+rules use the link's silence limit, and they measure different silences:
+
+| Case | Result |
+| --- | --- |
+| the first frame | the `seq` baseline; nothing |
+| more than 10 s after the previous frame of any kind | `SequenceTracker.Reset()`; this frame is the new baseline, so the `seq` step across the silence is no loss |
+| up to 10 s after the previous frame, the tracker counts k > 0 lost | a `Loss` break at this frame with k lost |
+| a spectrum more than 10 s after the previous spectrum | a `NoSpectra` break at this spectrum, besides the above, whatever heartbeats came between |
+| a measurement-failed bit of either device in the frame's `state` | a failure mark at this frame with only the failed bits |
+
+A reconnect, an unplug, an emulator restart after 10 s and a stopped board all fall under the reset. A board restart
+inside 10 s shows as a Loss break with the link's count (`board-protocol.md`, Sequence counter), and a frame the link's
+channel dropped leaves a `seq` gap in the distributor stream, so it breaks the line too. One spectrum after a
+heartbeat-only stretch can carry both a NoSpectra and a Loss break.
+
+Breaks and marks come from `seq`, time and `state`, never from the wavelength or `delta`, so they belong to the run,
+not to the key. The store wipes the instance file at open and the trend feed subscribes before the distributor
+starts, so every stored frame passed through the cache first. The cache therefore keeps its breaks and marks for its
+whole life, a key change recomputes point values only, and the store's points read returns points only. The store's
+heartbeat table has no reader in the app.
+
+### Key change and re-read
+
+A spectrum with another key raises the key generation and moves the points older than the recent spectra aside. The
+cache recomputes the recent spectra at the new key at once and raises `ReReadRequested(generation, key, recentStart,
+ReadsHistory: true)`, so the store is asked only for rows older than `recentStart`, the start of the recent spectra.
+The store writes in batches behind its queue, so the newest rows may not be in the file yet; 120 s covers the writer's
+normal lag. `recentStart` and the recent spectra share the millisecond stamps, so the store's `received_at <
+recentStart` and the recent set meet with no double point. Each key change logs at Debug with the new key and a
+running count of key changes.
+
+A return to the previous key restores that key's older points without a read, and raises a request with `ReadsHistory`
+false, which only cancels the pending read, when all of these hold:
+
+- the outgoing key's history was complete: it was the first key, or a key a return restored, so a key whose re-read
+  was still pending comes back through a read instead of partial;
+- no chunk of the current generation has landed yet;
+- the return comes at most 120 s after the change. While the previous key's points are kept, the recent spectra are
+  not evicted below the change, so the return recomputes every spectrum since it with no hole, for at most 240 s
+  since the change; past that the kept points are dropped.
+
+Any other return asks for a read like any change.
+
+`LandHistory(generation, chunk)` inserts a chunk's points in time order when its generation is current and ignores it
+otherwise. Chunks never overlap each other or the recent spectra, because every planned range ends at `recentStart`.
+Frames the store never wrote (a full queue, a failed batch, both counted as dropped) are absent from the history after
+a re-read, although the live trend showed them; the dropped-frames count in the status bar already reports them.
+
+`TrendHistoryPlan.For(visibleFrom, visibleTo, newest, recentStart)` returns the ranges in order: the visible window
+clipped to `[newest - 24 h, recentStart)` first, then the hour chunks from the window's end to `recentStart`, then the
+hour chunks from the window's start back to `newest - 24 h`, each run newest first. A window inside the recent spectra
+reads nothing first. The hour chunks let the trend fill progressively while a day of pixel pages is read, and let a
+cancel land within one chunk.
+
+### The feed
+
+`TrendFeed` is a singleton over the distributor, the cache, the trend chart, the switching source, two read delegates
+(`SpectrumHistory.IntensityPointsAsync` and `SpectrumAtAsync`), the message panel, the UI scheduler, a throttle
+scheduler and its logger.
+
+- `Start()` subscribes the two read pipelines, then `FrameDistributor.Frames` with `IntensityCache.Add`, and logs a
+  Debug line. `Add` takes a mean over at most 2048 pixels; it never touches SQLite and never blocks the distributor.
+  `Start` after a start or a stop does nothing.
+- The re-read pipeline is `ReReadRequested.Throttle(500 ms)` on the throttle scheduler, `ObserveOn(uiScheduler)`,
+  where it snapshots the chart's `From` and `To` into an immutable window, then `Select(ReadHistory).Switch()`.
+  `ReadHistory` is `Observable.Create` with a cancellation token that runs the plan's ranges one after another on the
+  thread pool and lands each chunk; the read sees only the snapshot, and nothing reads the navigation model off the UI
+  thread. A newer request disposes the read in flight, which cancels its token, and `IntensityPointsAsync` checks it
+  every 256 rows. A request with `ReadsHistory` false maps to an empty observable, so it only cancels. A failed range
+  reports one `TrendHistoryError` (Warning) through `TryReportFailure` and ends that read; the live part stays.
+- The moment pipeline is `Select(ReadMomentFrom).Switch()`, so a second click cancels the first read, then
+  `ObserveOn(uiScheduler)`. A moment inside the cache's recent spectra needs no store read; any other moment reads
+  `SpectrumAtAsync`. A found spectrum goes to `SwitchingSpectrumSource.ShowMoment`; none (before the first row) changes
+  nothing and logs at Debug; a failed read reports one `TrendMomentError` (Warning).
+- Every store read is tracked in a set under a lock until it ends. `StopAsync()` disposes the subscriptions, which
+  cancels both pipelines, then awaits every tracked read, superseded ones included, because a cancelled read may still
+  hold a reader connection, and logs a Debug line. `Dispose()` cancels without waiting, for the container's dispose.
+
+### The chart
+
+`TrendChartViewModel` owns the `Plot`: one `EnvelopeLine`, one `TrendMarkerStrip`, one `VerticalLine` for the shown
+moment, ScottPlot's `DateTimeAutomatic` on the bottom axis over local-time OADate (`LocalTimeAxis`), and a
+`TrendNavigationModel`. Every member runs on the UI thread. Before the first point the window is the 10 min before the
+`TimeProvider`'s current time, and the Y limits are `0 .. 1`, so an empty chart renders finite axes.
+
+A refresh runs on every sampled cache change and on every navigation call. It moves the window to the newest point
+while following, folds the cache over `[From, To + 1 ms)` (while following the window ends at the newest point, and
+the range is half-open) at one column per pixel of the data area, maps the columns with `TrendColumns`, and replaces
+the envelope's columns, the strip's spans, the X limits, the Y limits and the Y label under `lock (Plot.Sync)`; then it
+requests one redraw. The column width is `ceil(span / clamp(dataAreaPixels, 256, 2048))` in whole milliseconds, at
+least 1 ms. The view reports the data area's width after each ScottPlot render, posted to the UI thread; before the
+first report the chart folds to 2048 columns. The first point opens the window at the newest point; a later change of
+the first point (retention, a landed chunk) moves only the pan floor.
+
+| Column | Envelope output |
+| --- | --- |
+| values, no break | one column at the column's centre: `Min`, `Max`, `Last` |
+| values and a break | a gap at the column's start, then the value column |
+| no values, a break or an uncovered spectrum | a gap at the column's start |
+| no values, nothing else | none |
+
+An empty column with nothing else is left out, so the path connects across columns narrower than the frame period,
+and a stretch of more than 10 s without spectra breaks only through its NoSpectra break. A gap column has NaN values,
+and `EnvelopePath` breaks the line there; a break in a column that also holds values cuts the connector into that
+column at every zoom, so at the 24 h width one lost spectrum shows as a one-column cut. The envelope line is 1 px in
+`AppAccentBrush`. A column with a failure mark draws the strip, 4 px high at the bottom of the data area in
+`AppSeverityErrorBrush` and at least 1 px wide, so one failed spectrum shows at 24 h; the readout names the failure, so
+colour never carries it alone.
+
+The Y limits pad the drawn values by 5 % of their span, `v - 1 .. v + 1` when they are flat, and stay unchanged when
+nothing is drawn. The Y label names the key on two lines, "Intensity" over "650 nm ±10 nm", so no pane row repeats
+it: on one line the widest Russian key overruns the room the plot gives a label at the trend's floor. The X label
+reads "Time". While a moment is shown, the shown-moment line stands at it in `AppMarkerLineBrush`.
+
+### Navigation
+
+The window's width runs from 10 s to 24 h, the history the cache keeps, and opens at 10 min, following.
+
+- While following, each refresh sets `From = newest - width` with no clamp, so a run shorter than the window leaves an
+  empty span on the left.
+- A pan and a zoom place the window through the one clamp, which keeps `From` at or after the cache's first point.
+- A pan that leaves the newest point outside the window stops following; a pan that keeps it inside keeps following.
+  A wheel zoom that leaves the newest point outside the window stops following too, so a zoom-in keeps the time under
+  the cursor instead of snapping back.
+- Zoom widths snap to the ladder `10 s x 1.25^n`. A preset sets its width exactly, keeps the right edge and keeps
+  following as it was.
+- Follow live jumps to the newest point and follows again; it is enabled only while not following.
+
+`TrendChartView` turns ScottPlot's input off (`UserInputProcessor.Disable()`, `HandleMouseWheelEvent = false`) and
+handles the pointer itself. A wheel notch zooms around the cursor time by 0.8 (wheel up) or 1.25 (wheel down);
+Shift + wheel pans by 10 % of the width, wheel down toward newer data. A left press captures the pointer; a move past
+4 px from the press starts a drag that pans by the time under the pointer; a release within 4 px is a click, which
+passes the press time to `TrendViewModel.ShowMoment`. A lost capture ends the drag. The view serves redraw requests
+once per display frame with the same `BitmapCache` layout and palette repaint as the spectrum chart view.
+
+Until the first point a line over the plot reads "No intensity yet. It appears with the first spectrum."
+
+### The readout
+
+An Avalonia `Canvas` over the cached plot holds the hover line, 1 px in `AppSecondaryForegroundBrush`, and the readout,
+a `Border` in `AppPanelBackgroundBrush` with a 1 px `AppBorderBrush` border and 12 px text. Both follow the pointer
+without a plot redraw, hide while dragging, outside the data area and on pointer exit, and move again after each served
+redraw. The readout sits right of the line, and left of it when it would run past the view's right edge.
+
+The text comes from the column under the pointer in the last fold (`TrendReadout`): the column's start in local time
+as `HH:mm:ss`, then one value or "min – max" in `G6` under the current culture with "Spectra: {n}", or the gap reason,
+then one "Measurement failed: {device}" line per failed device. The gap reasons are "No data", "{n} spectra lost",
+"No spectra" and "Spectrometer does not cover {nm} nm". An empty column between drawn columns reads as the line there:
+the gap reason of the column that ends the gap, or else the values of the column the line comes from, with the
+failures of the whole empty run, so a NoSpectra gap names a failure a heartbeat inside it carried. Outside the window
+or before the first point there is no readout.
+
+### The overview
+
+`OverviewView` is a 36 px strip in `AppContentBackgroundBrush`. `OverviewBand` draws the band in `AppAccentBrush` at
+opacity 0.35; the window highlight is `AppAccentFillBrush` with an `AppAccentBrush` border and at least 6 px wide; a
+hover line in `AppSecondaryForegroundBrush` follows the pointer. A left press, and a move with the button held, centre
+the trend window on the time under the pointer, clamped at the first point, and stop following.
+
+`OverviewViewModel` folds the whole cache to 250 columns: the column width is `ceil((newest - first) / 250)` in whole
+milliseconds over `[first, newest + 1 ms)`, on the epoch grid, so the first column may start before the oldest point
+and the strip's left bound is that column's start. The band takes the trend's gap rule (`OverviewGeometry.Connected`),
+so it breaks where the trend line breaks, not at every empty column of a short extent. It refolds at start, after each
+landed chunk, after each key change, and on a cadence of `clamp(extent / 1000, 2 s, 60 s)`. It reads the cache only,
+so it needs no store read and no cancellation of its own. The window's place along the strip is computed again on each
+`TrendChartViewModel.RedrawRequested`, which follows every refresh.
+
+### Lifecycle
+
+The trend's parts are container singletons. `Opened` starts the store, the trend feed, then the distributor, so both
+subscriptions exist before the first frame; the close chain stops the feed after the distributor and before the store
+(Startup). The chart and overview subscriptions to the cache live for the process.
 
 ## Spectrum store
 
@@ -422,7 +721,8 @@ read from the pixels. `received_at` is not unique: the frames of one decode pass
 with equal stamps. SQLite stores a NaN double as NULL, so the float columns are nullable and read NULL back as NaN.
 `pixels` is the last column, so a read of the narrow columns never touches the blob's overflow pages. Heartbeats go to
 their own table, so the series scans spectra only; a heartbeat carries the measuring spectrometer's own failure bit and
-marks 3 s without a spectrum (`board-protocol.md`).
+marks 3 s without a spectrum (`board-protocol.md`). No query of the app reads the heartbeat table: the trend takes its
+breaks and marks from the live frames (Trend). The store keeps writing it, for the diagnosis of a copied file.
 
 `StoreConnection.Open` uses `Data Source=<file>;Mode=ReadWriteCreate;Pooling=False;Default Timeout=2` and runs
 `PRAGMA journal_mode=WAL`, `PRAGMA synchronous=NORMAL` and `PRAGMA journal_size_limit=67108864` on every connection.
@@ -511,7 +811,10 @@ The link's channel drops are the other half of the dropped count (`board-protoco
   spectrum in the range it takes the mean of the pixels in `SpectrometerCalibration.Window(nm, delta)` of the row's
   device, dark frames included, and folds it into the column of its time. A row whose device does not cover the
   wavelength (the firmware table range `FirstNm..LastNm`) adds to the column's `UncoveredCount` only, and so does a
-  corrupt row, which the series skips instead of failing. The series checks the token every 256 rows.
+  corrupt row, which the series skips instead of failing. The series adds no break and no failure mark.
+- `IntensityPointsAsync(wavelength, delta, from, to)` returns an `IntensityChunk` of `[from, to)` with one point per
+  spectrum in receive order (`received_at`, then `id`): its Unix milliseconds and its window mean, NaN for an
+  uncovered device or a corrupt row. The trend's re-read lands these chunks in the cache.
 - `StoredRangeAsync()` returns the receive times of the first and last spectrum, or null when none is stored.
 
 `IntensityQuery.Create` truncates `From` and `To` to whole milliseconds, the unit of `received_at`, and fails for an
@@ -521,16 +824,19 @@ columns sit on a grid anchored at the Unix epoch: a column starts at a multiple 
 and last column may start before `From` or end after `To`, and carries `From`, `To`, `ColumnWidth` and each column's
 `Start`. Two queries of one width share the boundaries and the content of every column both hold in full, so a live
 window that moves forward, or a pan, keeps its full columns and recomputes only the edges. A column with no covered
-row has NaN `Min` and `Max`, the gap a chart draws; `UncoveredCount > 0` there says the gap comes from the other
-spectrometer or from corrupt rows.
+row has NaN `Min`, `Max` and `Last`, the gap a chart draws; `UncoveredCount > 0` there says the gap comes from the
+other spectrometer or from corrupt rows. A column also carries `Last`, the value with the latest receive time, and,
+from the trend cache's fold only, `BreakCount`, `LostCount` and `Failed`, the OR of the failure bits.
 
-The series is one statement over the range in `received_at, id` order, which the `spectrum_time` index gives without a
-sort: a `CASE` cuts each row's window out of its pixels with `substr(pixels, 2 x First + 1, 2 x count)`, whatever
-wavelength the row was stored at, and yields NULL for a corrupt row. The length check sits inside the `CASE`, because
-`GetBytes` of Microsoft.Data.Sqlite on an expression column crashes the process when the result holds a second
-expression column. Every series read loads the pixel page of every row in the range: the cost scales with the rows on
-disk, so a 24 h read touches about a day of pages, and a cold 24 h read, with the OS file cache empty, runs at the
-speed of the disk.
+The series and the points share one statement over the range and one row loop. The statement runs in
+`received_at, id` order, which the `spectrum_time` index gives without a sort: a `CASE` cuts each row's window out of
+its pixels with `substr(pixels, 2 x First + 1, 2 x count)`, whatever wavelength the row was stored at, and yields NULL
+for a corrupt row. The length check sits inside the `CASE`, because `GetBytes` of Microsoft.Data.Sqlite on an
+expression column crashes the process when the result holds a second expression column. The row loop is a lazy
+iterator of points that checks the token every 256 rows; the series folds it into buckets and counts a NaN point as
+uncovered, and the points read collects it into the chunk. Every read loads the pixel page of every row in the range:
+the cost scales with the rows on disk, so a 24 h read touches about a day of pages, and a cold 24 h read, with the OS
+file cache empty, runs at the speed of the disk.
 
 `substr` is the kept read. A per-row `SqliteBlob` read of only the window's bytes was no faster on a day-long churned
 file, so the tool keeps `substr` only, and a precomputed per-row intensity column does not halve the read once the
@@ -546,8 +852,11 @@ With the defaults it fills a day of ATP-2000 spectra at 2 per second, every row 
 24 rounds of retention and refill, and prints one table of inserts, file size, series reads, `SpectrumHistory` calls,
 retention and WAL growth, fresh and churned. Every series reads the rows' pixels, so the stored wavelength changes no
 read the benchmark measures. A series runs in columns of the range over 1 000 truncated to whole milliseconds, so it
-has 1 000 columns or one more. The tool does not drop the OS file cache, which needs administrator rights, so a
-first run can be warm too. A run deletes its file and its temp folder unless `--keep` is given.
+has 1 000 columns or one more. Four rows time the trend over the file's frames: an `IntensityCache` fold of the whole
+day and of 10 min to 2048 columns, and a re-read at another wavelength through `TrendHistoryPlan` and
+`IntensityPointsAsync`, timed to the landing of the visible 10 min and to the last chunk of the day. The tool does not
+drop the OS file cache, which needs administrator rights, so a first run can be warm too. A run deletes its file and
+its temp folder unless `--keep` is given.
 
 | Option | Default | Range | Effect |
 | --- | --- | --- | --- |
@@ -581,6 +890,8 @@ extensions:
 | `StoreOpenError` | Error: nothing is stored for the run |
 | `StoreWriteError` | Warning: the lost frames count as dropped; after a failed batch the store keeps trying |
 | `StoreStoppedError` | Error: nothing more is stored for the run, and every later frame counts as dropped |
+| `TrendHistoryError` | Warning: the trend keeps its live part; no remedy is owed |
+| `TrendMomentError` | Warning: the operator clicks another moment |
 | an exception error | Error; the detail keeps the exception type and message |
 | any other error | Error; the detail keeps the error's own message |
 
@@ -593,7 +904,8 @@ severity class.
 The panel holds at most 200 entries, newest first. A message equal to the newest entry, severity included, does not add
 a row: it raises that entry's repeat count and last-seen time, and the log line drops to Debug. Only the newest entry
 is compared, so a lost port, a restored link and a second lost port are three rows. The panel row is visible while the
-list has entries: the first entry opens it, Clear empties the list and hides it. An entry with an empty remedy shows
+list has entries: the first entry opens it, Clear empties the list and hides it. The list shows at most 64 px, one
+three-line entry, and scrolls past that, so the panel row stands at most 133 px. An entry with an empty remedy shows
 no remedy line.
 
 `UnhandledErrorObserver` is the handler `BuildAvaloniaApp` passes to `UseReactiveUI(... WithExceptionHandler ...)`.

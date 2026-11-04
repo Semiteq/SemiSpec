@@ -950,7 +950,7 @@ Data flow:
   and stays with the owner, skipped here)
 
 ### Task 16: [Final] Update documentation
-- [ ] `docs/architecture/overview.md`: the purpose paragraph (`:3-15`); the components table (`:34-92`) gains
+- [x] `docs/architecture/overview.md`: the purpose paragraph (`:3-15`); the components table (`:34-92`) gains
   `FrameContinuity`, `IntensityCache`, `TrendHistoryPlan`, `TrendNavigationModel`, `TrendColumns`, `OverviewGeometry`,
   `IntensityChunk`, `SwitchingSpectrumSource`, `EnvelopeLine`, `TrendMarkerStrip`, `TrendChartViewModel`, `TrendFeed`,
   `TrendViewModel`, `OverviewViewModel` and the two trend errors; `AddUi` and `App` rows; startup and close order
@@ -958,18 +958,18 @@ Data flow:
   points read and the shared row loop; the schema section (`:396-425`) states that the heartbeat table has no reader
   in the app and stays written for diagnostics; a new "Trend" section: the cache and its recent spectra, the continuity rule,
   the re-read and its cancellation, the column mapping, navigation, readout, overview, click and the chart rules
-- [ ] `docs/architecture/README.md`: a Trend row (cache fed by the distributor, store re-read only on a key change,
+- [x] `docs/architecture/README.md`: a Trend row (cache fed by the distributor, store re-read only on a key change,
   session rule); the Frame distribution row names the trend feed as a subscriber
-- [ ] `docs/architecture/board-protocol.md`: "Sequence counter" (`:123-146`) notes the trend's 10 s session rule
-- [ ] `docs/architecture/ui-theme.md`: the consumers of the keys in the table (`:44-59`); "The plot" section names the
+- [x] `docs/architecture/board-protocol.md`: "Sequence counter" (`:123-146`) notes the trend's 10 s session rule
+- [x] `docs/architecture/ui-theme.md`: the consumers of the keys in the table (`:44-59`); "The plot" section names the
   trend plot
-- [ ] `docs/architecture/ui-text.md`: owners Trend pane, Trend chart, Trend readout, Spectrum chart (historical line),
+- [x] `docs/architecture/ui-text.md`: owners Trend pane, Trend chart, Trend readout, Spectrum chart (historical line),
   Chart controls (`ChartBackToLive`), and the trend errors in the `ErrorMessageMapper` row
-- [ ] `docs/architecture/testing-strategy.md`: the Area list (`:23-25`) gains `Trend`; a Trend row in the table
+- [x] `docs/architecture/testing-strategy.md`: the Area list (`:23-25`) gains `Trend`; a Trend row in the table
   (`:46-62`); the benchmark row names the trend timings
-- [ ] `CLAUDE.md`: add `Trend` to the Area list (`:41-43`); the Layout line for `SpectrumVisualizer.UI/` names the
+- [x] `CLAUDE.md`: add `Trend` to the Area list (`:41-43`); the Layout line for `SpectrumVisualizer.UI/` names the
   trend; `SpectrumVisualizer.Core/` names the trend rules
-- [ ] `readme.md`: the paragraph "The new app shows the live spectrum ..." (`readme.md:18`) names the trend, the
+- [x] `readme.md`: the paragraph "The new app shows the live spectrum ..." (`readme.md:18`) names the trend, the
   overview and the click to a past spectrum
 
 ## Post-Completion

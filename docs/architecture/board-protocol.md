@@ -139,7 +139,9 @@ the last spectrum's `seq`, 0 before any spectrum. After 255 comes 0.
 The first frame is the baseline, so an app started mid-run reports no false loss, even when that frame carries 57. A
 heartbeat reports k, not k - 1: it repeats the last spectrum the board sent, so every spectrum up to and including
 that `seq` was lost. Every frame, heartbeats included, becomes the new baseline, so the spectrum after a heartbeat
-that reported a loss does not report it again. `Reset()` starts a new baseline, for a reconnect.
+that reported a loss does not report it again. `Reset()` starts a new baseline, for a reconnect. The trend keeps its
+own tracker over the distributor's frames and resets it after more than 10 s without any frame, so the `seq` step
+across a reconnect, an unplug or a stopped board is not counted as loss there (`overview.md`, Trend).
 
 A board restart looks like an ordinary gap. A loss of 256 or more spectra in a row miscounts; at 1.3 spectra per second
 that is over 3 minutes of silence. OptoskyProj#20 has the app report a silent board after 10 s without a valid frame,
