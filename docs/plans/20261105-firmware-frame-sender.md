@@ -177,41 +177,52 @@ state byte and the frame size are visible only in the spectrum store, and each l
 
   `received_at` is Unix time in milliseconds. The store keeps 2 bytes per pixel, so `frame_bytes` is 8 for a heartbeat,
   1048 for ATP-8000 and 4120 for ATP-2000.
-- Log: `%LOCALAPPDATA%\SpectrumVisualizer\Logs\spectrum-visualizer.log`. Each loss writes the Information line
-  `<n> spectra lost before seq <s> on port <port>`.
+- Log: the newest `%LOCALAPPDATA%\SpectrumVisualizer\Logs\spectrum-visualizer*.log`. Serilog rolls the file at 5 MB
+  (`spectrum-visualizer_001.log` and on), so read the file with the latest change time. Each loss writes the
+  Information line `<n> spectra lost before seq <s> on port <port>`; the lost total in the status bar shows the same
+  count.
 
-1. Power the board with both spectrometers and no PLC trigger. About 3 s after power-up the status bar shows the link
-   up: the first heartbeat comes 3000 ms after `PcSenderInit`. Heartbeat rows then arrive every 3 s with `seq` 0.
-   State bits 0 and 1 (ATP-2000 and ATP-8000 in the status bar) set once the spectrometers answer; `Ready_*` start
-   at 0.
+The `state` column is a bit field (`PcStateByte`, `main.c:891-895`): bit 0 ATP-2000 connected (`Ready_2000`), bit 1
+ATP-8000 connected (`Ready_8000`), bit 2 ATP-2000 fault, bit 3 ATP-8000 fault. Decode it as `state & 1`, `state & 2`,
+`state & 4`, `state & 8`.
+
+1. Hold PLC byte 3 bit 0 low at power-up. The edge detector starts with `previous_state` 0 (`main.c:201`), so a bit
+   already high at boot reads as a rising edge and queues a dark spectrum (`main.c:290-296`, `main.c:1175-1183`); a
+   dark `seq` 1 row is then correct behaviour, and step 2's first spectrum is that dark one. Power the board with both
+   spectrometers and no PLC trigger. About 3 s after power-up the status bar shows the link up: the first heartbeat
+   comes 3000 ms after `PcSenderInit`. Heartbeat rows then arrive every 3 s with `seq` 0. State bits 0 and 1 (ATP-2000
+   and ATP-8000 in the status bar) set once the spectrometers answer; the fault bits 2 and 3 stay 0.
 2. Trigger a measurement on ATP-8000 (PLC wavelength 1550 nm, pulse mode). Pulse mode measures continuously, so this
    starts a stream of spectra. The first spectrum row has `seq` 1 and `frame_bytes` 1048; the chart shows the spectrum
-   with wavelength 1550 and the PLC `delta`; Amplitude, SNR and Q on screen equal the values the PLC reads.
+   with wavelength 1550 and `delta` equal to min(PLC delta, 100) (`main.c:1163`). Stop pulse mode, then compare
+   Amplitude, SNR and Q on screen with the values the PLC reads: they must be equal. During a live stream they differ,
+   because the PLC reply carries the globals at poll time and the next measurement overwrites them about one frame
+   before the app shows that frame.
 3. Keep measuring. `seq` rises by 1 per spectrum row; the lost total in the status bar stays 0, the log has no
    "spectra lost" line, and the link never shows "other device". Then stop pulse mode for at least 3 s after some
    spectra: heartbeat rows arrive every 3 s and repeat the last spectrum's non-zero `seq`. The first spectrum after a
    restart of pulse mode carries that `seq` + 1.
 4. Set the PLC wavelength to 650 nm (below 904 nm, `main.c:394-402`). The next spectrum rows are ATP-2000 rows with
-   `frame_bytes` 4120 and wavelength 650; the spectrum and trend follow. Measure the frame time:
-   - with a logic analyser on USARTC0 TX, one ATP-2000 frame from the first `AA` to the last CRC byte takes about
-     358 ms (4120 bytes x 10 bits at 115200 baud), one ATP-8000 frame about 91 ms. A clearly longer frame means the
-     main loop does not keep the TX buffer fed;
-   - without an analyser, the mean spectrum interval in continuous pulse mode,
-     `SELECT (max(received_at) - min(received_at)) / (count(*) - 1) FROM spectrum WHERE device = 1;` over a run on
-     ATP-2000 only, against the interval the old firmware gave in the same mode (recorded before flashing, see
-     Post-Completion). Both firmwares send about 4100 bytes per ATP-2000 spectrum, so a clearly longer interval than
-     the old one means the main loop does not keep the TX buffer fed.
-5. Request a dark measurement (PLC byte 3 bit 0 rising edge, `main.c:1207-1215`). One spectrum row arrives with the
+   `frame_bytes` 4120 and wavelength 650; the spectrum and trend follow. Measure the frame time with a logic analyser
+   or an oscilloscope on USARTC0 TX: one ATP-2000 frame from the first `AA` to the last CRC byte takes about 358 ms
+   (4120 bytes x 10 bits at 115200 baud), one ATP-8000 frame about 91 ms. A clearly longer frame means the main loop
+   does not keep the TX buffer fed. Without an analyser or an oscilloscope, record this check as not checkable: the
+   old app shows no rate and the new app cannot read the old frames, so no baseline exists. The risk of a starved TX
+   buffer then stays open.
+5. Request a dark measurement (PLC byte 3 bit 0 rising edge, `main.c:1175-1183`). One spectrum row arrives with the
    next `seq` and `amplitude` and `snr` 0, and the chart shows all pixels at 0; the following light spectra show the
    dark-subtracted signal.
 6. Change the PLC wavelength while measuring continuously. The frame's wavelength follows the PLC within one
    measurement, and the trend recomputes at the new wavelength.
-7. Unplug one spectrometer. After 3 failed service requests (`main.c:496-499`) its connected bit clears in the next
-   heartbeat or frame, and the app shows it as not connected.
+7. Unplug the measuring spectrometer while pulse mode runs. Its fault bit sets first: one failed spectrum job calls
+   `CommFail(JOB_SPECTRUM)` (`main.c:500-501`). Its connected bit clears later, after 3 failed service requests 2 s
+   apart (`main.c:492-499`). In the store's `state` column (decoded as above) and in the status bar, the unplugged
+   device, not the other one, shows failed and then not connected; the other device's bits do not change.
 8. Leave pulse mode running for at least 255 spectra. The store shows `seq` 255 followed by 0, and the lost total
    stays 0.
 9. Reset the board while the app runs, best in the middle of a spectrum frame. Frames resume within 10 s: a frame cut
-   by the reset stalls the decoder until the 10 s drain (`board-protocol.md`, Drain). The gap shows as a "spectra lost
+   by the reset stalls the decoder for about one frame period while spectra flow, and up to the 10 s drain otherwise
+   (`board-protocol.md`, Drain). The gap shows as a "spectra lost
    before seq" log line and a higher lost total, because the restart's first frame does not continue `seq` (per #20 a
    restart reads as loss); the trend shows a NoSpectra break when more than 10 s pass between spectra. The app
    recovers without a reconnect.
@@ -543,8 +554,6 @@ Repositories: OptoskyProj (commit `docs(readme): описать протокол
   headers cover `atxmega128a1u`.
 - Before flashing, save the current `Release/*.hex`: the repository no longer carries a `.hex` (PR #2), so the saved
   file is the only way back to the old firmware.
-- Before flashing, and only without a logic analyser for checklist step 4: record the old firmware's ATP-2000
-  spectrum interval in continuous pulse mode.
 - Switch the board and the PC app together: the old WinForms app cannot read the new frames.
 - The owner builds `OptoskyEncoder.atsln` in Atmel Studio (Release, `-Os`), checks the build has no new warnings and
   that flash and SRAM use fit the ATxmega128A1U, flashes the board, and runs the manual board checklist of Acceptance
