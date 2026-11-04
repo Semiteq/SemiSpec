@@ -22,6 +22,8 @@ internal sealed class LinkSession(
 	private const int ReadSize = 4096;
 	private const int EndOfStream = 0;
 
+	private static readonly TimeSpan _reopenInterval = TimeSpan.FromSeconds(1);
+
 	private static readonly PipeOptions _pipeOptions = new(
 		pauseWriterThreshold: 65536,
 		resumeWriterThreshold: 32768,
@@ -30,6 +32,9 @@ internal sealed class LinkSession(
 	private readonly SequenceTracker _sequenceTracker = new();
 	private readonly List<BoardFrame> _decoded = [];
 	private long _lostSpectra;
+
+	// A run lasts from one Receiving to the next; only its first failed open or port loss carries a fault.
+	private bool _runFaultReported;
 
 	private Pipe _pipe = new(_pipeOptions);
 	private FrameReader _frameReader = new();
@@ -41,23 +46,18 @@ internal sealed class LinkSession(
 	private BoardState? _board;
 	private LinkState _state;
 
-	/// <summary>Runs until the port is lost, the token is cancelled or an exception escapes; returns the fault, if any.</summary>
+	/// <summary>Reads the port and reopens it after every loss, until cancelled or an exception escapes.</summary>
 	public async Task<IError?> RunAsync(CancellationToken cancellationToken)
 	{
 		try
 		{
 			publish(StatusOf(LinkState.Connecting));
-			logger.LogDebug("Opening port {Port}", portName);
-			var opened = serialPortProvider.Open(portName);
-			if (opened.IsFailed)
+			while (true)
 			{
-				publish(StatusOf(LinkState.PortUnavailable, opened.Errors[0]));
-				return null;
+				cancellationToken.ThrowIfCancellationRequested();
+				var failure = await OpenAndReadAsync(cancellationToken).ConfigureAwait(false);
+				await WaitForReopenAsync(failure, cancellationToken).ConfigureAwait(false);
 			}
-
-			await ReadPortAsync(opened.Value, cancellationToken).ConfigureAwait(false);
-			publish(StatusOf(LinkState.PortUnavailable, new PortLostError(portName)));
-			return null;
 		}
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
 		{
@@ -68,6 +68,36 @@ internal sealed class LinkSession(
 			logger.LogError(exception, "The link on port {Port} failed", portName);
 			return new ExceptionalError(exception.Message, exception);
 		}
+	}
+
+	/// <summary>Returns the error that ended this attempt: the failed open, or the loss of the open port.</summary>
+	private async Task<IError> OpenAndReadAsync(CancellationToken cancellationToken)
+	{
+		logger.LogDebug("Opening port {Port}", portName);
+		var opened = serialPortProvider.Open(portName);
+		if (opened.IsFailed)
+		{
+			logger.LogDebug("Opening port {Port} failed: {Reason}", portName, opened.Errors[0].Message);
+			return opened.Errors[0];
+		}
+
+		await ReadPortAsync(opened.Value, cancellationToken).ConfigureAwait(false);
+		return new PortLostError(portName);
+	}
+
+	/// <summary>Arms the reopen timer before publishing PortUnavailable, so a status reader may move the clock.</summary>
+	private async Task WaitForReopenAsync(IError failure, CancellationToken cancellationToken)
+	{
+		var reopen = new TaskCompletionSource();
+		using var timer = scheduler.Schedule(_reopenInterval, () => reopen.TrySetResult());
+		using var cancellation = cancellationToken.Register(() => reopen.TrySetCanceled(cancellationToken));
+
+		var fault = _runFaultReported ? null : failure;
+		_runFaultReported = true;
+		_state = LinkState.PortUnavailable;
+		publish(StatusOf(LinkState.PortUnavailable, fault));
+
+		await reopen.Task.ConfigureAwait(false);
 	}
 
 	/// <summary>Returns when the port is lost; tears the pipe down and closes the port on every exit.</summary>
@@ -107,6 +137,7 @@ internal sealed class LinkSession(
 
 	private void StartReading()
 	{
+		_pipe = new Pipe(_pipeOptions);
 		_sequenceTracker.Reset();
 		_frameReader = new FrameReader();
 		_openedAt = scheduler.Now;
@@ -159,6 +190,11 @@ internal sealed class LinkSession(
 		var state = LinkHealth.Evaluate(now, _openedAt, _lastByteAt, _lastFrameAt, _bytesSinceFrame);
 		var fault = state == _state ? null : FaultOnEntry(state);
 		_state = state;
+		if (state == LinkState.Receiving)
+		{
+			_runFaultReported = false;
+		}
+
 		publish(StatusOf(state, fault));
 	}
 

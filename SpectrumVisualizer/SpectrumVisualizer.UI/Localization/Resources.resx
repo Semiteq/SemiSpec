@@ -57,4 +57,55 @@
   <data name="FailureUnknownRemedy" xml:space="preserve">
     <value>Send the log file to the developer. It carries the full entry.</value>
   </data>
+  <data name="PortBusyTitle" xml:space="preserve">
+    <value>Port is busy</value>
+  </data>
+  <data name="PortBusyDetail" xml:space="preserve">
+    <value>Another program holds the port, or Windows denied access to it.</value>
+  </data>
+  <data name="PortBusyRemedy" xml:space="preserve">
+    <value>Close the program that uses the port, or select another port. The application retries every second.</value>
+  </data>
+  <data name="PortNotFoundTitle" xml:space="preserve">
+    <value>Port not found</value>
+  </data>
+  <data name="PortNotFoundDetail" xml:space="preserve">
+    <value>The selected port is not on this computer.</value>
+  </data>
+  <data name="PortNotFoundRemedy" xml:space="preserve">
+    <value>Check the cable and the adapter, then refresh the port list. The application retries every second.</value>
+  </data>
+  <data name="PortLostTitle" xml:space="preserve">
+    <value>Connection lost</value>
+  </data>
+  <data name="PortLostDetail" xml:space="preserve">
+    <value>The port stopped answering or left the port list.</value>
+  </data>
+  <data name="PortLostRemedy" xml:space="preserve">
+    <value>Check the cable and the adapter. The application reopens the port every second.</value>
+  </data>
+  <data name="BoardNotRespondingTitle" xml:space="preserve">
+    <value>Board not responding</value>
+  </data>
+  <data name="BoardNotRespondingDetail" xml:space="preserve">
+    <value>No data came from the board for 10 seconds.</value>
+  </data>
+  <data name="BoardNotRespondingRemedy" xml:space="preserve">
+    <value>Check the board's power and the cable.</value>
+  </data>
+  <data name="UnrecognisedDataTitle" xml:space="preserve">
+    <value>Unrecognised data</value>
+  </data>
+  <data name="UnrecognisedDataDetail" xml:space="preserve">
+    <value>Data arrives on the port, but no valid frame came for 10 seconds.</value>
+  </data>
+  <data name="UnrecognisedDataRemedy" xml:space="preserve">
+    <value>Check that the port belongs to the spectrometer board and runs at 115200 baud.</value>
+  </data>
+  <data name="LinkRestoredTitle" xml:space="preserve">
+    <value>Data restored</value>
+  </data>
+  <data name="LinkRestoredDetail" xml:space="preserve">
+    <value>Data from the board restored: valid frames arrive again.</value>
+  </data>
 </root>

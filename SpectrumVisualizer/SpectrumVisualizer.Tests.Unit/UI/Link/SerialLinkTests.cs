@@ -43,6 +43,12 @@ public sealed class SerialLinkTests : IAsyncLifetime
 		};
 	}
 
+	public static TheoryData<Exception> BusyPortFailures =>
+	[
+		new UnauthorizedAccessException("Access to the port is denied."),
+		new IOException($"Sharing violation: {PortName}", 32)
+	];
+
 	public ValueTask InitializeAsync()
 	{
 		return ValueTask.CompletedTask;
@@ -281,6 +287,150 @@ public sealed class SerialLinkTests : IAsyncLifetime
 		Statuses().Should().HaveCount(3);
 	}
 
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task ALostPortReopensAfterOneSecond()
+	{
+		await using var reopened = new FakePortStream();
+		await ConnectAsync();
+		await LoseAsync(_port, 2);
+
+		_provider.QueueOpen(reopened);
+		_scheduler.AdvanceTo(Ticks(2.9));
+		_provider.OpenCount.Should().Be(1);
+		_scheduler.AdvanceTo(Ticks(3));
+		await reopened.WaitForPendingReadAsync().WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+
+		_provider.OpenCount.Should().Be(2);
+		Statuses().Select(status => status.State).Should().Equal(
+			LinkState.Connecting, LinkState.Waiting, LinkState.PortUnavailable, LinkState.Waiting);
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task ReopeningResetsTheSequenceBaseline()
+	{
+		await using var reopened = new FakePortStream();
+		await ConnectAsync();
+		await AtAsync(0, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 5))));
+		await LoseAsync(_port, 1);
+		await ReopenAsync(reopened, 2);
+
+		await AtAsync(reopened, 3, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 57))));
+
+		TakeFrames().Should().Equal(Spectrum(Spectrometer.Atp8000, 5), Spectrum(Spectrometer.Atp8000, 57));
+		_link.Status.State.Should().Be(LinkState.Receiving);
+		_link.Status.LostSpectra.Should().Be(0);
+	}
+
+	[Theory(Timeout = TestTimeoutMs)]
+	[MemberData(nameof(BusyPortFailures))]
+	public async Task APortHeldByAnotherProgramReportsPortBusyAndRetries(Exception openFailure)
+	{
+		_provider.QueueOpenFailure(RjcpSerialPortProvider.MapOpenFailure(PortName, openFailure));
+		_link.Connect(PortName);
+		await WaitForStateAsync(LinkState.PortUnavailable);
+
+		await FailReopenAsync(1, RjcpSerialPortProvider.MapOpenFailure(PortName, openFailure));
+		await ReopenAsync(_port, 2);
+
+		Statuses().Select(status => status.State).Should().Equal(
+			LinkState.Connecting, LinkState.PortUnavailable, LinkState.Waiting);
+		Faults().Should().ContainSingle().Which.Should().BeOfType<PortBusyError>()
+			.Which.Metadata[LinkError.PortKey].Should().Be(PortName);
+		_provider.OpenCount.Should().Be(3);
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task AMissingPortReportsPortNotFoundAndRetries()
+	{
+		var missing = new IOException($"Port not found: {PortName}");
+		_provider.QueueOpenFailure(RjcpSerialPortProvider.MapOpenFailure(PortName, missing));
+		_link.Connect(PortName);
+		await WaitForStateAsync(LinkState.PortUnavailable);
+
+		_link.Status.Fault.Should().BeOfType<PortNotFoundError>()
+			.Which.Metadata[LinkError.PortKey].Should().Be(PortName);
+		await ReopenAsync(_port, 1);
+
+		_link.Status.State.Should().Be(LinkState.Waiting);
+		_provider.OpenCount.Should().Be(2);
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task DisconnectCancelsAPendingReadAndStopsRetrying()
+	{
+		await ConnectAsync();
+
+		await _link.DisconnectAsync().WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		_scheduler.AdvanceBy(Ticks(5));
+
+		_port.IsDisposed.Should().BeTrue();
+		_provider.OpenCount.Should().Be(1);
+		Statuses().Select(status => status.State).Should().Equal(
+			LinkState.Connecting, LinkState.Waiting, LinkState.Disconnected);
+		_link.Status.Should().Be(new LinkStatus(LinkState.Disconnected, null, null, 0, null));
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task DisconnectDuringTheReopenWaitOpensNothingMore()
+	{
+		await ConnectAsync();
+		await LoseAsync(_port, 1);
+
+		await _link.DisconnectAsync().WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		_scheduler.AdvanceTo(Ticks(2));
+
+		_provider.OpenCount.Should().Be(1);
+		_link.Status.Should().Be(new LinkStatus(LinkState.Disconnected, null, null, 0, null));
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task LostSpectraAccumulateAcrossReopensAndResetOnConnect()
+	{
+		await using var reopened = new FakePortStream();
+		await using var reconnected = new FakePortStream();
+		await ConnectAsync();
+		await AtAsync(0, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 1))));
+		await AtAsync(1, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 3))));
+		await LoseAsync(_port, 2);
+		await ReopenAsync(reopened, 3);
+		await AtAsync(reopened, 4, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 10))));
+		await AtAsync(reopened, 5, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 12))));
+		_link.Status.LostSpectra.Should().Be(2);
+
+		await _link.DisconnectAsync().WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		await ConnectAsync(reconnected);
+		await AtAsync(reconnected, 6, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 30))));
+
+		_link.Status.State.Should().Be(LinkState.Receiving);
+		Statuses().Should().OnlyContain(status => status.LostSpectra == 0);
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task EachFaultIsPublishedOnceAndRetriesStayQuiet()
+	{
+		await using var reopened = new FakePortStream();
+		await using var reopenedAgain = new FakePortStream();
+		await ConnectAsync();
+		await AtAsync(0, port => port.PushBytes(FrameEncoder.Encode(Heartbeat(1))));
+		await LoseAsync(_port, 1);
+		for (var second = 2; second <= 6; second++)
+		{
+			await FailReopenAsync(second, new PortNotFoundError(PortName));
+		}
+
+		Faults().Should().ContainSingle().Which.Should().BeOfType<PortLostError>();
+		await ReopenAsync(reopened, 7);
+		await LoseAsync(reopened, 8);
+		Faults().Should().ContainSingle("a reopen without a frame stays in the same run");
+
+		await ReopenAsync(reopenedAgain, 9);
+		await AtAsync(reopenedAgain, 9.5, port => port.PushBytes(FrameEncoder.Encode(Heartbeat(2))));
+		await LoseAsync(reopenedAgain, 10);
+
+		Faults().Should().HaveCount(2).And.AllBeOfType<PortLostError>();
+		_provider.OpenCount.Should().Be(8);
+	}
+
 	private static byte[] CorruptedSpectrum(byte seq)
 	{
 		var bytes = FrameEncoder.Encode(Spectrum(Spectrometer.Atp2000, seq));
@@ -288,20 +438,51 @@ public sealed class SerialLinkTests : IAsyncLifetime
 		return bytes;
 	}
 
-	private async Task ConnectAsync()
+	private static long Ticks(double seconds)
 	{
-		_provider.QueueOpen(_port);
+		return TimeSpan.FromSeconds(seconds).Ticks;
+	}
+
+	private static async Task WaitUntilAsync(Func<bool> condition)
+	{
+		using var limit = new CancellationTokenSource(_waitLimit);
+		while (!condition())
+		{
+			await Task.Delay(10, limit.Token);
+		}
+	}
+
+	private async Task ConnectAsync(FakePortStream? port = null)
+	{
+		port ??= _port;
+		ClearStatuses();
+		_provider.QueueOpen(port);
 		_link.Connect(PortName);
-		await ReadPendingAsync();
+		await port.WaitForPendingReadAsync().WaitAsync(_waitLimit);
 		Statuses().Select(status => status.State).Should().Equal(LinkState.Connecting, LinkState.Waiting);
 	}
 
-	/// <summary>Moves virtual time first, so the link stamps the step with the given second.</summary>
-	private async Task AtAsync(double seconds, Action<FakePortStream> push)
+	private Task AtAsync(double seconds, Action<FakePortStream> push)
 	{
-		_scheduler.AdvanceTo(TimeSpan.FromSeconds(seconds).Ticks);
-		push(_port);
-		await ReadPendingAsync();
+		return AtAsync(_port, seconds, push);
+	}
+
+	/// <summary>Moves virtual time first, so the link stamps the step with the given second.</summary>
+	private async Task AtAsync(FakePortStream port, double seconds, Action<FakePortStream> push)
+	{
+		_scheduler.AdvanceTo(Ticks(seconds));
+		push(port);
+		await port.WaitForPendingReadAsync().WaitAsync(_waitLimit);
+	}
+
+	/// <summary>The link arms its reopen timer before it publishes PortUnavailable, so the clock may move next.</summary>
+	private async Task LoseAsync(FakePortStream port, double seconds)
+	{
+		var losses = CountOf(LinkState.PortUnavailable);
+		_scheduler.AdvanceTo(Ticks(seconds));
+		port.PushZeroRead();
+		await WaitUntilAsync(() => CountOf(LinkState.PortUnavailable) > losses);
+		port.IsDisposed.Should().BeTrue();
 	}
 
 	private Task ReadPendingAsync()
@@ -309,25 +490,35 @@ public sealed class SerialLinkTests : IAsyncLifetime
 		return _port.WaitForPendingReadAsync().WaitAsync(_waitLimit);
 	}
 
-	private async Task WaitForStateAsync(LinkState state)
+	private async Task ReopenAsync(FakePortStream port, double seconds)
 	{
-		using var limit = new CancellationTokenSource(_waitLimit);
-		while (!Statuses().Any(status => status.State == state))
-		{
-			await Task.Delay(10, limit.Token);
-		}
+		_provider.QueueOpen(port);
+		_scheduler.AdvanceTo(Ticks(seconds));
+		await port.WaitForPendingReadAsync().WaitAsync(_waitLimit);
+	}
+
+	private async Task FailReopenAsync(double seconds, IError failure)
+	{
+		var opens = _provider.OpenCount;
+		_provider.QueueOpenFailure(failure);
+		_scheduler.AdvanceTo(Ticks(seconds));
+		await WaitUntilAsync(() => _provider.OpenCount > opens);
+	}
+
+	private Task WaitForStateAsync(LinkState state)
+	{
+		return WaitUntilAsync(() => CountOf(state) > 0);
 	}
 
 	private async Task ShouldReportPortLostAsync()
 	{
-		await WaitForStateAsync(LinkState.Disconnected);
+		await WaitForStateAsync(LinkState.PortUnavailable);
 
-		var statuses = Statuses();
-		statuses[^2].State.Should().Be(LinkState.PortUnavailable);
-		statuses[^2].Fault.Should().BeOfType<PortLostError>()
+		_link.Status.State.Should().Be(LinkState.PortUnavailable);
+		_link.Status.Fault.Should().BeOfType<PortLostError>()
 			.Which.Metadata[LinkError.PortKey].Should().Be(PortName);
-		statuses[^1].Should().Be(new LinkStatus(LinkState.Disconnected, null, null, 0, null));
 		_port.IsDisposed.Should().BeTrue();
+		_provider.OpenCount.Should().Be(1);
 	}
 
 	private List<LinkStatus> Statuses()
@@ -335,6 +526,24 @@ public sealed class SerialLinkTests : IAsyncLifetime
 		lock (_gate)
 		{
 			return [.. _statuses];
+		}
+	}
+
+	private int CountOf(LinkState state)
+	{
+		return Statuses().Count(status => status.State == state);
+	}
+
+	private List<IError> Faults()
+	{
+		return [.. Statuses().Select(status => status.Fault).OfType<IError>()];
+	}
+
+	private void ClearStatuses()
+	{
+		lock (_gate)
+		{
+			_statuses.Clear();
 		}
 	}
 

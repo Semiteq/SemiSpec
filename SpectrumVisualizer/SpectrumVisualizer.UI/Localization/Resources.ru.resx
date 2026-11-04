@@ -57,4 +57,55 @@
   <data name="FailureUnknownRemedy" xml:space="preserve">
     <value>Передайте файл журнала разработчику: в нём записаны подробности.</value>
   </data>
+  <data name="PortBusyTitle" xml:space="preserve">
+    <value>Порт занят</value>
+  </data>
+  <data name="PortBusyDetail" xml:space="preserve">
+    <value>Порт открыт другой программой, или Windows запретила доступ к нему.</value>
+  </data>
+  <data name="PortBusyRemedy" xml:space="preserve">
+    <value>Закройте программу, которая использует порт, или выберите другой порт. Программа повторяет попытку каждую секунду.</value>
+  </data>
+  <data name="PortNotFoundTitle" xml:space="preserve">
+    <value>Порт не найден</value>
+  </data>
+  <data name="PortNotFoundDetail" xml:space="preserve">
+    <value>Выбранного порта нет на этом компьютере.</value>
+  </data>
+  <data name="PortNotFoundRemedy" xml:space="preserve">
+    <value>Проверьте кабель и адаптер, затем обновите список портов. Программа повторяет попытку каждую секунду.</value>
+  </data>
+  <data name="PortLostTitle" xml:space="preserve">
+    <value>Связь потеряна</value>
+  </data>
+  <data name="PortLostDetail" xml:space="preserve">
+    <value>Порт перестал отвечать или пропал из списка портов.</value>
+  </data>
+  <data name="PortLostRemedy" xml:space="preserve">
+    <value>Проверьте кабель и адаптер. Программа открывает порт заново каждую секунду.</value>
+  </data>
+  <data name="BoardNotRespondingTitle" xml:space="preserve">
+    <value>Плата не отвечает</value>
+  </data>
+  <data name="BoardNotRespondingDetail" xml:space="preserve">
+    <value>От платы 10 секунд нет данных.</value>
+  </data>
+  <data name="BoardNotRespondingRemedy" xml:space="preserve">
+    <value>Проверьте питание платы и кабель.</value>
+  </data>
+  <data name="UnrecognisedDataTitle" xml:space="preserve">
+    <value>Нераспознанные данные</value>
+  </data>
+  <data name="UnrecognisedDataDetail" xml:space="preserve">
+    <value>Данные приходят в порт, но за 10 секунд не пришло ни одного верного кадра.</value>
+  </data>
+  <data name="UnrecognisedDataRemedy" xml:space="preserve">
+    <value>Проверьте, что порт принадлежит плате спектрометра и работает на скорости 115200 бод.</value>
+  </data>
+  <data name="LinkRestoredTitle" xml:space="preserve">
+    <value>Данные восстановлены</value>
+  </data>
+  <data name="LinkRestoredDetail" xml:space="preserve">
+    <value>Данные от платы восстановлены: верные кадры снова приходят.</value>
+  </data>
 </root>

@@ -517,21 +517,22 @@ the same run do not.
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Link/SerialLinkTests.cs`,
   `UI/Messages/ErrorMessageMapperTests.cs`
 
-- [ ] implement the open-with-retry and port-loss paths of the session flow: the cancellable 1 s wait on the link's
+- [x] implement the open-with-retry and port-loss paths of the session flow: the cancellable 1 s wait on the link's
   scheduler, `SequenceTracker.Reset()` and a fresh pipe on each open, a fault only on the first failure of a run,
   Debug log lines with the port name for every attempt
-- [ ] implement `DisconnectAsync` (cancel and await) and `Dispose` (cancel) as in Solution Overview
-- [ ] add one `ErrorMessageMapper` arm per link error with the severities of Solution Overview, and the resx keys for
+- [x] implement `DisconnectAsync` (cancel and await) and `Dispose` (cancel) as in Solution Overview
+  (implemented in Task 6; this task adds their tests)
+- [x] add one `ErrorMessageMapper` arm per link error with the severities of Solution Overview, and the resx keys for
   their titles, details, remedies and the restored entry, in English and Russian
-- [ ] write tests: `ALostPortReopensAfterOneSecond`, `ReopeningResetsTheSequenceBaseline`,
+- [x] write tests: `ALostPortReopensAfterOneSecond`, `ReopeningResetsTheSequenceBaseline`,
   `APortHeldByAnotherProgramReportsPortBusyAndRetries`, `AMissingPortReportsPortNotFoundAndRetries`,
   `DisconnectCancelsAPendingReadAndStopsRetrying`, `DisconnectDuringTheReopenWaitOpensNothingMore`,
   `LostSpectraAccumulateAcrossReopensAndResetOnConnect`, `EachFaultIsPublishedOnceAndRetriesStayQuiet`
-- [ ] write mapper tests: each link error gives its title, remedy and severity; no mapped detail contains the port
+- [x] write mapper tests: each link error gives its title, remedy and severity; no mapped detail contains the port
   name; two `PortLostError`s on different ports map to equal views
-- [ ] ➕ in `ResultReportingTests`, a reported `PortLostError` logs at Warning and its coalesced repeat at Debug (moved
+- [x] ➕ in `ResultReportingTests`, a reported `PortLostError` logs at Warning and its coalesced repeat at Debug (moved
   from Task 1)
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 8: Link composition and the window's start and stop
 **Files:**

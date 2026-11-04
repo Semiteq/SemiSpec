@@ -2,6 +2,7 @@ using AwesomeAssertions;
 
 using FluentResults;
 
+using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Messages;
 
@@ -14,6 +15,35 @@ namespace SpectrumVisualizer.Tests.Unit.UI.Messages;
 [Trait("Category", "Unit")]
 public sealed class ErrorMessageMapperTests
 {
+	private const string DistinctPort = "COM987";
+
+	public static TheoryData<LinkError, string, string, string, MessageSeverity> LinkErrors => new()
+	{
+		{
+			new PortBusyError(DistinctPort),
+			Resources.PortBusyTitle, Resources.PortBusyDetail, Resources.PortBusyRemedy, MessageSeverity.Error
+		},
+		{
+			new PortNotFoundError(DistinctPort),
+			Resources.PortNotFoundTitle, Resources.PortNotFoundDetail, Resources.PortNotFoundRemedy,
+			MessageSeverity.Error
+		},
+		{
+			new PortLostError(DistinctPort),
+			Resources.PortLostTitle, Resources.PortLostDetail, Resources.PortLostRemedy, MessageSeverity.Warning
+		},
+		{
+			new BoardNotRespondingError(DistinctPort),
+			Resources.BoardNotRespondingTitle, Resources.BoardNotRespondingDetail, Resources.BoardNotRespondingRemedy,
+			MessageSeverity.Warning
+		},
+		{
+			new UnrecognisedDataError(DistinctPort),
+			Resources.UnrecognisedDataTitle, Resources.UnrecognisedDataDetail, Resources.UnrecognisedDataRemedy,
+			MessageSeverity.Warning
+		}
+	};
+
 	[Fact]
 	public void MapKeepsTheExceptionTypeAndMessageInTheDetailOfAThrownError()
 	{
@@ -50,5 +80,31 @@ public sealed class ErrorMessageMapperTests
 		var secondView = ErrorMessageMapper.Map(new ExceptionalError(second.Message, second));
 
 		firstView.Should().NotBe(secondView);
+	}
+
+	[Theory]
+	[MemberData(nameof(LinkErrors))]
+	public void MapGivesEachLinkErrorItsOwnTextAndSeverityWithoutThePortName(
+		LinkError error,
+		string title,
+		string detail,
+		string remedy,
+		MessageSeverity severity)
+	{
+		var view = ErrorMessageMapper.Map(error);
+
+		view.Should().Be(new MessageView(title, detail, remedy, severity));
+		view.Title.Should().NotContain(DistinctPort);
+		view.Detail.Should().NotContain(DistinctPort);
+		view.Remedy.Should().NotContain(DistinctPort);
+	}
+
+	[Fact]
+	public void MapGivesTwoPortLostErrorsOnDifferentPortsEqualViews()
+	{
+		var first = ErrorMessageMapper.Map(new PortLostError("COM3"));
+		var second = ErrorMessageMapper.Map(new PortLostError("COM12"));
+
+		first.Should().Be(second);
 	}
 }
