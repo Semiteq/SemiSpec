@@ -36,6 +36,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
 	private readonly SerialLink _serialLink;
 	private readonly ConnectionBarViewModel _connectionBar;
+	private readonly AppStatusBarViewModel _statusBar;
 	private readonly MainWindowViewModel _viewModel;
 
 	public MainWindowViewModelTests()
@@ -48,10 +49,15 @@ public sealed class MainWindowViewModelTests : IDisposable
 			.WriteTo.Sink(_sink)
 			.CreateLogger();
 		_loggerFactory = new SerilogLoggerFactory(_serilogLogger);
+		_statusBar = new AppStatusBarViewModel(
+			_serialLink,
+			_messagePanel,
+			ImmediateScheduler.Instance,
+			NullLogger<AppStatusBarViewModel>.Instance);
 		_viewModel = new MainWindowViewModel(
 			_messagePanel,
 			_connectionBar,
-			new AppStatusBarViewModel(),
+			_statusBar,
 			_logLevelControl,
 			_loggerFactory.CreateLogger<MainWindowViewModel>());
 	}
@@ -140,6 +146,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 	{
 		_viewModel.Dispose();
 		_connectionBar.Dispose();
+		_statusBar.Dispose();
 		_serialLink.Dispose();
 		_messagePanel.Dispose();
 		_loggerFactory.Dispose();

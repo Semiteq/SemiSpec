@@ -74,6 +74,17 @@ public sealed class CompositionRootTests : IDisposable
 	}
 
 	[AvaloniaFact]
+	public void TheMainWindowShowsTheContainersStatusBarSeededFromTheLink()
+	{
+		using var provider = BuildContainer();
+
+		var statusBar = provider.GetRequiredService<MainWindowViewModel>().StatusBar;
+
+		statusBar.Should().BeSameAs(provider.GetRequiredService<AppStatusBarViewModel>());
+		statusBar.Status.Should().BeSameAs(provider.GetRequiredService<SerialLink>().Status);
+	}
+
+	[AvaloniaFact]
 	public async Task TheMainWindowViewModelSharesTheContainersPanelAndLogLevelControl()
 	{
 		using var provider = BuildContainer();

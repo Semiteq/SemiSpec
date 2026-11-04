@@ -588,20 +588,20 @@ the same run do not.
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/MainWindow/MainWindowViewTests.cs`,
   `UI/Di/CompositionRootTests.cs`
 
-- [ ] rewrite `AppStatusBarViewModel` (`AppStatusBarViewModel.cs:5-9`) as an `IDisposable` `ReactiveObject` taking
+- [x] rewrite `AppStatusBarViewModel` (`AppStatusBarViewModel.cs:5-9`) as an `IDisposable` `ReactiveObject` taking
   `SerialLink`, `MessagePanelViewModel`, `IScheduler uiScheduler` and a logger; the pipeline of Solution Overview,
   seeded with `link.Status`, feeds one `Apply(LinkStatus)` that sets `LinkText`, `LinkTone`, `PortText`,
   `Atp2000Text`, `Atp8000Text`, `LostSpectraText`; computed texts notify from the setter of their input
-- [ ] report faults and the restored entry as in Solution Overview; a throw in `Apply` goes to `TryReportFailure`
-- [ ] lay out `AppStatusBar.axaml` (`:12-14`) as a left-aligned `Grid` of `Auto` columns: an 8 px dot with
+- [x] report faults and the restored entry as in Solution Overview; a throw in `Apply` goes to `TryReportFailure`
+- [x] lay out `AppStatusBar.axaml` (`:12-14`) as a left-aligned `Grid` of `Auto` columns: an 8 px dot with
   `Margin="0,0,8,0"` and the link text, then each segment after a 1 px `AppSubtleLineBrush` separator with
   `Margin="8,4"`; dot colour through three classes bound to `LinkTone`
-- [ ] write view model tests over a `TestScheduler`: the text for every state of Technical Details; the four
+- [x] write view model tests over a `TestScheduler`: the text for every state of Technical Details; the four
   spectrometer texts from the state bits; "-" for port and lost count while disconnected; one fault entry per faulted
   status; one Info entry on Receiving after a fault and none after the first connect; a throwing panel goes to the log
-- [ ] update `MainWindowViewTests` to build the bar from a link over the fake provider and assert every segment is
-  realised; extend `CompositionRootTests`
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] update `MainWindowViewTests` to build the bar from a link over the fake provider and assert every segment is
+  realised; extend `CompositionRootTests` (`AddUi` already builds the bar through its constructor; no change was needed)
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 11: Desktop UI pre-handover checklist
 **Files:**

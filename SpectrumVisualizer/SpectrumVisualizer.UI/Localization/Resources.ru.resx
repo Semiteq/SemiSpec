@@ -123,4 +123,43 @@
   <data name="ConnectionDisconnect" xml:space="preserve">
     <value>Отключить</value>
   </data>
+  <data name="StatusConnecting" xml:space="preserve">
+    <value>Подключение</value>
+  </data>
+  <data name="StatusPortUnavailable" xml:space="preserve">
+    <value>Порт недоступен, повтор</value>
+  </data>
+  <data name="StatusWaiting" xml:space="preserve">
+    <value>Ожидание данных</value>
+  </data>
+  <data name="StatusReceiving" xml:space="preserve">
+    <value>Приём данных</value>
+  </data>
+  <data name="StatusNotResponding" xml:space="preserve">
+    <value>Плата не отвечает</value>
+  </data>
+  <data name="StatusOtherDevice" xml:space="preserve">
+    <value>Другое устройство</value>
+  </data>
+  <data name="StatusSpectrometerFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="StatusSpectrometerConnected" xml:space="preserve">
+    <value>подключён</value>
+  </data>
+  <data name="StatusSpectrometerNotConnected" xml:space="preserve">
+    <value>не подключён</value>
+  </data>
+  <data name="StatusSpectrometerFailed" xml:space="preserve">
+    <value>ошибка измерения</value>
+  </data>
+  <data name="StatusSpectrometerNoData" xml:space="preserve">
+    <value>нет данных</value>
+  </data>
+  <data name="StatusLostSpectraFormat" xml:space="preserve">
+    <value>Потеряно спектров: {0}</value>
+  </data>
+  <data name="StatusNoValue" xml:space="preserve">
+    <value>-</value>
+  </data>
 </root>

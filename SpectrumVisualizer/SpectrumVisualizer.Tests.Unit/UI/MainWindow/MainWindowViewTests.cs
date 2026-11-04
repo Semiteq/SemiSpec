@@ -37,6 +37,7 @@ public sealed class MainWindowViewTests : IDisposable
 	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
 	private readonly SerialLink _serialLink;
 	private readonly ConnectionBarViewModel _connectionBar;
+	private readonly AppStatusBarViewModel _statusBar;
 	private readonly MainWindowViewModel _viewModel;
 	private readonly MainWindowView _window;
 
@@ -45,10 +46,15 @@ public sealed class MainWindowViewTests : IDisposable
 		var portProvider = new FakeSerialPortProvider();
 		_serialLink = new SerialLink(portProvider, ImmediateScheduler.Instance, NullLogger<SerialLink>.Instance);
 		_connectionBar = new ConnectionBarViewModel(portProvider, _serialLink, AvaloniaScheduler.Instance);
+		_statusBar = new AppStatusBarViewModel(
+			_serialLink,
+			_messagePanel,
+			AvaloniaScheduler.Instance,
+			NullLogger<AppStatusBarViewModel>.Instance);
 		_viewModel = new MainWindowViewModel(
 			_messagePanel,
 			_connectionBar,
-			new AppStatusBarViewModel(),
+			_statusBar,
 			new LogLevelControl(),
 			NullLogger<MainWindowViewModel>.Instance);
 		_window = new MainWindowView { DataContext = _viewModel };
@@ -72,8 +78,28 @@ public sealed class MainWindowViewTests : IDisposable
 
 		var statusBar = Named<Border>(_window, "StatusBar");
 		statusBar.IsEffectivelyVisible.Should().BeTrue();
-		var statusBarContent = statusBar.Child.Should().BeOfType<AppStatusBar>().Which;
-		Named<TextBlock>(statusBarContent, "ConnectionText").Text.Should().Be(Resources.StatusNotConnected);
+		statusBar.Child.Should().BeOfType<AppStatusBar>();
+	}
+
+	[AvaloniaFact]
+	public void TheStatusBarRealisesTheDotAndEverySegmentOfADisconnectedLink()
+	{
+		Realise();
+
+		var bar = Named<Border>(_window, "StatusBar").Child.Should().BeOfType<AppStatusBar>().Which;
+		var dot = Named<Ellipse>(bar, "LinkDot");
+		dot.IsEffectivelyVisible.Should().BeTrue();
+		dot.Classes.Where(name => name.StartsWith("tone-", StringComparison.Ordinal)).Should().Equal("tone-neutral");
+
+		string[] segments = ["LinkText", "PortText", "Atp2000Text", "Atp8000Text", "LostSpectraText"];
+		segments.Select(name => Named<TextBlock>(bar, name))
+			.Should().OnlyContain(segment => segment.IsEffectivelyVisible && segment.Bounds.Width > 0);
+		segments.Select(name => Named<TextBlock>(bar, name).Text).Should().Equal(
+			Resources.StatusNotConnected,
+			Resources.StatusNoValue,
+			Resources.FormatStatusSpectrometerFormat("ATP-2000", Resources.StatusSpectrometerNoData),
+			Resources.FormatStatusSpectrometerFormat("ATP-8000", Resources.StatusSpectrometerNoData),
+			Resources.FormatStatusLostSpectraFormat(Resources.StatusNoValue));
 	}
 
 	[AvaloniaFact]
@@ -221,6 +247,7 @@ public sealed class MainWindowViewTests : IDisposable
 		_window.Close();
 		_viewModel.Dispose();
 		_connectionBar.Dispose();
+		_statusBar.Dispose();
 		_serialLink.Dispose();
 		_messagePanel.Dispose();
 	}
