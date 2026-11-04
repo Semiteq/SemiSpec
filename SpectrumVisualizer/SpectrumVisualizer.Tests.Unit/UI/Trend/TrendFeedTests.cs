@@ -1,0 +1,166 @@
+using Avalonia.Headless.XUnit;
+
+using AwesomeAssertions;
+
+using FluentResults;
+
+using SpectrumVisualizer.Core.Store;
+using SpectrumVisualizer.Tests.Unit.Core.Store;
+using SpectrumVisualizer.UI.Localization;
+
+using Xunit;
+
+using static SpectrumVisualizer.Tests.Unit.Core.Store.StoreSamples;
+
+namespace SpectrumVisualizer.Tests.Unit.UI.Trend;
+
+[Trait("Component", "UI")]
+[Trait("Area", "Trend")]
+[Trait("Category", "Unit")]
+public sealed class TrendFeedTests : TrendFeedTestBase
+{
+	[AvaloniaFact]
+	public async Task TheFeedFillsTheCacheFromTheDistributor()
+	{
+		Feed.Start();
+		Distributor.Start();
+
+		WriteToChannel(StoreSamples.Spectrum(At(0), seq: 1));
+		WriteToChannel(Heartbeat(At(1), seq: 1));
+		WriteToChannel(StoreSamples.Spectrum(At(2), seq: 2));
+
+		await Waits.UntilAsync(() => Cache.NewestAt == At(2));
+		Cache.FirstPointAt.Should().Be(At(0));
+		Cache.Key.Should().NotBeNull();
+	}
+
+	[AvaloniaFact]
+	public async Task AKeyChangeReadsTheVisibleRangeFirst()
+	{
+		Feed.Start();
+		ChangeKeyAfterTwentyMinutes(OtherNm);
+		var (from, to) = (Chart.From, Chart.To);
+		var plan = PlanFor(from, to);
+
+		PassThrottle();
+
+		await Waits.UntilAsync(() => PointsCalls.Count == plan.Count);
+		var first = PointsCalls.First();
+		first.WavelengthNm.Should().Be(OtherNm);
+		first.Delta.Should().Be(SampleDelta);
+		first.From.Should().Be(from);
+		first.To.Should().Be(Requests[^1].RecentStart);
+		RangesOf(PointsCalls).Should().Equal(plan);
+	}
+
+	[AvaloniaFact]
+	public async Task TheReadTakesTheVisibleWindowSnapshotFromTheTrigger()
+	{
+		Feed.Start();
+		ChangeKeyAfterTwentyMinutes(OtherNm);
+		var (from, to) = (Chart.From, Chart.To);
+		var plan = PlanFor(from, to);
+		HoldPoints();
+		PassThrottle();
+		await Waits.UntilAsync(() => PointsCalls.Count == 1);
+
+		Chart.PanBy(TimeSpan.FromMinutes(-5));
+		ReleasePoints();
+
+		Chart.From.Should().NotBe(from, "the navigation moved after the trigger");
+		await Waits.UntilAsync(() => PointsCalls.Count == plan.Count);
+		RangesOf(PointsCalls).Should().Equal(plan);
+	}
+
+	[AvaloniaFact]
+	public async Task ASecondKeyChangeCancelsTheReadInFlight()
+	{
+		Feed.Start();
+		ChangeKeyAfterTwentyMinutes(OtherNm);
+		HoldPoints();
+		PassThrottle();
+		await Waits.UntilAsync(() => PointsCalls.Count == 1);
+		var held = PointsCalls.Single();
+
+		AddAt(1201, ThirdNm);
+		PassThrottle();
+
+		held.Token.IsCancellationRequested.Should().BeTrue();
+		await Waits.UntilAsync(() => PointsCalls.Any(call => call.WavelengthNm == ThirdNm));
+	}
+
+	[AvaloniaFact]
+	public async Task KeyChangesInsideTheThrottleReadOnce()
+	{
+		Feed.Start();
+		ChangeKeyAfterTwentyMinutes(OtherNm);
+		Throttle.AdvanceBy(TimeSpan.FromMilliseconds(200).Ticks);
+		AddAt(1200.2, ThirdNm);
+		var plan = PlanFor(Chart.From, Chart.To);
+
+		PassThrottle();
+
+		await Waits.UntilAsync(() => PointsCalls.Count == plan.Count);
+		await Feed.StopAsync().WaitAsync(Waits.Limit);
+		PointsCalls.Should().OnlyContain(call => call.WavelengthNm == ThirdNm);
+		RangesOf(PointsCalls).Should().Equal(plan);
+	}
+
+	[AvaloniaFact]
+	public async Task AReturnToThePreviousKeyCancelsThePendingReadAndStartsNone()
+	{
+		Feed.Start();
+		ChangeKeyAfterTwentyMinutes(OtherNm);
+		HoldPoints();
+		PassThrottle();
+		await Waits.UntilAsync(() => PointsCalls.Count == 1);
+		var held = PointsCalls.Single();
+
+		AddAt(1201, SampleNm);
+		PassThrottle();
+
+		Requests[^1].ReadsHistory.Should().BeFalse();
+		held.Token.IsCancellationRequested.Should().BeTrue();
+		ReleasePoints();
+		await Feed.StopAsync().WaitAsync(Waits.Limit);
+		PointsCalls.Should().ContainSingle();
+	}
+
+	[AvaloniaFact]
+	public async Task AFailedReadReportsOnceAndKeepsTheLivePart()
+	{
+		PointsResult = _ => Result.Fail(new Error("the store file is locked"));
+		Feed.Start();
+		ChangeKeyAfterTwentyMinutes(OtherNm);
+
+		PassThrottle();
+
+		await Waits.UntilAsync(() => MessagePanel.Entries.Count == 1);
+		await Feed.StopAsync().WaitAsync(Waits.Limit);
+		PointsCalls.Should().ContainSingle("the read ends at its first failed range");
+		MessagePanel.Entries.Should().ContainSingle().Which.View.Title.Should().Be(Resources.TrendHistoryTitle);
+		var query = IntensityQuery.Create(OtherNm, SampleDelta, At(0), At(1201), TimeSpan.FromSeconds(1)).Value;
+		Cache.Fold(query).Columns.Sum(column => column.Count).Should().Be(121, "the recent spectra stay at the new key");
+	}
+
+	[AvaloniaFact]
+	public async Task StopCancelsTheReadsAndAwaitsThem()
+	{
+		Feed.Start();
+		ChangeKeyAfterTwentyMinutes(OtherNm);
+		HoldPoints();
+		HoldSpectrum();
+		PassThrottle();
+		Feed.ReadMoment(At(10));
+		await Waits.UntilAsync(() => PointsCalls.Count == 1 && SpectrumCalls.Count == 1);
+
+		var stop = Feed.StopAsync();
+
+		PointsCalls.Single().Token.IsCancellationRequested.Should().BeTrue();
+		SpectrumCalls.Single().Token.IsCancellationRequested.Should().BeTrue();
+		stop.IsCompleted.Should().BeFalse("both reads are still held");
+		ReleasePoints();
+		ReleaseSpectrum();
+		await stop.WaitAsync(Waits.Limit);
+	}
+}

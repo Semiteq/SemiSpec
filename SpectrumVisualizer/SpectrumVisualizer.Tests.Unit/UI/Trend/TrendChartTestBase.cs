@@ -49,11 +49,16 @@ public abstract class TrendChartTestBase : IDisposable
 
 	public void Dispose()
 	{
+		Dispose(disposing: true);
+		GC.SuppressFinalize(this);
+	}
+
+	protected virtual void Dispose(bool disposing)
+	{
 		Chart.Dispose();
 		Switching.Dispose();
 		Cache.Dispose();
 		_live.Dispose();
-		GC.SuppressFinalize(this);
 	}
 
 	protected static DateTimeOffset At(double seconds)
@@ -95,7 +100,7 @@ public abstract class TrendChartTestBase : IDisposable
 		Scheduler.AdvanceBy(TimeSpan.FromMilliseconds(100).Ticks);
 	}
 
-	private byte NextSeq()
+	protected byte NextSeq()
 	{
 		return ++_seq;
 	}

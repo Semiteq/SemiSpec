@@ -748,19 +748,21 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Trend/TrendFeedTests.cs`, `TrendViewModelTests.cs`
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Messages/ErrorMessageMapperTests.cs`
 
-- [ ] write `TrendFeed` with `Start`, `StopAsync`, `Dispose`, the re-read pipeline and the moment pipeline; its readers
+- [x] write `TrendFeed` with `Start`, `StopAsync`, `Dispose`, the re-read pipeline and the moment pipeline; its readers
   are two delegates, `Func<ushort, byte, DateTimeOffset, DateTimeOffset, CancellationToken, Task<Result<IntensityChunk>>>`
   and `Func<DateTimeOffset, CancellationToken, Task<Result<StoredSpectrum?>>>`, bound to `SpectrumHistory` in the
   container, so tests pass gated fakes without an interface
-- [ ] at each trigger, take the `TrendWindow(From, To)` snapshot on the UI scheduler and pass only that value to the
+- [x] at each trigger, take the `TrendWindow(From, To)` snapshot on the UI scheduler and pass only that value to the
   read on the thread pool; a no-read request maps to `Observable.Empty`
-- [ ] write `TrendViewModel`: owns `TrendChartViewModel` and the overview view model, the presets and the selected
+- [x] write `TrendViewModel`: owns `TrendChartViewModel` and the overview view model, the presets and the selected
   preset, `FollowLiveCommand` (`canExecute` = not following), `ShowMoment`, which hands the moment to the feed's
-  moment pipeline
-- [ ] add `TrendHistoryError` and `TrendMomentError` (Warning) to the mapper
-- [ ] write `TrendFeedTests`, `TrendViewModelTests` (a click inside the recent spectra needs no store read; a second
+  moment pipeline. The overview view model joins in Task 11, where it is written; `TrendViewModel` takes the chart
+  and the feed from the container, so Task 12 registers `TrendChartViewModel` as a singleton too, and `TrendFeed`
+  takes a second scheduler for the throttle, passed in a factory lambda like `SerialLink`'s
+- [x] add `TrendHistoryError` and `TrendMomentError` (Warning) to the mapper
+- [x] write `TrendFeedTests`, `TrendViewModelTests` (a click inside the recent spectra needs no store read; a second
   click cancels the first; none found changes nothing; a failure reports once) and the mapper rows
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (844 of 844)
 
 ### Task 10: Trend chart view
 **Files:**
