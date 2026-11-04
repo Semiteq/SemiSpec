@@ -63,7 +63,7 @@
     (`:937`, `:958`). `TicksMs` counts milliseconds from `TCC0` (`:1645-1658`).
   - Build: the Atmel Studio project lists every compiled file in `<Compile Include>` items (`OptoskyEncoder.cproj:139-190`);
     `-funsigned-char` (`cproj:69`), `-fpack-struct` (`cproj:82`), `-Os` (`cproj:81`), all warnings (`cproj:84`). No
-    `-std` flag is set. No CI and no `.gitattributes` exist in OptoskyProj; `main.c` is UTF-8 with BOM and LF line ends;
+    `-std` flag is set. No CI and no `.gitattributes` exist in OptoskyProj; `main.c` is UTF-8 with BOM and CRLF line ends;
     `core.autocrlf` is false. `main.c` already has English comments (`:494`, `:506-509`, `:757-758`).
   - `.gitignore` ignores `*.o`, `*.bin`, `Debug/`, `Release/` but not `*.obj` or `*.exe` (`.gitignore`).
   - Docs: the README is Russian. It names USARTC0 "отладка через ПК" (`README.md:29`) and says debug messages go out on
@@ -132,7 +132,8 @@ Automatable, on this machine:
    ./out/pc_link_test.exe out/firmware-frames.txt
    ```
 
-   Compiles with 0 warnings, prints `all checks passed`, exits 0. The same build from a Developer PowerShell
+   Compiles with 0 warnings, prints `all checks passed`, exits 0. From Git Bash, keep the `-Fo` and `-Fe` paths
+   relative: MSYS rewrites an absolute `C:/` path glued to a flag letter. The same build from a Developer PowerShell
    (`Common7/Tools/Launch-VsDevShell.ps1 -Arch amd64`) is `cl /nologo /W4 /WX /std:c11 /I..\OptoskyEncoder /Foout\
    /Feout\pc_link_test.exe pc_link_test.c ..\OptoskyEncoder\pc_link.c`; with gcc it is `gcc -std=c11 -Wall -Wextra
    -Werror -I../OptoskyEncoder -o out/pc_link_test pc_link_test.c ../OptoskyEncoder/pc_link.c`.
@@ -160,29 +161,60 @@ The host check leaves three things unverified; the steps below cover them:
 - the DREIF/TXCIF/1000 ms state machine in the new `Send2Aplication()`: steps 1-3 (frames complete, heartbeats and
   spectra alternate, no frame is cut);
 - the bit pattern of the target's `(float)uint16_t`: step 2 (Amplitude, SNR and Q in the app equal the PLC values);
-- the main-loop pass rate that keeps the 2-byte USARTC0 TX buffer fed: steps 2 and 4. Throughput is passes x 2
-  bytes per pass, as today; the 32-byte budget at `main.c:945` never delivers 32 bytes in one pass, because the loop
-  stops when `DREIF` clears. A slow pass rate shows as frames that arrive later than 4120 bytes at 115200 baud
-  (about 358 ms) allows, or as the 1000 ms abandon (a `seq` gap in the app).
+- the main-loop pass rate that keeps the 2-byte USARTC0 TX buffer fed: step 4. Throughput is passes x 2 bytes per
+  pass, as today; the 32-byte budget at `main.c:945` never delivers 32 bytes in one pass, because the loop stops when
+  `DREIF` clears. A slow pass rate never shows as the 1000 ms abandon or a `seq` gap, because every byte written
+  restarts the 1000 ms limit. It shows only as a longer frame time, so step 4 measures it.
 
-1. Power the board with both spectrometers and no PLC trigger. Within 3 s the status bar shows the link up; a
-   heartbeat arrives every 3 s with `seq` 0 and state bits 0 and 1 set.
-2. Trigger a measurement on ATP-8000 (PLC wavelength 1550 nm, pulse mode). A 1048-byte spectrum frame arrives with
-   `seq` 1; the chart shows the spectrum with wavelength 1550 and the PLC `delta`; Amplitude, SNR and Q on screen equal
-   the values the PLC reads.
-3. Keep measuring. `seq` rises by 1 per spectrum; heartbeats between spectra repeat the last `seq`; the app reports
-   no lost spectra and no "other device" status.
-4. Set the PLC wavelength to 650 nm (below 904 nm, `main.c:394-402`). The next frames are 4120-byte ATP-2000 frames
-   with wavelength 650; the spectrum and trend follow.
-5. Request a dark measurement (PLC byte 3 bit 0 rising edge, `main.c:1207-1215`). One spectrum frame arrives with all
-   pixels, amplitude and SNR at 0 and the next `seq`; the following light spectra show the dark-subtracted signal.
+The app's screen shows the link state, the two connected bits and the lost-spectra total in the status bar. `seq`, the
+state byte and the frame size are visible only in the spectrum store, and each loss also writes a log line:
+- Store: the newest `%LOCALAPPDATA%\SpectrumVisualizer\Spectra\spectra-<pid>.db`, `<pid>` being the app's process id.
+  The file is in WAL mode, so the `sqlite3` shell reads it while the app runs. The last 20 frames, newest first:
+
+  ```
+  sqlite3 "%LOCALAPPDATA%\SpectrumVisualizer\Spectra\spectra-<pid>.db" "SELECT 'spectrum' AS kind, received_at, seq, state, device, wavelength_nm, amplitude, snr, 24 + length(pixels) AS frame_bytes FROM spectrum UNION ALL SELECT 'heartbeat', received_at, seq, state, NULL, NULL, NULL, NULL, 8 FROM heartbeat ORDER BY received_at DESC LIMIT 20;"
+  ```
+
+  `received_at` is Unix time in milliseconds. The store keeps 2 bytes per pixel, so `frame_bytes` is 8 for a heartbeat,
+  1048 for ATP-8000 and 4120 for ATP-2000.
+- Log: `%LOCALAPPDATA%\SpectrumVisualizer\Logs\spectrum-visualizer.log`. Each loss writes the Information line
+  `<n> spectra lost before seq <s> on port <port>`.
+
+1. Power the board with both spectrometers and no PLC trigger. About 3 s after power-up the status bar shows the link
+   up: the first heartbeat comes 3000 ms after `PcSenderInit`. Heartbeat rows then arrive every 3 s with `seq` 0.
+   State bits 0 and 1 (ATP-2000 and ATP-8000 in the status bar) set once the spectrometers answer; `Ready_*` start
+   at 0.
+2. Trigger a measurement on ATP-8000 (PLC wavelength 1550 nm, pulse mode). Pulse mode measures continuously, so this
+   starts a stream of spectra. The first spectrum row has `seq` 1 and `frame_bytes` 1048; the chart shows the spectrum
+   with wavelength 1550 and the PLC `delta`; Amplitude, SNR and Q on screen equal the values the PLC reads.
+3. Keep measuring. `seq` rises by 1 per spectrum row; the lost total in the status bar stays 0, the log has no
+   "spectra lost" line, and the link never shows "other device". Then stop pulse mode for at least 3 s after some
+   spectra: heartbeat rows arrive every 3 s and repeat the last spectrum's non-zero `seq`. The first spectrum after a
+   restart of pulse mode carries that `seq` + 1.
+4. Set the PLC wavelength to 650 nm (below 904 nm, `main.c:394-402`). The next spectrum rows are ATP-2000 rows with
+   `frame_bytes` 4120 and wavelength 650; the spectrum and trend follow. Measure the frame time:
+   - with a logic analyser on USARTC0 TX, one ATP-2000 frame from the first `AA` to the last CRC byte takes about
+     358 ms (4120 bytes x 10 bits at 115200 baud), one ATP-8000 frame about 91 ms. A clearly longer frame means the
+     main loop does not keep the TX buffer fed;
+   - without an analyser, the mean spectrum interval in continuous pulse mode,
+     `SELECT (max(received_at) - min(received_at)) / (count(*) - 1) FROM spectrum WHERE device = 1;` over a run on
+     ATP-2000 only, against the interval the old firmware gave in the same mode (recorded before flashing, see
+     Post-Completion). Both firmwares send about 4100 bytes per ATP-2000 spectrum, so a clearly longer interval than
+     the old one means the main loop does not keep the TX buffer fed.
+5. Request a dark measurement (PLC byte 3 bit 0 rising edge, `main.c:1207-1215`). One spectrum row arrives with the
+   next `seq` and `amplitude` and `snr` 0, and the chart shows all pixels at 0; the following light spectra show the
+   dark-subtracted signal.
 6. Change the PLC wavelength while measuring continuously. The frame's wavelength follows the PLC within one
    measurement, and the trend recomputes at the new wavelength.
 7. Unplug one spectrometer. After 3 failed service requests (`main.c:496-499`) its connected bit clears in the next
    heartbeat or frame, and the app shows it as not connected.
-8. Leave the app running for at least 255 spectra. `seq` wraps from 255 to 0 with no loss reported.
-9. Reset the board while the app runs. The app reports a gap (a `seq` restart reads as loss, per #20) and recovers
-   without a reconnect.
+8. Leave pulse mode running for at least 255 spectra. The store shows `seq` 255 followed by 0, and the lost total
+   stays 0.
+9. Reset the board while the app runs, best in the middle of a spectrum frame. Frames resume within 10 s: a frame cut
+   by the reset stalls the decoder until the 10 s drain (`board-protocol.md`, Drain). The gap shows as a "spectra lost
+   before seq" log line and a higher lost total, because the restart's first frame does not continue `seq` (per #20 a
+   restart reads as loss); the trend shows a NoSpectra break when more than 10 s pass between spectra. The app
+   recovers without a reconnect.
 
 ## Progress Tracking
 - mark completed items with `[x]` immediately when done
@@ -225,7 +257,7 @@ Decisions:
   board check guards the format.
 - The new C files use `uint8_t`, never plain `char` (`-funsigned-char` on AVR only, `cproj:69`), and never write a
   struct to the wire (`-fpack-struct` on AVR only, `cproj:82`).
-- The new C files are ASCII only, English comments, LF line ends, UTF-8 with BOM like `main.c`. Non-ASCII text would
+- The new C files are ASCII only, English comments, CRLF line ends, UTF-8 with BOM like `main.c`. Non-ASCII text would
   trip MSVC C4819 under a Russian code page, and `-WX` makes it fatal.
 - The CRC step lives once in `pc_link.c` as `PcCrc16Update`. The PLC `crc16()` stays as it is: changing it touches the
   PLC path, which the scope guard forbids.
@@ -249,8 +281,9 @@ Decisions:
 - Host build output goes to `OptoskyEncoder/HostTest/out/`, which `.gitignore` ignores, so no `.obj` or `.exe` lands in
   the OptoskyProj PR.
 - The golden file is text: one frame per line, `<name> <uppercase hex without spaces>`, so a diff shows which frame
-  and byte moved. The C program writes LF; SpectrumVisualizer's `* text=auto` can check it out as CRLF, so the drift
-  check ignores CR at end of line and the C# test reads lines with `File.ReadAllLines`.
+  and byte moved. The C program writes LF, and SpectrumVisualizer stores the file with LF
+  (`SpectrumVisualizer/** text eol=lf`). The drift check ignores CR at end of line for a copy an editor saved with CRLF,
+  and the C# test reads lines with `File.ReadAllLines`.
 
 ## Technical Details
 `pc_link.h` surface:
@@ -280,11 +313,13 @@ void PcSenderQueueSpectrum(PcSender *sender, const PcMeasurement *measurement);
 bool PcSenderStartNext(PcSender *sender, uint32_t now, uint8_t state); /* true when a frame started */
 PcFrame *PcSenderFrame(PcSender *sender);
 bool PcSenderFinish(PcSender *sender, uint32_t now);                   /* true when the finished frame was a spectrum */
+bool PcSenderActive(const PcSender *sender);                           /* true while a frame is going out */
 bool PcSenderBusy(const PcSender *sender);
 ```
 
 `PcFrame` holds the common-part array, its size, the pixel byte count (`2 * P`, 0 for a heartbeat), the device, the
-next byte position, the frame size and the CRC. `PcSender` holds a `PcFrame`, the queued `PcMeasurement`, flags for
+next byte position and the CRC. `PcFrameDone` derives the frame size from the common-part size and the pixel byte
+count, so the size is not stored twice. `PcSender` holds a `PcFrame`, the queued `PcMeasurement`, flags for
 active, active-is-spectrum and spectrum-queued, `seq` and the last-finished time.
 
 Frame bytes, positions from 0:
@@ -356,7 +391,14 @@ Host rule checks in `pc_link_test.c`:
   heartbeat; `PcSenderBusy` is true while it waits;
 - `PcSenderFinish` returns true for a spectrum and false for a heartbeat;
 - 256 spectra take seq from 1 through 255 to 0;
-- the timer works across a `uint32_t` wrap (init at `0xFFFFF000`).
+- the timer works across a `uint32_t` wrap (init at `0xFFFFF000`): no heartbeat 100 ms after a finish at
+  `0xFFFFFF00`, whose 3000 ms deadline wraps; a heartbeat 68000 ms after a finish, so elapsed time keeps 32 bits;
+- every spectrum frame's trailer equals CRC-16/MODBUS recomputed over its bytes from `len` to the last pixel; the
+  `atp2000` and `atp8000` frames end with `AE 43` and `B0 2A`, the trailers `FirmwareFrameTests` accepts;
+- the pixel hook gets the measurement's device, for both frame kinds and through the sender;
+- a heartbeat after a spectrum finishes as a heartbeat;
+- a spectrum abandoned mid-frame finishes as a spectrum; the next spectrum takes the next seq with a fresh CRC;
+- the render buffer is one byte longer than the largest frame, so a frame that runs long fails its size check.
 
 ## What Goes Where
 - **Implementation Steps**: the C module and host program, the `main.c` glue, the golden file and C# test, the docs in
@@ -501,6 +543,8 @@ Repositories: OptoskyProj (commit `docs(readme): описать протокол
   headers cover `atxmega128a1u`.
 - Before flashing, save the current `Release/*.hex`: the repository no longer carries a `.hex` (PR #2), so the saved
   file is the only way back to the old firmware.
+- Before flashing, and only without a logic analyser for checklist step 4: record the old firmware's ATP-2000
+  spectrum interval in continuous pulse mode.
 - Switch the board and the PC app together: the old WinForms app cannot read the new frames.
 - The owner builds `OptoskyEncoder.atsln` in Atmel Studio (Release, `-Os`), checks the build has no new warnings and
   that flash and SRAM use fit the ATxmega128A1U, flashes the board, and runs the manual board checklist of Acceptance
@@ -519,5 +563,9 @@ Repositories: OptoskyProj (commit `docs(readme): описать протокол
   next good spectrum at `:1064`) stays set while the PLC measures on the other device, so heartbeats keep reporting an
   old failure. Should the board clear it on a device switch or after a successful service request? The app shows only
   the measuring device's bit until then.
+
+**For OptoskyProj#17:**
+- `PixelCount()` in `pc_link.c` repeats `Pixels()` at `main.c:315`. It stays: `pc_link.c` must build without AVR
+  headers. When #17 splits `main.c`, one pure module should own the pixel count and both callers should use it.
 
 **Remaining slices:** release-3-0.
