@@ -859,23 +859,25 @@ Note: Task 9 already added the dropped segment to the status sum and set `Minimu
   (skipped - needs com0com or hardware)
 
 ### Task 13: [Final] Update documentation
-- [ ] `docs/architecture/overview.md`: the purpose paragraph (`:5-12`) says frames are stored; the Stack list
+- [x] `docs/architecture/overview.md`: the purpose paragraph (`:5-12`) says frames are stored; the Stack list
   (`:14-27`) gains Microsoft.Data.Sqlite 10.0.14; the components table (`:29-75`) gains `StoreFiles`,
   `SpectrumDatabase`, `SpectrumIntensity`, `IntensityBuckets`, `SpectrumHistory`, `SpectrumStore`, the store errors,
   `ReceivedFrame` under Core, `AppDataPaths` with the store folder, `AddUi` with the paths; startup and close
   (`:103-122`) name the store; the status bar table (`:191-196`) gains Dropped frames; the minimum width paragraph
   (`:139-147`) carries the new measurement; a "Spectrum store" section: files and sweep, schema, pragmas, writer,
-  retention, drop counts, queries, the read strategy kept and its measured numbers without dates
-- [ ] `docs/architecture/board-protocol.md`: "Frames out" (`:283-289`) says the link counts channel drops into
+  retention, drop counts, queries, the read strategy kept and its measured numbers without dates (the section states
+  the kept strategy and why in sentences and names the benchmark command; the measured numbers stay in Acceptance
+  Evidence item 8 of this plan, because they are measurements of one machine)
+- [x] `docs/architecture/board-protocol.md`: "Frames out" (`:283-289`) says the link counts channel drops into
   `LinkStatus.DroppedFrames`; "Status" (`:257-263`) names the new member
-- [ ] `docs/architecture/README.md`: the Spectrum storage row (`:40`) names the file per process id, the sweep, WAL with
+- [x] `docs/architecture/README.md`: the Spectrum storage row (`:40`) names the file per process id, the sweep, WAL with
   `synchronous=NORMAL` and the 64 MB journal limit, the single writer and the kept read strategy; the Tools row (`:39`)
   names both tools
-- [ ] `docs/architecture/testing-strategy.md`: the Area list (`:22-24`) gains `Store`; a Store row (temp files, the
+- [x] `docs/architecture/testing-strategy.md`: the Area list (`:22-24`) gains `Store`; a Store row (temp files, the
   second-connection lock, the manual `TimeProvider`, the benchmark's small run); the Link, View model, Composition root
   and App lifecycle rows gain the drop counter, the segment and the store
-- [ ] `docs/architecture/ui-text.md`: the key owners gain the status bar's dropped segment and the store errors
-- [ ] `CLAUDE.md`: add `Store` to the Area list (`:41`); the Layout block names `Core/Store`, `UI/Store` and
+- [x] `docs/architecture/ui-text.md`: the key owners gain the status bar's dropped segment and the store errors
+- [x] `CLAUDE.md`: add `Store` to the Area list (`:41`); the Layout block names `Core/Store`, `UI/Store` and
   `SpectrumVisualizer.Tools.StoreBenchmark`; the Build block gains the benchmark command
 
 ## Post-Completion

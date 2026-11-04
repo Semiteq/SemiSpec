@@ -43,12 +43,12 @@ AXAML reads a key as `{x:Static text:Resources.Key}` with
 | Main window | `WindowTitle` |
 | Menu | `MenuFile`, `MenuFileExit`, `MenuView`, `MenuViewVerboseLogging` |
 | Connection row | `ConnectionPortLabel`, `ConnectionPortPlaceholder`, `ConnectionRefresh`, `ConnectionConnect`, `ConnectionDisconnect` |
-| Status bar | `StatusNotConnected`, `StatusConnecting`, `StatusPortUnavailable`, `StatusWaiting`, `StatusReceiving`, `StatusNotResponding`, `StatusOtherDevice`, `StatusSpectrometerFormat`, `StatusSpectrometerConnected`, `StatusSpectrometerNotConnected`, `StatusSpectrometerFailed`, `StatusSpectrometerNoData`, `StatusLostSpectraFormat`, `StatusNoValue`; the restored entry: `LinkRestoredTitle`, `LinkRestoredDetail` |
+| Status bar | `StatusNotConnected`, `StatusConnecting`, `StatusPortUnavailable`, `StatusWaiting`, `StatusReceiving`, `StatusNotResponding`, `StatusOtherDevice`, `StatusSpectrometerFormat`, `StatusSpectrometerConnected`, `StatusSpectrometerNotConnected`, `StatusSpectrometerFailed`, `StatusSpectrometerNoData`, `StatusLostSpectraFormat`, `StatusDroppedFramesFormat`, `StatusNoValue`; the restored entry: `LinkRestoredTitle`, `LinkRestoredDetail` |
 | Message panel | `MessagePanelTitle`, `MessagePanelClear`, `MessagePanelRepeatFormat` |
 | Signal pane | `SignalTitle`, `SignalDevice`, `SignalWavelength`, `SignalWindow`, `SignalAmplitude`, `SignalSnr`, `SignalQ`, `SignalUpdated`, `SignalWavelengthFormat`, `SignalWindowFormat`; it also reads the status bar's `StatusNoValue` for a row with no value |
 | Chart controls | `ChartTitle`, `ChartInvert`, `ChartLogScale`, `ChartResetScale`, `ChartStickToZero` |
 | Spectrum chart | `SpectrumAxisWavelength`, `SpectrumAxisIntensity`, `SpectrumEmpty` |
-| `ErrorMessageMapper` | `FailureThrownTitle`, `FailureThrownDetail`, `FailureThrownRemedy`, `FailureUnknownTitle`, `FailureUnknownRemedy`; for each link error a `Title`, `Detail` and `Remedy` key: `PortBusy*`, `PortNotFound*`, `PortLost*`, `BoardNotResponding*`, `UnrecognisedData*`; for a failed port listing `PortListTitle`, `PortListDetail`, `PortListRemedy` |
+| `ErrorMessageMapper` | `FailureThrownTitle`, `FailureThrownDetail`, `FailureThrownRemedy`, `FailureUnknownTitle`, `FailureUnknownRemedy`; for each link error a `Title`, `Detail` and `Remedy` key: `PortBusy*`, `PortNotFound*`, `PortLost*`, `BoardNotResponding*`, `UnrecognisedData*`; for a failed port listing `PortListTitle`, `PortListDetail`, `PortListRemedy`; for the store errors `StoreOpenTitle`, `StoreOpenDetail`, `StoreOpenRemedy`, `StoreWriteTitle`, `StoreWriteDetail`, `StoreWriteRemedy` |
 
 The device names `ATP-2000` and `ATP-8000` stay literals in code: they read the same in both sets.
 

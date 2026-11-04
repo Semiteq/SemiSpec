@@ -257,7 +257,8 @@ stopping it. A failure of the abandoned dispose logs at Debug. Every open logs a
 ### Status
 
 `LinkStatus(State, PortName, Board, LostSpectra, Fault)` is what the link publishes. `Board` is the `state` byte of the
-latest frame; `LostSpectra` is the total since the operator's Connect, kept across reopens. Each loss logs at
+latest frame; `LostSpectra` is the total since the operator's Connect, kept across reopens. The `init` member
+`DroppedFrames` is the count of frames the channel dropped since the application started (Frames out). Each loss logs at
 Information with the `seq` value. The session publishes Connecting first and Disconnected last. `StatusChanged` is
 raised on a thread-pool thread of the session task, never inside `Connect` or `DisconnectAsync`, and only when the
 status differs from the last one with `Fault` left out of the comparison: a fault rides a state change.
@@ -287,6 +288,15 @@ reader. 64 frames are about 50 s of ATP-8000 spectra at 1.3 per second. `Wait` w
 loop and trip the 10 s status on a healthy board. A reader that falls behind drops many frames in a row, so only the
 first drop of a session logs at Debug. `FrameDistributor` is the one reader: it keeps the latest frame that carries a
 spectrum and forwards every frame to its subscribers (`overview.md`, Spectrum).
+
+Every drop adds 1 to the link's drop count in the channel's drop callback, before the log-once check. `Publish` stamps
+the count into each status before it compares the status with the last one, so the next session status after a drop
+(at most 1 s later) carries it, and the Disconnected status carries the final count. The count runs for the process
+and survives Connect, because the channel lives across sessions and the stored history covers the run. The callback
+runs inside `TryWrite` on the session task, and `Publish` runs on the same task, so the count needs no lock. The tracker
+observes each frame before the channel write, so a frame the channel drops leaves no `seq` gap and never counts as a
+lost spectrum. The
+status bar adds this count to the spectrum store's (`overview.md`, Status bar).
 
 ### Stop
 
