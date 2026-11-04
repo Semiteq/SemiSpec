@@ -63,8 +63,8 @@ headless surface shows no other trace of frame pacing, so the frame-joining test
 
 `LogLevelControlTests` logs through an in-memory sink and asserts which events pass the level switch; `AppLoggingTests`
 writes a real file under a temporary folder and reads it back. The message panel takes its clock from an injected
-`TimeProvider`, so a test that reads back a timestamp does not depend on the host's zone. Every test clock is a
-`FakeTimeProvider` from Microsoft.Extensions.TimeProvider.Testing: the panel's steps 1 s per read through
+`TimeProvider`, so a test that reads back a timestamp does not depend on the host's zone. Every `TimeProvider`
+double is a `FakeTimeProvider` from Microsoft.Extensions.TimeProvider.Testing: the panel's steps 1 s per read through
 `AutoAdvanceAmount`, the signal pane's sets its zone with `SetLocalTimeZone`, and the store's subclass adds only what
 the package lacks.
 
