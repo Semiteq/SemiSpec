@@ -284,7 +284,7 @@
 {0} nm ±{1} nm</value>
   </data>
   <data name="TrendEmpty" xml:space="preserve">
-    <value>No intensity yet. It appears with the first spectrum.</value>
+    <value>No trend yet. It appears with the first spectrum.</value>
   </data>
   <data name="TrendReadoutRangeFormat" xml:space="preserve">
     <value>{0} – {1}</value>
@@ -311,7 +311,7 @@
     <value>The trend history could not be read</value>
   </data>
   <data name="TrendHistoryDetail" xml:space="preserve">
-    <value>The stored spectra at the new wavelength could not be read; the trend shows the live part.</value>
+    <value>The stored spectra at the new wavelength or window could not be read; the trend shows only the data since the change.</value>
   </data>
   <data name="TrendMomentTitle" xml:space="preserve">
     <value>The spectrum of that moment could not be read</value>

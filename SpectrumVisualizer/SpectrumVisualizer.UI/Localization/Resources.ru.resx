@@ -208,7 +208,7 @@
     <value>Спектра пока нет. Подключитесь к плате в строке выше.</value>
   </data>
   <data name="SpectrumHistoricalFormat" xml:space="preserve">
-    <value>Спектр от {0}</value>
+    <value>Спектр в {0}</value>
   </data>
   <data name="SignalTitle" xml:space="preserve">
     <value>Сигнал</value>
@@ -256,13 +256,13 @@
     <value>Прижать к нулю</value>
   </data>
   <data name="ChartBackToLive" xml:space="preserve">
-    <value>К текущему спектру</value>
+    <value>Вернуться к текущему</value>
   </data>
   <data name="TrendTitle" xml:space="preserve">
     <value>Тренд</value>
   </data>
   <data name="TrendTimeWindow" xml:space="preserve">
-    <value>Окно времени</value>
+    <value>Интервал</value>
   </data>
   <data name="TrendFollowLive" xml:space="preserve">
     <value>Следить за данными</value>
@@ -284,7 +284,7 @@
 {0} нм ±{1} нм</value>
   </data>
   <data name="TrendEmpty" xml:space="preserve">
-    <value>Интенсивности пока нет. Она появится с первым спектром.</value>
+    <value>Тренда пока нет. Он появится с первым спектром.</value>
   </data>
   <data name="TrendReadoutRangeFormat" xml:space="preserve">
     <value>{0} – {1}</value>
@@ -311,7 +311,7 @@
     <value>Не удалось прочитать историю тренда</value>
   </data>
   <data name="TrendHistoryDetail" xml:space="preserve">
-    <value>Сохранённые спектры на новой длине волны не прочитаны; тренд показывает текущую часть.</value>
+    <value>Сохранённые спектры на новой длине волны или ширине окна не прочитаны; тренд показывает только данные после смены.</value>
   </data>
   <data name="TrendMomentTitle" xml:space="preserve">
     <value>Не удалось прочитать спектр этого момента</value>
