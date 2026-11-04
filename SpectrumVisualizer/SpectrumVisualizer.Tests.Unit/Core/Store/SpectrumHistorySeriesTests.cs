@@ -25,8 +25,8 @@ public sealed class SpectrumHistorySeriesTests : SpectrumHistoryTestBase
 
 		var series = await SeriesAsync(StoreSamples.SampleNm, StoreSamples.SampleDelta, columns: 5);
 
-		series.Columns[0].Should().Be(new IntensityColumn(Start, mean, mean, 1, 0));
-		series.Columns[1].Should().Be(new IntensityColumn(Start.AddSeconds(2), mean + 10, mean + 20, 2, 0));
+		series.Columns[0].Should().Be(Column(Start, mean, mean, 1, 0, mean));
+		series.Columns[1].Should().Be(Column(Start.AddSeconds(2), mean + 10, mean + 20, 2, 0, mean + 20));
 		series.Columns[2].Count.Should().Be(0);
 		double.IsNaN(series.Columns[2].Min).Should().BeTrue();
 		series.Columns.Sum(column => column.Count).Should().Be(3, "a row at To lies outside the range");
@@ -45,7 +45,7 @@ public sealed class SpectrumHistorySeriesTests : SpectrumHistoryTestBase
 		series.Columns[0].Count.Should().Be(0);
 		series.Columns[0].UncoveredCount.Should().Be(1);
 		double.IsNaN(series.Columns[0].Max).Should().BeTrue();
-		series.Columns[1].Should().Be(new IntensityColumn(Start.AddSeconds(5), mean, mean, 1, 0));
+		series.Columns[1].Should().Be(Column(Start.AddSeconds(5), mean, mean, 1, 0, mean));
 	}
 
 	[Theory]
@@ -62,7 +62,7 @@ public sealed class SpectrumHistorySeriesTests : SpectrumHistoryTestBase
 
 		var series = await SeriesAsync(StoreSamples.SampleNm, StoreSamples.SampleDelta, columns: 1);
 
-		series.Columns.Should().Equal(new IntensityColumn(Start, mean, mean, 2, 1));
+		series.Columns.Should().Equal(Column(Start, mean, mean, 2, 1, mean));
 	}
 
 	[Fact]
@@ -109,7 +109,7 @@ public sealed class SpectrumHistorySeriesTests : SpectrumHistoryTestBase
 		var series = await SeriesAsync(700, 3, columns: 1);
 
 		queriedMean.Should().NotBe(RampMean(Spectrometer.Atp2000, 650, 10));
-		series.Columns[0].Should().Be(new IntensityColumn(Start, queriedMean, queriedMean, 1, 0));
+		series.Columns[0].Should().Be(Column(Start, queriedMean, queriedMean, 1, 0, queriedMean));
 	}
 
 	[Fact]
@@ -120,7 +120,7 @@ public sealed class SpectrumHistorySeriesTests : SpectrumHistoryTestBase
 
 		var series = await SeriesAsync(StoreSamples.SampleNm, StoreSamples.SampleDelta, columns: 1);
 
-		series.Columns[0].Should().Be(new IntensityColumn(Start, 0, mean, 2, 0));
+		series.Columns[0].Should().Be(Column(Start, 0, mean, 2, 0, 0));
 	}
 
 	[Fact]
@@ -160,5 +160,12 @@ public sealed class SpectrumHistorySeriesTests : SpectrumHistoryTestBase
 
 		read.Should().Throw<OperationCanceledException>();
 		substrCalls.Should().Be(512, "the token is checked every 256 rows");
+	}
+
+	/// <summary>A store series column: the store adds no breaks and no failure bits.</summary>
+	private static IntensityColumn Column(
+		DateTimeOffset start, double min, double max, int count, int uncoveredCount, double last)
+	{
+		return new IntensityColumn(start, min, max, count, uncoveredCount, last, 0, 0, BoardState.None);
 	}
 }

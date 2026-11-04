@@ -592,15 +592,15 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Trend/FrameContinuityTests.cs`
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Store/IntensityBucketsTests.cs`
 
-- [ ] write `FrameContinuity` with a `SequenceTracker`, the 10 s session reset and the 10 s NoSpectra rule of
+- [x] write `FrameContinuity` with a `SequenceTracker`, the 10 s session reset and the 10 s NoSpectra rule of
   Technical Details; `TrendBreak`, `BreakKind` and `TrendFailure` live in the same file as the closed type family they
   form
-- [ ] add `AddBreak`, `AddFailure` and `Last` to `IntensityBuckets`; extend `IntensityColumn` with `Last`,
+- [x] add `AddBreak`, `AddFailure` and `Last` to `IntensityBuckets`; extend `IntensityColumn` with `Last`,
   `BreakCount`, `LostCount`, `Failed`
-- [ ] write `FrameContinuityTests` of Acceptance Evidence item 1
-- [ ] extend the bucket tests: `Last` is the latest value of the column; breaks and failures fold into their columns
+- [x] write `FrameContinuityTests` of Acceptance Evidence item 1
+- [x] extend the bucket tests: `Last` is the latest value of the column; breaks and failures fold into their columns
   and outside-range moments are ignored; the store series columns stay equal apart from the new fields
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 2: Store points read
 **Files:**
