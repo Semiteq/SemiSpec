@@ -12,12 +12,10 @@ public sealed class TrendMarkerStrip : IPlottable
 
 	private const float MinimumWidth = 1f;
 
-	private readonly FillStyle _fill = new();
+	private readonly FillStyle _fill = new() { Color = Colors.Red };
 
-	// The UI thread writes the spans and the colour; the render thread reads them in Render.
+	// The UI thread writes the spans and the colour under Plot.Sync; ScottPlot renders under the same lock.
 	private readonly List<StripSpan> _spans = [];
-	private readonly Lock _renderStateLock = new();
-	private Color _color = Colors.Red;
 
 	public bool IsVisible { get; set; } = true;
 
@@ -35,39 +33,30 @@ public sealed class TrendMarkerStrip : IPlottable
 		var dataRect = rp.DataRect;
 		var top = dataRect.Bottom - Height;
 
-		lock (_renderStateLock)
+		foreach (var span in _spans)
 		{
-			_fill.Color = _color;
-			foreach (var span in _spans)
+			var left = Math.Max(dataRect.Left, Axes.XAxis.GetPixel(span.FromX, dataRect));
+			var right = Math.Min(dataRect.Right, Axes.XAxis.GetPixel(span.ToX, dataRect));
+			if (right < dataRect.Left || left > dataRect.Right)
 			{
-				var left = Math.Max(dataRect.Left, Axes.XAxis.GetPixel(span.FromX, dataRect));
-				var right = Math.Min(dataRect.Right, Axes.XAxis.GetPixel(span.ToX, dataRect));
-				if (right < dataRect.Left || left > dataRect.Right)
-				{
-					continue;
-				}
-
-				right = Math.Max(right, left + MinimumWidth);
-				Drawing.FillRectangle(rp.Canvas, new PixelRect(left, right, dataRect.Bottom, top), rp.Paint, _fill);
+				continue;
 			}
+
+			right = Math.Max(right, left + MinimumWidth);
+			Drawing.FillRectangle(rp.Canvas, new PixelRect(left, right, dataRect.Bottom, top), rp.Paint, _fill);
 		}
 	}
 
+	/// <summary>Called under Plot.Sync.</summary>
 	public void Recolor(Color color)
 	{
-		lock (_renderStateLock)
-		{
-			_color = color;
-		}
+		_fill.Color = color;
 	}
 
-	/// <summary>Replaces every span with the given ones.</summary>
+	/// <summary>Replaces every span with the given ones; called under Plot.Sync.</summary>
 	public void ReplaceSpans(IReadOnlyList<StripSpan> spans)
 	{
-		lock (_renderStateLock)
-		{
-			_spans.Clear();
-			_spans.AddRange(spans);
-		}
+		_spans.Clear();
+		_spans.AddRange(spans);
 	}
 }

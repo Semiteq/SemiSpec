@@ -27,7 +27,7 @@ public sealed class IntensityCache : IDisposable
 	private readonly ILogger<IntensityCache> _logger;
 
 	// Add runs on the distributor task, LandHistory on a pool thread of the re-read, Fold and the lookups on the UI
-	// thread; every field from here to _keyChanges is read and written under _gate only.
+	// thread; every field from here to _disposed is read and written under _gate only.
 	private readonly Lock _gate = new();
 	private readonly FrameContinuity _continuity = new();
 	private readonly RecentSpectra _recent = new();
@@ -43,6 +43,7 @@ public sealed class IntensityCache : IDisposable
 
 	private KeyBlock? _previous;
 	private int _keyChanges;
+	private bool _disposed;
 
 	// All emit after _gate is released: _changed from the distributor task and a re-read pool thread, through the
 	// synchronized _changedGate, _historyLanded from re-read pool threads through _historyLandedGate, _reReadRequests
@@ -73,38 +74,14 @@ public sealed class IntensityCache : IDisposable
 	/// <summary>Raised on a key change; a request with ReadsHistory false only cancels the pending read.</summary>
 	public IObservable<ReReadRequest> ReReadRequested { get; }
 
-	/// <summary>The wavelength and delta of the latest spectrum frame; null before the first spectrum.</summary>
-	public TrendKey? Key
+	/// <summary>The key of the latest spectrum frame and the receive times of the oldest and newest points.</summary>
+	public TrendExtent? Extent
 	{
 		get
 		{
 			lock (_gate)
 			{
-				return _key;
-			}
-		}
-	}
-
-	/// <summary>The receive time of the oldest point; null before the first spectrum.</summary>
-	public DateTimeOffset? FirstPointAt
-	{
-		get
-		{
-			lock (_gate)
-			{
-				return _points.Count == 0 ? null : DateTimeOffset.FromUnixTimeMilliseconds(_points[0].UnixMs);
-			}
-		}
-	}
-
-	/// <summary>The receive time of the newest point; null before the first spectrum.</summary>
-	public DateTimeOffset? NewestAt
-	{
-		get
-		{
-			lock (_gate)
-			{
-				return _points.Count == 0 ? null : DateTimeOffset.FromUnixTimeMilliseconds(_points[^1].UnixMs);
+				return CurrentExtent();
 			}
 		}
 	}
@@ -115,6 +92,11 @@ public sealed class IntensityCache : IDisposable
 		int keyChanges;
 		lock (_gate)
 		{
+			if (_disposed)
+			{
+				return;
+			}
+
 			AddContinuity(_continuity.Observe(received));
 			request = received.Frame.Measurement is { } measurement ? AddSpectrum(received, measurement) : null;
 			DropExpired();
@@ -139,7 +121,7 @@ public sealed class IntensityCache : IDisposable
 	{
 		lock (_gate)
 		{
-			if (generation != _generation)
+			if (_disposed || generation != _generation)
 			{
 				return;
 			}
@@ -168,42 +150,31 @@ public sealed class IntensityCache : IDisposable
 	/// <summary>Folds the points, breaks and failure marks of the query's range; the query's key is not checked.</summary>
 	public IntensitySeries Fold(IntensityQuery query)
 	{
-		var fromMs = query.From.ToUnixTimeMilliseconds();
-		var toMs = query.To.ToUnixTimeMilliseconds();
-		var buckets = new IntensityBuckets(query);
 		lock (_gate)
 		{
-			for (var i = TimeOrdered.LowerBound(_points, fromMs, TimeOf); i < _points.Count && _points[i].UnixMs < toMs; i++)
-			{
-				var (unixMs, value) = _points[i];
-				var moment = DateTimeOffset.FromUnixTimeMilliseconds(unixMs);
-				if (double.IsNaN(value))
-				{
-					buckets.AddUncovered(moment);
-				}
-				else
-				{
-					buckets.Add(moment, value);
-				}
-			}
-
-			for (var i = TimeOrdered.LowerBound(_breaks, fromMs, TimeOf); i < _breaks.Count && _breaks[i].UnixMs < toMs; i++)
-			{
-				buckets.AddBreak(DateTimeOffset.FromUnixTimeMilliseconds(_breaks[i].UnixMs), _breaks[i].Lost);
-			}
-
-			for (var i = TimeOrdered.LowerBound(_failures, fromMs, TimeOf);
-				i < _failures.Count && _failures[i].UnixMs < toMs;
-				i++)
-			{
-				buckets.AddFailure(DateTimeOffset.FromUnixTimeMilliseconds(_failures[i].UnixMs), _failures[i].State);
-			}
+			return FoldHeld(query);
 		}
-
-		return buckets.ToSeries();
 	}
 
-	/// <summary>The recent spectrum at or before the moment as a new measurement; null before the recent spectra.</summary>
+	/// <summary>
+	/// Folds the query built from the current extent under one hold of the lock, so the series matches the extent;
+	/// null before the first spectrum. queryFor runs under the lock and must not call back into the cache.
+	/// </summary>
+	public TrendFold? FoldCurrent(Func<TrendExtent, IntensityQuery> queryFor)
+	{
+		lock (_gate)
+		{
+			if (CurrentExtent() is not { } extent)
+			{
+				return null;
+			}
+
+			var query = queryFor(extent);
+			return new TrendFold(extent, query, FoldHeld(query));
+		}
+	}
+
+	/// <summary>The recent spectrum at or before the moment; null before the recent spectra.</summary>
 	public StoredSpectrum? SpectrumAt(DateTimeOffset moment)
 	{
 		lock (_gate)
@@ -212,11 +183,61 @@ public sealed class IntensityCache : IDisposable
 		}
 	}
 
+	/// <summary>Later frames and history chunks are ignored, so a read that outlives the container lands nothing.</summary>
 	public void Dispose()
 	{
+		lock (_gate)
+		{
+			_disposed = true;
+		}
+
 		_changed.Dispose();
 		_historyLanded.Dispose();
 		_reReadRequests.Dispose();
+	}
+
+	private TrendExtent? CurrentExtent()
+	{
+		return _key is { } key && _points.Count > 0
+			? new TrendExtent(
+				key,
+				DateTimeOffset.FromUnixTimeMilliseconds(_points[0].UnixMs),
+				DateTimeOffset.FromUnixTimeMilliseconds(_points[^1].UnixMs))
+			: null;
+	}
+
+	private IntensitySeries FoldHeld(IntensityQuery query)
+	{
+		var fromMs = query.From.ToUnixTimeMilliseconds();
+		var toMs = query.To.ToUnixTimeMilliseconds();
+		var buckets = new IntensityBuckets(query);
+		for (var i = TimeOrdered.LowerBound(_points, fromMs, TimeOf); i < _points.Count && _points[i].UnixMs < toMs; i++)
+		{
+			var (unixMs, value) = _points[i];
+			var moment = DateTimeOffset.FromUnixTimeMilliseconds(unixMs);
+			if (double.IsNaN(value))
+			{
+				buckets.AddUncovered(moment);
+			}
+			else
+			{
+				buckets.Add(moment, value);
+			}
+		}
+
+		for (var i = TimeOrdered.LowerBound(_breaks, fromMs, TimeOf); i < _breaks.Count && _breaks[i].UnixMs < toMs; i++)
+		{
+			buckets.AddBreak(DateTimeOffset.FromUnixTimeMilliseconds(_breaks[i].UnixMs), _breaks[i].Lost);
+		}
+
+		for (var i = TimeOrdered.LowerBound(_failures, fromMs, TimeOf);
+			i < _failures.Count && _failures[i].UnixMs < toMs;
+			i++)
+		{
+			buckets.AddFailure(DateTimeOffset.FromUnixTimeMilliseconds(_failures[i].UnixMs), _failures[i].State);
+		}
+
+		return buckets.ToSeries();
 	}
 
 	private void AddContinuity(Continuity continuity)
@@ -343,6 +364,12 @@ public sealed class IntensityCache : IDisposable
 	/// <summary>The previous key's points older than EndMs, the recent spectra start at that change.</summary>
 	private sealed record KeyBlock(TrendKey Key, QueryWindows Windows, List<TrendPoint> Points, long EndMs);
 }
+
+/// <summary>The current key with the receive times of the oldest and the newest point.</summary>
+public readonly record struct TrendExtent(TrendKey Key, DateTimeOffset First, DateTimeOffset Newest);
+
+/// <summary>A fold of the cache with the extent and the query it was built from, all read under one lock hold.</summary>
+public sealed record TrendFold(TrendExtent Extent, IntensityQuery Query, IntensitySeries Series);
 
 /// <summary>The wavelength and delta the trend's intensity is the window mean at.</summary>
 public readonly record struct TrendKey(ushort WavelengthNm, byte Delta);

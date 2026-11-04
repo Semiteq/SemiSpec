@@ -99,7 +99,7 @@ public abstract class TrendFeedTestBase : TrendChartTestBase
 	/// <summary>The ranges the feed reads for the newest request over the window.</summary>
 	protected IReadOnlyList<TimeRange> PlanFor(DateTimeOffset from, DateTimeOffset to)
 	{
-		return TrendHistoryPlan.For(from, to, Cache.NewestAt!.Value, Requests[^1].RecentStart);
+		return TrendHistoryPlan.For(from, to, Cache.Extent!.Value.Newest, Requests[^1].RecentStart);
 	}
 
 	/// <summary>A stored ATP-8000 spectrum at the sample key, received at the moment.</summary>

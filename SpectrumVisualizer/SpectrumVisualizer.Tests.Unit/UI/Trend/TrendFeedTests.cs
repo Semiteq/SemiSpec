@@ -7,6 +7,7 @@ using AwesomeAssertions;
 using FluentResults;
 
 using SpectrumVisualizer.Core.Store;
+using SpectrumVisualizer.Core.Trend;
 using SpectrumVisualizer.Tests.Unit.Core.Store;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Trend;
@@ -32,9 +33,9 @@ public sealed class TrendFeedTests : TrendFeedTestBase
 		WriteToChannel(Heartbeat(At(1), seq: 1));
 		WriteToChannel(StoreSamples.Spectrum(At(2), seq: 2));
 
-		await Waits.UntilAsync(() => Cache.NewestAt == At(2));
-		Cache.FirstPointAt.Should().Be(At(0));
-		Cache.Key.Should().NotBeNull();
+		await Waits.UntilAsync(() => Cache.Extent?.Newest == At(2));
+		Cache.Extent!.Value.First.Should().Be(At(0));
+		Cache.Extent!.Value.Key.Should().Be(new TrendKey(SampleNm, SampleDelta));
 	}
 
 	[AvaloniaFact]
@@ -144,6 +145,39 @@ public sealed class TrendFeedTests : TrendFeedTestBase
 		MessagePanel.Entries.Should().ContainSingle().Which.View.Title.Should().Be(Resources.TrendHistoryTitle);
 		var query = IntensityQuery.Create(OtherNm, SampleDelta, At(0), At(1201), TimeSpan.FromSeconds(1)).Value;
 		Cache.Fold(query).Columns.Sum(column => column.Count).Should().Be(121, "the recent spectra stay at the new key");
+	}
+
+	[AvaloniaFact]
+	public async Task AReadThatFailsAfterTheStopReportsNothing()
+	{
+		var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+		var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+		using var feed = new TrendFeed(
+			Distributor,
+			Cache,
+			Chart,
+			Switching,
+			async (_, _, _, _, _) =>
+			{
+				entered.TrySetResult();
+				await gate.Task;
+				return Result.Fail<IntensityChunk>("the store file is locked");
+			},
+			(_, _) => Task.FromResult(Result.Ok<StoredSpectrum?>(null)),
+			MessagePanel,
+			ImmediateScheduler.Instance,
+			Throttle,
+			FeedLogger);
+		feed.Start();
+		ChangeKeyAfterTwentyMinutes(OtherNm);
+		PassThrottle();
+		await entered.Task.WaitAsync(Waits.Limit);
+
+		var stop = feed.StopAsync();
+		gate.SetResult();
+
+		await stop.WaitAsync(Waits.Limit);
+		MessagePanel.Entries.Should().BeEmpty("the read ended after the stop, which ignores its failure");
 	}
 
 	[AvaloniaFact]

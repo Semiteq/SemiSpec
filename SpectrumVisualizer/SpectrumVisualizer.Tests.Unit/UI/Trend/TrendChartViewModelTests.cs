@@ -323,6 +323,18 @@ public sealed class TrendChartViewModelTests : TrendChartTestBase
 	}
 
 	[AvaloniaFact]
+	public void AWidthPostedAfterTheDisposeDoesNothing()
+	{
+		AddSpectra(0, 3);
+		Sample();
+		Chart.Dispose();
+
+		var postedLate = () => Chart.SetDataAreaWidth(300);
+
+		postedLate.Should().NotThrow();
+	}
+
+	[AvaloniaFact]
 	public void EveryRefreshRequestsARedraw()
 	{
 		var redraws = 0;

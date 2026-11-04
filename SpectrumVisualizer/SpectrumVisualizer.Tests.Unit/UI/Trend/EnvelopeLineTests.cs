@@ -33,7 +33,7 @@ public sealed class EnvelopeLineTests
 	private static readonly TimeSpan _mutationPause = TimeSpan.FromMilliseconds(1);
 
 	[Fact(Timeout = TestTimeoutMilliseconds)]
-	public async Task RenderWhileTheUiThreadReplacesTheColumnsDoesNotThrow()
+	public async Task RenderWhileTheUiThreadReplacesTheColumnsUnderThePlotLockDoesNotThrow()
 	{
 		var line = new EnvelopeLine();
 		using var plot = new Plot();
@@ -45,16 +45,17 @@ public sealed class EnvelopeLineTests
 		var shortColumns = Columns(ShortColumnCount);
 
 		await RenderWhileMutating.RunAsync(
+			() => plot.RenderInMemory(PlotWidth, PlotHeight),
 			() =>
 			{
-				plot.RenderInMemory(PlotWidth, PlotHeight);
-				_ = line.GetAxisLimits();
-			},
-			() =>
-			{
-				line.ReplaceColumns(longColumns);
-				line.ReplaceColumns(shortColumns);
-				line.ReplaceColumns([]);
+				// The chart replaces the columns under Plot.Sync, which every render holds.
+				lock (plot.Sync)
+				{
+					line.ReplaceColumns(longColumns);
+					line.ReplaceColumns(shortColumns);
+					line.ReplaceColumns([]);
+				}
+
 				Thread.Sleep(_mutationPause);
 			},
 			"the render thread must survive concurrent replacements");

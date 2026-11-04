@@ -103,7 +103,7 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 
 		column.Count.Should().Be(0);
 		column.UncoveredCount.Should().Be(0);
-		_cache.NewestAt.Should().BeNull();
+		_cache.Extent.Should().BeNull();
 	}
 
 	[Fact]
@@ -266,7 +266,7 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 
 		SecondColumns(0, 2).Should().AllSatisfy(column =>
 			column.Should().Match<IntensityColumn>(c => c.Count == 0 && c.BreakCount == 0 && c.Failed == BoardState.None));
-		_cache.FirstPointAt.Should().Be(now);
+		_cache.Extent!.Value.First.Should().Be(now);
 	}
 
 	[Fact]
@@ -312,8 +312,8 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 		var columns = _cache.Fold(Query(SampleNm, SampleDelta, Start, At(80), TimeSpan.FromSeconds(20))).Columns;
 		columns.Select(column => column.Count).Should().Equal(20, 20, 20, 20);
 		columns.Select(column => column.Last).Should().Equal(19, 39, 59, 79);
-		_cache.FirstPointAt.Should().Be(Start);
-		_cache.NewestAt.Should().Be(At(200));
+		_cache.Extent!.Value.First.Should().Be(Start);
+		_cache.Extent!.Value.Newest.Should().Be(At(200));
 	}
 
 	[Fact]
@@ -364,6 +364,22 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 		liveBreaks.Should().HaveCount(2);
 		reRead.Where(column => column.Count > 0).Should().HaveCount(180 - 16).And.AllSatisfy(column =>
 			column.Min.Should().Be(RampMean(Spectrometer.Atp8000, OtherNm, SampleDelta)));
+	}
+
+	[Fact]
+	public void AfterTheDisposeFramesAndChunksAreIgnored()
+	{
+		var cache = new IntensityCache(_time, _logger);
+		cache.Add(StoreSamples.Spectrum(At(0), seq: 0));
+		cache.Add(StoreSamples.Spectrum(At(1), nm: OtherNm, seq: 1));
+		cache.Dispose();
+
+		var lateFrame = () => cache.Add(StoreSamples.Spectrum(At(2), nm: OtherNm, seq: 2));
+		var lateChunk = () => cache.LandHistory(1, Chunk(0, 1));
+
+		lateFrame.Should().NotThrow();
+		lateChunk.Should().NotThrow();
+		cache.Extent!.Value.Newest.Should().Be(At(1));
 	}
 
 	[Fact]

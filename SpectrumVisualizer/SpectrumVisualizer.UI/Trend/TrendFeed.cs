@@ -45,9 +45,10 @@ public sealed class TrendFeed(
 	private readonly Lock _readsGate = new();
 	private readonly HashSet<Task> _reads = [];
 
-	// Start, StopAsync, Dispose and ReadMoment run on the UI thread only.
+	// Start, StopAsync, Dispose and ReadMoment run on the UI thread only; the reads on the pool also read _stopped, so
+	// a read that ends after the stop reports nothing.
 	private bool _started;
-	private bool _stopped;
+	private volatile bool _stopped;
 
 	/// <summary>Subscribes the distributor and both read pipelines once; does nothing after a start or a stop.</summary>
 	public void Start()
@@ -131,7 +132,7 @@ public sealed class TrendFeed(
 		var (request, window) = read;
 		try
 		{
-			var newest = cache.NewestAt ?? request.RecentStart;
+			var newest = cache.Extent?.Newest ?? request.RecentStart;
 			foreach (var range in TrendHistoryPlan.For(window.From, window.To, newest, request.RecentStart))
 			{
 				var chunk = await readPoints(request.Key.WavelengthNm, request.Key.Delta, range.From, range.To, token)
@@ -159,6 +160,11 @@ public sealed class TrendFeed(
 
 	private void ReportHistoryFailure(IError error)
 	{
+		if (_stopped)
+		{
+			return;
+		}
+
 		messagePanel.TryReportFailure(error, logger, uiScheduler);
 	}
 

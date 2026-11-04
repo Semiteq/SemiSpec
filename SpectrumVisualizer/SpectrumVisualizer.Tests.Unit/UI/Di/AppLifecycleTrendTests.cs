@@ -33,7 +33,7 @@ public sealed class AppLifecycleTrendTests : AppLifecycleTestBase
 
 		await PushOneFrameThenCloseAsync(provider, window, SpectrumFrame(Spectrometer.Atp8000, 7));
 
-		provider.GetRequiredService<IntensityCache>().NewestAt
+		provider.GetRequiredService<IntensityCache>().Extent
 			.Should().NotBeNull("the feed took the first frame the distributor handed out");
 		var templates = LoggedTemplates();
 		var feedStarted = templates.IndexOf(FeedStarted);

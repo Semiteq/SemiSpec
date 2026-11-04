@@ -28,9 +28,6 @@ public sealed class OverviewViewModel : ReactiveObject, IDisposable
 	private static readonly TimeSpan _fastestRefold = TimeSpan.FromSeconds(2);
 	private static readonly TimeSpan _slowestRefold = TimeSpan.FromSeconds(60);
 
-	// The band ends at the newest point, which the fold's half-open range would leave out.
-	private static readonly TimeSpan _newestPointInclusion = TimeSpan.FromMilliseconds(1);
-
 	private readonly IntensityCache _cache;
 	private readonly TrendChartViewModel _chart;
 	private readonly MessagePanelViewModel _messagePanel;
@@ -59,7 +56,7 @@ public sealed class OverviewViewModel : ReactiveObject, IDisposable
 			.StartWith(Unit.Default)
 			.Subscribe(_ => Reporting(Refold), ReportFailure));
 		// The chart requests a redraw after every refresh, which is where its window and the cache's extent move.
-		_disposables.Add(chart.RedrawRequested.Subscribe(_ => Reporting(PlaceWindow), ReportFailure));
+		_disposables.Add(chart.RedrawRequested.Subscribe(_ => Reporting(() => PlaceWindow(cache.Extent)), ReportFailure));
 	}
 
 	/// <summary>The cache folded to about 250 columns over its extent; null before the first spectrum.</summary>
@@ -122,10 +119,9 @@ public sealed class OverviewViewModel : ReactiveObject, IDisposable
 	{
 		try
 		{
-			Band = _cache.Key is { } key && _cache.FirstPointAt is { } first && _cache.NewestAt is { } newest
-				? Fold(key, first, newest)
-				: null;
-			PlaceWindow();
+			var fold = _cache.FoldCurrent(BandQuery);
+			Band = fold is null ? null : OverviewGeometry.Connected(fold.Series);
+			PlaceWindow(fold?.Extent);
 		}
 		finally
 		{
@@ -135,28 +131,24 @@ public sealed class OverviewViewModel : ReactiveObject, IDisposable
 		}
 	}
 
-	private IntensitySeries Fold(TrendKey key, DateTimeOffset first, DateTimeOffset newest)
+	private static IntensityQuery BandQuery(TrendExtent extent)
 	{
-		var milliseconds = Math.Ceiling((newest - first).TotalMilliseconds / BandColumns);
+		var milliseconds = Math.Ceiling((extent.Newest - extent.First).TotalMilliseconds / BandColumns);
 		var columnWidth = TimeSpan.FromMilliseconds(Math.Max(1.0, milliseconds));
-		var query = IntensityQuery
-			.Create(key.WavelengthNm, key.Delta, first, newest + _newestPointInclusion, columnWidth)
-			.Value;
-
-		return OverviewGeometry.Connected(_cache.Fold(query));
+		return TrendColumns.QueryThrough(extent.Key, extent.First, extent.Newest, columnWidth);
 	}
 
-	private void PlaceWindow()
+	private void PlaceWindow(TrendExtent? extent)
 	{
-		if (_cache.FirstPointAt is not { } first || _cache.NewestAt is not { } newest)
+		if (extent is not { } current)
 		{
 			HasExtent = false;
 			return;
 		}
 
-		var bandStart = Band is { Columns: [var firstColumn, ..] } ? firstColumn.Start : first;
-		ExtentFirst = bandStart < first ? bandStart : first;
-		ExtentLast = newest;
+		var bandStart = Band is { Columns: [var firstColumn, ..] } ? firstColumn.Start : current.First;
+		ExtentFirst = bandStart < current.First ? bandStart : current.First;
+		ExtentLast = current.Newest;
 		HasExtent = true;
 		(WindowStartFraction, WindowWidthFraction) =
 			OverviewGeometry.WindowFraction(ExtentFirst, ExtentLast, _chart.From, _chart.To);

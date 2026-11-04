@@ -34,9 +34,6 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	private static readonly TimeSpan _changeSample = TimeSpan.FromMilliseconds(100);
 	private static readonly TimeSpan _liveTick = TimeSpan.FromSeconds(1);
 
-	// While following, the window ends at the newest point, which the fold's half-open range would leave out.
-	private static readonly TimeSpan _newestPointInclusion = TimeSpan.FromMilliseconds(1);
-
 	private readonly IntensityCache _cache;
 	private readonly MessagePanelViewModel _messagePanel;
 	private readonly TimeProvider _timeProvider;
@@ -49,7 +46,8 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	private readonly CompositeDisposable _disposables = [];
 	private TrendNavigationModel _navigation;
 	private double _dataAreaPixels = TrendColumns.MaximumColumns;
-	private LastFold? _lastFold;
+	private TrendFold? _lastFold;
+	private bool _disposed;
 
 	public TrendChartViewModel(
 		IntensityCache cache,
@@ -119,7 +117,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	/// <summary>Zooms around the anchor; a window that no longer holds now stops following.</summary>
 	public void ZoomAt(double factor, DateTimeOffset anchor)
 	{
-		if (_cache.NewestAt is null)
+		if (!HasPoints)
 		{
 			return;
 		}
@@ -137,7 +135,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	/// <summary>Moves the window; a pan that leaves now outside it stops following.</summary>
 	public void PanBy(TimeSpan delta)
 	{
-		if (_cache.NewestAt is null)
+		if (!HasPoints)
 		{
 			return;
 		}
@@ -149,7 +147,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	/// <summary>Moves the window's centre to the moment, clamped at the first point, and stops following.</summary>
 	public void CentreOn(DateTimeOffset moment)
 	{
-		if (_cache.NewestAt is null)
+		if (!HasPoints)
 		{
 			return;
 		}
@@ -175,7 +173,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	/// <summary>The width of the plot's data area; the fold takes one column per pixel of it.</summary>
 	public void SetDataAreaWidth(double pixels)
 	{
-		if (pixels <= 0 || pixels.Equals(_dataAreaPixels))
+		if (_disposed || pixels <= 0 || pixels.Equals(_dataAreaPixels))
 		{
 			return;
 		}
@@ -195,23 +193,30 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		var index = fold.Query.ColumnOf(moment);
 		return index < 0 || index >= fold.Series.Columns.Length
 			? null
-			: TrendReadout.For(fold.Series, index, fold.Key);
+			: TrendReadout.For(fold.Series, index, fold.Extent.Key);
 	}
 
 	public void ApplyPalette(ChartColors colors)
 	{
-		_envelope.Recolor(colors.Envelope);
-		_strip.Recolor(colors.FailureStrip);
 		lock (Plot.Sync)
 		{
+			_envelope.Recolor(colors.Envelope);
+			_strip.Recolor(colors.FailureStrip);
 			_momentLine.Color = colors.MomentLine;
 		}
 
 		RequestRedraw();
 	}
 
+	/// <summary>Idempotent; a width the view posted before the dispose finds it disposed and does nothing.</summary>
 	public void Dispose()
 	{
+		if (_disposed)
+		{
+			return;
+		}
+
+		_disposed = true;
 		_disposables.Dispose();
 		_redrawRequests.OnCompleted();
 		_redrawRequests.Dispose();
@@ -233,18 +238,13 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 
 	private void Refresh()
 	{
-		var key = _cache.Key;
-		var first = _cache.FirstPointAt;
-		var newest = _cache.NewestAt;
-		var hasPoints = key is not null && first is not null && newest is not null;
-		if (hasPoints)
+		if (_disposed)
 		{
-			var now = _timeProvider.GetUtcNow();
-			TrackExtent(first!.Value, now);
-			_navigation.OnLiveEdge(now);
+			return;
 		}
 
-		_lastFold = hasPoints ? Fold(key!.Value) : null;
+		_lastFold = _cache.FoldCurrent(FollowExtent);
+		var key = _lastFold?.Extent.Key;
 		var columns = _lastFold is { } fold ? TrendColumns.Map(fold.Series, LocalTimeAxis.ToAxis) : [];
 		lock (Plot.Sync)
 		{
@@ -261,7 +261,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 				: Resources.TrendAxisIntensity;
 		}
 
-		HasPoints = hasPoints;
+		HasPoints = _lastFold is not null;
 		Width = _navigation.Width;
 		IsFollowing = _navigation.IsSticky;
 		RequestRedraw();
@@ -280,13 +280,14 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		}
 	}
 
-	private LastFold Fold(TrendKey key)
+	/// <summary>Runs under the cache's lock: moves the window with the extent and the clock, then folds over it.</summary>
+	private IntensityQuery FollowExtent(TrendExtent extent)
 	{
+		var now = _timeProvider.GetUtcNow();
+		TrackExtent(extent.First, now);
+		_navigation.OnLiveEdge(now);
 		var columnWidth = TrendColumns.ColumnWidth(_navigation.Width, _dataAreaPixels);
-		var query = IntensityQuery
-			.Create(key.WavelengthNm, key.Delta, _navigation.From, _navigation.To + _newestPointInclusion, columnWidth)
-			.Value;
-		return new LastFold(query, _cache.Fold(query), key);
+		return TrendColumns.QueryThrough(extent.Key, _navigation.From, _navigation.To, columnWidth);
 	}
 
 	/// <summary>While following, the window's right edge is now, so a silence shows as an empty span within a second.</summary>
@@ -359,6 +360,4 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	{
 		_messagePanel.TryReportFailure(new ExceptionalError(exception.Message, exception), _logger, _uiScheduler);
 	}
-
-	private sealed record LastFold(IntensityQuery Query, IntensitySeries Series, TrendKey Key);
 }
