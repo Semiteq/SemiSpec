@@ -16,7 +16,7 @@
   bar, no change to the old app, no launch keys or config files, nothing sent to the board.
 
 ## Context (from discovery)
-- Roadmap: docs/plans/roadmaps/20261104-avalonia-rewrite-roadmap.md — slice spectrum-view
+- Roadmap: docs/plans/roadmaps/20261104-avalonia-rewrite-roadmap.md, slice spectrum-view
 - Stacking base: local branch `serial-link` at `5fca2ab`; this slice works on the local branch `spectrum-view` created
   from it. Local commits only.
 - Verified 2026-11-04 at `5fca2ab`: `dotnet test SpectrumVisualizer.slnx` passes 320 of 320.
@@ -210,7 +210,8 @@ Automatable (baseline 320 of 320 at `5fca2ab`):
    spectrum view model resolve as singletons; `AppLifecycleTests.OpeningTheWindowStartsTheFrameDistributor` (after
    `Opened` and Connect over `FakeSerialPortProvider`, frame bytes fed through `FakePortStream` reach a distributor
    subscriber); `AppLifecycleTests.ClosingTheWindowStopsTheDistributorAfterTheLink` (after the close completes, the
-   distributor's stop line is in the log and no subscriber receives anything more).
+   distributor's stop line is in the log); `AppLifecycleTests.AfterTheCloseADistributorSubscriberReceivesNothingMore`
+   (a frame the link writes after the close stays in `SerialLink.Frames` and reaches no subscriber).
 6. `dotnet test SpectrumVisualizer.slnx --filter "Area=Resources"` passes with the four new palette keys under both
    variants and every new resx key in the Russian set.
 7. `dotnet test SpectrumVisualizer.slnx` passes 320 plus every test this slice adds, with none skipped.
@@ -292,8 +293,9 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
   lives across link sessions and ends on cancellation, or on any other read failure, which it logs at Error.
   `StopAsync()` cancels and awaits the task, then disposes the cancellation source, and completes at once when nothing
   runs; `Start()` after a start or a stop does nothing; `Dispose()` cancels without waiting, for the
-  container's synchronous dispose. Subscribers own their scheduling and never block the loop: the live source filters
-  and signals, the view model moves to the UI scheduler with `ObserveOn`, the store adds a queue later.
+  container's synchronous dispose. Subscribers own their scheduling and never block the loop. The one subscriber is
+  `LiveSpectrumSource`, which filters spectrum frames and signals; `SpectrumViewModel` reads the source, not the
+  distributor, and moves to the UI scheduler with `ObserveOn`; spectrum-store adds its own queue later.
 - **Why `LatestSpectrum` and not the latest frame.** A heartbeat carries no measurement (`BoardFrame.cs:6`); if the
   latest frame were a heartbeat the chart would have nothing to read for up to 3 s. The distributor keeps the latest
   frame that carries a spectrum, and that is the only "latest" anything reads.
@@ -791,7 +793,7 @@ Data flow:
   "65535 nm", "±255 nm" (`Delta` is a byte, so 255 bounds the plan's 100), "23:59:59.999", both device names. Labels:
   en 91.0 px, ru 93.0 px. Bold headers: en 43.2 px, ru 54.5 px (fit both columns). The formula adds the 1 px left
   border of `SignalPane`: en 1 + 16 + 91.0 + 12 + 140.6 + 16 + 24 = 300.6, ru 1 + 16 + 93.0 + 12 + 198.9 + 16 + 24 =
-  360.9, rounded 368. `SpectrumPanel.PaneWidth` = 368 (the estimate 352 failed by 16 px in Russian)
+  360.9, rounded 368; the estimate 352 failed by 16 px in Russian
 - ➕ review: the Russian window label became "Окно измерения" (117.5 px); ru 1 + 16 + 117.5 + 12 + 198.9 + 16 + 24 =
   385.4, rounded 392, so `SpectrumPanel.PaneWidth` = 392 and the content floor is 392 + 400 = 792; `MinimumWidth`
   stays 1048 and the chart keeps 656 px at it
@@ -799,12 +801,12 @@ Data flow:
   ticks on `Axes.Bottom`; set `MainWindow.MinimumWidth` to the larger of the status bar's 1042.4 px Russian width and
   `SpectrumPanel.PaneWidth` + 400, rounded up to 8; record the result.
   `AnAtp8000SpectrumOnTheChartFloorKeepsFourLabelledWavelengthTicks`: 8 labelled ticks at 400 px (1 000 to 2 400 by
-  200). max(1042.4, 368 + 400 = 768) = 1042.4, rounded 1048: `MinimumWidth` stays 1048, its summary names both bounds
+  200). max(1042.4, 392 + 400 = 792) = 1042.4, rounded 1048: `MinimumWidth` stays 1048, its summary names both bounds
 - [x] at the window's minimum width the pane shows every row and control and the chart keeps at least 400 px; at
   2560 px the pane keeps its width and left-aligned content, and only the chart grows.
   `AtTheMinimumWidthTheSignalPaneShowsEveryRowAndTheChartKeepsItsFloor` (window 1048 x 800 with the message panel
-  shown: pane 368 px, chart 680 px, every part's bottom inside the pane padding) and
-  `AtALargeWidthTheSignalPaneKeepsItsWidthAndContentAndOnlyTheChartGrows` (pane 368 px ending at 2560, the chart
+  shown: pane 392 px, chart 656 px, every part's bottom inside the pane padding) and
+  `AtALargeWidthTheSignalPaneKeepsItsWidthAndContentAndOnlyTheChartGrows` (pane 392 px ending at 2560, the chart
   grows by exactly 1280 px, every pane part keeps its offset in the pane)
 - [x] every label, value, checkbox and button fits on one line in English and Russian. The NoWrap check caught a
   miss: Semi's `CheckBox` template wraps string content (`TextWrapping="Wrap"` on its `ContentPresenter`, template
@@ -816,13 +818,13 @@ Data flow:
   chart bounds. The message panel row cannot keep the pane height literally: it takes its height from the content row,
   so the test asserts the window size, both panes' width and left unchanged and both heights lower by exactly the
   message panel's height. Colour grep: no output
-- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (479 of 479)
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (final count in Task 13)
 
 ### Task 13: Verify acceptance criteria
 - [x] run every command of Acceptance Evidence and record each result with its count (per Area, full suite, none
   skipped; Release build 0 warnings; format and terse exit 0; old solution 13 of 13; both greps print nothing).
-  Area=Chart 54, Area=Link 75, Area=Spectrum 86, Area=MainWindow 66, Area=Di 21, Area=Resources 9, all passed, 0
-  skipped; full suite 484 of 484 (479 after Task 12, plus the two tests below). Release build 0 warnings, 0 errors;
+  At HEAD: Area=Chart 50, Area=Link 76, Area=Spectrum 110, Area=MainWindow 66, Area=Di 21, Area=Resources 9, all
+  passed, 0 skipped; full suite 505 of 505, including the two tests below. Release build 0 warnings, 0 errors;
   `dotnet format --verify-no-changes` and `dotnet terse SpectrumVisualizer` exit 0; both `ui-theme.md` greps print
   nothing. Acceptance item 5 had a gap: no test showed that a subscriber gets nothing after the close.
   `AppLifecycleTests.AfterTheCloseADistributorSubscriberReceivesNothingMore` closes it with no test-only writer: a
@@ -858,8 +860,8 @@ Data flow:
   bare click: `APressAndReleaseWithoutAMoveKeepsFollowing`; heartbeats: `TheLatestSpectrumSkipsHeartbeats`,
   `AHeartbeatChangesNeitherCurrentNorChanged`; throwing subscriber: `AThrowingSubscriberDoesNotTakeTheFrameFromTheOthers`
 - [x] run the full suite: `dotnet test SpectrumVisualizer.slnx`; confirm the old solution builds and passes 13 of 13.
-  484 of 484; `dotnet build SpectrumVisualizer.sln` 0 errors (15 warnings, not gated; this slice changes no file of
-  the old app), `dotnet test SpectrumVisualizer.Tests` 13 of 13
+  505 of 505; `dotnet build SpectrumVisualizer.sln` 0 errors (its warnings are not gated; this slice changes no file
+  of the old app), `dotnet test SpectrumVisualizer.Tests` 13 of 13
 - [x] start the app with `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI` and confirm the window shows
   the empty-state line and the log gains its start line; leave the port-pair checklist to the owner.
   The app ran 25 s under `timeout` with no exception; the log gained "SpectrumVisualizer starting; log folder ...".
@@ -907,3 +909,117 @@ Data flow:
 - firmware-frame-sender: the OptoskyProj#20 frame sender in the board firmware, verified on the board against the app.
 - release-3-0: the 3.0.0 installer over the self-contained publish folder, the release workflow, and removal of the
   old app.
+
+**Executed by exec:**
+- branch: spectrum-view
+
+Run note: 25 commits on `spectrum-view` (`6efcc6b`..`d0ac7bb`) before this record, stacked on `serial-link` at
+`5fca2ab`; two of them add and revise this plan. Review phase 1 (5 agents) found 0 critical, 6 major and about 27
+minor findings, all fixed in one fix iteration (`9c10e54`, `db4dbc3`, `27af489`, `02351e6`, `f02ec40`); its critical
+re-check found the code clean. Phase 2 (smells) fixed 9 minor and 3 carried findings in `a5e58c2`, `b9c4d2a` and
+`a216459`. Phase 3 (codex) was skipped because codex is not installed. Phase 3b (comments) fixed 12 minor comment
+findings in `d0ac7bb`. Phase 4 (critical) found the code clean at `d0ac7bb`. Final state: 505/505 tests in
+`SpectrumVisualizer.slnx`, 13/13 in `SpectrumVisualizer.sln`, Release build 0 warnings, format and terse clean. The
+manual smoke checklist was not run: this machine has no com0com pair, and the workstation was locked during the app
+start check, so the empty-state line was confirmed by the headless test only.
+
+**Decisions made autonomously:**
+- On the log axis a dark frame while following draws below the kept Y range, so the data area is empty for that
+  frame; accepted, because the axis stays still and the pane shows the values.
+- `ChartColors` lives in `ChartPalette.cs`, its only producer. `Resolve` takes alpha = round(A x clamp(Opacity, 0, 1)),
+  so 0.25 gives 64.
+- `LogAxis.Project` and `LogTickGenerator.IsLogarithmic` were deleted (no reader); `TickCache` is folded into
+  `LogTickGenerator` with the culture in its key. Copied `LogAxisTests` lose their underscores; culture tests use
+  `CultureScope`.
+- `FrameDistributor.Frames` is a private `IObservable` over the subscriber list, not `Observable.Create`: Create's
+  `AutoDetachObserver` unsubscribes an observer whose `OnNext` throws (measured). A subscriber throw is logged once
+  through `TryReportFailure`; the per-frame snapshot is read under the lock that replaces it.
+- `StopBackgroundServicesAsync` catches every failure, and `StopLinkThenDistributorAsync` stops the distributor in
+  `finally`, so the window closes after a failed stop. No test covers a faulting stop: no fake makes `DisconnectAsync`
+  throw.
+- Every close after `Opened` is held until the distributor's read task ends
+  (`WithAnIdleLinkTheWindowClosesOnceTheDistributorStops`). `CollectingSink` is thread-safe and the lifecycle logger is
+  verbose, because the distributor's stop line is Debug.
+- `AfterTheCloseADistributorSubscriberReceivesNothingMore` reconnects the link on a second `FakePortStream` and reads the
+  late frame back from `SerialLink.Frames`; no test-only writer exists. `StopBeforeStartCompletesAtOnce` uses a
+  counting `ChannelReader` and a 200 ms bounded wait.
+- The test helper `ProtocolSamples.Spectrum` became `SpectrumFrame`: the namespace `Tests.Unit.UI.Spectrum` shadowed it
+  (CS0118).
+- `LiveSpectrumSource.Current` builds a new `DisplayedSpectrum` on every read, with no cache.
+- `SpectrumProjection.Fill` returns `ProjectedSpectrum(RawMax, IsDark)`: darkness means every raw pixel is zero, which
+  the projected values cannot show. `SpectrumScale.Following(xs, ys, logarithmic)` and
+  `StuckToZero(xs, rawMax, logarithmic)` return the ScottPlot-free `SpectrumLimits(AxisRange X, AxisRange Y)`.
+- `LogAxis` sits in `Core/Chart`; `SpectrumDisplay`, `SpectrumProjection` and `SpectrumScale` in `Core/Spectrum`; all
+  public, because Core has no `InternalsVisibleTo`.
+- The dark-frame reference is per device (`DeviceLine.LastNonDark`); a dark frame re-projects it in the current mode
+  into a scratch buffer. A non-dark flat frame takes the flat range.
+- A `delta` of 0 hides the band and draws the centre line only.
+- One `ChangeScale` helper runs every scale change, `TakeManualScale` included: it takes `Plot.Sync`, raises
+  `IsFollowing` after the lock and requests one redraw. `RequestRedraw` is private; no `ObjectDisposedException` guards
+  and no `_isDisposed` flag.
+- The view takes `Plot.Sync` once around `ChartPalette.Apply` and `ApplyPalette`. `PlotControl.Reset` is skipped for
+  the same plot and for a null `DataContext`; a switch from chart A to chart B still disposes A's plot, because
+  `AvaPlot.Reset` always does.
+- `OnHeldMove(press, current, isButtonHeld)` freezes at 5 px, the larger of the X and Y distances, for every button.
+  ScottPlot 5.1.59's `MouseDragZoom` has no floor, so a right drag under 5 px zooms a little and the next frame
+  restores it. Nothing freezes before the first spectrum.
+- The default `UserActionResponses` were read through reflection; `MouseInteractWithPlottables` stays. The headless
+  drag test passes `RawInputModifiers.LeftMouseButton` on the move.
+- A throw from the `Current` read or from `Chart.Show` is reported through `TryReportFailure` and skips that spectrum;
+  only a failure of `Changed` ends the subscription. The static Serilog handler in the chart view was removed.
+  `ThreeQueuedSignalsApplyTheLatestSpectrumOnce` blocks on a `ManualResetEventSlim` after one flake.
+- `SignalInfoViewModel.Spectrum` compares by reference; the update time formats `HH:mm:ss.fff` with the invariant
+  culture, numbers `G6` with the current one. A private `TimeProvider` subclass replaces `FakeTimeProvider`, which the
+  referenced package lacks.
+- `SpectrumViewModel` disposes its subscriptions, both commands and `Chart`; `MainWindowViewModel` leaves the injected
+  `SpectrumViewModel` to the container.
+- The const is `SpectrumPanel.PaneWidth`, 392 after the Russian label "Окно измерения"; the formula adds the 1 px left
+  border, and the fit tests assert `PaneWidth` is at least the measured need. Widest values use type maxima
+  (65535 nm, ±255 nm). `MainWindow.MinimumWidth` stays 1048.
+- Checkboxes hold a `TextBlock`, because Semi's template wraps string content at template priority; both buttons carry
+  `HorizontalAlignment="Left"`. With the message panel shown, both pane heights shrink by its height.
+- Test classes were split under the size cap: `MainWindowSignalPaneTests` and `MainWindowMessagePanelTests` from
+  `MainWindowViewTests`; `SpectrumChartViewTests` and `SpectrumChartViewInputTests` over `SpectrumChartViewTestBase`;
+  `SpectrumChartViewModelTests` and `SpectrumChartViewModelScaleTests` with `SpectrumChartAssertions`;
+  `FrameReaderDecodeBufferedTests` from `FrameReaderTests`.
+- The Context section keeps the SemiPlot source names (`ReportFailureOf`, `LogAxis.Project`, `TickCache`): it
+  describes SemiPlot, not this repo.
+
+## Verify it yourself
+
+Automated, from the repo root on branch `spectrum-view`:
+
+1. `dotnet build SpectrumVisualizer.slnx -c Release` gives 0 warnings, 0 errors.
+2. `dotnet test SpectrumVisualizer.slnx` passes 505 of 505. Per area with `--filter "Area=X"`: Spectrum 110, Link 76,
+   MainWindow 66, Protocol 56, Emulator 56, Chart 50, Messages 32, Di 21, Calibration 15, Resources 9, Logging 7,
+   Paths 7.
+3. `dotnet format SpectrumVisualizer.slnx --verify-no-changes`, then `dotnet tool restore` and
+   `dotnet terse SpectrumVisualizer`; both gates exit 0.
+4. `dotnet build SpectrumVisualizer.sln` and `dotnet test SpectrumVisualizer.Tests` build the old app and pass 13 of 13.
+5. The chart behaviour is pinned by these test classes:
+   - `SpectrumScaleTests`, `SpectrumProjectionTests`: padding, flat ranges, Stick to zero, inversion, the log floor,
+     finite limits for an all-zero spectrum.
+   - `SpectrumChartViewModelTests`: device X ranges, the band and the centre line, the log tick generator, pixels
+     never written, the palette under the plot lock.
+   - `SpectrumChartViewModelScaleTests`: following and frozen, the 5 px held move, Reset scale, Stick to zero, the
+     per-device dark-frame reference.
+   - `SpectrumChartViewModelRenderTests`: dark frames render on both axes with finite limits.
+   - `SpectrumChartViewTests`, `SpectrumChartViewInputTests`: the cache wrapper, the frame-paced redraw, the empty
+     state, the removed ScottPlot responses, wheel, click and drag.
+   - `LogAxisTests`, `LogTickGeneratorTests`, `ChartPaletteTests`: ticks, culture labels, the palette surfaces.
+   - `MainWindowSignalPaneTests`, `MainWindowTextFitTests`: the 392 px pane and the 1048 px minimum width in English
+     and Russian.
+
+By hand: run the manual smoke checklist in Acceptance Evidence over the com0com pair. The highest-value checks, with
+the emulator on `COM10` and the app on `COM11`:
+
+1. Step 4 and step 5, `--dark-every 3` on the linear axis, then with "Logarithmic scale" ticked: the Y axis keeps the
+   previous spectrum's limits on every dark frame; on the log axis the dark line lies below the kept range.
+2. Step 7, a click and a 1 to 4 px move keep the plot following and Reset scale disabled; a drag of 5 px or more
+   freezes the limits.
+3. Step 4 and step 7, Stick to zero, also during a dark frame: Y runs from 0 to about 1.2 times the last peak and
+   stays there until Reset scale.
+4. Step 3 and step 8, restart the emulator between `--device 8000` and `--device 2000`: X follows each device's
+   range while following, and a frozen scale keeps its limits.
+5. Step 11, resize the window to its 1048 px minimum and to full screen: the signal pane keeps 392 px and every text
+   stays on one line.
