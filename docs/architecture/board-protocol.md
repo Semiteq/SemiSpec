@@ -2,8 +2,9 @@
 
 The board sends frames to the PC over a serial port, one way only; the app sends nothing. The contract is
 Semiteq/OptoskyProj#20. This page restates it in English and describes the Core code that reads it
-(`SpectrumVisualizer.Core/Protocol/`, `SpectrumVisualizer.Core/Calibration/`) and the board emulator
-(`SpectrumVisualizer.Tools.BoardEmulator`). Core holds no serial port code.
+(`SpectrumVisualizer.Core/Protocol/`, `SpectrumVisualizer.Core/Calibration/`), the serial link that carries it into
+the app (`SpectrumVisualizer.UI/Link/`) and the board emulator (`SpectrumVisualizer.Tools.BoardEmulator`). Core holds
+no serial port code.
 
 ## Channel
 
@@ -71,6 +72,8 @@ gives `0x4B37`.
 `BoardFrame` holds `State`, `Seq` and a `SpectrumMeasurement` that is null for a heartbeat. `SpectrumMeasurement`'s
 constructor rejects a pixel array whose length does not match its `Spectrometer`, so every measurement in the app has
 a valid size. `FrameEncoder.Encode` builds the bytes of a frame; the emulator and the tests use it.
+`Spectrometer.FrameSize` gives the bytes of a device's spectrum frame on the wire: 4120 for ATP-2000, 1048 for
+ATP-8000.
 
 ## Decoder
 
@@ -95,6 +98,11 @@ to `DiscardedBytes`, a running count that any thread may read. When the writer c
 more: the reader drops one byte at each pending candidate and decodes again, so a false candidate cannot hide the whole
 frames behind it. Only the bytes that belong to no frame are added to `DiscardedBytes`.
 
+`FrameReader.DecodeBuffered(PipeReader, ICollection<BoardFrame>)` is the same decode step without a wait, for a
+caller that owns its own read loop. It calls `TryRead`, adds every whole frame to the collection, runs the drop-one-byte
+pass when the writer has completed, calls `AdvanceTo(consumed, end)` and returns whether the writer has completed.
+When `TryRead` finds nothing it returns false and leaves the pipe as it is.
+
 A false candidate whose `len` reads as a valid value stalls the decoder: it waits for the whole frame before the CRC
 can fail. Three inputs produce one: a corrupted header that keeps a valid `len`, a false `AA 55` followed by a valid
 `len` inside pixel data, and a stream opened in the middle of a frame. The wait is a byte count, not a time: up to
@@ -107,9 +115,10 @@ can fail. Three inputs produce one: a corrupted header that keeps a valid `len`,
 | heartbeats only, one 8-byte frame every 3 s | about 26 min (`len` 4114), about 6.5 min (`len` 1042) |
 
 No frame is lost, because the bytes stay in the buffer: after the CRC fails, the decoder drops one byte and finds the
-real frames behind it, and they arrive late in one burst. A wait over 10 s trips the "no valid frame" status of
-OptoskyProj#20. Recovery belongs to the serial-link slice, which owns the port: when that status fires, it drops the
-decoder's buffer.
+real frames behind it, and they arrive late in one burst. A wait over 10 s would trip the "no valid frame" status of
+OptoskyProj#20, so the serial link drains the decoder 10 s after the last frame when bytes arrived since it: it
+completes the pipe's writer, which makes the stalled candidate invalid and releases the frames behind it, and starts a
+fresh pipe (see the drain under "Serial link").
 
 ## Sequence counter
 
@@ -135,6 +144,126 @@ that reported a loss does not report it again. `Reset()` starts a new baseline, 
 A board restart looks like an ordinary gap. A loss of 256 or more spectra in a row miscounts; at 1.3 spectra per second
 that is over 3 minutes of silence. OptoskyProj#20 has the app report a silent board after 10 s without a valid frame,
 long before that.
+
+## Serial link
+
+`SerialLink` (`SpectrumVisualizer.UI/Link/`) carries the board's bytes from a COM port to decoded frames. It holds the
+public surface: `Connect(port)`, `DisconnectAsync()`, `Dispose()`, `Status`, `StatusChanged`, `Frames` and
+`DroppedFrames`. Each Connect creates one `LinkSession` and runs it as one task. That task opens the port, reads,
+writes the pipe, decodes, feeds `SequenceTracker`, writes the channel, judges the health, drains, reopens and publishes
+every status. No second task runs and no lock exists: each piece of session state has one writer, and `Status` is
+published with `Volatile.Write`.
+
+### Port
+
+`ISerialPortProvider` (`PortNames()`, `Open(port)` returning `Result<Stream>`) is the seam the tests replace.
+`RjcpSerialPortProvider` is the production implementation over `RJCP.SerialPortStream`:
+
+- `PortNames()` asks an unopened `SerialPortStream` for the names and sorts them by the number after `COM`
+  (`COM2` before `COM10`), then any other name by ordinal.
+- `Open` checks the name against `PortNames()` first, so an unlisted name returns `PortNotFoundError` without
+  touching the driver. It opens at 115200 baud, 8N1, with `ReadTimeout` 1000 ms and `ThrowOnReadError` on.
+- `UnauthorizedAccessException` and an `IOException` with `HResult` 32 (sharing violation) map to `PortBusyError`;
+  any other `IOException` maps to `PortNotFoundError`.
+
+### Read loop
+
+Each pass takes `GetMemory(4096)` from the pipe's writer, awaits `ReadAsync(memory, token)`, then `Advance`,
+`FlushAsync` and `DecodeBuffered` on the pipe's reader. A read timeout (`TimeoutException`) is a 1 s tick with no
+bytes. After each read or tick the loop judges the health, drains when due and publishes the status, so a status comes
+at least once a second with no timer. The loop reads `scheduler.Now` once per pass and stamps the bytes and the frames
+of that pass with it.
+
+Each decoded frame is observed by the tracker, written to the channel and sets the last-frame time; the count of bytes
+since the last frame resets to 0, so bytes that trail a frame in the same read are not counted.
+
+The pipe uses `pauseWriterThreshold` 65536, `resumeWriterThreshold` 32768 and no synchronization context. The loop
+decodes after every flush and the decoder accepts only the three valid lengths, so the pipe holds at most one stalled
+candidate of 4120 bytes plus the bytes behind it, well under the pause threshold. Every teardown (drain, port loss,
+disconnect) completes both the writer and the reader, so the pipe returns its pooled segments.
+
+### Health
+
+`LinkHealth.Evaluate(now, openedAt, lastByteAt, lastFrameAt, bytesSinceFrame)` is a pure function of the loop's
+timestamps. The reference time is the last valid frame, or the port open before the first frame:
+
+- Under 10 s since the reference: Waiting before the first frame, Receiving after it.
+- From 10 s, inclusive: OtherDevice when a byte arrived in the last 10 s and more than 4120 bytes
+  (`Spectrometer.Atp2000.FrameSize`, the largest frame) arrived since the last frame; NotResponding otherwise.
+
+The byte rule keeps a board that stops mid-frame at NotResponding: its tail is shorter than one frame. The clock starts
+at port open, so a dead port shows NotResponding 10 s after Connect.
+
+### Drain
+
+`LinkHealth.IsDrainDue` is true when 10 s have passed since the later of the reference and the previous drain, and a
+byte arrived after the reference. Bytes in the same read as a frame share its stamp, so silence after a frame never
+drains a partial frame in flight. A drain completes the writer, calls `DecodeBuffered` once more, which releases the
+frames behind a stalled candidate, completes the reader and starts a fresh pipe. The loop drains before it judges the
+health, so a stall that hid real frames never shows NotResponding or OtherDevice. A drain that releases nothing keeps
+the byte count, so OtherDevice stays reachable after it.
+
+A drain has three side effects:
+
+- The partial frame in flight is discarded.
+- The fresh pipe starts mid-frame, so the decoder discards the rest of that frame as garbage.
+- The frames a drain releases are stamped with the drain time, not their arrival time.
+
+### Port loss and reopen
+
+Four signals mean the open port is lost:
+
+- A read returns 0 bytes: RJCP wakes a pending read this way when its monitor thread dies.
+- A read throws `InvalidOperationException`: RJCP's closed-port check under `ThrowOnReadError`.
+- A read throws `IOException`.
+- A read timeout comes while `PortNames()` no longer lists the port. Some drivers abort the pending read in a way RJCP
+  treats as benign, and only read timeouts keep coming.
+
+On a loss or a failed open the session tears the pipe down, disposes the stream, publishes PortUnavailable and waits
+1 s on the link's `IScheduler`, then opens again, until Disconnect. The wait is a `TaskCompletionSource` completed by
+`scheduler.Schedule(1 s, ...)` and cancelled through the session token; the timer is armed before PortUnavailable is
+published. Every open logs at Debug with the port name, resets `SequenceTracker` and starts a fresh pipe and
+`FrameReader`, so the gap of an unplug does not count as lost spectra.
+
+### Status
+
+`LinkStatus(State, PortName, Board, LostSpectra, Fault)` is what the link publishes. `Board` is the `state` byte of the
+latest frame; `LostSpectra` is the total since the operator's Connect, kept across reopens. Each loss logs at
+Information with the `seq` value. The session publishes Connecting first and Disconnected last. `StatusChanged` is
+raised on the session's thread, and only when the status differs from the last one with `Fault` left out of the
+comparison: a fault rides a state change.
+
+| State | Enters when | Fault on entry |
+| --- | --- | --- |
+| Disconnected | start; Disconnect; an unexpected exception | `ExceptionalError` for an exception |
+| Connecting | the session task starts | none |
+| PortUnavailable | an open failed or the port was lost; retried every 1 s | the first of a run: `PortBusyError`, `PortNotFoundError` or `PortLostError` |
+| Waiting | the port opened, no frame yet, under 10 s | none |
+| Receiving | a valid frame under 10 s ago | none |
+| NotResponding | 10 s with no frame; no byte in the last 10 s, or at most 4120 bytes since the last frame | `BoardNotRespondingError` |
+| OtherDevice | 10 s with no frame, a byte in the last 10 s and over 4120 bytes since the last frame | `UnrecognisedDataError` |
+
+A run lasts from one Receiving to the next: only its first failed open or port loss carries a fault, so retries that
+fail the same way stay quiet and the panel gets one entry per incident. An exception anywhere else in the session
+tears the pipe down, closes the port and publishes Disconnected with an `ExceptionalError`.
+
+The five link errors share the abstract `LinkError` (`LinkErrors.cs`), which puts the port name in the message and in
+the FluentResults metadata under `LinkError.PortKey` (`Port`). The message panel's view of a link error leaves the port
+out, so a repeat on another port coalesces into one row.
+
+### Frames out
+
+`Frames` is a `ChannelReader<BoardFrame>` over a bounded channel of 64 frames with `DropOldest`, one writer and one
+reader. 64 frames are about 50 s of ATP-8000 spectra at 1.3 per second. `Wait` would let a slow reader block the read
+loop and trip the 10 s status on a healthy board. Each dropped frame increments `DroppedFrames` and logs at Debug. No
+code reads the channel, so it fills and drops the oldest frame.
+
+### Stop
+
+`DisconnectAsync()` cancels the session token and returns the session task, which completes after the session closed
+the port and published Disconnected. `ReadAsync` honours the token, and the 1 s read timeout bounds the wait even if a
+driver did not. `Dispose()` cancels without waiting, for the container's synchronous dispose. `Connect` does nothing
+while a session runs.
 
 ## Calibration
 
@@ -174,8 +303,19 @@ about 0.36 s on the wire, so the port caps `--rate` near 2.8 for ATP-2000. A fai
 adapter, prints one line and exits with code 1.
 
 `SpectrumGenerator` builds the spectrum once: a Gaussian peak at the wavelength (σ = max(`delta`, 1)/2 nm, height
-30000) over a flat floor of 1000. The frame carries `amplitude` 30000, `snr` 30 and `q` 0. `state` has only the
-emulated spectrometer's connected bit set.
+30000) over a flat floor of 1000. The frame carries `amplitude` 30000, `snr` 30 and `q` 0.
+`SpectrumGenerator.Dark` builds the dark spectrum: every pixel, `amplitude` and `snr` zero.
+
+Three options shape `state` and the dark frames:
+
+| Option | Effect |
+| --- | --- |
+| `--both-connected` | Sets both connected bits; without it only the emulated spectrometer's bit is set. Spectra still come from `--device` only |
+| `--failed 2000\|8000` | Sets that spectrometer's measurement-failed bit. The emulated spectrometer's own bit is cleared in its spectrum frames, as the board does, so it shows in heartbeats only. Naming the other spectrometer requires `--both-connected`, or the command fails with a line naming both options |
+| `--dark-every <n>` | Sends every nth spectrum as the dark spectrum; 0, the default, never. A separate spectrum counter decides it, because `seq` wraps at 255; the dark frame consumes its `seq` like any spectrum |
+
+The cross-option rule is a validator on the root command. It checks the raw tokens before it reads the values, because
+`System.CommandLine` runs command validators before the option values convert.
 
 `FrameSchedule` decides, on a 10 ms tick, which frame is due: a spectrum at the rate, or a heartbeat after 3 s with
 nothing sent. `seq` follows the board's rules. A late tick sends one spectrum and drops the backlog instead of sending

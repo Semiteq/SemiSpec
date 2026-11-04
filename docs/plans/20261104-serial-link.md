@@ -665,24 +665,25 @@ the same run do not.
   adapters, and stays in Post-Completion)
 
 ### Task 14: [Final] Update documentation
-- [ ] `docs/architecture/board-protocol.md`: replace the recovery sentence (`:109-112`) with the drain; add a link
+- [x] `docs/architecture/board-protocol.md`: replace the recovery sentence (`:109-112`) with the drain; add a link
   section (the one session task, `DecodeBuffered`, pipe options and teardown, health rules with the 4120-byte rule,
   the drain and its side effects: the partial frame in flight is discarded, the fresh pipe starts mid-frame, released
   frames carry the drain time; the four port-lost signals; reopen; channel capacity, full mode and its one reader);
   add the new emulator options to the emulator section
-- [ ] `docs/architecture/overview.md`: purpose paragraph, components table (the link classes, connection row, status
+- [x] `docs/architecture/overview.md`: purpose paragraph, components table (the link classes, connection row, status
   bar), startup (the `Opened` refresh and the `Closing` stop, best-effort on an OS shutdown), main window rows
   (`:71-78`), error route with severities and newest-entry coalescing (`:100-104`) and dispatcher exceptions
   (`:113-115`)
-- [ ] `docs/architecture/README.md`: Errors row (`:28`) and Serial library row (`:33`), plus a Serial link row for the
+- [x] `docs/architecture/README.md`: Errors row (`:28`) and Serial library row (`:33`), plus a Serial link row for the
   channel and the reopen rule
-- [ ] `docs/architecture/testing-strategy.md`: the Area list (`:18-20`) gains `Link`; a Link row in the table of
+- [x] `docs/architecture/testing-strategy.md`: the Area list (`:18-20`) gains `Link`; a Link row in the table of
   test kinds (fake port stream, `TestScheduler`)
-- [ ] `docs/architecture/ui-theme.md`: the five new keys in the key table (`:44-50`); `docs/architecture/ui-text.md`:
+- [x] `docs/architecture/ui-theme.md`: the five new keys in the key table (`:44-50`); `docs/architecture/ui-text.md`:
   the new key owners in the table (`:39-45`)
-- [ ] `readme.md`: replace the "shell for now" paragraph (`:13-15`) and describe connecting to the emulator over a port
+- [x] `readme.md`: replace the "shell for now" paragraph (`:13-15`) and describe connecting to the emulator over a port
   pair
-- [ ] `CLAUDE.md`: add `Link` to the Area list (`:40-41`); add a line if a new pattern appeared during implementation
+- [x] `CLAUDE.md`: add `Link` to the Area list (`:40-41`); add a line if a new pattern appeared during implementation
+  (no new pattern line; the Layout line for `SpectrumVisualizer.UI/` gains "serial link")
 
 ## Post-Completion
 **Manual verification:**
