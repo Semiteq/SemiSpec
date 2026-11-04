@@ -208,7 +208,7 @@
     <value>Спектра пока нет. Подключитесь к плате в строке выше.</value>
   </data>
   <data name="SpectrumHistoricalFormat" xml:space="preserve">
-    <value>Спектр в {0}</value>
+    <value>Спектр от {0}</value>
   </data>
   <data name="SignalTitle" xml:space="preserve">
     <value>Сигнал</value>

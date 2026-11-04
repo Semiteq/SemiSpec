@@ -485,9 +485,10 @@ the last 120 s by millisecond receive time, held by reference, since the pixel a
 
 After each add, and after each landed chunk, it drops the points, breaks and marks older than 24 h before
 `TimeProvider.GetUtcNow()`, the store's retention rule. `Changed` signals after every added frame and every landed
-chunk; `HistoryLanded` signals after a landed chunk, just before its `Changed`. Both are private subjects behind
-`Subject.Synchronize`, exposed with `AsObservable()`, and every emission happens after the lock is released.
-`Dispose` sets a flag under the lock, so a frame or a chunk that arrives after it changes nothing and raises nothing.
+chunk; `HistoryLanded` signals after a landed chunk, just before its `Changed`. They and `ReReadRequested` are private
+subjects exposed with `AsObservable()`. Every emission happens after the lock is released, one at a time under a
+second lock. `Dispose` sets a flag under the first lock, so a frame or a chunk that arrives after it changes nothing,
+and disposes the subjects under the second lock, so a frame or a chunk in flight at the dispose raises nothing.
 
 `Fold(IntensityQuery)` finds the first point, break and mark at or after `From` by binary search and feeds the range
 into `IntensityBuckets`, so the cache and the store fold one way on the same epoch grid, and a 10 min fold costs the
@@ -579,12 +580,13 @@ scheduler and its logger.
   every 256 rows. A request with `ReadsHistory` false maps to an empty observable, so it only cancels. A failed range
   reports one `TrendHistoryError` (Warning) through `TryReportFailure` and ends that read; the trend keeps only the
   data since the change. A read that ends after the stop reports nothing.
-- The moment pipeline is `Select(ReadMomentFrom).Switch()`, so a second click cancels the first read, then
-  `ObserveOn(uiScheduler)`. A moment inside the cache's recent spectra needs no store read; any other moment reads
+- The moment pipeline is `Select(ReadMomentFrom)`, each read hopping with `ObserveOn(uiScheduler)`, then `Switch()`,
+  so a second click cancels the first read, also one already queued for the UI thread. A moment inside the cache's recent spectra needs no store read; any other moment reads
   `SpectrumAtAsync`. A found spectrum goes to `SwitchingSpectrumSource.ShowMoment`; none (before the first row) changes
   nothing and logs at Debug; a failed read reports one `TrendMomentError` (Warning). Back to live sets
   `ShownMoment` to null, and the feed then pushes a cancel into the same `Switch`, so a moment read in flight shows
-  nothing.
+  nothing. The feed also keeps the last requested moment on the UI thread, null after Back to live, and drops a read
+  of any other moment.
 - Every store read is tracked in a set under a lock until it ends. `StopAsync()` disposes the subscriptions, which
   cancels both pipelines, then awaits every tracked read, superseded ones included, because a cancelled read may still
   hold a reader connection, and logs a Debug line. `Dispose()` cancels without waiting, for the container's dispose.
@@ -638,7 +640,8 @@ The window's width runs from 10 s to 24 h, the history the cache keeps, and open
 - A pan and a zoom place the window through the one clamp, which keeps `From` at or after the cache's first point.
 - A pan or a wheel zoom that leaves now outside the window stops following; one that keeps it inside keeps
   following, so a zoom-in keeps the time under the cursor instead of snapping back. `TrendNavigationModel` owns this
-  rule.
+  rule. While following, the drawn window ends up to 1 s before now, so `TrendChartViewModel` first moves it onto now,
+  and the zoom anchor with it; a zoom-in at the right edge or a short drag toward now keeps following.
 - Zoom widths snap to the ladder `10 s x 1.25^n`. The preset box shows the preset of the current width, and is empty
   after a zoom off every preset; picking a preset, also from the empty box, sets its width exactly, keeps the right
   edge (while not following, the first-point clamp can move it) and keeps following as it was.

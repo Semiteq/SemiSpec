@@ -121,7 +121,9 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 			return;
 		}
 
-		_navigation.Zoom(factor, anchor, _timeProvider.GetUtcNow());
+		var now = _timeProvider.GetUtcNow();
+		var liveEdgeShift = SnapToLiveEdge(now);
+		_navigation.Zoom(factor, anchor + liveEdgeShift, now);
 		Refresh();
 	}
 
@@ -133,7 +135,9 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 			return;
 		}
 
-		_navigation.Pan(delta, _timeProvider.GetUtcNow());
+		var now = _timeProvider.GetUtcNow();
+		SnapToLiveEdge(now);
+		_navigation.Pan(delta, now);
 		Refresh();
 	}
 
@@ -263,6 +267,17 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		_navigation.OnLiveEdge(now);
 		var columnWidth = TrendColumns.ColumnWidth(_navigation.Width, _dataAreaPixels);
 		return TrendColumns.QueryThrough(extent.Key, _navigation.From, _navigation.To, columnWidth);
+	}
+
+	/// <summary>
+	/// While following, moves the window, drawn up to a second ago, onto now and returns how far it moved; an anchor
+	/// read off the drawn window moves with it.
+	/// </summary>
+	private TimeSpan SnapToLiveEdge(DateTimeOffset now)
+	{
+		var drawnTo = _navigation.To;
+		_navigation.OnLiveEdge(now);
+		return _navigation.To - drawnTo;
 	}
 
 	private static StripSpan ToStripSpan(TimeRange range)

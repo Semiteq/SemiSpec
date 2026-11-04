@@ -158,6 +158,33 @@ public sealed class TrendChartViewModelTests : TrendChartTestBase
 	}
 
 	[AvaloniaFact]
+	public void AWheelInAtTheRightEdgeWhileFollowingKeepsFollowing()
+	{
+		AddSpectra(0, 1800);
+		Sample();
+		Time.Advance(TimeSpan.FromMilliseconds(500));
+
+		Chart.ZoomAt(0.8, Chart.To);
+
+		Chart.IsFollowing.Should().BeTrue("the drawn right edge is now once the window moves onto the clock");
+		Chart.To.Should().Be(Time.GetUtcNow());
+		Chart.Width.Should().BeLessThan(_tenMinutes);
+	}
+
+	[AvaloniaFact]
+	public void AShortPanTowardNowWhileFollowingKeepsFollowing()
+	{
+		AddSpectra(0, 120);
+		Sample();
+		Chart.SetWidth(TimeSpan.FromMinutes(1));
+		Time.Advance(TimeSpan.FromMilliseconds(500));
+
+		Chart.PanBy(TimeSpan.FromMilliseconds(200));
+
+		Chart.IsFollowing.Should().BeTrue("the window still holds now after the pan");
+	}
+
+	[AvaloniaFact]
 	public void ThePresetSetsTheWidthAndKeepsFollowing()
 	{
 		AddSpectra(0, 60);

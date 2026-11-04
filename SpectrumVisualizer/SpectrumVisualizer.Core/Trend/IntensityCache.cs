@@ -41,20 +41,18 @@ public sealed class IntensityCache : IDisposable
 	private KeyBlock? _previous;
 	private bool _disposed;
 
-	// All emit after _gate is released: _changed from the distributor task and a re-read pool thread, through the
-	// synchronized _changedGate, _historyLanded from re-read pool threads through _historyLandedGate, _reReadRequests
-	// from the distributor task only.
+	// All emit after _gate is released, one at a time under _emitGate: _changed from the distributor task and re-read
+	// pool threads, _historyLanded from re-read pool threads, _reReadRequests from the distributor task only. Dispose
+	// takes _emitGate too, so no emit reaches a disposed subject; _subjectsDisposed is read and written under it.
+	private readonly Lock _emitGate = new();
 	private readonly Subject<Unit> _changed = new();
-	private readonly ISubject<Unit> _changedGate;
 	private readonly Subject<Unit> _historyLanded = new();
-	private readonly ISubject<Unit> _historyLandedGate;
 	private readonly Subject<ReReadRequest> _reReadRequests = new();
+	private bool _subjectsDisposed;
 
 	public IntensityCache(TimeProvider timeProvider)
 	{
 		_timeProvider = timeProvider;
-		_changedGate = Subject.Synchronize(_changed);
-		_historyLandedGate = Subject.Synchronize(_historyLanded);
 		Changed = _changed.AsObservable();
 		HistoryLanded = _historyLanded.AsObservable();
 		ReReadRequested = _reReadRequests.AsObservable();
@@ -98,10 +96,10 @@ public sealed class IntensityCache : IDisposable
 
 		if (request is { } changed)
 		{
-			_reReadRequests.OnNext(changed);
+			Emit(_reReadRequests, changed);
 		}
 
-		_changedGate.OnNext(Unit.Default);
+		Emit(_changed, Unit.Default);
 	}
 
 	/// <summary>Inserts the points of a stored chunk read for the generation; a chunk of an older generation is ignored.</summary>
@@ -119,8 +117,8 @@ public sealed class IntensityCache : IDisposable
 			DropExpired();
 		}
 
-		_historyLandedGate.OnNext(Unit.Default);
-		_changedGate.OnNext(Unit.Default);
+		Emit(_historyLanded, Unit.Default);
+		Emit(_changed, Unit.Default);
 	}
 
 	/// <summary>Marks the generation's history as read in full, so a later change keeps its points for a return.</summary>
@@ -179,9 +177,25 @@ public sealed class IntensityCache : IDisposable
 			_disposed = true;
 		}
 
-		_changed.Dispose();
-		_historyLanded.Dispose();
-		_reReadRequests.Dispose();
+		lock (_emitGate)
+		{
+			_subjectsDisposed = true;
+			_changed.Dispose();
+			_historyLanded.Dispose();
+			_reReadRequests.Dispose();
+		}
+	}
+
+	/// <summary>Emits nothing once the subjects are disposed, also when a subscriber of an earlier emit disposed them.</summary>
+	private void Emit<T>(Subject<T> subject, T value)
+	{
+		lock (_emitGate)
+		{
+			if (!_subjectsDisposed)
+			{
+				subject.OnNext(value);
+			}
+		}
 	}
 
 	private TrendExtent? CurrentExtent()

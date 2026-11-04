@@ -280,7 +280,8 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
    live is disabled.
 2. Run `emu --port COM10 --device 2000`, select `COM11`, Connect. A point per second appears at the right edge of the
    trend; the Y label reads "Intensity" over "650 nm ±10 nm"; the time axis shows local time; the window's right edge
-   moves with the clock; the overview band grows from the left.
+   moves with the clock; the overview band fills the strip and the highlight covers it until there is more data than
+   the window.
 3. Hover the trend: a vertical line follows the pointer and the readout shows the local time and the value. Move off
    the plot: both disappear.
 4. With more than 10 min of data, or with the 1 min preset, drag the trend to the right by more than 4 px: the window
@@ -289,19 +290,20 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
 5. After a pan has stopped following, wheel over the middle of the trend: the time under the cursor stays under the
    cursor while the span narrows or widens (a zoom-out stops at the first point). The preset box turns empty after the
    zoom; pick each preset, also from the empty box: the width changes, and while following the right edge stays at
-   now.
+   now. While following, wheel in at the right edge: following keeps.
 6. Click a point on the trend without moving the mouse: the spectrum chart shows that moment's spectrum, a line over
-   the chart reads "Spectrum from HH:mm:ss" ("Спектр в HH:mm:ss" in Russian), the Updated row shows that time, a marker line stands at that moment on
+   the chart reads "Spectrum from HH:mm:ss" ("Спектр от HH:mm:ss" in Russian), the Updated row shows that time, a marker line stands at that moment on
    the trend, Back to live is enabled. New frames do not replace the shown spectrum. Press Back to live: the latest
    spectrum shows, the line and the marker disappear.
-7. Restart the emulator with `--device 2000 --wavelength 400 --delta 25`. Within about 1 s the trend re-reads: the Y
-   label changes to 400 nm ±25 nm and the whole visible history is redrawn at 400 nm; older history fills in after.
+7. With more than 10 min of data (or the 1 min preset), restart the emulator with
+   `--device 2000 --wavelength 400 --delta 25`. Within about 1 s the trend re-reads: the Y label changes to
+   400 nm ±25 nm and the whole visible history is redrawn at 400 nm; older history fills in after.
    A gap stands at the restart (the emulator's `seq` starts again; within 10 s the readout reads the link's count, for
    example "199 spectra lost"). Spectra the store did not write are absent from the redrawn history.
-8. Stop the emulator, wait more than 10 s (15 s), then start it again: within a second of the stop an empty span
-   opens at the right edge; the line breaks over the silence; hover the gap: "No spectra". Then restart it with
-   `--device 2000 --rate 0` for 15 s (heartbeats only) and back to `--rate 1`: the line breaks again and the readout
-   says "No spectra".
+8. Stop the emulator, wait more than 10 s (15 s), then start it again with `--device 2000`: the empty span at the
+   right edge grows during the 15 s wait; the line breaks over the silence; hover the gap: "No spectra". Stop it
+   again, wait more than 10 s, then start it with `--device 2000 --rate 0` for 15 s (heartbeats only) and back to
+   `--device 2000 --rate 1`: the line breaks again and the readout says "No spectra".
 
    Each restart in steps 9 to 12 that comes within 10 s of the last frame also breaks the line once at the restart with
    the link's loss count; that break is not the one the step checks.
@@ -313,8 +315,9 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
     with no uncovered gap.
 11. Restart with `--device 2000 --dark-every 3`: every third point drops to 0.
 12. Restart with `--device 2000 --both-connected --failed 8000`: the failure strip shows under the line while the
-    heartbeats carry the bit; the strip is one bar, not dashes; the readout names "Measurement failed: ATP-8000".
-    (`--failed` of the emulated device shows only in heartbeats, `board-protocol.md:360`.) Then run
+    spectra carry the bit; the strip is one bar, not dashes; the readout names "Measurement failed: ATP-8000".
+    (The ATP-2000 spectra carry the ATP-8000 bit; at `--rate 1` the emulator sends no heartbeats. Only the emulated
+    device's own bit shows in heartbeats only, `board-protocol.md:360`.) Then run
     `--device 2000 --rate 0 --failed 2000` for 15 s and back to `--device 2000`: the strip covers the heartbeat-only
     stretch, and hovering its gap reads "No spectra" with "Measurement failed: ATP-2000" under it.
 13. Pick the 24 h preset after several minutes: the whole history shows without delay. Pick the 1 min or 10 min preset
@@ -576,7 +579,7 @@ New resx keys (en / ru):
 | `TrendReadoutUncoveredFormat` | Spectrometer does not cover {0} nm | {0} нм вне диапазона спектрометра |
 | `TrendReadoutFailedFormat` | Measurement failed: {0} | Ошибка измерения: {0} |
 | `ChartBackToLive` | Back to live | Вернуться к текущему |
-| `SpectrumHistoricalFormat` | Spectrum from {0} | Спектр в {0} |
+| `SpectrumHistoricalFormat` | Spectrum from {0} | Спектр от {0} |
 | `TrendHistoryTitle`, `TrendHistoryDetail` (no remedy key; the mapper passes an empty remedy) | The trend history could not be read / The stored spectra at the new wavelength or window could not be read; the trend shows only the data since the change. / (empty) | Не удалось прочитать историю тренда / Сохранённые спектры на новой длине волны или ширине окна не прочитаны; тренд показывает только данные после смены. / (пусто) |
 | `TrendMomentTitle`, `TrendMomentDetail`, `TrendMomentRemedy` | The spectrum of that moment could not be read / The stored spectrum at the clicked time could not be read. / Click another moment. | Не удалось прочитать спектр этого момента / Сохранённый спектр на выбранное время не прочитан. / Выберите другой момент. |
 

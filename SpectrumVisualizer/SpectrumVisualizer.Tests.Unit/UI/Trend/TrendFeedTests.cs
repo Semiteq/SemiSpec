@@ -1,3 +1,5 @@
+using System.Reactive.Concurrency;
+
 using Avalonia.Headless.XUnit;
 
 using AwesomeAssertions;
@@ -292,6 +294,31 @@ public sealed class TrendFeedTests : TrendFeedTestBase
 	}
 
 	[AvaloniaFact]
+	public async Task BackToLiveDropsAMomentReadAlreadyQueuedForTheUiThread()
+	{
+		var ui = new CountingScheduler();
+		using var feed = new TrendFeed(
+			Distributor, Cache, Chart, Switching, ReadPointsAsync, ReadSpectrumAsync, MessagePanel, ui, Throttle, FeedLogger);
+		feed.Start();
+		AddSpectra(0, 300);
+		feed.ReadMoment(At(250));
+		ui.Start();
+		Switching.ShownMoment.Should().Be(At(250), "the moment lies inside the recent spectra");
+		SpectrumResult = call => Result.Ok<StoredSpectrum?>(Stored(call.Moment));
+		HoldSpectrum();
+		feed.ReadMoment(At(10));
+		await Waits.UntilAsync(() => SpectrumCalls.Count == 1);
+		var queuedBefore = ui.Scheduled;
+		ReleaseSpectrum();
+		await Waits.UntilAsync(() => ui.Scheduled > queuedBefore);
+
+		Switching.ReturnToLive();
+		ui.Start();
+
+		Switching.ShownMoment.Should().BeNull("the read emitted before Back to live, and the chart stays live");
+	}
+
+	[AvaloniaFact]
 	public async Task StopCancelsTheReadsAndAwaitsThem()
 	{
 		Feed.Start();
@@ -310,5 +337,22 @@ public sealed class TrendFeedTests : TrendFeedTestBase
 		ReleasePoints();
 		ReleaseSpectrum();
 		await stop.WaitAsync(Waits.Limit);
+	}
+
+	/// <summary>Counts the work queued on it, so a test sees a UI hop waiting without running it.</summary>
+	private sealed class CountingScheduler : TestScheduler
+	{
+		// Written by the pool thread of a read, read by the test thread.
+		private int _scheduled;
+
+		public int Scheduled => Volatile.Read(ref _scheduled);
+
+		public override IDisposable ScheduleAbsolute<TState>(
+			TState state, long dueTime, Func<IScheduler, TState, IDisposable> action)
+		{
+			var scheduled = base.ScheduleAbsolute(state, dueTime, action);
+			Interlocked.Increment(ref _scheduled);
+			return scheduled;
+		}
 	}
 }

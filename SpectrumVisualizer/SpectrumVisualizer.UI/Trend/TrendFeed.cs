@@ -50,6 +50,9 @@ public sealed class TrendFeed(
 	private bool _started;
 	private volatile bool _stopped;
 
+	// UI thread only: the moment of the last click, null after Back to live; a read of any other moment shows nothing.
+	private DateTimeOffset? _requestedMoment;
+
 	/// <summary>Subscribes the distributor and both read pipelines once; does nothing after a start or a stop.</summary>
 	public void Start()
 	{
@@ -65,7 +68,7 @@ public sealed class TrendFeed(
 		_subscriptions.Add(source
 			.WhenAnyValue(switching => switching.ShownMoment)
 			.Where(shown => shown is null)
-			.Subscribe(_ => _momentRequests.OnNext(null), ReportPipelineFailure));
+			.Subscribe(_ => RequestMoment(null), ReportPipelineFailure));
 		_subscriptions.Add(distributor.Frames.Subscribe(cache.Add, ReportPipelineFailure));
 		logger.LogDebug("The trend feed started");
 	}
@@ -78,7 +81,7 @@ public sealed class TrendFeed(
 			return;
 		}
 
-		_momentRequests.OnNext(moment);
+		RequestMoment(moment);
 	}
 
 	/// <summary>Unsubscribes, cancels the reads and completes once every read has ended.</summary>
@@ -178,12 +181,18 @@ public sealed class TrendFeed(
 		messagePanel.TryReportFailure(error, logger, uiScheduler);
 	}
 
+	private void RequestMoment(DateTimeOffset? moment)
+	{
+		_requestedMoment = moment;
+		_momentRequests.OnNext(moment);
+	}
+
+	/// <summary>Each read hops to the UI thread before Switch, so a newer request drops a read still queued for it.</summary>
 	private IDisposable SubscribeToMomentReads()
 	{
 		return _momentRequests
-			.Select(ReadMomentFrom)
+			.Select(requested => ReadMomentFrom(requested).ObserveOn(uiScheduler))
 			.Switch()
-			.ObserveOn(uiScheduler)
 			.Subscribe(ShowRead, ReportPipelineFailure);
 	}
 
@@ -228,6 +237,11 @@ public sealed class TrendFeed(
 
 	private void ShowRead(MomentRead read)
 	{
+		if (read.Moment != _requestedMoment)
+		{
+			return;
+		}
+
 		if (read.Result.IsFailed)
 		{
 			messagePanel.TryReportFailure(new TrendMomentError().CausedBy(read.Result.Errors), logger, uiScheduler);
