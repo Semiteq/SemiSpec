@@ -10,6 +10,7 @@ using ReactiveUI;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.Messages;
 using SpectrumVisualizer.UI.Spectrum;
+using SpectrumVisualizer.UI.Trend;
 
 namespace SpectrumVisualizer.UI.MainWindow;
 
@@ -26,6 +27,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 		ConnectionBarViewModel connectionBar,
 		AppStatusBarViewModel statusBar,
 		SpectrumViewModel spectrum,
+		TrendViewModel trend,
 		LogLevelControl logLevelControl,
 		ILogger<MainWindowViewModel> logger)
 	{
@@ -33,6 +35,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 		ConnectionBar = connectionBar;
 		StatusBar = statusBar;
 		Spectrum = spectrum;
+		Trend = trend;
 		_logLevelControl = logLevelControl;
 		_logger = logger;
 
@@ -49,6 +52,8 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 	public AppStatusBarViewModel StatusBar { get; }
 
 	public SpectrumViewModel Spectrum { get; }
+
+	public TrendViewModel Trend { get; }
 
 	public IObservable<Unit> ExitRequests => _exitRequests.AsObservable();
 

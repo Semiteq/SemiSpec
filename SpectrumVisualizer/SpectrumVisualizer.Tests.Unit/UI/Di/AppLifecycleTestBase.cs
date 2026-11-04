@@ -7,12 +7,15 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Serilog;
 
 using SpectrumVisualizer.Core;
+using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Tests.Unit.UI.Link;
 using SpectrumVisualizer.Tests.Unit.UI.Logging;
 using SpectrumVisualizer.UI;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.Store;
+
+using Xunit;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Di;
 
@@ -74,6 +77,30 @@ public abstract class AppLifecycleTestBase : IAsyncDisposable
 	protected List<string> LoggedTemplates()
 	{
 		return [.. _sink.Events.Select(logEvent => logEvent.MessageTemplate.Text)];
+	}
+
+	/// <summary>
+	/// The distributor hands the frame to every subscriber before its stop completes, and the store drains its queue
+	/// before Closed.
+	/// </summary>
+	protected async Task PushOneFrameThenCloseAsync(IServiceProvider provider, Window window, BoardFrame frame)
+	{
+		await using var port = new FakePortStream();
+		PortProvider.QueueOpen(port);
+		var link = provider.GetRequiredService<SerialLink>();
+		var received = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+		using var subscription = provider.GetRequiredService<FrameDistributor>().Frames
+			.Subscribe(_ => received.TrySetResult());
+		var closed = new TaskCompletionSource();
+		window.Closed += (_, _) => closed.TrySetResult();
+		link.Connect(PortName);
+		await port.WaitForPendingReadAsync().WaitAsync(WaitLimit, TestContext.Current.CancellationToken);
+
+		port.PushBytes(FrameEncoder.Encode(frame));
+		await received.Task.WaitAsync(WaitLimit, TestContext.Current.CancellationToken);
+		window.Close();
+
+		await closed.Task.WaitAsync(WaitLimit, TestContext.Current.CancellationToken);
 	}
 
 	protected static Window ShowMainWindow(IServiceProvider provider)

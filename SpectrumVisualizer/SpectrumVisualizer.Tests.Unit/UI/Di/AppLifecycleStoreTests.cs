@@ -1,4 +1,3 @@
-using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 
 using AwesomeAssertions;
@@ -7,8 +6,6 @@ using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 
 using SpectrumVisualizer.Core.Protocol;
-using SpectrumVisualizer.Tests.Unit.UI.Link;
-using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Store;
 
 using Xunit;
@@ -69,30 +66,6 @@ public sealed class AppLifecycleStoreTests : AppLifecycleTestBase
 		var wal = new FileInfo(storePath + "-wal");
 		wal.Exists.Should().BeTrue("the idle connection keeps the WAL file");
 		wal.Length.Should().Be(0);
-	}
-
-	/// <summary>
-	/// The distributor hands the frame to every subscriber before its stop completes, and the store drains its queue
-	/// before Closed.
-	/// </summary>
-	private async Task PushOneFrameThenCloseAsync(IServiceProvider provider, Window window, BoardFrame frame)
-	{
-		await using var port = new FakePortStream();
-		PortProvider.QueueOpen(port);
-		var link = provider.GetRequiredService<SerialLink>();
-		var received = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-		using var subscription = provider.GetRequiredService<FrameDistributor>().Frames
-			.Subscribe(_ => received.TrySetResult());
-		var closed = new TaskCompletionSource();
-		window.Closed += (_, _) => closed.TrySetResult();
-		link.Connect(PortName);
-		await port.WaitForPendingReadAsync().WaitAsync(WaitLimit, TestContext.Current.CancellationToken);
-
-		port.PushBytes(FrameEncoder.Encode(frame));
-		await received.Task.WaitAsync(WaitLimit, TestContext.Current.CancellationToken);
-		window.Close();
-
-		await closed.Task.WaitAsync(WaitLimit, TestContext.Current.CancellationToken);
 	}
 
 	private static string? StoredSpectrumSeqs(IServiceProvider provider)

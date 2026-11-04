@@ -57,6 +57,7 @@ public sealed class TrendFeed(
 		_subscriptions.Add(SubscribeToHistoryReads());
 		_subscriptions.Add(SubscribeToMomentReads());
 		_subscriptions.Add(distributor.Frames.Subscribe(cache.Add, ReportPipelineFailure));
+		logger.LogDebug("The trend feed started");
 	}
 
 	/// <summary>Reads the spectrum at or before the moment and shows it, in place of the moment read in flight.</summary>
@@ -82,6 +83,7 @@ public sealed class TrendFeed(
 		}
 
 		await Task.WhenAll(reads).ConfigureAwait(false);
+		logger.LogDebug("The trend feed stopped");
 	}
 
 	/// <summary>Cancels the reads without waiting, for the container's synchronous dispose.</summary>

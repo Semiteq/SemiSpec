@@ -8,8 +8,6 @@ using AwesomeAssertions;
 
 using FluentResults;
 
-using Microsoft.Extensions.Logging;
-
 using SpectrumVisualizer.Core.Store;
 using SpectrumVisualizer.Tests.Unit.Core.Store;
 using SpectrumVisualizer.UI.Localization;
@@ -130,7 +128,8 @@ public sealed class TrendViewModelTests : TrendFeedTestBase
 
 		_trend.ShowMoment(At(10));
 
-		await Waits.UntilAsync(() => FeedLogger.Collector.GetSnapshot().Any(record => record.Level == LogLevel.Debug));
+		await Waits.UntilAsync(() => FeedLogger.Collector.GetSnapshot()
+			.Any(record => record.Message.StartsWith("No stored spectrum", StringComparison.Ordinal)));
 		Switching.ShownMoment.Should().BeNull();
 		Switching.Current.Should().BeNull();
 		MessagePanel.Entries.Should().BeEmpty();

@@ -16,6 +16,7 @@ using ReactiveUI.Avalonia;
 using SpectrumVisualizer.Tests.Unit.UI.Link;
 using SpectrumVisualizer.Tests.Unit.UI.Spectrum;
 using SpectrumVisualizer.Tests.Unit.UI.Store;
+using SpectrumVisualizer.Tests.Unit.UI.Trend;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Logging;
@@ -42,6 +43,7 @@ public sealed class MainWindowViewTests : IDisposable
 	private readonly FakeDisplayedSpectrumSource _spectrumSource = new();
 	private readonly SwitchingSpectrumSource _switchingSource;
 	private readonly SpectrumViewModel _spectrum;
+	private readonly TrendStand _trend;
 	private readonly MainWindowViewModel _viewModel;
 	private readonly MainWindowView _window;
 
@@ -69,11 +71,13 @@ public sealed class MainWindowViewTests : IDisposable
 			TimeProvider.System,
 			AvaloniaScheduler.Instance,
 			NullLogger<SpectrumViewModel>.Instance);
+		_trend = new TrendStand(_switchingSource, _messagePanel);
 		_viewModel = new MainWindowViewModel(
 			_messagePanel,
 			_connectionBar,
 			_statusBar,
 			_spectrum,
+			_trend.Trend,
 			new LogLevelControl(),
 			NullLogger<MainWindowViewModel>.Instance);
 		_window = new MainWindowView { DataContext = _viewModel };
@@ -204,6 +208,7 @@ public sealed class MainWindowViewTests : IDisposable
 		_window.Close();
 		_viewModel.Dispose();
 		_spectrum.Dispose();
+		_trend.Dispose();
 		_switchingSource.Dispose();
 		_spectrumSource.Dispose();
 		_connectionBar.Dispose();

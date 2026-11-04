@@ -17,6 +17,7 @@ using SpectrumVisualizer.Tests.Unit.UI.Link;
 using SpectrumVisualizer.Tests.Unit.UI.Logging;
 using SpectrumVisualizer.Tests.Unit.UI.Spectrum;
 using SpectrumVisualizer.Tests.Unit.UI.Store;
+using SpectrumVisualizer.Tests.Unit.UI.Trend;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
@@ -44,6 +45,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 	private readonly FakeDisplayedSpectrumSource _spectrumSource = new();
 	private readonly SwitchingSpectrumSource _switchingSource;
 	private readonly SpectrumViewModel _spectrum;
+	private readonly TrendStand _trend;
 	private readonly MainWindowViewModel _viewModel;
 
 	public MainWindowViewModelTests()
@@ -75,11 +77,13 @@ public sealed class MainWindowViewModelTests : IDisposable
 			TimeProvider.System,
 			ImmediateScheduler.Instance,
 			NullLogger<SpectrumViewModel>.Instance);
+		_trend = new TrendStand(_switchingSource, _messagePanel);
 		_viewModel = new MainWindowViewModel(
 			_messagePanel,
 			_connectionBar,
 			_statusBar,
 			_spectrum,
+			_trend.Trend,
 			_logLevelControl,
 			_loggerFactory.CreateLogger<MainWindowViewModel>());
 	}
@@ -160,6 +164,19 @@ public sealed class MainWindowViewModelTests : IDisposable
 	}
 
 	[AvaloniaFact]
+	public void DisposeLeavesTheInjectedTrendToItsOwner()
+	{
+		var trend = _viewModel.Trend;
+		var oneMinute = trend.Presets[0];
+
+		_viewModel.Dispose();
+		trend.SelectedPreset = oneMinute;
+
+		trend.Should().BeSameAs(_trend.Trend);
+		trend.Chart.Width.Should().Be(oneMinute.Width, "the trend view model still drives its chart");
+	}
+
+	[AvaloniaFact]
 	public void DisposeLeavesTheInjectedSpectrumToItsOwner()
 	{
 		var spectrum = SpectrumSamples.Atp8000Peak;
@@ -186,6 +203,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 	{
 		_viewModel.Dispose();
 		_spectrum.Dispose();
+		_trend.Dispose();
 		_switchingSource.Dispose();
 		_spectrumSource.Dispose();
 		_connectionBar.Dispose();

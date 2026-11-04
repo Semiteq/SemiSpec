@@ -808,16 +808,16 @@ Data flow:
   `UI/MainWindow/MainWindowViewModelTests.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Di/AppLifecycleTrendTests.cs`
 
-- [ ] register `SpectrumHistory` over `StoreFile.Path`, `IntensityCache`, `TrendFeed` and `TrendViewModel`, all
+- [x] register `SpectrumHistory` over `StoreFile.Path`, `IntensityCache`, `TrendFeed` and `TrendViewModel`, all
   singletons
-- [ ] ➕ register `TrendChartViewModel` and `OverviewViewModel` as singletons too: `TrendViewModel(chart, overview,
+- [x] ➕ register `TrendChartViewModel` and `OverviewViewModel` as singletons too: `TrendViewModel(chart, overview,
   feed)` takes both from the container
-- [ ] start the feed between the store and the distributor (`App.axaml.cs:74-80`); stop it after the distributor and
+- [x] start the feed between the store and the distributor (`App.axaml.cs:74-80`); stop it after the distributor and
   before the store in `StopLinkDistributorThenStoreAsync` (`:146-164`), each stop in a `finally` of the one before; add
   it to `ConfiguredServices`
-- [ ] add `TrendViewModel Trend` to `MainWindowViewModel`
-- [ ] write the Di tests of Acceptance Evidence item 5
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] add `TrendViewModel Trend` to `MainWindowViewModel`
+- [x] write the Di tests of Acceptance Evidence item 5
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (879 of 879)
 
 ### Task 13: Main window layout and the side pane sections
 **Files:**

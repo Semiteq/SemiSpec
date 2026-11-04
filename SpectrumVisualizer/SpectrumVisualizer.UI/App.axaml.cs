@@ -18,6 +18,7 @@ using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
 using SpectrumVisualizer.UI.Store;
+using SpectrumVisualizer.UI.Trend;
 
 namespace SpectrumVisualizer.UI;
 
@@ -74,8 +75,9 @@ public class App : Application
 		window.Opened += (_, _) =>
 		{
 			services.MainWindow.ConnectionBar.RefreshPorts();
-			// The store subscribes before the distributor reads its first frame.
+			// The store and the trend feed subscribe before the distributor reads its first frame.
 			services.SpectrumStore.Start();
+			services.TrendFeed.Start();
 			services.FrameDistributor.Start();
 		};
 		window.Closing += (sender, e) => OnMainWindowClosing(services, sender, e);
@@ -84,8 +86,8 @@ public class App : Application
 	}
 
 	/// <summary>
-	/// Holds an operator close until the link, the frame distributor and the spectrum store have stopped, at most for
-	/// the stop limit.
+	/// Holds an operator close until the link, the frame distributor, the trend feed and the spectrum store have
+	/// stopped, at most for the stop limit.
 	/// </summary>
 	private async void OnMainWindowClosing(ConfiguredServices services, object? sender, WindowClosingEventArgs e)
 	{
@@ -113,7 +115,7 @@ public class App : Application
 		{
 			services.Logger.LogError(
 				exception,
-				"Stopping the link, the frame distributor and the spectrum store on window close failed");
+				"Stopping the link, the frame distributor, the trend feed and the spectrum store on window close failed");
 		}
 	}
 
@@ -127,7 +129,7 @@ public class App : Application
 		catch (TimeoutException)
 		{
 			services.Logger.LogWarning(
-				"The link, the frame distributor and the spectrum store did not stop within {Limit}; "
+				"The link, the frame distributor, the trend feed and the spectrum store did not stop within {Limit}; "
 				+ "the window closes anyway",
 				_backgroundStopLimit);
 		}
@@ -135,13 +137,15 @@ public class App : Application
 		{
 			services.Logger.LogError(
 				exception,
-				"Stopping the link, the frame distributor and the spectrum store failed; the window closes anyway");
+				"Stopping the link, the frame distributor, the trend feed and the spectrum store failed; "
+				+ "the window closes anyway");
 		}
 	}
 
 	/// <summary>
 	/// The link stops first, so no frame enters the channel after the distributor has stopped reading it, and the
-	/// distributor before the store, so no frame reaches the store after its queue has closed.
+	/// distributor before the store, so no frame reaches the store after its queue has closed. The trend feed stops in
+	/// between, so no trend read holds a snapshot when the store checkpoints.
 	/// </summary>
 	private static async Task StopLinkDistributorThenStoreAsync(ConfiguredServices services)
 	{
@@ -158,7 +162,14 @@ public class App : Application
 			}
 			finally
 			{
-				await services.SpectrumStore.StopAsync(storeDrain.Token);
+				try
+				{
+					await services.TrendFeed.StopAsync();
+				}
+				finally
+				{
+					await services.SpectrumStore.StopAsync(storeDrain.Token);
+				}
 			}
 		}
 	}
@@ -192,6 +203,7 @@ public class App : Application
 			services.GetRequiredService<MessagePanelViewModel>(),
 			services.GetRequiredService<SerialLink>(),
 			services.GetRequiredService<FrameDistributor>(),
+			services.GetRequiredService<TrendFeed>(),
 			services.GetRequiredService<SpectrumStore>(),
 			services.GetRequiredService<ILogger<App>>());
 	}
@@ -219,6 +231,7 @@ public class App : Application
 		MessagePanelViewModel MessagePanel,
 		SerialLink SerialLink,
 		FrameDistributor FrameDistributor,
+		TrendFeed TrendFeed,
 		SpectrumStore SpectrumStore,
 		ILogger<App> Logger);
 }

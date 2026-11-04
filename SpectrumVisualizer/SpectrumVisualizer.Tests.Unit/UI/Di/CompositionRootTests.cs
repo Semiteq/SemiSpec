@@ -14,6 +14,8 @@ using Serilog;
 using Serilog.Events;
 
 using SpectrumVisualizer.Core;
+using SpectrumVisualizer.Core.Store;
+using SpectrumVisualizer.Core.Trend;
 using SpectrumVisualizer.Tests.Unit.UI.Logging;
 using SpectrumVisualizer.UI;
 using SpectrumVisualizer.UI.Link;
@@ -22,6 +24,7 @@ using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
 using SpectrumVisualizer.UI.Spectrum;
 using SpectrumVisualizer.UI.Store;
+using SpectrumVisualizer.UI.Trend;
 
 using Xunit;
 
@@ -117,6 +120,40 @@ public sealed class CompositionRootTests : IAsyncDisposable
 	}
 
 	[AvaloniaFact]
+	public void TheTrendPartsAreOneInstanceEach()
+	{
+		using var provider = BuildContainer();
+
+		ShouldBeOneInstance<IntensityCache>(provider);
+		ShouldBeOneInstance<SpectrumHistory>(provider);
+		ShouldBeOneInstance<TrendFeed>(provider);
+		ShouldBeOneInstance<TrendChartViewModel>(provider);
+		ShouldBeOneInstance<OverviewViewModel>(provider);
+		ShouldBeOneInstance<TrendViewModel>(provider);
+	}
+
+	[AvaloniaFact]
+	public void TheTrendViewModelSharesTheContainersChartAndOverview()
+	{
+		using var provider = BuildContainer();
+
+		var trend = provider.GetRequiredService<TrendViewModel>();
+
+		trend.Chart.Should().BeSameAs(provider.GetRequiredService<TrendChartViewModel>());
+		trend.Overview.Should().BeSameAs(provider.GetRequiredService<OverviewViewModel>());
+	}
+
+	[AvaloniaFact]
+	public void TheMainWindowShowsTheContainersTrendViewModel()
+	{
+		using var provider = BuildContainer();
+
+		var trend = provider.GetRequiredService<MainWindowViewModel>().Trend;
+
+		trend.Should().BeSameAs(provider.GetRequiredService<TrendViewModel>());
+	}
+
+	[AvaloniaFact]
 	public void TheMainWindowShowsTheContainersStatusBarSeededFromTheLink()
 	{
 		using var provider = BuildContainer();
@@ -189,6 +226,12 @@ public sealed class CompositionRootTests : IAsyncDisposable
 		var createMainWindow = () => new App().CreateMainWindow();
 
 		createMainWindow.Should().Throw<InvalidOperationException>();
+	}
+
+	private static void ShouldBeOneInstance<T>(IServiceProvider provider)
+		where T : notnull
+	{
+		provider.GetRequiredService<T>().Should().BeSameAs(provider.GetRequiredService<T>(), typeof(T).Name);
 	}
 
 	private ServiceProvider BuildContainer()
