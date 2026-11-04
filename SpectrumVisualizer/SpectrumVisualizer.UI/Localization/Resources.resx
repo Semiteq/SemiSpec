@@ -280,7 +280,8 @@
     <value>Intensity</value>
   </data>
   <data name="TrendAxisIntensityFormat" xml:space="preserve">
-    <value>Intensity at {0} nm ±{1} nm</value>
+    <value>Intensity
+{0} nm ±{1} nm</value>
   </data>
   <data name="TrendEmpty" xml:space="preserve">
     <value>No intensity yet. It appears with the first spectrum.</value>

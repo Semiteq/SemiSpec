@@ -280,7 +280,8 @@
     <value>Интенсивность</value>
   </data>
   <data name="TrendAxisIntensityFormat" xml:space="preserve">
-    <value>Интенсивность на {0} нм ±{1} нм</value>
+    <value>Интенсивность
+{0} нм ±{1} нм</value>
   </data>
   <data name="TrendEmpty" xml:space="preserve">
     <value>Интенсивности пока нет. Она появится с первым спектром.</value>

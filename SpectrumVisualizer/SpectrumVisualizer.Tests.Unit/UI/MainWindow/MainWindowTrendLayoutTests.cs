@@ -4,17 +4,24 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
+using Avalonia.Layout;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 
 using AwesomeAssertions;
 
+using Microsoft.Extensions.Logging.Abstractions;
+
 using SpectrumVisualizer.UI.Localization;
+using SpectrumVisualizer.UI.Messages;
 using SpectrumVisualizer.UI.Spectrum;
 using SpectrumVisualizer.UI.Trend;
 
 using Xunit;
 
 using static SpectrumVisualizer.Tests.Unit.UI.Spectrum.SpectrumSamples;
+
+using MainWindowView = SpectrumVisualizer.UI.MainWindow.MainWindow;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.MainWindow;
 
@@ -24,8 +31,9 @@ namespace SpectrumVisualizer.Tests.Unit.UI.MainWindow;
 [Trait("Category", "Unit")]
 public sealed class MainWindowTrendLayoutTests : MainWindowLayoutTestBase
 {
-	private const double ChartRowMinHeight = 260;
 	private const double OverviewHeight = 37;
+
+	private static readonly string[] _trendParts = ["TrendHeader", "TimeWindowLabel", "TimeWindowPreset", "FollowLive"];
 
 	[AvaloniaFact]
 	public void TheContentAreaSplitsTheChartRowsThreeToTwoAboveTheirFloorAndEndsWithTheOverview()
@@ -34,7 +42,8 @@ public sealed class MainWindowTrendLayoutTests : MainWindowLayoutTestBase
 
 		content.RowDefinitions.Select(row => row.Height)
 			.Should().Equal(new GridLength(3, GridUnitType.Star), new GridLength(2, GridUnitType.Star), GridLength.Auto);
-		content.RowDefinitions.Select(row => row.MinHeight).Should().Equal(ChartRowMinHeight, ChartRowMinHeight, 0);
+		content.RowDefinitions.Select(row => row.MinHeight)
+			.Should().Equal(MainWindowView.SpectrumRowMinHeight, MainWindowView.TrendRowMinHeight, 0);
 	}
 
 	[AvaloniaFact]
@@ -87,6 +96,10 @@ public sealed class MainWindowTrendLayoutTests : MainWindowLayoutTestBase
 	{
 		var pane = Named<Border>(Realise(), "SignalPane");
 
+		var form = (Grid)pane.GetVisualDescendants().OfType<TrendPanel>().Single().Content!;
+		var formOrigin = form.TranslatePoint(default, pane)!.Value;
+		var scroll = Named<ScrollViewer>(pane, "SidePaneScroll");
+
 		double Left(string name)
 		{
 			return Named<Control>(pane, name).TranslatePoint(default, pane)!.Value.X;
@@ -103,12 +116,92 @@ public sealed class MainWindowTrendLayoutTests : MainWindowLayoutTestBase
 			return Top(name) + Named<Control>(pane, name).Bounds.Height;
 		}
 
+		// The arranged slot is the grid cell, so a centred text's rounding inside its row does not count as a gap.
+		Rect Cell(string name)
+		{
+			return LayoutInformation.GetPreviousArrangeBounds(Named<Control>(pane, name))!.Value;
+		}
+
+		var rightInset = pane.Bounds.Width - scroll.TranslatePoint(default, pane)!.Value.X - scroll.Bounds.Width;
+		TestContext.Current.TestOutputHelper?.WriteLine(
+			$"trend form at {formOrigin}, right inset {rightInset}, label column {Cell("TimeWindowLabel").Width}, "
+			+ $"header {Top("TrendHeader") - Bottom("BackToLive")} above and "
+			+ $"{Cell("TimeWindowLabel").Top - Cell("TrendHeader").Bottom} below, "
+			+ $"field {Left("TimeWindowPreset") - formOrigin.X - Cell("TimeWindowLabel").Right} after the labels, "
+			+ $"rows {Top("FollowLive") - Bottom("TimeWindowPreset")} apart");
+		formOrigin.X.Should().Be(PaneBorder + PanePadding, "the left border and the pane padding");
+		rightInset.Should().Be(PanePadding, "equal padding on both sides");
 		Left("TimeWindowLabel").Should().Be(Left("DeviceLabel"), "one label edge");
+		Left("TimeWindowPreset").Should().Be(formOrigin.X + Cell("TimeWindowLabel").Right + LabelToField);
 		new[] { Left("TimeWindowPreset"), Left("FollowLive") }
 			.Should().AllSatisfy(left => left.Should().Be(Left("ResetScale"), "one field edge across both sections"));
 		(Top("TrendHeader") - Bottom("BackToLive")).Should().Be(SectionHeaderAbove);
-		(Top("TimeWindowPreset") - Bottom("TrendHeader")).Should().BeGreaterThanOrEqualTo(RowSpacing);
+		(Cell("TimeWindowLabel").Top - Cell("TrendHeader").Bottom).Should().Be(RowSpacing, "8 below a section header");
 		(Top("FollowLive") - Bottom("TimeWindowPreset")).Should().Be(RowSpacing);
+	}
+
+	[AvaloniaFact]
+	public void AtALargeWidthOnlyTheChartsAndTheOverviewGrowAndTheSidePaneKeepsItsContent()
+	{
+		var window = Realise();
+		var pane = Named<Border>(window, "SignalPane");
+		string[] chartPanes = ["SpectrumPane", "TrendPane", "OverviewPane"];
+		var openingWidths = chartPanes.Select(name => Named<Border>(window, name).Bounds.Width).ToList();
+		var openingOffsets = TrendOffsets(pane);
+
+		window.Width = LargeWidth;
+		Dispatcher.UIThread.RunJobs();
+
+		pane.Bounds.Width.Should().Be(SpectrumPanel.PaneWidth);
+		chartPanes.Select(name => Named<Border>(window, name).Bounds.Width).Should().Equal(
+			openingWidths.Select(width => width + LargeWidth - MainWindowView.OpeningWidth),
+			"the charts and the overview take every added pixel");
+		TrendOffsets(pane).Should().Equal(openingOffsets, "the trend section stays left-aligned inside the pane");
+	}
+
+	[AvaloniaFact]
+	public void EveryTrendStateKeepsTheWindowAndThePaneBoundsAndTheMessagePanelScrollsThePane()
+	{
+		var window = Realise();
+		var shapes = new List<(string State, TrendShape Shape)> { ("no data", ShapeOf(window)) };
+		void Record(string state)
+		{
+			Trend.Sample();
+			Dispatcher.UIThread.RunJobs();
+			window.UpdateLayout();
+			shapes.Add((state, ShapeOf(window)));
+		}
+
+		Trend.AddSpectraEndingNow(TimeSpan.FromMinutes(20));
+		Record("live, following");
+		Trend.Trend.Chart.PanBy(TimeSpan.FromMinutes(-2));
+		Record("live, not following");
+		SwitchingSource.ShowMoment(Atp8000Peak.Measurement, ReceivedAt);
+		Record("historical");
+		SwitchingSource.ReturnToLive();
+		Record("back to live");
+		var opening = shapes[0].Shape;
+
+		MessagePanel.ReportFailure(new TrendHistoryError(), NullLogger.Instance);
+		Dispatcher.UIThread.RunJobs();
+		window.UpdateLayout();
+
+		Trend.Trend.Chart.HasPoints.Should().BeTrue();
+		Trend.Trend.Chart.IsFollowing.Should().BeFalse();
+		shapes.Select(shape => shape.Shape).Should().AllBeEquivalentTo(opening);
+		var failed = ShapeOf(window);
+		var messageHeight = Named<Border>(window, "MessagePanel").Bounds.Height;
+		var scroll = Named<ScrollViewer>(window, "SidePaneScroll");
+		TestContext.Current.TestOutputHelper?.WriteLine(
+			$"{window.Bounds.Size} with the message panel ({messageHeight} px): side pane {failed.Pane.Height} px high, "
+			+ $"scroll extent {scroll.Extent.Height} px in a {scroll.Viewport.Height} px viewport");
+		failed.Window.Should().Be(opening.Window, "a failed re-read never changes the window size");
+		failed.Pane.Should().Be(opening.Pane.WithHeight(opening.Pane.Height - messageHeight));
+		new[] { failed.Spectrum, failed.Trend, failed.Overview }.Select(bounds => bounds.Width)
+			.Should().Equal(opening.Spectrum.Width, opening.Trend.Width, opening.Overview.Width);
+		scroll.ScrollBarMaximum.Y.Should().Be(
+			Math.Max(0, scroll.Extent.Height - scroll.Viewport.Height),
+			"every row of the side pane stays reachable by scrolling");
 	}
 
 	[AvaloniaFact]
@@ -136,7 +229,7 @@ public sealed class MainWindowTrendLayoutTests : MainWindowLayoutTestBase
 	{
 		var window = Realise();
 
-		window.Height = 480;
+		window.Height = MainWindowView.MinimumHeight;
 		Dispatcher.UIThread.RunJobs();
 
 		var pane = Named<Border>(window, "SignalPane");
@@ -145,8 +238,25 @@ public sealed class MainWindowTrendLayoutTests : MainWindowLayoutTestBase
 		scroll.HorizontalScrollBarVisibility.Should().Be(ScrollBarVisibility.Disabled);
 		pane.Bounds.Width.Should().Be(SpectrumPanel.PaneWidth);
 		pane.Bounds.Height.Should().BeGreaterThanOrEqualTo(
-			(2 * ChartRowMinHeight) + OverviewHeight,
+			MainWindowView.SpectrumRowMinHeight + MainWindowView.TrendRowMinHeight + OverviewHeight,
 			"the content area keeps both chart floors and the overview");
 		scroll.Extent.Height.Should().BeLessThanOrEqualTo(scroll.Viewport.Height, "every part shows without scrolling");
 	}
+
+	private static List<Point> TrendOffsets(Border pane)
+	{
+		return [.. _trendParts.Select(name => Named<Control>(pane, name).TranslatePoint(default, pane)!.Value)];
+	}
+
+	private static TrendShape ShapeOf(Window window)
+	{
+		return new TrendShape(
+			window.Bounds.Size,
+			Named<Border>(window, "SignalPane").Bounds,
+			Named<Border>(window, "SpectrumPane").Bounds,
+			Named<Border>(window, "TrendPane").Bounds,
+			Named<Border>(window, "OverviewPane").Bounds);
+	}
+
+	private sealed record TrendShape(Size Window, Rect Pane, Rect Spectrum, Rect Trend, Rect Overview);
 }

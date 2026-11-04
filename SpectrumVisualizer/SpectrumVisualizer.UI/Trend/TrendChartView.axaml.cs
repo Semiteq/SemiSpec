@@ -339,10 +339,14 @@ public partial class TrendChartView : UserControl
 		CrosshairLine.EndPoint = new Point(line.X, line.Bottom);
 		CrosshairLine.IsVisible = true;
 
-		ReadoutText.Text = readout;
-		Canvas.SetLeft(ReadoutBox, line.X);
-		Canvas.SetTop(ReadoutBox, line.Top);
+		// A hidden control measures as empty, so the box shows before it measures its new text.
 		ReadoutBox.IsVisible = true;
+		ReadoutText.Text = readout;
+		ReadoutBox.Measure(Size.Infinity);
+		var readoutWidth = ReadoutBox.DesiredSize.Width;
+		var fitsRightOfLine = line.X + readoutWidth <= Bounds.Width;
+		Canvas.SetLeft(ReadoutBox, fitsRightOfLine ? line.X : Math.Max(0.0, line.X - readoutWidth));
+		Canvas.SetTop(ReadoutBox, line.Top);
 	}
 
 	/// <summary>The hover line in device-independent pixels; null when the cursor is outside the data area.</summary>

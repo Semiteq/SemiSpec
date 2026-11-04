@@ -31,6 +31,22 @@ internal static class RenderedText
 			: throw new InvalidOperationException($"No candidate face holds every glyph of '{text}'.");
 	}
 
+	/// <summary>The tallest candidate face's line spacing, the height a one-line text block takes in that face.</summary>
+	public static double LineHeight(FontFamily family, double fontSize)
+	{
+		var tallest = 0d;
+		foreach (var typeface in Candidates(family, FontWeight.Normal))
+		{
+			using (typeface)
+			using (var font = new SKFont(typeface, (float)fontSize))
+			{
+				tallest = Math.Max(tallest, font.Spacing);
+			}
+		}
+
+		return tallest;
+	}
+
 	public static IReadOnlyList<string> InstalledFamilies(FontFamily family)
 	{
 		var installed = SKFontManager.Default.GetFontFamilies();

@@ -13,6 +13,18 @@ public partial class MainWindow : Window
 
 	public const double OpeningWidth = 1280;
 
+	/// <summary>
+	/// Holds the menu, the connection row, both chart floors, the overview, the message panel at its cap and the status
+	/// bar inside a maximised 1366 x 768 client (689 px); MainWindowChartHeightTests measures it.
+	/// </summary>
+	public const double MinimumHeight = 688;
+
+	/// <summary>The spectrum plot's 67 px of axis margins over a data area of at least 120 px.</summary>
+	public const double SpectrumRowMinHeight = 192;
+
+	/// <summary>The pane's 1 px border and the trend plot's 83 px of axis margins over a 120 px data area.</summary>
+	public const double TrendRowMinHeight = 208;
+
 	private IDisposable? _exitSubscription;
 
 	public MainWindow()

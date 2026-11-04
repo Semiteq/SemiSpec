@@ -16,6 +16,7 @@
         Width="{x:Static local:MainWindow.OpeningWidth}"
         Height="800"
         MinWidth="{x:Static local:MainWindow.MinimumWidth}"
+        MinHeight="{x:Static local:MainWindow.MinimumHeight}"
         WindowStartupLocation="CenterScreen">
 
     <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
@@ -35,12 +36,12 @@
         <Grid Grid.Row="2"
               Name="ContentArea"
               ColumnDefinitions="*,Auto">
-            <!-- The spectrum is the primary live view, so it takes the larger share; 260 keeps a readable data area. -->
+            <!-- The spectrum is the primary live view, so it takes the larger share. -->
             <Grid.RowDefinitions>
                 <RowDefinition Height="3*"
-                               MinHeight="260" />
+                               MinHeight="{x:Static local:MainWindow.SpectrumRowMinHeight}" />
                 <RowDefinition Height="2*"
-                               MinHeight="260" />
+                               MinHeight="{x:Static local:MainWindow.TrendRowMinHeight}" />
                 <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
 

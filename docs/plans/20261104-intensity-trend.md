@@ -234,8 +234,9 @@ Automatable (baseline: verified 2026-11-04, `dotnet test SpectrumVisualizer.slnx
    (rows of the content area; the trend under the spectrum chart, the overview under the trend, the side pane across
    all three; the side pane width unchanged at `SpectrumPanel.PaneWidth`) and `MainWindowTextFitTests` with the new
    pane texts, the trend axis labels and the readout lines in English and Russian, and `MinimumWidth` 1256 unchanged;
-   `MainWindowChartHeightTests` at 1280 x 800, 1366 x 768 (client 1366 x 689) and 1280 x 1024: the spectrum and trend
-   rows split 3 : 2 above their `MinHeight`, each data area keeps at least 200 px at 768, the overview stays 37 px.
+   `MainWindowChartHeightTests` at 1280 x 800, 1366 x 768 (client 1366 x 689) and 1280 x 1024, with and without the
+   message panel, and at the 688 px minimum: the spectrum and trend rows split 3 : 2 above their `MinHeight`, each data
+   area keeps at least 120 px, nothing runs past the window, the overview stays 37 px.
 5. `dotnet test SpectrumVisualizer.slnx --filter "Area=Di"` passes: the cache, the history, the feed, the switching
    source and the trend view models resolve as singletons; `IDisplayedSpectrumSource` resolves to the
    `SwitchingSpectrumSource`; `AppLifecycleTrendTests.OpeningTheWindowStartsTheTrendFeedBeforeTheDistributor` and
@@ -450,26 +451,39 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   spectrum chart in the left column, and the side pane keeps 392 px.
   - `ContentArea` gets `RowDefinitions="3*,2*,Auto"`: `SpectrumPane` (row 0), `TrendPane` (row 1, a 1 px top border in
     `AppBorderBrush`), `OverviewPane` (row 2, 36 px band plus a 1 px top border, 37 px). The spectrum takes the larger
-    share because it is the primary live view. Both chart rows carry `MinHeight` 260: ScottPlot's axis margins take
-    about 60 px (ASSUMPTION, measured in Task 14), so 260 keeps at least 200 px of data area.
-  - Heights, ASSUMPTION until Task 14 measures them (menu 32, connection row 49, status bar 37, so the content row is
-    the client height minus 118; the overview 37; the charts share the rest 3 : 2):
+    share because it is the primary live view. ScottPlot's axis margins, measured in Task 14, are 66.2 px on the
+    spectrum and 82.2 px on the trend (its time ticks take two lines, date over time), plus the trend pane's 1 px
+    border. The rows carry `MinHeight` 192 (spectrum) and 208 (trend), so each data area keeps at least 120 px; the
+    window's `MinHeight` is 688 (`MainWindow.MinimumHeight`), and the message panel's list scrolls past 64 px (one
+    three-line entry), so the panel stands at most 133 px.
+  - A 200 px data floor in both charts does not fit 1366 x 768: 200 + 66.2 and 200 + 83.2 make 551 px, the fixed rows
+    (menu 32, connection row 49, overview 37, status bar 35.6) make 154 px, so the window needs 705 px of client height
+    before the message panel; a maximised 1366 x 768 window gives 689. The floor is 120 px instead, and nothing is cut
+    with the message panel shown.
+  - Heights measured in Task 14 (`MainWindowChartHeightTests`; headless rows, the status bar corrected to the tallest
+    real face, Segoe UI at 14 px, 35.6 px against the headless 33; data areas from ScottPlot rendering at the pane's
+    size; the message panel at its 133 px cap):
 
-    | Window | Client height | Content row | Spectrum row | Trend row |
-    | --- | --- | --- | --- | --- |
-    | 1280 x 800 | 800 | 682 | 385 | 260 (`MinHeight`) |
-    | 1366 x 768, maximised over a 48 px taskbar and a 31 px title bar | 689 | 571 | 274 | 260 (`MinHeight`) |
-    | 1280 x 1024 | 1024 | 906 | 521 | 348 |
+    | Window | Client height | Message panel | Content row | Spectrum row (data) | Trend row (data) |
+    | --- | --- | --- | --- | --- | --- |
+    | 1280 x 800 | 800 | hidden | 686 | 389 (322.8) | 260 (176.8) |
+    | 1280 x 800 | 800 | 133 | 553 | 308 (241.8) | 208 (124.8), floor |
+    | 1366 x 768, maximised over a 48 px taskbar and a 31 px title bar | 689 | hidden | 575 | 323 (256.8) | 215 (131.8) |
+    | 1366 x 768, maximised | 689 | 133 | 442 | 197 (130.8) | 208 (124.8), floor |
+    | 1280 x 1024 | 1024 | hidden | 910 | 524 (457.8) | 349 (265.8) |
+    | 1280 x 1024 | 1024 | 133 | 777 | 444 (377.8) | 296 (212.8) |
+    | the minimum | 688 | 133 | 441 | 196 (129.8) | 208 (124.8), floor |
 
-    At 1366 x 768 the 3 : 2 split would give 320 and 214; the trend's `MinHeight` takes 260 and the spectrum keeps the
-    rest. At 1280 x 800 the split would give 387 and 258, just under the floor. With the message panel shown at 768 the
-    rows meet their `MinHeight` sooner; Task 14 records whether the status bar stays inside the window there.
+    Menu 32, connection row 49, overview 37 in every row. Above their floors the charts split 3 : 2. At 1366 x 768 with
+    the message panel shown the rows need 686.6 px of the 689, so the status bar stays inside the window.
   - `SignalPane` spans the three rows. Its form wraps in a vertical `ScrollViewer`, so a short window or the shown
     message panel scrolls the pane instead of clipping it, and no row ever disappears.
   - The Chart section gains a "Back to live" button under Stick to zero, enabled only while a moment is shown.
   - A new "Trend" section follows (16 above, 8 below): a "Time window" label with a preset `ComboBox` 120 px wide (a
     short code, from the width table), then a "Follow live" button in the field column, `HorizontalAlignment="Left"`.
-  - The trend's Y label names the key ("Intensity at 650 nm ±10 nm"), so no pane row repeats it.
+  - The trend's Y label names the key on two lines ("Intensity" over "650 nm ±10 nm"), so no pane row repeats it. On
+    one line the widest key ("Интенсивность на 2461 нм ±255 нм", 256.4 px in Segoe UI 16) overruns the 154.8 px the
+    plot gives a label at the trend's floor; on two lines the longest line is 133.4 px (ru) and 137.6 px (en).
   - Empty state over the trend until the first point: "No intensity yet. It appears with the first spectrum."
 
 ## Technical Details
@@ -514,7 +528,7 @@ New resx keys (en / ru):
 | `TrendPresetHoursFormat` | {0} h | {0} ч |
 | `TrendAxisTime` | Time | Время |
 | `TrendAxisIntensity` | Intensity | Интенсивность |
-| `TrendAxisIntensityFormat` | Intensity at {0} nm ±{1} nm | Интенсивность на {0} нм ±{1} нм |
+| `TrendAxisIntensityFormat` | Intensity, a line break, {0} nm ±{1} nm | Интенсивность, a line break, {0} нм ±{1} нм |
 | `TrendEmpty` | No intensity yet. It appears with the first spectrum. | Интенсивности пока нет. Она появится с первым спектром. |
 | `TrendReadoutRangeFormat` | {0} – {1} | {0} – {1} |
 | `TrendReadoutCountFormat` | Spectra: {0} | Спектров: {0} |
@@ -578,7 +592,9 @@ Data flow:
   array.
 - Live follow sets `From = newest - width` with no clamp; only `PlaceFrom` (pan, zoom) clamps at the first point.
 - The trend and the overview stack under the spectrum chart; the side pane spans all three rows, scrolls vertically and
-  keeps 392 px, so `MinimumWidth` stays 1256. The chart rows split 3 : 2, spectrum first, each with `MinHeight` 260.
+  keeps 392 px, so `MinimumWidth` stays 1256. The chart rows split 3 : 2, spectrum first, with `MinHeight` 192 and
+  208 (a 120 px data floor each); the window's `MinHeight` is 688 and the message panel's list caps at 64 px, so
+  every row shows inside a maximised 1366 x 768 window with the message panel shown.
 - No new palette key: the trend reads existing keys.
 - The trend feed, with its re-read and click reads, stops after the distributor and before the store, so no trend
   reader holds a snapshot at the store's checkpoint.
@@ -846,27 +862,45 @@ Data flow:
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/MainWindow/MainWindowTextFitTests.cs`,
   `MainWindowTrendLayoutTests.cs`
 
-- [ ] every gap and inset reads off the spacing table, measured on the arranged cells (pane padding 16, label to field
+- [x] every gap and inset reads off the spacing table, measured on the arranged cells (pane padding 16, label to field
   12, rows 8, the Trend header 16 above and 8 below); the `ui-theme.md:86` grep prints nothing; record the numbers
-- [ ] every field width reads off the width table or carries its reason: the preset box 120 (short code); the buttons
+  (measured: the trend form starts at 1 + 16, right inset 16, label to field 12, rows 8, the header 16 above and 8
+  below; the grep prints nothing)
+- [x] every field width reads off the width table or carries its reason: the preset box 120 (short code); the buttons
   at their measured width; record the en and ru widths of "Back to live", "Follow live", "Time window" and the widest
-  preset label
-- [ ] measure through `RenderedText` in English and Russian the new labels, the buttons, the Y label at `delta` 255 and
+  preset label (en: 102.3, 96.6, 89.3 and "10 min" 46 px in the box's 76 px slot; ru: 167.9, 169.9, 102.2 and "10 мин"
+  49 px in 76 px)
+- [x] measure through `RenderedText` in English and Russian the new labels, the buttons, the Y label at `delta` 255 and
   wavelength 2461 ("Интенсивность на 2461 нм ±255 нм"), the historical line and the widest readout line; recompute
   `PaneWidth` = 1 + 16 + label + 12 + field + 16 + 24, rounded up to 8; it stays 392 unless the Russian field column
-  passes 205.5 px, and `MinimumWidth` stays 1256 while `PaneWidth` + 400 is under 1256; record the result
-- [ ] at the 1256 px minimum the trend keeps at least four labelled time ticks over a 10 min window (`RenderInMemory`
+  passes 205.5 px, and `MinimumWidth` stays 1256 while `PaneWidth` + 400 is under 1256; record the result (ru: labels
+  117.5, field column 198.9, pane needs 385.4, rounded 392; en needs 300.6, rounded 304; `PaneWidth` 392 and
+  `MinimumWidth` 1256 unchanged. The one-line Y label took 256.4 px (ru) and 212 px (en) against 154.8 px of room at
+  the trend's floor, so `TrendAxisIntensityFormat` breaks after "Intensity": 133.4 px (ru), 137.6 px (en). Historical
+  line 133.3 (ru) and 162.3 (en) in an 864 px chart; widest readout box 243.9 (ru) and 238.1 (en), under half of 864)
+- [x] at the 1256 px minimum the trend keeps at least four labelled time ticks over a 10 min window (`RenderInMemory`
   of the trend plot at the chart width the window gives, 1256 - 392 = 864 px; and at a 400 px floor); record the count
-- [ ] at 2560 px only the charts and the overview grow; the side pane keeps its width and left-aligned content
-- [ ] every label and button fits on one line in English and Russian; the readout box sizes to its content
-- [ ] every state keeps the window size and the pane bounds: no data, live, following and not, historical, a failed
+  (864 px: 10 ticks, one a minute; 400 px: 2 ticks, five minutes apart, recorded only: the window never gives the
+  charts less than 864 px)
+- [x] at 2560 px only the charts and the overview grow; the side pane keeps its width and left-aligned content
+- [x] every label and button fits on one line in English and Russian; the readout box sizes to its content
+- [x] every state keeps the window size and the pane bounds: no data, live, following and not, historical, a failed
   re-read, the message panel shown (the pane scrolls); the `ui-theme.md:99` grep prints nothing; record the measured
-  pane height and the scroll extent at 1280 x 800 with the message panel shown
-- [ ] measure the menu, connection row and status bar heights and both chart rows, their data areas and the overview at
+  pane height and the scroll extent at 1280 x 800 with the message panel shown (one entry, 124 px: side pane 562 px,
+  scroll extent 530 px in a 530 px viewport; the grep prints nothing)
+- [x] measure the menu, connection row and status bar heights and both chart rows, their data areas and the overview at
   1280 x 800, 1366 x 768 (client 1366 x 689) and 1280 x 1024, with and without the message panel; replace the
   ASSUMPTION heights in Solution Overview with the measured table; adjust `MinHeight` so each data area keeps at least
   200 px at 768, and record whether the status bar stays inside the window at 768 with the message panel shown
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+  (⚠️ 200 px does not fit 768, see Solution Overview; `MinHeight` 192 and 208 keep 120 px, the window's `MinHeight` is
+  688, the message list caps at 64 px; at 768 with the message panel the rows need 686.6 of 689 px and the status bar
+  stays inside the window)
+- [x] ➕ the hover readout flips to the left of the line when it would run past the plot's right edge, so it never
+  covers the side pane (`TrendChartView.axaml.cs`; `TrendChartViewTests.AtTheRightEdgeTheReadoutFlipsLeftOfTheLineAndStaysInsideTheView`)
+- ⚠️ owner decision, not done here: the trend's time ticks repeat the date on every tick ("04.11.2026" over
+  "20:48:00"); the date once (or only at a day change) would return about 16 px of height to the trend and give the
+  400 px floor more than two ticks
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (904 of 904)
 
 ### Task 15: Verify acceptance criteria
 - [ ] run every command of Acceptance Evidence and record each result with its count (per Area, full suite against the

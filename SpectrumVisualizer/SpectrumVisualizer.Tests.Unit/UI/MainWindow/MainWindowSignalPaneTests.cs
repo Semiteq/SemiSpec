@@ -235,13 +235,16 @@ public sealed class MainWindowSignalPaneTests : MainWindowLayoutTestBase
 		shapes.Select(shape => shape.Shape).Should().AllBeEquivalentTo(opening);
 		var messageHeight = Named<Border>(window, "MessagePanel").Bounds.Height;
 		messageHeight.Should().BePositive();
-		PaneShapeOf(window).Should().Be(
-			opening with
-			{
-				Pane = opening.Pane.WithHeight(opening.Pane.Height - messageHeight),
-				Chart = opening.Chart.WithHeight(opening.Chart.Height - messageHeight),
-			},
-			"the message panel row takes its height from the content row and never changes the window size");
+		var shown = PaneShapeOf(window);
+		shown.Window.Should().Be(opening.Window, "the message panel row never changes the window size");
+		shown.Pane.Should().Be(
+			opening.Pane.WithHeight(opening.Pane.Height - messageHeight),
+			"the message panel row takes its height from the content row");
+		shown.Chart.Width.Should().Be(opening.Chart.Width);
+		shown.Chart.Height.Should().BeInRange(
+			MainWindowView.SpectrumRowMinHeight,
+			opening.Chart.Height - 1,
+			"the spectrum row gives up its share of the message panel's height down to its floor");
 	}
 
 	private static List<Point> PaneOffsets(Border pane)

@@ -192,6 +192,23 @@ public sealed class TrendChartViewTests : TrendChartViewTestBase
 	}
 
 	[AvaloniaFact]
+	public void AtTheRightEdgeTheReadoutFlipsLeftOfTheLineAndStaysInsideTheView()
+	{
+		ShowTrend();
+		var hover = new Point(DataRect.Right - 1, DataRect.VerticalCenter);
+
+		Window.MouseMove(InWindow(hover));
+
+		ReadoutBox.IsVisible.Should().BeTrue();
+		var left = Canvas.GetLeft(ReadoutBox);
+		var width = ReadoutBox.DesiredSize.Width;
+		width.Should().BeGreaterThan(0);
+		(left + width).Should().BeApproximately(CrosshairLine.StartPoint.X, 0.5, "the box ends at the hover line");
+		left.Should().BeGreaterThanOrEqualTo(0);
+		(left + width).Should().BeLessThanOrEqualTo(View.Bounds.Width, "the box never runs over the side pane");
+	}
+
+	[AvaloniaFact]
 	public void TheHoverOverlayHidesOutsideTheDataArea()
 	{
 		ShowTrend();

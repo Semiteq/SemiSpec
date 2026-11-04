@@ -39,7 +39,8 @@
 
         </StackPanel>
 
-        <ScrollViewer MaxHeight="140"
+        <!-- One three-line entry; a taller cap pushes the chart floors past a 1366 x 768 screen. -->
+        <ScrollViewer MaxHeight="64"
                       HorizontalScrollBarVisibility="Disabled">
             <ItemsControl Name="MessageEntries"
                           ItemsSource="{Binding Entries}">
