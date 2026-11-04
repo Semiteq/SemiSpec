@@ -27,7 +27,8 @@ public abstract class TrendChartViewTestBase : TrendFeedTestBase
 
 	protected TrendChartViewTestBase()
 	{
-		Trend = new TrendViewModel(Chart, Feed);
+		Overview = NewOverview();
+		Trend = new TrendViewModel(Chart, Overview, Feed);
 		Feed.Start();
 		View = new TrendChartView { DataContext = Trend };
 		Window = new Window
@@ -37,6 +38,8 @@ public abstract class TrendChartViewTestBase : TrendFeedTestBase
 			Content = new Border { Padding = new Thickness(ViewMargin), Child = View }
 		};
 	}
+
+	protected OverviewViewModel Overview { get; }
 
 	protected TrendViewModel Trend { get; }
 
@@ -101,6 +104,7 @@ public abstract class TrendChartViewTestBase : TrendFeedTestBase
 	{
 		Window.Close();
 		Trend.Dispose();
+		Overview.Dispose();
 		base.Dispose(disposing);
 	}
 }

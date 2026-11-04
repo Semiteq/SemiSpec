@@ -44,10 +44,13 @@ public sealed class IntensityCache : IDisposable
 	private KeyBlock? _previous;
 	private int _keyChanges;
 
-	// Both emit after _gate is released: _changed from the distributor task and a re-read pool thread, through the
-	// synchronized _changedGate, _reReadRequests from the distributor task only.
+	// All emit after _gate is released: _changed from the distributor task and a re-read pool thread, through the
+	// synchronized _changedGate, _historyLanded from re-read pool threads through _historyLandedGate, _reReadRequests
+	// from the distributor task only.
 	private readonly Subject<Unit> _changed = new();
 	private readonly ISubject<Unit> _changedGate;
+	private readonly Subject<Unit> _historyLanded = new();
+	private readonly ISubject<Unit> _historyLandedGate;
 	private readonly Subject<ReReadRequest> _reReadRequests = new();
 
 	public IntensityCache(TimeProvider timeProvider, ILogger<IntensityCache> logger)
@@ -55,12 +58,17 @@ public sealed class IntensityCache : IDisposable
 		_timeProvider = timeProvider;
 		_logger = logger;
 		_changedGate = Subject.Synchronize(_changed);
+		_historyLandedGate = Subject.Synchronize(_historyLanded);
 		Changed = _changed.AsObservable();
+		HistoryLanded = _historyLanded.AsObservable();
 		ReReadRequested = _reReadRequests.AsObservable();
 	}
 
 	/// <summary>Signals after every added frame and every landed history chunk.</summary>
 	public IObservable<Unit> Changed { get; }
+
+	/// <summary>Signals after a history chunk of the current generation landed, just before its Changed.</summary>
+	public IObservable<Unit> HistoryLanded { get; }
 
 	/// <summary>Raised on a key change; a request with ReadsHistory false only cancels the pending read.</summary>
 	public IObservable<ReReadRequest> ReReadRequested { get; }
@@ -141,6 +149,7 @@ public sealed class IntensityCache : IDisposable
 			DropExpired();
 		}
 
+		_historyLandedGate.OnNext(Unit.Default);
 		_changedGate.OnNext(Unit.Default);
 	}
 
@@ -194,6 +203,7 @@ public sealed class IntensityCache : IDisposable
 	public void Dispose()
 	{
 		_changed.Dispose();
+		_historyLanded.Dispose();
 		_reReadRequests.Dispose();
 	}
 

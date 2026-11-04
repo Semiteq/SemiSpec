@@ -69,6 +69,29 @@ public static class OverviewGeometry
 		return extentFirst + (span * Math.Clamp(fraction, 0.0, 1.0));
 	}
 
+	/// <summary>
+	/// The band columns under the trend's gap rule: an empty column without a break or an uncovered spectrum is left
+	/// out, so the band connects across it; a break puts an empty column before the column's values.
+	/// </summary>
+	public static IntensitySeries Connected(IntensitySeries band)
+	{
+		var columns = new List<IntensityColumn>(band.Columns.Length);
+		foreach (var column in band.Columns)
+		{
+			if (column.BreakCount > 0 && column.Count > 0)
+			{
+				columns.Add(column with { Min = double.NaN, Max = double.NaN, Last = double.NaN, Count = 0 });
+			}
+
+			if (column.Count > 0 || column.BreakCount > 0 || column.UncoveredCount > 0)
+			{
+				columns.Add(column);
+			}
+		}
+
+		return band with { Columns = [.. columns] };
+	}
+
 	/// <summary>The unbroken runs of drawable columns between first and last, scaled to the band's pixels.</summary>
 	public static IReadOnlyList<BandFigure> BandFigures(
 		IntensitySeries band,

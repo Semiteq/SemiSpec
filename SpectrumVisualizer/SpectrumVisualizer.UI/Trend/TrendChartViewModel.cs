@@ -137,6 +137,19 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		Refresh();
 	}
 
+	/// <summary>Moves the window's centre to the moment, clamped at the first point, and stops following.</summary>
+	public void CentreOn(DateTimeOffset moment)
+	{
+		if (_cache.NewestAt is not { } newest)
+		{
+			return;
+		}
+
+		_navigation.Pan(moment - (_navigation.From + (_navigation.Width / 2)), newest);
+		_navigation.DetachSticky();
+		Refresh();
+	}
+
 	/// <summary>Sets the width and keeps the right edge; following stays as it was.</summary>
 	public void SetWidth(TimeSpan width)
 	{

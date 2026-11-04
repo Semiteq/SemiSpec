@@ -240,6 +240,45 @@ public sealed class OverviewGeometryTests
 	}
 
 	[Fact]
+	public void ConnectedLeavesOutAnEmptyColumnWithoutABreakOrAnUncoveredSpectrum()
+	{
+		var band = Band((0.0, 1.0, 3.0, 2.0), (1.0, double.NaN, double.NaN, double.NaN), (2.0, 2.0, 4.0, 3.0));
+
+		var connected = OverviewGeometry.Connected(band);
+
+		connected.Columns.Select(column => column.Start).Should().Equal(_first, _first.AddDays(2));
+		OverviewGeometry.BandFigures(connected, _first, _first.AddDays(2), BandWidth, BandHeight)
+			.Should().ContainSingle();
+	}
+
+	[Fact]
+	public void ConnectedKeepsAnEmptyColumnWithAnUncoveredSpectrumAsABreak()
+	{
+		var band = Band((0.0, 1.0, 3.0, 2.0), (1.0, double.NaN, double.NaN, double.NaN), (2.0, 2.0, 4.0, 3.0));
+		band.Columns[1] = band.Columns[1] with { UncoveredCount = 1 };
+
+		var connected = OverviewGeometry.Connected(band);
+
+		connected.Columns.Should().HaveCount(3);
+		OverviewGeometry.BandFigures(connected, _first, _first.AddDays(2), BandWidth, BandHeight).Should().HaveCount(2);
+	}
+
+	[Fact]
+	public void ConnectedPutsAGapBeforeAColumnWithABreakAndValues()
+	{
+		var band = Band((0.0, 1.0, 3.0, 2.0), (1.0, 2.0, 4.0, 3.0), (2.0, 2.0, 4.0, 3.0));
+		band.Columns[1] = band.Columns[1] with { BreakCount = 1, LostCount = 2 };
+
+		var connected = OverviewGeometry.Connected(band);
+
+		connected.Columns.Should().HaveCount(4);
+		connected.Columns[1].Start.Should().Be(_first.AddDays(1));
+		double.IsNaN(connected.Columns[1].Min).Should().BeTrue();
+		connected.Columns[2].Should().Be(band.Columns[1]);
+		OverviewGeometry.BandFigures(connected, _first, _first.AddDays(2), BandWidth, BandHeight).Should().HaveCount(2);
+	}
+
+	[Fact]
 	public void TimeAtFractionHalfReturnsExtentMidpoint()
 	{
 		var time = OverviewGeometry.TimeAtFraction(_first, _last, 0.5);

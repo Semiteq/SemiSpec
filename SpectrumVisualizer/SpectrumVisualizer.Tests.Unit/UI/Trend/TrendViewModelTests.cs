@@ -24,11 +24,13 @@ namespace SpectrumVisualizer.Tests.Unit.UI.Trend;
 [Trait("Category", "Unit")]
 public sealed class TrendViewModelTests : TrendFeedTestBase
 {
+	private readonly OverviewViewModel _overview;
 	private readonly TrendViewModel _trend;
 
 	public TrendViewModelTests()
 	{
-		_trend = new TrendViewModel(Chart, Feed);
+		_overview = NewOverview();
+		_trend = new TrendViewModel(Chart, _overview, Feed);
 		Feed.Start();
 	}
 
@@ -153,6 +155,7 @@ public sealed class TrendViewModelTests : TrendFeedTestBase
 	protected override void Dispose(bool disposing)
 	{
 		_trend.Dispose();
+		_overview.Dispose();
 		base.Dispose(disposing);
 	}
 

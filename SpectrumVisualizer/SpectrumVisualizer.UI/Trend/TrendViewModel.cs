@@ -5,15 +5,16 @@ using ReactiveUI;
 
 namespace SpectrumVisualizer.UI.Trend;
 
-/// <summary>The trend section: the chart, the time window presets, Follow live and the click to a moment.</summary>
+/// <summary>The trend section: the chart, the overview, the presets, Follow live and the click to a moment.</summary>
 public sealed class TrendViewModel : ReactiveObject, IDisposable
 {
 	private readonly TrendFeed _feed;
 	private TrendPreset _selectedPreset;
 
-	public TrendViewModel(TrendChartViewModel chart, TrendFeed feed)
+	public TrendViewModel(TrendChartViewModel chart, OverviewViewModel overview, TrendFeed feed)
 	{
 		Chart = chart;
+		Overview = overview;
 		_feed = feed;
 		Presets = TrendPresets.All;
 		_selectedPreset = Presets.First(preset => preset.Width == TrendPresets.Default.Width);
@@ -23,6 +24,8 @@ public sealed class TrendViewModel : ReactiveObject, IDisposable
 	}
 
 	public TrendChartViewModel Chart { get; }
+
+	public OverviewViewModel Overview { get; }
 
 	public IReadOnlyList<TrendPreset> Presets { get; }
 

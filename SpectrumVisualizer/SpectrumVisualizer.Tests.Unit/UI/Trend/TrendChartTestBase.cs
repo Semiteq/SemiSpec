@@ -100,6 +100,12 @@ public abstract class TrendChartTestBase : IDisposable
 		Scheduler.AdvanceBy(TimeSpan.FromMilliseconds(100).Ticks);
 	}
 
+	/// <summary>An overview over the stand's cache and chart; the caller disposes it.</summary>
+	protected OverviewViewModel NewOverview()
+	{
+		return new OverviewViewModel(Cache, Chart, MessagePanel, Scheduler, new FakeLogger<OverviewViewModel>());
+	}
+
 	protected byte NextSeq()
 	{
 		return ++_seq;

@@ -789,12 +789,16 @@ Data flow:
   `OverviewView.axaml.cs`, `OverviewBand.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Trend/OverviewViewModelTests.cs`, `OverviewViewTests.cs`
 
-- [ ] copy `MinimapView.axaml` (`:16-39`) without the marker ticks, `MinimapBand` (`:19`, `:39-57`) and the pointer
-  handlers of `MinimapView.axaml.cs:185-226`
-- [ ] write `OverviewViewModel`: band from `cache.Fold` at 250 columns over the cache extent, the window fractions from
-  the trend's navigation, `NavigateToFraction` (stops following), the refold cadence and the refold after a landing
-- [ ] write the tests of Acceptance Evidence item 1
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] copy `MinimapView.axaml` (`:16-39`) without the marker ticks, `MinimapBand` (`:19`, `:39-57`) and the pointer
+  handlers of `MinimapView.axaml.cs:185-226`. The view is the 36 px strip only; the 1 px top border belongs to the
+  `OverviewPane` row of Task 13. The hover line stays in the code-behind (no hover label row)
+- [x] write `OverviewViewModel`: band from `cache.Fold` at 250 columns over the cache extent, the window fractions from
+  the trend's navigation, `NavigateToFraction` (stops following), the refold cadence and the refold after a landing.
+  `IntensityCache.HistoryLanded` signals a landed chunk; a key change refolds too. `TrendChartViewModel.CentreOn` moves
+  the window and stops following. `OverviewGeometry.Connected` applies the trend's gap rule to the band, so sparse
+  points over a short extent draw one band instead of isolated 2 px pieces. `TrendViewModel` takes the overview
+- [x] write the tests of Acceptance Evidence item 1
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (873 of 873)
 
 ### Task 12: Composition root and lifecycle
 **Files:**
@@ -806,6 +810,8 @@ Data flow:
 
 - [ ] register `SpectrumHistory` over `StoreFile.Path`, `IntensityCache`, `TrendFeed` and `TrendViewModel`, all
   singletons
+- [ ] ➕ register `TrendChartViewModel` and `OverviewViewModel` as singletons too: `TrendViewModel(chart, overview,
+  feed)` takes both from the container
 - [ ] start the feed between the store and the distributor (`App.axaml.cs:74-80`); stop it after the distributor and
   before the store in `StopLinkDistributorThenStoreAsync` (`:146-164`), each stop in a `finally` of the one before; add
   it to `ConfiguredServices`
