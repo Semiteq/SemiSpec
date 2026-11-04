@@ -17,6 +17,7 @@ using Semi.Avalonia;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
+using SpectrumVisualizer.UI.Store;
 
 namespace SpectrumVisualizer.UI;
 
@@ -25,6 +26,9 @@ public class App : Application
 	private const string RussianLanguage = "ru";
 
 	private static readonly TimeSpan _backgroundStopLimit = TimeSpan.FromSeconds(5);
+
+	// The store's checkpoint and close run after its drain ends, so the drain ends this long before the stop limit.
+	private static readonly TimeSpan _storeCloseReserve = TimeSpan.FromSeconds(0.5);
 
 	// Started by the first close of the main window; a later close passes once the stop completes.
 	private Task? _backgroundStop;
@@ -70,6 +74,8 @@ public class App : Application
 		window.Opened += (_, _) =>
 		{
 			services.MainWindow.ConnectionBar.RefreshPorts();
+			// The store subscribes before the distributor reads its first frame.
+			services.SpectrumStore.Start();
 			services.FrameDistributor.Start();
 		};
 		window.Closing += (sender, e) => OnMainWindowClosing(services, sender, e);
@@ -78,7 +84,8 @@ public class App : Application
 	}
 
 	/// <summary>
-	/// Holds an operator close until the link and the frame distributor have stopped, at most for the stop limit.
+	/// Holds an operator close until the link, the frame distributor and the spectrum store have stopped, at most for
+	/// the stop limit.
 	/// </summary>
 	private async void OnMainWindowClosing(ConfiguredServices services, object? sender, WindowClosingEventArgs e)
 	{
@@ -104,7 +111,7 @@ public class App : Application
 		}
 		catch (Exception exception)
 		{
-			services.Logger.LogError(exception, "Stopping the link and the frame distributor on window close failed");
+			services.Logger.LogError(exception, "Stopping the link, the frame distributor and the spectrum store on window close failed");
 		}
 	}
 
@@ -113,34 +120,44 @@ public class App : Application
 	{
 		try
 		{
-			await StopLinkThenDistributorAsync(services).WaitAsync(_backgroundStopLimit);
+			await StopLinkDistributorThenStoreAsync(services).WaitAsync(_backgroundStopLimit);
 		}
 		catch (TimeoutException)
 		{
 			services.Logger.LogWarning(
-				"The link and the frame distributor did not stop within {Limit}; the window closes anyway",
+				"The link, the frame distributor and the spectrum store did not stop within {Limit}; "
+				+ "the window closes anyway",
 				_backgroundStopLimit);
 		}
 		catch (Exception exception)
 		{
 			services.Logger.LogError(
 				exception,
-				"Stopping the link and the frame distributor failed; the window closes anyway");
+				"Stopping the link, the frame distributor and the spectrum store failed; the window closes anyway");
 		}
 	}
 
 	/// <summary>
-	/// The link stops first, so no frame enters the channel after the distributor has stopped reading it.
+	/// The link stops first, so no frame enters the channel after the distributor has stopped reading it, and the
+	/// distributor before the store, so no frame reaches the store after its queue has closed.
 	/// </summary>
-	private static async Task StopLinkThenDistributorAsync(ConfiguredServices services)
+	private static async Task StopLinkDistributorThenStoreAsync(ConfiguredServices services)
 	{
+		using var storeDrain = new CancellationTokenSource(_backgroundStopLimit - _storeCloseReserve);
 		try
 		{
 			await services.SerialLink.DisconnectAsync();
 		}
 		finally
 		{
-			await services.FrameDistributor.StopAsync();
+			try
+			{
+				await services.FrameDistributor.StopAsync();
+			}
+			finally
+			{
+				await services.SpectrumStore.StopAsync(storeDrain.Token);
+			}
 		}
 	}
 
@@ -173,6 +190,7 @@ public class App : Application
 			services.GetRequiredService<MessagePanelViewModel>(),
 			services.GetRequiredService<SerialLink>(),
 			services.GetRequiredService<FrameDistributor>(),
+			services.GetRequiredService<SpectrumStore>(),
 			services.GetRequiredService<ILogger<App>>());
 	}
 
@@ -199,5 +217,6 @@ public class App : Application
 		MessagePanelViewModel MessagePanel,
 		SerialLink SerialLink,
 		FrameDistributor FrameDistributor,
+		SpectrumStore SpectrumStore,
 		ILogger<App> Logger);
 }

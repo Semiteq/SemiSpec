@@ -761,22 +761,24 @@ Data flow:
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.UI/UiServiceCollectionExtensions.cs`, `App.axaml.cs`, `Program.cs`
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Di/CompositionRootTests.cs`, `AppLifecycleTests.cs`
 
-- [ ] `AddUi(LoggingSetup, AppDataPaths)` registers `StoreFile` from `StoreFiles.InstanceFile(paths.StoreFolder,
+- [x] (done in Task 9) `AddUi(LoggingSetup, AppDataPaths)` registers `StoreFile` from `StoreFiles.InstanceFile(paths.StoreFolder,
   Environment.ProcessId)` and `SpectrumStore`, both singletons; `Program.Main` passes its paths (`Program.cs:40-42`)
-- [ ] add the store to `ConfiguredServices` (`App.axaml.cs:197-202`) and `Configure` (`:169-177`); start it in
+- [x] add the store to `ConfiguredServices` (`App.axaml.cs:197-202`) and `Configure` (`:169-177`); start it in
   `Opened` before the distributor (`:70-74`)
-- [ ] rename `StopLinkThenDistributorAsync` (`:132-145`) to `StopLinkDistributorThenStoreAsync`: link, distributor in
+- [x] rename `StopLinkThenDistributorAsync` (`:132-145`) to `StopLinkDistributorThenStoreAsync`: link, distributor in
   a `finally`, store in a `finally` of that; the limit stays 5 s (`:27`); the store gets a drain token that fires
   0.5 s before the limit ends (a `CancellationTokenSource` with a 4.5 s delay, started with the stop); every log
   line names the three services
-- [ ] the container tests pass `AppDataPaths.Under(<temp root>)` to `AddUi` (`CompositionRootTests.cs:51`, `:166`,
+- [x] the container tests pass `AppDataPaths.Under(<temp root>)` to `AddUi` (`CompositionRootTests.cs:51`, `:166`,
   `AppLifecycleTests.cs:242-247`), so no test writes under the real local app data. Every test in one process gets
   the same `spectra-<pid>.db` name, so each test has its own temp root (an instance field), and `Dispose` awaits
   `SpectrumStore.StopAsync()` before it deletes the root; otherwise a writer left open by one test would hold the
   file and the next test's `Prepare` could not wipe it
-- [ ] write `OpeningTheWindowStartsTheStore`, `ClosingTheWindowStopsTheStoreAfterTheDistributor`,
+- [x] write `OpeningTheWindowStartsTheStore`, `ClosingTheWindowStopsTheStoreAfterTheDistributor`,
   `AfterTheCloseTheStoreFileHasNoWal` and the singleton check of Acceptance Evidence item 4
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] ➕ a second `SpectrumStore.StopAsync`, called while the first still drains, now completes with the writer, so a
+  test's cleanup can await it after a window close it did not wait for and only then delete its root
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (611 of 611)
 
 ### Task 11: Status bar pre-handover checklist (`dev:desktop-ui`)
 Note: Task 9 already added the dropped segment to the status sum and set `MinimumWidth` to 1256 (measured Russian

@@ -100,13 +100,15 @@ public sealed class SpectrumStore : IDisposable
 
 	/// <summary>
 	/// Stops taking frames and completes once the writer has written the queue and closed the file; when drainToken
-	/// fires first, the frames still queued count as dropped. Completes at once when nothing started.
+	/// fires first, the frames still queued count as dropped. Completes at once when nothing started; a later call
+	/// completes with the writer of the first.
 	/// </summary>
 	public async Task StopAsync(CancellationToken drainToken = default)
 	{
 		_stopped = true;
 		if (_cancellation is not { } cancellation || _drainCancellation is not { } drainCancellation)
 		{
+			await _writer.ConfigureAwait(false);
 			return;
 		}
 
