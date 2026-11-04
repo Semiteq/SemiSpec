@@ -2,6 +2,8 @@ using AwesomeAssertions;
 
 using FluentResults;
 
+using Microsoft.Extensions.Logging.Abstractions;
+
 using SpectrumVisualizer.UI.Link;
 
 using Xunit;
@@ -70,7 +72,7 @@ public sealed class RjcpSerialPortProviderTests
 	{
 		const string MissingPort = "COM-not-on-this-machine";
 
-		var result = new RjcpSerialPortProvider().Open(MissingPort);
+		var result = new RjcpSerialPortProvider(NullLogger<RjcpSerialPortProvider>.Instance).Open(MissingPort);
 
 		result.IsFailed.Should().BeTrue();
 		result.Errors.Should().ContainSingle().Which.Should().BeOfType<PortNotFoundError>()

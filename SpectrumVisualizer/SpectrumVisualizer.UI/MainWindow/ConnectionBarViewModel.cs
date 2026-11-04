@@ -60,11 +60,13 @@ public sealed class ConnectionBarViewModel : ReactiveObject, IDisposable
 
 	public ReactiveCommand<Unit, Unit> DisconnectCommand { get; }
 
-	/// <summary>Reads the port list again and keeps the selection while its port is still listed.</summary>
+	/// <summary>
+	/// Reads the port list again and keeps the selection while its port is still listed; a failed listing shows none.
+	/// </summary>
 	public void RefreshPorts()
 	{
 		var selectedPort = SelectedPort;
-		var portNames = _serialPortProvider.PortNames();
+		var portNames = _serialPortProvider.PortNames().ValueOrDefault ?? [];
 
 		// Clearing the bound list pushes null into SelectedPort, so the selection is restored after the adds.
 		Ports.Clear();
@@ -73,7 +75,9 @@ public sealed class ConnectionBarViewModel : ReactiveObject, IDisposable
 			Ports.Add(portName);
 		}
 
-		SelectedPort = selectedPort is not null && portNames.Contains(selectedPort) ? selectedPort : null;
+		SelectedPort = selectedPort is not null && portNames.Contains(selectedPort, StringComparer.OrdinalIgnoreCase)
+			? selectedPort
+			: null;
 		this.RaisePropertyChanged(nameof(PortPlaceholder));
 	}
 

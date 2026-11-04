@@ -196,7 +196,10 @@ public sealed class MainWindowViewTests : IDisposable
 		Realise();
 
 		_messagePanel.Report(new MessageView("title", "detail", "remedy", severity));
-		var dot = RealisedEntry(0).GetVisualDescendants().OfType<Ellipse>().Single(item => item.Name == "EntrySeverity");
+		var dot = RealisedEntry(0)
+			.GetVisualDescendants()
+			.OfType<Ellipse>()
+			.Single(item => item.Name == "EntrySeverity");
 
 		dot.Classes.Where(name => name.StartsWith("severity-", StringComparison.Ordinal))
 			.Should().Equal(expected);

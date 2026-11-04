@@ -115,7 +115,7 @@ subscribes in `OnLoaded`, unsubscribes in `OnUnloaded`, and closes itself.
 `MainWindow.MinimumWidth` is 1048 px, the window's `MinWidth`. It is the widest row with its longest texts, rounded up
 to the 8 px grid: the Russian status bar with `COM256`, a six-digit lost count and "Порт недоступен, переподключение"
 measures 1042.4 px (English 900.8 px), the connection row 654.9 px in Russian (English 595.4 px). The headless text stub
-gives no real widths, so `MainWindowLayoutTests` adds the realised row chrome to each text measured through SkiaSharp at
+gives no real widths, so `MainWindowTextFitTests` adds the realised row chrome to each text measured through SkiaSharp at
 14 px in the widest of Inter and every installed family of Semi's font chain; on Windows the app resolves that chain to
 Microsoft YaHei. Both rows stay left-aligned at any width above the minimum, and no link state changes the set of rows
 or a row's height.
@@ -132,7 +132,7 @@ The port list and Connect are enabled only while the link is Disconnected; Conne
 Disconnect is enabled in every other state, and Refresh in every state. `IsIdle` follows
 `SerialLink.StatusUpdates(uiScheduler)`, which starts with `SerialLink.Status` and moves every later change to the UI
 scheduler, so it is right from construction. Refresh reads the port list again and keeps the selection when its port is
-still listed. With no ports the list shows the placeholder "No ports found"; the placeholder is empty while ports are
+still listed; a listing that fails shows an empty list. With no ports the list shows the placeholder "No ports found"; the placeholder is empty while ports are
 listed. Connect and Refresh are synchronous commands; Disconnect awaits `DisconnectAsync`.
 
 ### Status bar

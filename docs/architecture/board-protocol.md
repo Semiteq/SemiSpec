@@ -157,14 +157,17 @@ state has one writer, and `Status` is published with `Volatile.Write`.
 
 ### Port
 
-`ISerialPortProvider` (`PortNames()`, `Open(port)` returning `Result<Stream>`) is the seam the tests replace.
+`ISerialPortProvider` (`PortNames()` returning `Result<IReadOnlyList<string>>`, `Open(port)` returning
+`Result<Stream>`) is the seam the tests replace. Neither member throws.
 `RjcpSerialPortProvider` is the production implementation over `RJCP.SerialPortStream`:
 
 - `PortNames()` asks an unopened `SerialPortStream` for the names and sorts them by the number after `COM`
-  (`COM2` before `COM10`), then any other name by ordinal.
-- `Open` checks the name against `PortNames()` first, so an unlisted name returns `PortNotFoundError` without
-  touching the driver. It opens at 115200 baud, 8N1, with `ReadTimeout` 1000 ms and `ThrowOnReadError` on. The
-  listing and the `SerialPortStream` constructor can throw as well as `Open()`, so all three sit inside one `try`.
+  (`COM2` before `COM10`), then any other name by ordinal. A listing that throws is logged at Debug and returned as
+  a failed result, so the connection row shows an empty list.
+- `Open` checks the name against `PortNames()` first, so an unlisted name or a failed listing returns
+  `PortNotFoundError` without touching the driver; a listing failure rides along as its cause. It opens at 115200
+  baud, 8N1, with `ReadTimeout` 1000 ms and `ThrowOnReadError` on. The `SerialPortStream` constructor can throw as
+  well as `Open()`, so both sit inside one `try`.
 - `Open` never throws: every exception except `OperationCanceledException` becomes a link error, so the session keeps
   retrying. `UnauthorizedAccessException` and an `IOException` with `HResult` 32 (sharing violation) map to
   `PortBusyError`; any other exception maps to `PortNotFoundError` and rides along as its cause (an
@@ -229,8 +232,8 @@ Four signals mean the open port is lost:
 - A read throws `InvalidOperationException`: RJCP's closed-port check under `ThrowOnReadError`.
 - A read throws `IOException`.
 - A read timeout comes while `PortNames()` no longer lists the port. Some drivers abort the pending read in a way RJCP
-  treats as benign, and only read timeouts keep coming. A `PortNames()` call that throws logs at Debug and counts as
-  "still listed": a port list that cannot be read is no proof of a loss.
+  treats as benign, and only read timeouts keep coming. A failed `PortNames()` result counts as "still listed": a port
+  list that cannot be read is no proof of a loss.
 
 On a loss the session arms the 1 s reopen timer, publishes PortUnavailable, then tears the pipe down and disposes the
 stream, so a driver that blocks in dispose cannot hold the status bar at its last state. A failed open arms the timer

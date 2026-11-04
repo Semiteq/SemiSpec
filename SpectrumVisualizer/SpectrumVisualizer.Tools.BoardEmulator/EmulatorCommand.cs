@@ -6,7 +6,9 @@ using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.Tools.BoardEmulator;
 
-/// <summary>The command line of the emulator; range rules live in option parsers, the cross-option rule in a validator.</summary>
+/// <summary>
+/// The command line of the emulator; range rules live in option parsers, the cross-option rule in a validator.
+/// </summary>
 public static class EmulatorCommand
 {
 	private const double MinimumRate = 0.001;
@@ -14,7 +16,11 @@ public static class EmulatorCommand
 	private const int MaximumWavelengthNm = 2460;
 	private const int MaximumDelta = 100;
 
-	private static readonly string[] _models = ["2000", "8000"];
+	private static readonly Dictionary<string, Spectrometer> _models = new()
+	{
+		["2000"] = Spectrometer.Atp2000,
+		["8000"] = Spectrometer.Atp8000,
+	};
 
 	private static readonly Option<string> _port = new("--port")
 	{
@@ -26,7 +32,7 @@ public static class EmulatorCommand
 	{
 		Description = "Spectrometer to emulate: 2000 (ATP-2000) or 8000 (ATP-8000).",
 		DefaultValueFactory = _ => 8000,
-	}.AcceptOnlyFromAmong(_models);
+	}.AcceptOnlyFromAmong([.. _models.Keys]);
 
 	private static readonly Option<double> _rate = new("--rate")
 	{
@@ -73,7 +79,7 @@ public static class EmulatorCommand
 		Description = "Set the measurement-failed bit of 2000 (ATP-2000) or 8000 (ATP-8000). The board clears the "
 					  + "bit of --device before each of its spectra, so that bit shows in heartbeats only. Naming "
 					  + "the other spectrometer requires --both-connected.",
-	}.AcceptOnlyFromAmong(_models);
+	}.AcceptOnlyFromAmong([.. _models.Keys]);
 
 	public static RootCommand Build(Func<EmulatorOptions, CancellationToken, Task<int>> run)
 	{
@@ -89,7 +95,7 @@ public static class EmulatorCommand
 	private static void RequireBothConnectedForTheOtherFailedBit(CommandResult result)
 	{
 		// Command validators run before option values convert, so GetValue would throw on a value outside _models.
-		if (!HoldsAModel(result, _failed) || !HoldsAModel(result, _device))
+		if (!IsAbsentOrAModel(result, _failed) || !IsAbsentOrAModel(result, _device))
 		{
 			return;
 		}
@@ -104,10 +110,10 @@ public static class EmulatorCommand
 		}
 	}
 
-	private static bool HoldsAModel(CommandResult result, Option option)
+	private static bool IsAbsentOrAModel(CommandResult result, Option option)
 	{
 		return result.GetResult(option) is not { } optionResult
-			|| optionResult.Tokens.All(token => _models.Contains(token.Value));
+			|| optionResult.Tokens.All(token => _models.ContainsKey(token.Value));
 	}
 
 	private static EmulatorOptions From(ParseResult parsed)
@@ -127,7 +133,7 @@ public static class EmulatorCommand
 
 	private static Spectrometer ToSpectrometer(int model)
 	{
-		return model == 2000 ? Spectrometer.Atp2000 : Spectrometer.Atp8000;
+		return _models[model.ToString(CultureInfo.InvariantCulture)];
 	}
 
 	private static double ParseRate(ArgumentResult result)

@@ -87,13 +87,9 @@ public sealed class AppStatusBarViewModel : ReactiveObject, IDisposable
 
 	public string PortText => Status.PortName ?? Resources.StatusNoValue;
 
-	public string Atp2000Text => Resources.FormatStatusSpectrometerFormat(
-		"ATP-2000",
-		SpectrometerText(BoardState.Atp2000Connected, BoardState.Atp2000MeasurementFailed));
+	public string Atp2000Text => SpectrometerText(Spectrometer.Atp2000);
 
-	public string Atp8000Text => Resources.FormatStatusSpectrometerFormat(
-		"ATP-8000",
-		SpectrometerText(BoardState.Atp8000Connected, BoardState.Atp8000MeasurementFailed));
+	public string Atp8000Text => SpectrometerText(Spectrometer.Atp8000);
 
 	public string LostSpectraText => Resources.FormatStatusLostSpectraFormat(
 		IsDisconnected ? Resources.StatusNoValue : Status.LostSpectra.ToString(Resources.Culture));
@@ -105,15 +101,17 @@ public sealed class AppStatusBarViewModel : ReactiveObject, IDisposable
 		_disposables.Dispose();
 	}
 
-	private string SpectrometerText(BoardState connectedBit, BoardState failedBit)
+	private string SpectrometerText(Spectrometer device)
 	{
-		return Status.Board switch
+		var state = Status.Board switch
 		{
 			null => Resources.StatusSpectrometerNoData,
-			{ } board when !board.HasFlag(connectedBit) => Resources.StatusSpectrometerNotConnected,
-			{ } board when board.HasFlag(failedBit) => Resources.StatusSpectrometerFailed,
+			{ } board when !board.HasFlag(device.ConnectedBit) => Resources.StatusSpectrometerNotConnected,
+			{ } board when board.HasFlag(device.FailedBit) => Resources.StatusSpectrometerFailed,
 			_ => Resources.StatusSpectrometerConnected
 		};
+
+		return Resources.FormatStatusSpectrometerFormat(device.DisplayName, state);
 	}
 
 	private void Apply(LinkStatus status)

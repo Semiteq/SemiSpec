@@ -40,7 +40,9 @@ public sealed class UnhandledErrorObserver(
 	{
 	}
 
-	/// <summary>Reports what a dispatcher job threw; with no panel yet the exception stays unhandled and ends the app.</summary>
+	/// <summary>
+	/// Reports what a dispatcher job threw; with no panel yet the exception stays unhandled and ends the app.
+	/// </summary>
 	public void OnDispatcherUnhandledException(object? sender, DispatcherUnhandledExceptionEventArgs e)
 	{
 		try

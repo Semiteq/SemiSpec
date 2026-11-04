@@ -63,7 +63,7 @@ public class App : Application
 		if (_services is not { } services)
 		{
 			throw new InvalidOperationException(
-				"The main window view model is not set. Call Run() before starting the app.");
+				"The app is not configured. Call Run() before starting the app.");
 		}
 
 		var window = new MainWindow.MainWindow { DataContext = services.MainWindow };
@@ -110,11 +110,15 @@ public class App : Application
 		}
 		catch (TimeoutException)
 		{
-			services.Logger.LogWarning("The link did not stop within {Limit}; the window closes anyway", _linkStopLimit);
+			services.Logger.LogWarning(
+				"The link did not stop within {Limit}; the window closes anyway",
+				_linkStopLimit);
 		}
 	}
 
-	/// <summary>Runs the app until its window closes; the logger receives what ReactiveUI or a dispatcher job raises unhandled.</summary>
+	/// <summary>
+	/// Runs the app until its window closes; the logger receives what ReactiveUI or a dispatcher job raises unhandled.
+	/// </summary>
 	public static void Run(IServiceProvider services, ILogger unhandledErrorLogger)
 	{
 		// Process lifetime by design: ReactiveUI takes its exception handler once, before any window exists,

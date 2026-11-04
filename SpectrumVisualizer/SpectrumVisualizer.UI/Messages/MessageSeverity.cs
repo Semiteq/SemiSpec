@@ -8,7 +8,7 @@ public enum MessageSeverity
 	/// <summary>The application recovers by itself; the entry records that it happened.</summary>
 	Info,
 
-	/// <summary>The read failed but the path retries; the operator watches rather than acts.</summary>
+	/// <summary>The link retries by itself; the operator watches rather than acts.</summary>
 	Warning,
 
 	/// <summary>Nothing recovers until the operator changes something outside the application.</summary>

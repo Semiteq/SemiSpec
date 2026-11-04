@@ -11,7 +11,7 @@ public sealed class FrameSchedule(EmulatorOptions options, TimeProvider timeProv
 
 	private readonly BoardState _state = StateOf(options);
 
-	private readonly BoardState _ownFailedBit = FailedBitOf(options.Device);
+	private readonly BoardState _ownFailedBit = options.Device.FailedBit;
 
 	private readonly SpectrumMeasurement _measurement =
 		SpectrumGenerator.Generate(options.Device, options.WavelengthNm, options.Delta);
@@ -69,19 +69,7 @@ public sealed class FrameSchedule(EmulatorOptions options, TimeProvider timeProv
 	{
 		var connected = options.BothConnected
 			? BoardState.Atp2000Connected | BoardState.Atp8000Connected
-			: ConnectedBitOf(options.Device);
-		return options.Failed is { } failed ? connected | FailedBitOf(failed) : connected;
-	}
-
-	private static BoardState ConnectedBitOf(Spectrometer device)
-	{
-		return device == Spectrometer.Atp2000 ? BoardState.Atp2000Connected : BoardState.Atp8000Connected;
-	}
-
-	private static BoardState FailedBitOf(Spectrometer device)
-	{
-		return device == Spectrometer.Atp2000
-			? BoardState.Atp2000MeasurementFailed
-			: BoardState.Atp8000MeasurementFailed;
+			: options.Device.ConnectedBit;
+		return options.Failed is { } failed ? connected | failed.FailedBit : connected;
 	}
 }

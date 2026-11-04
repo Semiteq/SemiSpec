@@ -31,8 +31,6 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 {
 	private const string PortName = "COM3";
 
-	private static readonly TimeSpan _waitLimit = TimeSpan.FromSeconds(5);
-
 	private readonly TestScheduler _linkScheduler = new();
 	private readonly FakeSerialPortProvider _portProvider = new(PortName);
 	private readonly FakePortStream _port = new();
@@ -60,7 +58,11 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 	public static TheoryData<BoardState, string, string> SpectrometerStates => new()
 	{
 		{ BoardState.None, Resources.StatusSpectrometerNotConnected, Resources.StatusSpectrometerNotConnected },
-		{ BoardState.Atp8000Connected, Resources.StatusSpectrometerNotConnected, Resources.StatusSpectrometerConnected },
+		{
+			BoardState.Atp8000Connected,
+			Resources.StatusSpectrometerNotConnected,
+			Resources.StatusSpectrometerConnected
+		},
 		{
 			BoardState.Atp2000Connected | BoardState.Atp8000Connected | BoardState.Atp2000MeasurementFailed,
 			Resources.StatusSpectrometerFailed,
@@ -71,7 +73,11 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 			Resources.StatusSpectrometerNotConnected,
 			Resources.StatusSpectrometerFailed
 		},
-		{ BoardState.Atp2000MeasurementFailed, Resources.StatusSpectrometerNotConnected, Resources.StatusSpectrometerNotConnected },
+		{
+			BoardState.Atp2000MeasurementFailed,
+			Resources.StatusSpectrometerNotConnected,
+			Resources.StatusSpectrometerNotConnected
+		},
 	};
 
 	[AvaloniaFact]
@@ -96,8 +102,8 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 	public async Task BytesWithoutAValidFrameShowOtherDevice()
 	{
 		await ConnectAsync();
-		await AtAsync(1, port => port.PushBytes(CorruptedSpectrum(1)));
-		await AtAsync(4, port => port.PushBytes(CorruptedSpectrum(2)));
+		await AtAsync(1, port => port.PushBytes(Corrupted(Spectrum(Spectrometer.Atp2000, 1))));
+		await AtAsync(4, port => port.PushBytes(Corrupted(Spectrum(Spectrometer.Atp2000, 2))));
 		await AtAsync(10, port => port.PushTimeout());
 
 		_viewModel.LinkText.Should().Be(Resources.StatusOtherDevice);
@@ -177,7 +183,11 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 		await AtAsync(13, port => port.PushBytes(FrameEncoder.Encode(Heartbeat(3))));
 
 		_messagePanel.Entries.Select(entry => entry.View).Should().Equal(
-			new MessageView(Resources.LinkRestoredTitle, Resources.LinkRestoredDetail, string.Empty, MessageSeverity.Info),
+			new MessageView(
+				Resources.LinkRestoredTitle,
+				Resources.LinkRestoredDetail,
+				string.Empty,
+				MessageSeverity.Info),
 			ErrorMessageMapper.Map(new BoardNotRespondingError(PortName)));
 		_logger.Collector.GetSnapshot().Select(record => record.Level)
 			.Should().Equal(LogLevel.Warning, LogLevel.Information);
@@ -218,7 +228,9 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 		await AtAsync(11, port => port.PushTimeout());
 		Dispatcher.UIThread.RunJobs();
 
-		_viewModel.LinkText.Should().Be(Resources.StatusNotResponding, "a failed report leaves the shown state in place");
+		_viewModel.LinkText.Should().Be(
+			Resources.StatusNotResponding,
+			"a failed report leaves the shown state in place");
 		var last = _logger.LatestRecord;
 		last.Level.Should().Be(LogLevel.Error);
 		last.Message.Should().Be("The failure could not reach the message panel");
@@ -238,13 +250,6 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 		return Resources.FormatStatusSpectrometerFormat(device, state);
 	}
 
-	private static byte[] CorruptedSpectrum(byte seq)
-	{
-		var bytes = FrameEncoder.Encode(Spectrum(Spectrometer.Atp2000, seq));
-		bytes[^1] ^= 0xFF;
-		return bytes;
-	}
-
 	private static long Ticks(double seconds)
 	{
 		return TimeSpan.FromSeconds(seconds).Ticks;
@@ -255,7 +260,7 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 		port ??= _port;
 		_portProvider.QueueOpen(port);
 		_serialLink.Connect(PortName);
-		await port.WaitForPendingReadAsync().WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		await port.WaitForPendingReadAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
 		await SettleAsync();
 	}
 
@@ -269,7 +274,7 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 	{
 		_linkScheduler.AdvanceTo(Ticks(seconds));
 		push(port);
-		await port.WaitForPendingReadAsync().WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		await port.WaitForPendingReadAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
 		await SettleAsync();
 	}
 
@@ -277,34 +282,18 @@ public sealed class AppStatusBarViewModelTests : IDisposable
 	{
 		_linkScheduler.AdvanceTo(Ticks(seconds));
 		_port.PushZeroRead();
-		await WaitUntilAsync(() => _serialLink.Status.State == LinkState.PortUnavailable);
+		await Waits.UntilAsync(() => _serialLink.Status.State == LinkState.PortUnavailable, pumpDispatcher: true);
 		await SettleAsync();
 	}
 
 	private async Task DisconnectAsync()
 	{
-		await _serialLink.DisconnectAsync().WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		await _serialLink.DisconnectAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
 		await SettleAsync();
 	}
 
-	/// <summary>The link raises its status off the UI thread, so the bar catches up once the dispatcher runs the hop.</summary>
 	private Task SettleAsync()
 	{
-		return WaitUntilAsync(() => ReferenceEquals(_viewModel.Status, _serialLink.Status));
-	}
-
-	private static async Task WaitUntilAsync(Func<bool> condition)
-	{
-		using var limit = new CancellationTokenSource(_waitLimit);
-		while (true)
-		{
-			Dispatcher.UIThread.RunJobs();
-			if (condition())
-			{
-				return;
-			}
-
-			await Task.Delay(10, limit.Token);
-		}
+		return Waits.StatusBarSettledAsync(_viewModel, _serialLink);
 	}
 }

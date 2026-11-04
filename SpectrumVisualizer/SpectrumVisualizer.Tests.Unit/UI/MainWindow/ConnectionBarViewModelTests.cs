@@ -2,9 +2,10 @@ using System.Reactive.Linq;
 using System.Windows.Input;
 
 using Avalonia.Headless.XUnit;
-using Avalonia.Threading;
 
 using AwesomeAssertions;
+
+using FluentResults;
 
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Reactive.Testing;
@@ -26,8 +27,6 @@ namespace SpectrumVisualizer.Tests.Unit.UI.MainWindow;
 public sealed class ConnectionBarViewModelTests : IDisposable
 {
 	private const string PortName = "COM3";
-
-	private static readonly TimeSpan _waitLimit = TimeSpan.FromSeconds(5);
 
 	private readonly FakeSerialPortProvider _portProvider = new(PortName, "COM5");
 	private readonly FakePortStream _port = new();
@@ -64,6 +63,32 @@ public sealed class ConnectionBarViewModelTests : IDisposable
 		_viewModel.RefreshPorts();
 
 		_viewModel.SelectedPort.Should().BeNull();
+	}
+
+	[AvaloniaFact]
+	public void ASelectionKeepsItsPortWhenTheListSpellsTheNameInAnotherCase()
+	{
+		_viewModel.RefreshPorts();
+		_viewModel.SelectedPort = "COM5";
+
+		_portProvider.SetPorts("com5");
+		_viewModel.RefreshPorts();
+
+		_viewModel.SelectedPort.Should().Be("COM5");
+	}
+
+	[AvaloniaFact]
+	public void AFailedListingShowsNoPortAndClearsTheSelection()
+	{
+		_viewModel.RefreshPorts();
+		_viewModel.SelectedPort = PortName;
+
+		_portProvider.FailPortNames(new Error("the port registry key is gone"));
+		_viewModel.RefreshPorts();
+
+		_viewModel.Ports.Should().BeEmpty();
+		_viewModel.SelectedPort.Should().BeNull();
+		_viewModel.PortPlaceholder.Should().Be(Resources.ConnectionPortPlaceholder);
 	}
 
 	[AvaloniaFact]
@@ -113,7 +138,9 @@ public sealed class ConnectionBarViewModelTests : IDisposable
 		_viewModel.SelectedPort = PortName;
 
 		await _viewModel.ConnectCommand.Execute();
-		await WaitUntilAsync(() => _serialLink.Status.State == LinkState.PortUnavailable && !_viewModel.IsIdle);
+		await Waits.UntilAsync(
+			() => _serialLink.Status.State == LinkState.PortUnavailable && !_viewModel.IsIdle,
+			pumpDispatcher: true);
 
 		CanExecute(_viewModel.ConnectCommand).Should().BeFalse();
 		CanExecute(_viewModel.DisconnectCommand).Should().BeTrue();
@@ -127,7 +154,7 @@ public sealed class ConnectionBarViewModelTests : IDisposable
 		_serialLink.Status.PortName.Should().Be(PortName);
 
 		await _viewModel.DisconnectCommand.Execute();
-		await WaitUntilAsync(() => _viewModel.IsIdle);
+		await Waits.UntilAsync(() => _viewModel.IsIdle, pumpDispatcher: true);
 
 		_serialLink.Status.State.Should().Be(LinkState.Disconnected);
 		_port.IsDisposed.Should().BeTrue();
@@ -140,7 +167,7 @@ public sealed class ConnectionBarViewModelTests : IDisposable
 	{
 		_portProvider.QueueOpen(_port);
 		_serialLink.Connect(PortName);
-		await _port.WaitForPendingReadAsync().WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		await _port.WaitForPendingReadAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
 
 		using var lateViewModel = new ConnectionBarViewModel(_portProvider, _serialLink, AvaloniaScheduler.Instance);
 
@@ -159,17 +186,6 @@ public sealed class ConnectionBarViewModelTests : IDisposable
 		return command.CanExecute(null);
 	}
 
-	/// <summary>The link raises its status off the UI thread, so the wait pumps the dispatcher for the hop back.</summary>
-	private static async Task WaitUntilAsync(Func<bool> condition)
-	{
-		using var limit = new CancellationTokenSource(_waitLimit);
-		while (!condition())
-		{
-			Dispatcher.UIThread.RunJobs();
-			await Task.Delay(10, limit.Token);
-		}
-	}
-
 	private async Task ConnectThroughTheBarAsync()
 	{
 		_portProvider.QueueOpen(_port);
@@ -177,7 +193,7 @@ public sealed class ConnectionBarViewModelTests : IDisposable
 		_viewModel.SelectedPort = PortName;
 
 		await _viewModel.ConnectCommand.Execute();
-		await _port.WaitForPendingReadAsync().WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
-		await WaitUntilAsync(() => !_viewModel.IsIdle);
+		await _port.WaitForPendingReadAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
+		await Waits.UntilAsync(() => !_viewModel.IsIdle, pumpDispatcher: true);
 	}
 }

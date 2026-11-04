@@ -33,6 +33,14 @@ internal static class ProtocolSamples
 		return [.. Enumerable.Range(0, device.PixelCount).Select(i => (ushort)(i * 7))];
 	}
 
+	/// <summary>The frame's bytes with a broken CRC, so the decoder drops the frame.</summary>
+	public static byte[] Corrupted(BoardFrame frame)
+	{
+		var bytes = FrameEncoder.Encode(frame);
+		bytes[^1] ^= 0xFF;
+		return bytes;
+	}
+
 	public static byte[] Concat(params IEnumerable<byte[]> parts)
 	{
 		return [.. parts.SelectMany(part => part)];

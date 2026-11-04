@@ -4,7 +4,9 @@ using SpectrumVisualizer.UI.Link;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Link;
 
-/// <summary>Hands out the open results a test queues, counts opens and lists the ports a test sets or throws its failure.</summary>
+/// <summary>
+/// Hands out the open results a test queues, counts opens and lists the ports a test sets or fails the listing.
+/// </summary>
 internal sealed class FakeSerialPortProvider : ISerialPortProvider
 {
 	// The test thread and the link's session thread both reach every field below; _gate guards them.
@@ -12,7 +14,7 @@ internal sealed class FakeSerialPortProvider : ISerialPortProvider
 	private readonly Queue<Result<Stream>> _openResults = new();
 	private readonly List<string> _portNames = [];
 	private int _openCount;
-	private Exception? _portNamesFailure;
+	private IError? _portNamesFailure;
 
 	public FakeSerialPortProvider(params string[] portNames)
 	{
@@ -39,7 +41,7 @@ internal sealed class FakeSerialPortProvider : ISerialPortProvider
 		}
 	}
 
-	public void FailPortNames(Exception failure)
+	public void FailPortNames(IError failure)
 	{
 		lock (_gate)
 		{
@@ -57,11 +59,13 @@ internal sealed class FakeSerialPortProvider : ISerialPortProvider
 		QueueOpen(Result.Fail<Stream>(error));
 	}
 
-	public IReadOnlyList<string> PortNames()
+	public Result<IReadOnlyList<string>> PortNames()
 	{
 		lock (_gate)
 		{
-			return _portNamesFailure is { } failure ? throw failure : [.. _portNames];
+			return _portNamesFailure is { } failure
+				? Result.Fail<IReadOnlyList<string>>(failure)
+				: Result.Ok<IReadOnlyList<string>>([.. _portNames]);
 		}
 	}
 

@@ -2,12 +2,14 @@ using System.Globalization;
 
 using FluentResults;
 
+using Microsoft.Extensions.Logging;
+
 using RJCP.IO.Ports;
 
 namespace SpectrumVisualizer.UI.Link;
 
 /// <summary>Opens the board's port at 115200 baud, 8N1, with 1 s read timeouts that throw.</summary>
-public sealed class RjcpSerialPortProvider : ISerialPortProvider
+public sealed class RjcpSerialPortProvider(ILogger<RjcpSerialPortProvider> logger) : ISerialPortProvider
 {
 	private const int BaudRate = 115200;
 	private const int DataBits = 8;
@@ -15,24 +17,33 @@ public sealed class RjcpSerialPortProvider : ISerialPortProvider
 	private const int SharingViolation = 32;
 	private const string ComPrefix = "COM";
 
-	public IReadOnlyList<string> PortNames()
+	public Result<IReadOnlyList<string>> PortNames()
 	{
-		using var enumerator = new SerialPortStream();
+		try
+		{
+			using var enumerator = new SerialPortStream();
 
-		return SortPortNames(enumerator.GetPortNames());
+			return Result.Ok(SortPortNames(enumerator.GetPortNames()));
+		}
+		catch (Exception exception) when (exception is not OperationCanceledException)
+		{
+			logger.LogDebug(exception, "Listing the serial ports failed");
+			return Result.Fail<IReadOnlyList<string>>(new ExceptionalError(exception));
+		}
 	}
 
 	/// <summary>Every failure, of the listing and the constructor included, is a retryable link error.</summary>
 	public Result<Stream> Open(string portName)
 	{
+		var listed = PortNames();
+		if (listed.IsFailed || !listed.Value.Contains(portName, StringComparer.OrdinalIgnoreCase))
+		{
+			return Result.Fail<Stream>(new PortNotFoundError(portName).CausedBy(listed.Errors));
+		}
+
 		SerialPortStream? port = null;
 		try
 		{
-			if (!PortNames().Contains(portName, StringComparer.OrdinalIgnoreCase))
-			{
-				return Result.Fail<Stream>(new PortNotFoundError(portName));
-			}
-
 			port = new SerialPortStream(portName, BaudRate, DataBits, Parity.None, StopBits.One)
 			{
 				ReadTimeout = ReadTimeoutMilliseconds,
@@ -51,10 +62,17 @@ public sealed class RjcpSerialPortProvider : ISerialPortProvider
 	/// <summary>Orders COM ports by their number, then every other name by ordinal comparison.</summary>
 	internal static IReadOnlyList<string> SortPortNames(IEnumerable<string> names)
 	{
-		return [.. names.OrderBy(name => ComNumber(name) ?? int.MaxValue).ThenBy(name => name, StringComparer.Ordinal)];
+		return
+		[
+			.. names
+				.OrderBy(name => ComNumber(name) ?? int.MaxValue)
+				.ThenBy(name => name, StringComparer.Ordinal)
+		];
 	}
 
-	/// <summary>A busy port is told apart; any other failure counts as a missing port and keeps its exception.</summary>
+	/// <summary>
+	/// A busy port is told apart; any other failure counts as a missing port and keeps its exception.
+	/// </summary>
 	internal static IError MapOpenFailure(string portName, Exception exception)
 	{
 		return exception switch
@@ -68,7 +86,11 @@ public sealed class RjcpSerialPortProvider : ISerialPortProvider
 	private static int? ComNumber(string name)
 	{
 		if (name.StartsWith(ComPrefix, StringComparison.OrdinalIgnoreCase)
-			&& int.TryParse(name.AsSpan(ComPrefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out var number))
+			&& int.TryParse(
+				name.AsSpan(ComPrefix.Length),
+				NumberStyles.None,
+				CultureInfo.InvariantCulture,
+				out var number))
 		{
 			return number;
 		}

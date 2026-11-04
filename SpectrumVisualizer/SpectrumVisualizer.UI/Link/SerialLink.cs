@@ -8,7 +8,9 @@ using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.UI.Link;
 
-/// <summary>The board's serial link: one session task per Connect, decoded frames out through a bounded channel.</summary>
+/// <summary>
+/// The board's serial link: one session task per Connect, decoded frames out through a bounded channel.
+/// </summary>
 public sealed class SerialLink : IDisposable
 {
 	private const int FrameCapacity = 64;
@@ -80,7 +82,9 @@ public sealed class SerialLink : IDisposable
 		_session = Task.Run(() => RunSessionAsync(session, portName, cancellationToken), CancellationToken.None);
 	}
 
-	/// <summary>Cancels the session and completes once it has published Disconnected; an idle link completes at once.</summary>
+	/// <summary>
+	/// Cancels the session and completes once it has published Disconnected; an idle link completes at once.
+	/// </summary>
 	public async Task DisconnectAsync()
 	{
 		var session = _session;
@@ -125,7 +129,9 @@ public sealed class SerialLink : IDisposable
 		StatusChanged?.Invoke(this, status);
 	}
 
-	/// <summary>A reader that falls behind drops many frames in a row, so only the first drop of a session is logged.</summary>
+	/// <summary>
+	/// A reader that falls behind drops many frames in a row, so only the first drop of a session is logged.
+	/// </summary>
 	private void OnFrameDropped(BoardFrame frame)
 	{
 		if (_frameDropLogged)

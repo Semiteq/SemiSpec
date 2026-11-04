@@ -10,7 +10,9 @@ using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.UI.Link;
 
-/// <summary>One Connect of the link: opens the port, reads, decodes, judges the health and publishes every status.</summary>
+/// <summary>
+/// One Connect of the link: opens the port, reads, decodes, judges the health and publishes every status.
+/// </summary>
 internal sealed class LinkSession(
 	string portName,
 	ISerialPortProvider serialPortProvider,
@@ -100,7 +102,9 @@ internal sealed class LinkSession(
 		await reopen.ConfigureAwait(false);
 	}
 
-	/// <summary>Arms the reopen timer before publishing PortUnavailable, so a status reader may move the clock.</summary>
+	/// <summary>
+	/// Arms the reopen timer before publishing PortUnavailable, so a status reader may move the clock.
+	/// </summary>
 	private async Task WaitForReopenAsync(IError failure, CancellationToken cancellationToken)
 	{
 		cancellationToken.ThrowIfCancellationRequested();
@@ -116,22 +120,24 @@ internal sealed class LinkSession(
 		await reopen.Task.ConfigureAwait(false);
 	}
 
-	/// <summary>Returns when the port is lost; an exception or cancellation leaves through the caller's teardown.</summary>
+	/// <summary>
+	/// Returns when the port is lost; an exception or cancellation leaves through the caller's teardown.
+	/// </summary>
 	private async Task ReadPortAsync(Stream port, CancellationToken cancellationToken)
 	{
 		StartReading();
 		while (true)
 		{
-			var count = await ReadOnceAsync(port, cancellationToken).ConfigureAwait(false);
-			if (count == EndOfStream)
+			var read = await ReadOnceAsync(port, cancellationToken).ConfigureAwait(false);
+			if (read.Outcome == ReadOutcome.PortLost)
 			{
 				return;
 			}
 
 			var now = _stopwatch.Elapsed;
-			if (count is { } byteCount)
+			if (read.Outcome == ReadOutcome.Bytes)
 			{
-				await AcceptBytesAsync(byteCount, now, cancellationToken).ConfigureAwait(false);
+				await AcceptBytesAsync(read.ByteCount, now, cancellationToken).ConfigureAwait(false);
 			}
 			else if (!IsPortStillListed())
 			{
@@ -158,37 +164,31 @@ internal sealed class LinkSession(
 		publish(StatusOf(_state));
 	}
 
-	/// <summary>Returns the byte count, null for a read timeout, and end of stream for every lost-port signal.</summary>
-	private async Task<int?> ReadOnceAsync(Stream port, CancellationToken cancellationToken)
+	/// <summary>A zero-byte read, a read failure and a closed port are all one lost-port signal.</summary>
+	private async Task<PortRead> ReadOnceAsync(Stream port, CancellationToken cancellationToken)
 	{
 		try
 		{
 			var memory = _pipe.Writer.GetMemory(ReadSize);
-			return await port.ReadAsync(memory, cancellationToken).ConfigureAwait(false);
+			var count = await port.ReadAsync(memory, cancellationToken).ConfigureAwait(false);
+			return count == EndOfStream ? new PortRead(ReadOutcome.PortLost) : new PortRead(ReadOutcome.Bytes, count);
 		}
 		catch (TimeoutException)
 		{
-			return null;
+			return new PortRead(ReadOutcome.Timeout);
 		}
 		catch (Exception exception) when (exception is IOException or InvalidOperationException)
 		{
 			logger.LogDebug(exception, "A read on port {Port} failed", portName);
-			return EndOfStream;
+			return new PortRead(ReadOutcome.PortLost);
 		}
 	}
 
 	/// <summary>A port list that cannot be read is no proof of a loss, so the port counts as listed.</summary>
 	private bool IsPortStillListed()
 	{
-		try
-		{
-			return serialPortProvider.PortNames().Contains(portName, StringComparer.OrdinalIgnoreCase);
-		}
-		catch (Exception exception) when (exception is not OperationCanceledException)
-		{
-			logger.LogDebug(exception, "Listing the ports failed; port {Port} counts as listed", portName);
-			return true;
-		}
+		var listed = serialPortProvider.PortNames();
+		return listed.IsFailed || listed.Value.Contains(portName, StringComparer.OrdinalIgnoreCase);
 	}
 
 	private async Task AcceptBytesAsync(int count, TimeSpan now, CancellationToken cancellationToken)
@@ -228,11 +228,16 @@ internal sealed class LinkSession(
 		await _pipe.Reader.CompleteAsync().ConfigureAwait(false);
 		_pipe = new Pipe(_pipeOptions);
 		_lastDrainAt = now;
-		logger.LogDebug("Drained the decoder of port {Port}, {Count} frames released", portName, _decoded.Count);
+		logger.LogDebug(
+			"Drained the decoder of port {Port}, {Count} frames released",
+			portName,
+			_decoded.Count);
 		Deliver(now);
 	}
 
-	/// <summary>Frames are stamped with the time they leave the decoder, which for a drain is the drain time.</summary>
+	/// <summary>
+	/// Frames are stamped with the time they leave the decoder, which for a drain is the drain time.
+	/// </summary>
 	private void Deliver(TimeSpan now)
 	{
 		if (_decoded.Count == 0)
@@ -246,7 +251,11 @@ internal sealed class LinkSession(
 			if (lost > 0)
 			{
 				_lostSpectra += lost;
-				logger.LogInformation("{Lost} spectra lost before seq {Seq} on port {Port}", lost, frame.Seq, portName);
+				logger.LogInformation(
+					"{Lost} spectra lost before seq {Seq} on port {Port}",
+					lost,
+					frame.Seq,
+					portName);
 			}
 
 			_board = frame.State;
@@ -286,4 +295,14 @@ internal sealed class LinkSession(
 	{
 		return new LinkStatus(state, portName, _board, _lostSpectra, fault);
 	}
+
+	private enum ReadOutcome
+	{
+		Bytes,
+		Timeout,
+		PortLost,
+	}
+
+	/// <summary>One read of the port; ByteCount is set for Bytes only.</summary>
+	private readonly record struct PortRead(ReadOutcome Outcome, int ByteCount = 0);
 }

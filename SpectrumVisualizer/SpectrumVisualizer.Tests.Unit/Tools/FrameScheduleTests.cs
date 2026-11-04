@@ -166,7 +166,8 @@ public sealed class FrameScheduleTests
 
 		var frames = SendEverySecond(schedule, 6);
 
-		frames.Select(frame => frame.Measurement!.Amplitude == 0).Should().Equal(false, false, true, false, false, true);
+		frames.Select(frame => frame.Measurement!.Amplitude == 0)
+			.Should().Equal(false, false, true, false, false, true);
 		frames[2].Measurement!.Pixels.Should().OnlyContain(pixel => pixel == 0);
 		frames.Select(frame => frame.Seq).Should().Equal(1, 2, 3, 4, 5, 6);
 	}

@@ -27,7 +27,9 @@ internal static class RenderedText
 			}
 		}
 
-		return widest > 0 ? widest : throw new InvalidOperationException($"No candidate face holds every glyph of '{text}'.");
+		return widest > 0
+			? widest
+			: throw new InvalidOperationException($"No candidate face holds every glyph of '{text}'.");
 	}
 
 	public static IReadOnlyList<string> InstalledFamilies(FontFamily family)
