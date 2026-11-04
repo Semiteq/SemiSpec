@@ -300,7 +300,11 @@ public sealed class SpectrumStore : IDisposable
 				if (retentionDue.IsCompleted)
 				{
 					await retentionDue.ConfigureAwait(false);
-					DeleteExpired(database);
+					if (!drainToken.IsCancellationRequested)
+					{
+						DeleteExpired(database);
+					}
+
 					retentionDue = Task.Delay(_retentionInterval, _timeProvider, retentionCancellation.Token);
 				}
 

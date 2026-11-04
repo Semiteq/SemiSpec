@@ -27,8 +27,9 @@ public class App : Application
 
 	private static readonly TimeSpan _backgroundStopLimit = TimeSpan.FromSeconds(5);
 
-	// After its drain token the store can still finish one batch, which a held lock fails after the 1 s busy timeout of
-	// the stop, and then checkpoints, which never waits; so the drain token fires this long before the stop limit.
+	// After its drain token the store can still finish the one batch or retention pass already running, which a held
+	// lock fails after the 1 s busy timeout of the stop, and then checkpoints, which never waits; so the drain token
+	// fires this long before the stop limit.
 	private static readonly TimeSpan _storeCloseReserve = TimeSpan.FromSeconds(1.5);
 
 	// Started by the first close of the main window; a later close passes once the stop completes.
