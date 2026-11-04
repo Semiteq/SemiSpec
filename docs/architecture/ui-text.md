@@ -16,7 +16,7 @@ Russian set; any other language shows English. Semi's own control strings follow
 
 Numbers and times follow `CultureInfo.CurrentCulture`: the signal pane's amplitude, SNR and Q in `G6`, the log
 axis's tick labels in `"0.###"`, the trend readout's values in `G6` and its counts, and the numbers in the preset
-labels. Three outputs are the exception. `AppLogging` writes the log file with the invariant culture, so every machine
+labels. These outputs are the exception. `AppLogging` writes the log file with the invariant culture, so every machine
 produces the same log format. The signal pane's update time is the fixed `HH:mm:ss.fff`, and the trend readout's time
 and the historical line's time are the fixed `HH:mm:ss` in local time, all formatted with the invariant culture.
 ScottPlot's `DateTimeAutomatic` labels the trend's time axis.

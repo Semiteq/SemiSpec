@@ -532,9 +532,9 @@ false, which only cancels the pending read, when all of these hold:
 - the outgoing key's history was complete: it was the first key, or a key a return restored, so a key whose re-read
   was still pending comes back through a read instead of partial;
 - no chunk of the current generation has landed yet;
-- the return comes at most 120 s after the change. While the previous key's points are kept, the recent spectra are
-  not evicted below the change, so the return recomputes every spectrum since it with no hole, for at most 240 s
-  since the change; past that the kept points are dropped.
+- the return comes at most 240 s after the kept points' end, the start of the recent spectra at the change, so about
+  120 s after the change. While the previous key's points are kept, the recent spectra are not evicted below their
+  end, so the return recomputes every spectrum from that end with no hole; past 240 s the kept points are dropped.
 
 Any other return asks for a read like any change.
 
