@@ -6,8 +6,8 @@ namespace SpectrumVisualizer.Tools.BoardEmulator;
 /// <summary>A synthetic spectrum: a Gaussian peak at the wavelength over a flat floor.</summary>
 public static class SpectrumGenerator
 {
-	public const ushort FloorLevel = 1000;
-	public const ushort PeakHeight = 30000;
+	private const ushort FloorLevel = 1000;
+	private const ushort PeakHeight = 30000;
 
 	public static SpectrumMeasurement Generate(Spectrometer device, ushort wavelengthNm, byte delta)
 	{

@@ -10,7 +10,7 @@ public static class Program
 
 	public static Task<int> Main(string[] arguments)
 	{
-		return EmulatorOptions.BuildCommand(RunAsync).Parse(arguments).InvokeAsync();
+		return EmulatorCommand.Build(RunAsync).Parse(arguments).InvokeAsync();
 	}
 
 	private static async Task<int> RunAsync(EmulatorOptions options, CancellationToken cancellationToken)
@@ -22,7 +22,7 @@ public static class Program
 		}
 		catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
 		{
-			await Console.Error.WriteLineAsync($"Cannot open {options.Port}: {exception.Message}");
+			Console.Error.WriteLine($"Cannot open {options.Port}: {exception.Message}");
 			return 1;
 		}
 
@@ -48,7 +48,7 @@ public static class Program
 		}
 		catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
 		{
-			await Console.Error.WriteLineAsync($"Cannot write to {options.Port}: {exception.Message}");
+			Console.Error.WriteLine($"Cannot write to {options.Port}: {exception.Message}");
 			return 1;
 		}
 

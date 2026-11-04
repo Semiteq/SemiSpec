@@ -19,7 +19,9 @@ public static class FrameDecoder
 		Whole,
 	}
 
-	/// <summary>Returns false only when a whole frame is not buffered yet; every dropped byte is sliced off and counted.</summary>
+	/// <summary>
+	/// Returns false only when a whole frame is not buffered yet; every dropped byte is sliced off and counted.
+	/// </summary>
 	public static bool TryReadFrame(
 		ref ReadOnlySequence<byte> buffer,
 		[NotNullWhen(true)] out BoardFrame? frame,
@@ -60,7 +62,7 @@ public static class FrameDecoder
 		}
 	}
 
-	/// <summary>Checks the sync, the length and whether the whole frame is buffered; the CRC is checked later.</summary>
+	/// <summary>Checks the sync, the length and whether the whole frame is buffered; the CRC comes later.</summary>
 	private static Candidate CheckHeader(ReadOnlySequence<byte> buffer, out int frameSize, out Spectrometer? device)
 	{
 		frameSize = 0;
@@ -138,7 +140,7 @@ public static class FrameDecoder
 		}
 
 		var measurementPart = bytes[FrameLayout.MeasurementOffset..crcOffset];
-		if (measurementPart[0] != (byte)spectrometer)
+		if (measurementPart[FrameLayout.DeviceOffset] != (byte)spectrometer)
 		{
 			return null;
 		}
@@ -157,11 +159,11 @@ public static class FrameDecoder
 
 		return new SpectrumMeasurement(
 			device,
-			BinaryPrimitives.ReadUInt16LittleEndian(part[1..]),
-			part[3],
-			BinaryPrimitives.ReadSingleLittleEndian(part[4..]),
-			BinaryPrimitives.ReadSingleLittleEndian(part[8..]),
-			BinaryPrimitives.ReadSingleLittleEndian(part[12..]),
+			BinaryPrimitives.ReadUInt16LittleEndian(part[FrameLayout.WavelengthOffset..]),
+			part[FrameLayout.DeltaOffset],
+			BinaryPrimitives.ReadSingleLittleEndian(part[FrameLayout.AmplitudeOffset..]),
+			BinaryPrimitives.ReadSingleLittleEndian(part[FrameLayout.SnrOffset..]),
+			BinaryPrimitives.ReadSingleLittleEndian(part[FrameLayout.QOffset..]),
 			pixels);
 	}
 }

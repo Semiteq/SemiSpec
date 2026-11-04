@@ -140,14 +140,17 @@ type is decided by `len` only.
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Protocol/Crc16ModbusTests.cs`
 
 - [x] confirm `System.IO.Pipelines.dll` is in `Microsoft.NETCore.App.Ref/10.*/ref/net10.0`; if not, pin the package (present in 10.0.8, 10.0.11, 10.0.13, 10.0.14; no pin)
-- [x] write tests first: `123456789` → `0x4B37`; the heartbeat bytes `02 00 03 2A` → `0xB380`; incremental update equals
-  the span result
-- [x] implement `Crc16Modbus` (init 0xFFFF, reflected 0xA001, no final XOR) with a per-byte `Update` and a span overload
+- [x] write tests first: `123456789` → `0x4B37`; the heartbeat bytes `02 00 03 2A` → `0xB380` (the incremental-update
+  test went with the per-byte `Update` in review)
+- [x] implement `Crc16Modbus` (init 0xFFFF, reflected 0xA001, no final XOR) as `Compute` over a span (review removed
+  the per-byte `Update`: nothing called it)
 - [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 2: Frame model and encoder
 **Files:**
-- Create: `SpectrumVisualizer.Core/Protocol/BoardFrame.cs` (with `BoardState`, `SpectrumMeasurement`, `Spectrometer`)
+- Create: `SpectrumVisualizer.Core/Protocol/BoardFrame.cs` (with `BoardState`, `SpectrumMeasurement`)
+- ➕ Create: `SpectrumVisualizer.Core/Protocol/Spectrometer.cs` (`Spectrometer` and `PixelCount`, split out in review once
+  calibration and the emulator used them)
 - Create: `SpectrumVisualizer.Core/Protocol/FrameEncoder.cs`
 - Create: `SpectrumVisualizer.Tests.Unit/Core/Protocol/FrameEncoderTests.cs`
 
@@ -204,7 +207,10 @@ type is decided by `len` only.
 **Files:**
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator/SpectrumVisualizer.Tools.BoardEmulator.csproj`,
   `Program.cs`, `EmulatorOptions.cs`, `SpectrumGenerator.cs`, `FrameSchedule.cs`
-- Create: `SpectrumVisualizer.Tests.Unit/Tools/SpectrumGeneratorTests.cs`, `FrameScheduleTests.cs`
+- ➕ Create: `SpectrumVisualizer.Tools.BoardEmulator/EmulatorCommand.cs` (the command line, split out of
+  `EmulatorOptions` in review)
+- Create: `SpectrumVisualizer.Tests.Unit/Tools/SpectrumGeneratorTests.cs`, `FrameScheduleTests.cs`,
+  ➕ `EmulatorCommandTests.cs`
 - Modify: `SpectrumVisualizer.slnx`, `SpectrumVisualizer/Directory.Packages.props` (pin `RJCP.SerialPortStream` 3.0.5 and
   `System.CommandLine` 2.0.2)
 
@@ -227,11 +233,11 @@ type is decided by `len` only.
 - [x] update the index, the overview components table and the CLAUDE.md layout
 
 ### Task 8: Verify acceptance criteria
-- [x] run every command of Acceptance Evidence and record the results: `--filter "Area=Protocol"` 42/42 pass (every
+- [x] run every command of Acceptance Evidence and record the results: `--filter "Area=Protocol"` 46/46 pass (every
   sub-item of item 1 has a named test); `--filter "Area=Calibration"` 15/15 pass; `dotnet build SpectrumVisualizer.slnx
   -c Release --no-incremental` 0 warnings, 0 errors; `dotnet format --verify-no-changes` exit 0; `dotnet terse
   SpectrumVisualizer` exit 0; emulator `--help` prints `--port`, `--device`, `--rate`, `--wavelength`, `--delta`,
-  `--bad-crc-every`, exit 0; full `dotnet test SpectrumVisualizer.slnx` 142/142 pass; manual port-pair smoke check left
+  `--bad-crc-every`, exit 0; full `dotnet test SpectrumVisualizer.slnx` 171/171 pass (counts after the review fixes); manual port-pair smoke check left
   to the owner (not automatable)
 - [x] confirm the old solution still builds and passes 13 tests: `dotnet build SpectrumVisualizer.sln` 0 errors, 15
   warnings (nullable CS86xx and CS0618 in `SpectrumVisualizer.Uart` and `SpectrumVisualizer.Tests`, which this slice does not touch:

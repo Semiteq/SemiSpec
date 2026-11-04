@@ -2,7 +2,9 @@ using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.Core.Calibration;
 
-/// <summary>Pixel-to-wavelength polynomial of one spectrometer and the board firmware's wavelength-to-pixel rule.</summary>
+/// <summary>
+/// Pixel-to-wavelength polynomial of one spectrometer and the board firmware's wavelength-to-pixel rule.
+/// </summary>
 public sealed class SpectrometerCalibration
 {
 	private static readonly SpectrometerCalibration _atp2000 = new(
@@ -51,7 +53,7 @@ public sealed class SpectrometerCalibration
 		return _wavelengths[pixel];
 	}
 
-	/// <summary>The pixel nearest to the wavelength, after clamping it to the table range as PixelForWave() does.</summary>
+	/// <summary>The pixel nearest to the wavelength, clamped to the table range as PixelForWave() does.</summary>
 	public int PixelFor(ushort nm)
 	{
 		var target = (double)Math.Clamp(nm, FirstNm, LastNm);

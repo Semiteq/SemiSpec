@@ -162,7 +162,7 @@ public sealed class FrameReaderTests
 		return frames;
 	}
 
-	/// <summary>Counts ReadAsync calls and fails past a small limit, so a reader that spins cannot hang the run.</summary>
+	/// <summary>Counts ReadAsync calls and fails past a limit, so a reader that spins cannot hang the run.</summary>
 	private sealed class CountingPipeReader(PipeReader inner) : PipeReader
 	{
 		private const int SpinLimit = 10;

@@ -43,8 +43,8 @@ public sealed class SpectrumGeneratorTests
 	{
 		var measurement = SpectrumGenerator.Generate(Spectrometer.Atp2000, 650, 10);
 
-		measurement.Pixels[0].Should().Be(SpectrumGenerator.FloorLevel);
-		measurement.Pixels[^1].Should().Be(SpectrumGenerator.FloorLevel);
+		measurement.Pixels[0].Should().Be(1000);
+		measurement.Pixels[^1].Should().Be(1000);
 	}
 
 	[Fact]
@@ -54,6 +54,6 @@ public sealed class SpectrumGeneratorTests
 
 		measurement.WavelengthNm.Should().Be(1310);
 		measurement.Delta.Should().Be(7);
-		measurement.Amplitude.Should().Be(SpectrumGenerator.PeakHeight);
+		measurement.Amplitude.Should().Be(30000);
 	}
 }

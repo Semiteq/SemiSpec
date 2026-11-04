@@ -11,6 +11,12 @@ internal static class FrameLayout
 	public const int SeqOffset = StateOffset + 1;
 	public const int StateAndSeqSize = 2;
 	public const int MeasurementOffset = StateOffset + StateAndSeqSize;
+	public const int DeviceOffset = 0;
+	public const int WavelengthOffset = 1;
+	public const int DeltaOffset = 3;
+	public const int AmplitudeOffset = 4;
+	public const int SnrOffset = 8;
+	public const int QOffset = 12;
 	public const int MeasurementHeaderSize = 16;
 	public const int CrcSize = 2;
 	public const int HeartbeatLength = StateAndSeqSize;

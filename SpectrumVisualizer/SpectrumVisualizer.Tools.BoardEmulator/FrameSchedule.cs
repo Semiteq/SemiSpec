@@ -5,7 +5,7 @@ namespace SpectrumVisualizer.Tools.BoardEmulator;
 /// <summary>Decides which frame the emulated board sends at a tick, with the board's seq and heartbeat rules.</summary>
 public sealed class FrameSchedule(EmulatorOptions options, TimeProvider timeProvider)
 {
-	public static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(3);
+	private static readonly TimeSpan _heartbeatInterval = TimeSpan.FromSeconds(3);
 
 	private readonly long _start = timeProvider.GetTimestamp();
 
@@ -37,7 +37,7 @@ public sealed class FrameSchedule(EmulatorOptions options, TimeProvider timeProv
 				_nextSpectrumAt = now + period;
 			}
 		}
-		else if (now - _lastSentAt >= HeartbeatInterval)
+		else if (now - _lastSentAt >= _heartbeatInterval)
 		{
 			frame = new BoardFrame(_state, _seq, null);
 		}

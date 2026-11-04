@@ -30,12 +30,12 @@ public static class FrameEncoder
 
 	private static void WriteMeasurement(Span<byte> target, SpectrumMeasurement measurement)
 	{
-		target[0] = (byte)measurement.Device;
-		BinaryPrimitives.WriteUInt16LittleEndian(target[1..], measurement.WavelengthNm);
-		target[3] = measurement.Delta;
-		BinaryPrimitives.WriteSingleLittleEndian(target[4..], measurement.Amplitude);
-		BinaryPrimitives.WriteSingleLittleEndian(target[8..], measurement.Snr);
-		BinaryPrimitives.WriteSingleLittleEndian(target[12..], measurement.Q);
+		target[FrameLayout.DeviceOffset] = (byte)measurement.Device;
+		BinaryPrimitives.WriteUInt16LittleEndian(target[FrameLayout.WavelengthOffset..], measurement.WavelengthNm);
+		target[FrameLayout.DeltaOffset] = measurement.Delta;
+		BinaryPrimitives.WriteSingleLittleEndian(target[FrameLayout.AmplitudeOffset..], measurement.Amplitude);
+		BinaryPrimitives.WriteSingleLittleEndian(target[FrameLayout.SnrOffset..], measurement.Snr);
+		BinaryPrimitives.WriteSingleLittleEndian(target[FrameLayout.QOffset..], measurement.Q);
 
 		var pixelBytes = target[FrameLayout.MeasurementHeaderSize..];
 		for (var i = 0; i < measurement.Pixels.Length; i++)

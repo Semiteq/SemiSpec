@@ -1,3 +1,5 @@
+using System.CommandLine;
+
 using AwesomeAssertions;
 
 using SpectrumVisualizer.Core.Protocol;
@@ -10,7 +12,7 @@ namespace SpectrumVisualizer.Tests.Unit.Tools;
 [Trait("Component", "Tools")]
 [Trait("Area", "Emulator")]
 [Trait("Category", "Unit")]
-public sealed class EmulatorOptionsTests
+public sealed class EmulatorCommandTests
 {
 	[Fact]
 	public async Task OnlyThePortGivenYieldsTheDefaults()
@@ -50,6 +52,16 @@ public sealed class EmulatorOptionsTests
 	}
 
 	[Theory]
+	[InlineData("189", 189)]
+	[InlineData("2460", 2460)]
+	public async Task TheWavelengthRangeEndsAreAccepted(string wavelength, ushort expectedNm)
+	{
+		var options = await ParseAsync("--port", "COM5", "--wavelength", wavelength);
+
+		options.WavelengthNm.Should().Be(expectedNm);
+	}
+
+	[Theory]
 	[InlineData("--rate", "-1")]
 	[InlineData("--rate", "NaN")]
 	[InlineData("--rate", "Infinity")]
@@ -62,12 +74,14 @@ public sealed class EmulatorOptionsTests
 	[InlineData("--delta", "1.5")]
 	[InlineData("--bad-crc-every", "-1")]
 	[InlineData("--bad-crc-every", "x")]
+	[InlineData("--wavelength", "188")]
+	[InlineData("--wavelength", "2461")]
 	[InlineData("--wavelength", "70000")]
 	[InlineData("--wavelength", "-1")]
 	[InlineData("--device", "4000")]
 	public void AnOutOfRangeValueIsAParseError(string option, string value)
 	{
-		var parsed = EmulatorOptions.BuildCommand((_, _) => Task.FromResult(0)).Parse(["--port", "COM5", option, value]);
+		var parsed = Parse("--port", "COM5", option, value);
 
 		parsed.Errors.Should().NotBeEmpty();
 	}
@@ -75,15 +89,20 @@ public sealed class EmulatorOptionsTests
 	[Fact]
 	public void AMissingPortIsAParseError()
 	{
-		var parsed = EmulatorOptions.BuildCommand((_, _) => Task.FromResult(0)).Parse([]);
+		var parsed = Parse();
 
 		parsed.Errors.Should().NotBeEmpty();
+	}
+
+	private static ParseResult Parse(params string[] arguments)
+	{
+		return EmulatorCommand.Build((_, _) => Task.FromResult(0)).Parse(arguments);
 	}
 
 	private static async Task<EmulatorOptions> ParseAsync(params string[] arguments)
 	{
 		EmulatorOptions? captured = null;
-		var parsed = EmulatorOptions.BuildCommand((options, _) =>
+		var parsed = EmulatorCommand.Build((options, _) =>
 		{
 			captured = options;
 			return Task.FromResult(0);

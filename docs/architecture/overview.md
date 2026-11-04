@@ -27,7 +27,7 @@ writes protocol frames to a serial port for manual runs.
 | Component | Project | Responsibility |
 | --- | --- | --- |
 | `AppDataPaths` | Core | Resolves the log folder `SpectrumVisualizer\Logs` under the local app data root; fails on a root that is not fully qualified |
-| `Crc16Modbus` | Core | CRC-16/MODBUS of the frame, per byte or over a span |
+| `Crc16Modbus` | Core | CRC-16/MODBUS of the frame, over a span |
 | `BoardFrame`, `SpectrumMeasurement` | Core | One decoded frame: state, `seq` and the measurement of a spectrum frame; the measurement rejects a pixel count that does not match its device |
 | `FrameEncoder` | Core | The bytes of a frame; used by the emulator and the tests |
 | `FrameDecoder` | Core | Finds and validates frames in a byte sequence; drops one byte per failed candidate |
@@ -35,7 +35,8 @@ writes protocol frames to a serial port for manual runs.
 | `SequenceTracker` | Core | Counts the spectra lost between frames from `seq` |
 | `SpectrometerCalibration` | Core | Per device: the wavelength of each pixel, the pixel for a wavelength, the pixel window for a wavelength and `delta` |
 | `FrameSchedule`, `SpectrumGenerator` | Tools.BoardEmulator | Which frame the emulated board sends at a tick, and its synthetic spectrum |
-| `Program` (emulator) | Tools.BoardEmulator | Parses the options, opens the port, checks every 10 ms which frame is due and writes it, until Ctrl+C |
+| `EmulatorCommand` | Tools.BoardEmulator | Parses and range-checks the command line into an `EmulatorOptions` record |
+| `Program` (emulator) | Tools.BoardEmulator | Opens the port, checks every 10 ms which frame is due and writes it, until Ctrl+C |
 | `AppLogging` | UI | Creates the log folder and the Serilog logger: `spectrum-visualizer.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
 | `AddUi(LoggingSetup)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, the message panel, the status bar and the main window view model, all singletons |

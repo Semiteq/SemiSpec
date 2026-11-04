@@ -38,9 +38,11 @@ public sealed class SpectrometerCalibrationTests
 	public void TheTableRangesMatchTheFirmwareTables()
 	{
 		_atp2000.FirstNm.Should().Be(FirmwarePixelTables.Atp2000FirstNm);
-		_atp2000.LastNm.Should().Be((ushort)(FirmwarePixelTables.Atp2000FirstNm + FirmwarePixelTables.Atp2000.Length - 1));
+		_atp2000.LastNm.Should().Be(
+			(ushort)(FirmwarePixelTables.Atp2000FirstNm + FirmwarePixelTables.Atp2000.Length - 1));
 		_atp8000.FirstNm.Should().Be(FirmwarePixelTables.Atp8000FirstNm);
-		_atp8000.LastNm.Should().Be((ushort)(FirmwarePixelTables.Atp8000FirstNm + FirmwarePixelTables.Atp8000.Length - 1));
+		_atp8000.LastNm.Should().Be(
+			(ushort)(FirmwarePixelTables.Atp8000FirstNm + FirmwarePixelTables.Atp8000.Length - 1));
 	}
 
 	[Theory]

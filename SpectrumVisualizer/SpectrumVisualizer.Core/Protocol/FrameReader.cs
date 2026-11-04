@@ -12,7 +12,7 @@ public sealed class FrameReader
 
 	public long DiscardedBytes => Interlocked.Read(ref _discardedBytes);
 
-	/// <summary>Yields frames until the writer completes; cancellation surfaces as OperationCanceledException.</summary>
+	/// <summary>Yields frames until the writer completes; cancellation throws OperationCanceledException.</summary>
 	public async IAsyncEnumerable<BoardFrame> ReadAllAsync(
 		PipeReader reader,
 		[EnumeratorCancellation] CancellationToken cancellationToken = default)

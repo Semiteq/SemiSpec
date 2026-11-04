@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Buffers.Binary;
 
 using AwesomeAssertions;
 
@@ -123,9 +122,9 @@ public sealed class FrameDecoderTests
 	[Fact]
 	public void ABadCrcDropsOneByteAndFindsAFrameInsideTheRejectedCandidate()
 	{
-		byte[] truncatedHeader = [0xAA, 0x55, 0x02, 0x00];
+		byte[] candidateWithBadCrc = [0xAA, 0x55, 0x02, 0x00];
 
-		AssertDropsThenFindsHeartbeat(truncatedHeader);
+		AssertDropsThenFindsHeartbeat(candidateWithBadCrc);
 	}
 
 	[Theory]
@@ -144,9 +143,7 @@ public sealed class FrameDecoderTests
 	{
 		var mismatched = FrameEncoder.Encode(Spectrum(Spectrometer.Atp2000, 3));
 		mismatched[6] = (byte)Spectrometer.Atp8000;
-		var crcOffset = mismatched.Length - 2;
-		var crc = Crc16Modbus.Compute(mismatched.AsSpan(2, crcOffset - 2));
-		BinaryPrimitives.WriteUInt16LittleEndian(mismatched.AsSpan(crcOffset), crc);
+		RecomputeCrc(mismatched);
 
 		AssertDropsThenFindsHeartbeat(mismatched);
 	}

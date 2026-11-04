@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Buffers.Binary;
 
 using AwesomeAssertions;
 
@@ -7,6 +6,8 @@ using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Tools.BoardEmulator;
 
 using Xunit;
+
+using static SpectrumVisualizer.Tests.Unit.Core.Protocol.ProtocolSamples;
 
 namespace SpectrumVisualizer.Tests.Unit.Tools;
 
@@ -97,7 +98,7 @@ public sealed class FrameScheduleTests
 		var schedule = new FrameSchedule(Options(rate: 0.25), _time);
 		Decode(schedule.Next()).Seq.Should().Be(1);
 
-		_time.Advance(FrameSchedule.HeartbeatInterval);
+		_time.Advance(TimeSpan.FromSeconds(3));
 
 		Decode(schedule.Next()).Should().Be(new BoardFrame(BoardState.Atp8000Connected, 1, null));
 	}
@@ -138,10 +139,10 @@ public sealed class FrameScheduleTests
 	{
 		var schedule = new FrameSchedule(Options(rate: 0, badCrcEvery: 2), _time);
 
-		_time.Advance(FrameSchedule.HeartbeatInterval);
+		_time.Advance(TimeSpan.FromSeconds(3));
 		HasValidCrc(schedule.Next()!).Should().BeTrue();
 
-		_time.Advance(FrameSchedule.HeartbeatInterval);
+		_time.Advance(TimeSpan.FromSeconds(3));
 		HasValidCrc(schedule.Next()!).Should().BeFalse();
 	}
 
@@ -170,13 +171,6 @@ public sealed class FrameScheduleTests
 		var found = FrameDecoder.TryReadFrame(ref buffer, out var frame, out var discarded);
 		discarded.Should().Be(0);
 		return found ? frame! : throw new InvalidOperationException("The bytes hold no whole valid frame.");
-	}
-
-	private static bool HasValidCrc(byte[] bytes)
-	{
-		var crcOffset = bytes.Length - 2;
-		var crc = Crc16Modbus.Compute(bytes.AsSpan(2, crcOffset - 2));
-		return BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(crcOffset)) == crc;
 	}
 
 	private sealed class ManualTimeProvider : TimeProvider

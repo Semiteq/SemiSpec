@@ -1,10 +1,15 @@
+using System.Buffers.Binary;
+
 using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.Tests.Unit.Core.Protocol;
 
-/// <summary>Sample frames whose pixel data holds no AA 55 pair, so no false sync appears unless a test plants one.</summary>
+/// <summary>Sample frames whose pixels hold no AA 55 pair, so no false sync appears unless a test plants one.</summary>
 internal static class ProtocolSamples
 {
+	private const int LengthOffset = 2;
+	private const int CrcSize = 2;
+
 	public static readonly byte[] HeartbeatExample = [0xAA, 0x55, 0x02, 0x00, 0x03, 0x2A, 0x80, 0xB3];
 
 	public static BoardFrame Heartbeat(byte seq)
@@ -31,5 +36,22 @@ internal static class ProtocolSamples
 	public static byte[] Concat(params IEnumerable<byte[]> parts)
 	{
 		return [.. parts.SelectMany(part => part)];
+	}
+
+	public static bool HasValidCrc(byte[] frameBytes)
+	{
+		return BinaryPrimitives.ReadUInt16LittleEndian(frameBytes.AsSpan(frameBytes.Length - CrcSize))
+			== CrcOf(frameBytes);
+	}
+
+	/// <summary>Rewrites the CRC after a test patched the frame bytes.</summary>
+	public static void RecomputeCrc(byte[] frameBytes)
+	{
+		BinaryPrimitives.WriteUInt16LittleEndian(frameBytes.AsSpan(frameBytes.Length - CrcSize), CrcOf(frameBytes));
+	}
+
+	private static ushort CrcOf(byte[] frameBytes)
+	{
+		return Crc16Modbus.Compute(frameBytes.AsSpan(LengthOffset..^CrcSize));
 	}
 }

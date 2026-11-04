@@ -168,7 +168,7 @@ dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator -
 dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator -- --help
 ```
 
-`--help` lists the options, their defaults and ranges. The port runs at 115200 baud, fixed. An ATP-2000 frame takes
+`--help` lists the options and their defaults. The port runs at 115200 baud, fixed. An ATP-2000 frame takes
 about 0.36 s on the wire, so the port caps `--rate` near 2.8 for ATP-2000. A failed write, for example an unplugged
 adapter, prints one line and exits with code 1.
 
