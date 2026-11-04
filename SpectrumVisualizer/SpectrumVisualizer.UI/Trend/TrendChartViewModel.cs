@@ -14,7 +14,6 @@ using ScottPlot;
 using ScottPlot.Plottables;
 using ScottPlot.TickGenerators;
 
-using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Core.Store;
 using SpectrumVisualizer.Core.Trend;
 using SpectrumVisualizer.UI.Chart;
@@ -33,12 +32,14 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	private const double YPadding = 0.05;
 
 	private static readonly TimeSpan _changeSample = TimeSpan.FromMilliseconds(100);
+	private static readonly TimeSpan _liveTick = TimeSpan.FromSeconds(1);
 
 	// While following, the window ends at the newest point, which the fold's half-open range would leave out.
 	private static readonly TimeSpan _newestPointInclusion = TimeSpan.FromMilliseconds(1);
 
 	private readonly IntensityCache _cache;
 	private readonly MessagePanelViewModel _messagePanel;
+	private readonly TimeProvider _timeProvider;
 	private readonly IScheduler _uiScheduler;
 	private readonly ILogger<TrendChartViewModel> _logger;
 	private readonly EnvelopeLine _envelope = new();
@@ -60,10 +61,12 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	{
 		_cache = cache;
 		_messagePanel = messagePanel;
+		_timeProvider = timeProvider;
 		_uiScheduler = uiScheduler;
 		_logger = logger;
 		var now = timeProvider.GetUtcNow();
 		_navigation = new TrendNavigationModel(now - TrendPresets.Default.Width, now, now, isSticky: true);
+		Width = _navigation.Width;
 
 		Plot.Add.Plottable(_envelope);
 		Plot.Add.Plottable(_strip);
@@ -77,6 +80,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 
 		_disposables.Add(cache.Changed
 			.Sample(_changeSample, uiScheduler)
+			.Merge(LiveTicks(uiScheduler))
 			.StartWith(Unit.Default)
 			.Subscribe(_ => RefreshReporting(), ReportPipelineFailure));
 		_disposables.Add(source
@@ -90,9 +94,13 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 
 	public DateTimeOffset To => _navigation.To;
 
-	public TimeSpan Width => _navigation.Width;
+	public TimeSpan Width
+	{
+		get;
+		private set => this.RaiseAndSetIfChanged(ref field, value);
+	}
 
-	/// <summary>True while every new point moves the window to the newest one.</summary>
+	/// <summary>True while the window's right edge moves with the clock.</summary>
 	public bool IsFollowing
 	{
 		get;
@@ -108,16 +116,17 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	/// <summary>One signal per redraw request, raised at once on the caller's thread; completes on dispose.</summary>
 	public IObservable<Unit> RedrawRequested => _redrawRequests.AsObservable();
 
-	/// <summary>Zooms around the anchor; a window that no longer holds the newest point stops following.</summary>
+	/// <summary>Zooms around the anchor; a window that no longer holds now stops following.</summary>
 	public void ZoomAt(double factor, DateTimeOffset anchor)
 	{
-		if (_cache.NewestAt is not { } newest)
+		if (_cache.NewestAt is null)
 		{
 			return;
 		}
 
+		var now = _timeProvider.GetUtcNow();
 		_navigation.Zoom(factor, anchor);
-		if (newest > _navigation.To || newest < _navigation.From)
+		if (now > _navigation.To || now < _navigation.From)
 		{
 			_navigation.DetachSticky();
 		}
@@ -125,27 +134,27 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		Refresh();
 	}
 
-	/// <summary>Moves the window; a pan that leaves the newest point outside it stops following.</summary>
+	/// <summary>Moves the window; a pan that leaves now outside it stops following.</summary>
 	public void PanBy(TimeSpan delta)
 	{
-		if (_cache.NewestAt is not { } newest)
+		if (_cache.NewestAt is null)
 		{
 			return;
 		}
 
-		_navigation.Pan(delta, newest);
+		_navigation.Pan(delta, _timeProvider.GetUtcNow());
 		Refresh();
 	}
 
 	/// <summary>Moves the window's centre to the moment, clamped at the first point, and stops following.</summary>
 	public void CentreOn(DateTimeOffset moment)
 	{
-		if (_cache.NewestAt is not { } newest)
+		if (_cache.NewestAt is null)
 		{
 			return;
 		}
 
-		_navigation.Pan(moment - (_navigation.From + (_navigation.Width / 2)), newest);
+		_navigation.Pan(moment - (_navigation.From + (_navigation.Width / 2)), _timeProvider.GetUtcNow());
 		_navigation.DetachSticky();
 		Refresh();
 	}
@@ -159,7 +168,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 
 	public void FollowLive()
 	{
-		_navigation.JumpToNow(_cache.NewestAt ?? _navigation.To);
+		_navigation.JumpToNow(_timeProvider.GetUtcNow());
 		Refresh();
 	}
 
@@ -230,8 +239,9 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		var hasPoints = key is not null && first is not null && newest is not null;
 		if (hasPoints)
 		{
-			TrackExtent(first!.Value, newest!.Value);
-			_navigation.OnLiveEdge(newest.Value);
+			var now = _timeProvider.GetUtcNow();
+			TrackExtent(first!.Value, now);
+			_navigation.OnLiveEdge(now);
 		}
 
 		_lastFold = hasPoints ? Fold(key!.Value) : null;
@@ -252,16 +262,17 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		}
 
 		HasPoints = hasPoints;
+		Width = _navigation.Width;
 		IsFollowing = _navigation.IsSticky;
 		RequestRedraw();
 	}
 
-	/// <summary>The first point opens the window at the newest one; a moved first point moves only the pan floor.</summary>
-	private void TrackExtent(DateTimeOffset first, DateTimeOffset newest)
+	/// <summary>The first point opens the window at now; a moved first point moves only the pan floor.</summary>
+	private void TrackExtent(DateTimeOffset first, DateTimeOffset now)
 	{
 		if (!HasPoints)
 		{
-			_navigation = new TrendNavigationModel(newest - _navigation.Width, newest, first, isSticky: true);
+			_navigation = new TrendNavigationModel(now - _navigation.Width, now, first, isSticky: true);
 		}
 		else if (first != _navigation.FirstSample)
 		{
@@ -278,20 +289,21 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		return new LastFold(query, _cache.Fold(query), key);
 	}
 
+	/// <summary>While following, the window's right edge is now, so a silence shows as an empty span within a second.</summary>
+	private IObservable<Unit> LiveTicks(IScheduler uiScheduler)
+	{
+		return Observable.Interval(_liveTick, uiScheduler)
+			.Where(_ => IsFollowing)
+			.Select(_ => Unit.Default);
+	}
+
 	private static List<StripSpan> FailureSpans(IntensitySeries series)
 	{
-		var spans = new List<StripSpan>();
-		foreach (var column in series.Columns)
-		{
-			if (column.Failed != BoardState.None)
-			{
-				spans.Add(new StripSpan(
-					LocalTimeAxis.ToAxis(column.Start),
-					LocalTimeAxis.ToAxis(column.Start + series.ColumnWidth)));
-			}
-		}
-
-		return spans;
+		return
+		[
+			.. TrendColumns.FailureRanges(series)
+				.Select(range => new StripSpan(LocalTimeAxis.ToAxis(range.From), LocalTimeAxis.ToAxis(range.To))),
+		];
 	}
 
 	/// <summary>The drawn values padded by 5 % of their span, plus or minus 1 when flat; null when none is drawn.</summary>

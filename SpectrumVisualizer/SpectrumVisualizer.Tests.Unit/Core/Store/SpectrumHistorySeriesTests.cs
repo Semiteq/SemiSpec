@@ -166,6 +166,6 @@ public sealed class SpectrumHistorySeriesTests : SpectrumHistoryTestBase
 	private static IntensityColumn Column(
 		DateTimeOffset start, double min, double max, int count, int uncoveredCount, double last)
 	{
-		return new IntensityColumn(start, min, max, count, uncoveredCount, last, 0, 0, BoardState.None);
+		return new IntensityColumn(start, min, max, count, uncoveredCount, last, 0, 0, 0, BoardState.None);
 	}
 }

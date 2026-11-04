@@ -1,3 +1,4 @@
+using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Core.Store;
 
 namespace SpectrumVisualizer.Core.Trend;
@@ -7,6 +8,8 @@ public static class TrendColumns
 {
 	public const int MinimumColumns = 256;
 	public const int MaximumColumns = 2048;
+
+	private static readonly TimeSpan _failureJoin = TimeSpan.FromSeconds(5);
 
 	/// <summary>One column per pixel of the data area, 256 to 2048 columns, each a whole number of ms, at least 1.</summary>
 	public static TimeSpan ColumnWidth(TimeSpan span, double dataAreaPixels)
@@ -38,5 +41,30 @@ public static class TrendColumns
 		}
 
 		return columns;
+	}
+
+	/// <summary>The failed columns as time ranges; failed columns less than 5 s apart join into one range.</summary>
+	public static IReadOnlyList<TimeRange> FailureRanges(IntensitySeries series)
+	{
+		var ranges = new List<TimeRange>();
+		foreach (var column in series.Columns)
+		{
+			if (column.Failed == BoardState.None)
+			{
+				continue;
+			}
+
+			var end = column.Start + series.ColumnWidth;
+			if (ranges.Count > 0 && column.Start - ranges[^1].To < _failureJoin)
+			{
+				ranges[^1] = ranges[^1] with { To = end };
+			}
+			else
+			{
+				ranges.Add(new TimeRange(column.Start, end));
+			}
+		}
+
+		return ranges;
 	}
 }

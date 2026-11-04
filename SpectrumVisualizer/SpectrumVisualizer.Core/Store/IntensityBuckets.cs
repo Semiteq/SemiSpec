@@ -17,6 +17,7 @@ public sealed class IntensityBuckets(IntensityQuery query)
 	private readonly DateTimeOffset[] _lastAt = new DateTimeOffset[query.ColumnCount];
 	private readonly int[] _breakCount = new int[query.ColumnCount];
 	private readonly int[] _lostCount = new int[query.ColumnCount];
+	private readonly int[] _noSpectraCount = new int[query.ColumnCount];
 	private readonly BoardState[] _failed = new BoardState[query.ColumnCount];
 
 	public void Add(DateTimeOffset receivedAt, double value)
@@ -57,14 +58,20 @@ public sealed class IntensityBuckets(IntensityQuery query)
 		}
 	}
 
-	/// <summary>Counts a break of the line; lost is 0 for a stretch without spectra.</summary>
+	/// <summary>Counts a break of the line; a break with none lost ends a stretch without spectra.</summary>
 	public void AddBreak(DateTimeOffset moment, int lost)
 	{
 		var column = query.ColumnOf(moment);
-		if (column >= 0)
+		if (column < 0)
 		{
-			_breakCount[column]++;
-			_lostCount[column] += lost;
+			return;
+		}
+
+		_breakCount[column]++;
+		_lostCount[column] += lost;
+		if (lost == 0)
+		{
+			_noSpectraCount[column]++;
 		}
 	}
 
@@ -93,6 +100,7 @@ public sealed class IntensityBuckets(IntensityQuery query)
 				empty ? double.NaN : _last[i],
 				_breakCount[i],
 				_lostCount[i],
+				_noSpectraCount[i],
 				_failed[i]);
 		}
 
@@ -219,8 +227,8 @@ public sealed record IntensitySeries(
 
 /// <summary>
 /// Min, max and latest value of the column's covered spectra, NaN when Count is 0; UncoveredCount counts the spectra of
-/// a device that does not cover the wavelength and the corrupt rows the series skipped; the break counts and the
-/// failed bits come from the trend's continuity rule, and the store series leaves them at zero.
+/// a device that does not cover the wavelength and the corrupt rows the series skipped; the break counts (NoSpectraCount
+/// of them end a silence) and the failed bits come from the trend's continuity rule, and the store leaves them at zero.
 /// </summary>
 public readonly record struct IntensityColumn(
 	DateTimeOffset Start,
@@ -231,4 +239,5 @@ public readonly record struct IntensityColumn(
 	double Last,
 	int BreakCount,
 	int LostCount,
+	int NoSpectraCount,
 	BoardState Failed);

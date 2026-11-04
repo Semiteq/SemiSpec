@@ -54,7 +54,7 @@ public static class TrendReadout
 
 		if (last + 1 < columns.Length && OpensAGap(columns[last + 1]))
 		{
-			lines.Add(GapReason(columns[last + 1], key));
+			AddGapReason(columns[last + 1], key, lines);
 		}
 		else if (first > 0 && last + 1 < columns.Length)
 		{
@@ -83,7 +83,7 @@ public static class TrendReadout
 	{
 		if (column.Count == 0)
 		{
-			lines.Add(GapReason(column, key));
+			AddGapReason(column, key, lines);
 			return;
 		}
 
@@ -91,30 +91,34 @@ public static class TrendReadout
 			? Format(column.Min)
 			: Resources.FormatTrendReadoutRangeFormat(Format(column.Min), Format(column.Max)));
 		lines.Add(Resources.FormatTrendReadoutCountFormat(column.Count.ToString(CultureInfo.CurrentCulture)));
-		if (column.BreakCount > 0)
-		{
-			lines.Add(BreakReason(column));
-		}
+		AddBreakReasons(column, lines);
 	}
 
-	private static string GapReason(IntensityColumn column, TrendKey key)
+	private static void AddGapReason(IntensityColumn column, TrendKey key, List<string> lines)
 	{
 		if (column.BreakCount > 0)
 		{
-			return BreakReason(column);
+			AddBreakReasons(column, lines);
+			return;
 		}
 
-		return column.UncoveredCount > 0
+		lines.Add(column.UncoveredCount > 0
 			? Resources.FormatTrendReadoutUncoveredFormat(key.WavelengthNm.ToString(CultureInfo.CurrentCulture))
-			: Resources.TrendReadoutNoData;
+			: Resources.TrendReadoutNoData);
 	}
 
-	/// <summary>Only a Loss break carries a lost count, so a break with none lost is a stretch without spectra.</summary>
-	private static string BreakReason(IntensityColumn column)
+	/// <summary>A column can end a stretch without spectra and count lost spectra too; both reasons show, in that order.</summary>
+	private static void AddBreakReasons(IntensityColumn column, List<string> lines)
 	{
-		return column.LostCount > 0
-			? Resources.FormatTrendReadoutLostFormat(column.LostCount.ToString(CultureInfo.CurrentCulture))
-			: Resources.TrendReadoutNoSpectra;
+		if (column.NoSpectraCount > 0)
+		{
+			lines.Add(Resources.TrendReadoutNoSpectra);
+		}
+
+		if (column.LostCount > 0)
+		{
+			lines.Add(Resources.FormatTrendReadoutLostFormat(column.LostCount.ToString(CultureInfo.CurrentCulture)));
+		}
 	}
 
 	private static void AddFailures(BoardState failed, List<string> lines)

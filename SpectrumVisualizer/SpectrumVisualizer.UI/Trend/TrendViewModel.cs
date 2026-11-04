@@ -1,4 +1,5 @@
 using System.Reactive;
+using System.Reactive.Disposables;
 using System.Reactive.Linq;
 
 using ReactiveUI;
@@ -9,7 +10,8 @@ namespace SpectrumVisualizer.UI.Trend;
 public sealed class TrendViewModel : ReactiveObject, IDisposable
 {
 	private readonly TrendFeed _feed;
-	private TrendPreset _selectedPreset;
+	private readonly ObservableAsPropertyHelper<TrendPreset?> _selectedPreset;
+	private readonly CompositeDisposable _disposables = [];
 
 	public TrendViewModel(TrendChartViewModel chart, OverviewViewModel overview, TrendFeed feed)
 	{
@@ -17,10 +19,13 @@ public sealed class TrendViewModel : ReactiveObject, IDisposable
 		Overview = overview;
 		_feed = feed;
 		Presets = TrendPresets.All;
-		_selectedPreset = Presets.First(preset => preset.Width == TrendPresets.Default.Width);
-		FollowLiveCommand = ReactiveCommand.Create(
+		_disposables.Add(chart
+			.WhenAnyValue(trend => trend.Width)
+			.Select(width => Presets.FirstOrDefault(preset => preset.Width == width))
+			.ToProperty(this, trend => trend.SelectedPreset, out _selectedPreset));
+		_disposables.Add(FollowLiveCommand = ReactiveCommand.Create(
 			chart.FollowLive,
-			chart.WhenAnyValue(trend => trend.IsFollowing).Select(isFollowing => !isFollowing));
+			chart.WhenAnyValue(trend => trend.IsFollowing).Select(isFollowing => !isFollowing)));
 	}
 
 	public TrendChartViewModel Chart { get; }
@@ -29,23 +34,20 @@ public sealed class TrendViewModel : ReactiveObject, IDisposable
 
 	public IReadOnlyList<TrendPreset> Presets { get; }
 
-	/// <summary>A new preset sets the chart's width and keeps its right edge and following.</summary>
-	public TrendPreset SelectedPreset
+	/// <summary>The preset of the chart's width, null after a zoom off every preset; a picked preset sets the width.</summary>
+	public TrendPreset? SelectedPreset
 	{
-		get => _selectedPreset;
+		get => _selectedPreset.Value;
 		set
 		{
-			if (value is null || value == _selectedPreset)
+			if (value is not null && value.Width != Chart.Width)
 			{
-				return;
+				Chart.SetWidth(value.Width);
 			}
-
-			this.RaiseAndSetIfChanged(ref _selectedPreset, value);
-			Chart.SetWidth(value.Width);
 		}
 	}
 
-	/// <summary>Jumps to the newest point and follows it; enabled only while not following.</summary>
+	/// <summary>Jumps to now and follows it; enabled only while not following.</summary>
 	public ReactiveCommand<Unit, Unit> FollowLiveCommand { get; }
 
 	/// <summary>Shows the spectrum of the clicked moment on the spectrum chart.</summary>
@@ -56,6 +58,6 @@ public sealed class TrendViewModel : ReactiveObject, IDisposable
 
 	public void Dispose()
 	{
-		FollowLiveCommand.Dispose();
+		_disposables.Dispose();
 	}
 }

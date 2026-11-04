@@ -68,6 +68,35 @@ public sealed class TrendChartViewModelTests : TrendChartTestBase
 	}
 
 	[AvaloniaFact]
+	public void WhileFollowingASilenceShowsAsAnEmptySpanWithinASecond()
+	{
+		AddSpectra(0, 60);
+		Sample();
+		Time.Advance(TimeSpan.FromSeconds(5));
+
+		Scheduler.AdvanceBy(Second.Ticks);
+
+		Chart.To.Should().Be(At(59) + TimeSpan.FromSeconds(5), "the live edge is now, not the newest spectrum");
+		Chart.Width.Should().Be(_tenMinutes);
+		Chart.IsFollowing.Should().BeTrue();
+	}
+
+	[AvaloniaFact]
+	public void APausedWindowStaysPutWhileTheClockRuns()
+	{
+		AddSpectra(0, 1800);
+		Sample();
+		Chart.PanBy(TimeSpan.FromMinutes(-5));
+		var (from, to) = (Chart.From, Chart.To);
+		Time.Advance(TimeSpan.FromSeconds(5));
+
+		Scheduler.AdvanceBy(Second.Ticks);
+
+		Chart.From.Should().Be(from);
+		Chart.To.Should().Be(to);
+	}
+
+	[AvaloniaFact]
 	public void APanIntoThePastStopsFollowingAndANewFrameKeepsTheWindow()
 	{
 		AddSpectra(0, 1800);

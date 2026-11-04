@@ -196,6 +196,42 @@ public sealed class TrendFeedTests : TrendFeedTestBase
 	}
 
 	[AvaloniaFact]
+	public async Task AReadThatLandsEveryRangeLetsAReturnRestoreTheKeyWithoutARead()
+	{
+		Feed.Start();
+		ChangeKeyAfterTwentyMinutes(OtherNm);
+		var plan = PlanFor(Chart.From, Chart.To);
+		PassThrottle();
+		await Waits.UntilAsync(() => PointsCalls.Count == plan.Count);
+		await Feed.StopAsync().WaitAsync(Waits.Limit);
+
+		AddAt(1201, ThirdNm);
+		AddAt(1202, OtherNm);
+
+		Requests.Select(request => request.ReadsHistory).Should().Equal(true, true, false);
+	}
+
+	[AvaloniaFact]
+	public async Task BackToLiveCancelsTheMomentReadInFlight()
+	{
+		Feed.Start();
+		AddSpectra(0, 300);
+		Feed.ReadMoment(At(250));
+		Switching.ShownMoment.Should().Be(At(250), "the moment lies inside the recent spectra");
+		SpectrumResult = call => Result.Ok<StoredSpectrum?>(Stored(call.Moment));
+		HoldSpectrum();
+		Feed.ReadMoment(At(10));
+		await Waits.UntilAsync(() => SpectrumCalls.Count == 1);
+
+		Switching.ReturnToLive();
+
+		SpectrumCalls.Single().Token.IsCancellationRequested.Should().BeTrue();
+		ReleaseSpectrum();
+		await Feed.StopAsync().WaitAsync(Waits.Limit);
+		Switching.ShownMoment.Should().BeNull("the cancelled read shows nothing");
+	}
+
+	[AvaloniaFact]
 	public async Task StopCancelsTheReadsAndAwaitsThem()
 	{
 		Feed.Start();

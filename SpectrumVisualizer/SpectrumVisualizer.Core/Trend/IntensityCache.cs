@@ -153,6 +153,18 @@ public sealed class IntensityCache : IDisposable
 		_changedGate.OnNext(Unit.Default);
 	}
 
+	/// <summary>Marks the generation's history as read in full, so a later change keeps its points for a return.</summary>
+	public void CompleteHistory(int generation)
+	{
+		lock (_gate)
+		{
+			if (generation == _generation)
+			{
+				_historyComplete = true;
+			}
+		}
+	}
+
 	/// <summary>Folds the points, breaks and failure marks of the query's range; the query's key is not checked.</summary>
 	public IntensitySeries Fold(IntensityQuery query)
 	{

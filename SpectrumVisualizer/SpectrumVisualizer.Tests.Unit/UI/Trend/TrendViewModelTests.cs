@@ -40,7 +40,7 @@ public sealed class TrendViewModelTests : TrendFeedTestBase
 			TimeSpan.FromHours(1),
 			TimeSpan.FromHours(6),
 			TimeSpan.FromHours(24));
-		_trend.SelectedPreset.Width.Should().Be(TimeSpan.FromMinutes(10));
+		_trend.SelectedPreset!.Width.Should().Be(TimeSpan.FromMinutes(10));
 	}
 
 	[AvaloniaFact]
@@ -54,6 +54,32 @@ public sealed class TrendViewModelTests : TrendFeedTestBase
 		Chart.Width.Should().Be(TimeSpan.FromHours(1));
 		Chart.To.Should().Be(At(59));
 		Chart.IsFollowing.Should().BeTrue();
+	}
+
+	[AvaloniaFact]
+	public void TheSelectedPresetFollowsTheChartWidth()
+	{
+		AddSpectra(0, 1800);
+		Sample();
+
+		Chart.ZoomAt(0.8, Chart.To);
+		_trend.SelectedPreset.Should().BeNull("a zoomed width matches no preset");
+
+		Chart.SetWidth(TimeSpan.FromHours(1));
+		_trend.SelectedPreset.Should().Be(_trend.Presets[2]);
+	}
+
+	[AvaloniaFact]
+	public void PickingAPresetAfterAZoomSetsItsWidth()
+	{
+		AddSpectra(0, 1800);
+		Sample();
+		Chart.ZoomAt(0.8, Chart.To);
+
+		_trend.SelectedPreset = _trend.Presets[1];
+
+		Chart.Width.Should().Be(TimeSpan.FromMinutes(10));
+		_trend.SelectedPreset.Should().Be(_trend.Presets[1]);
 	}
 
 	[AvaloniaFact]

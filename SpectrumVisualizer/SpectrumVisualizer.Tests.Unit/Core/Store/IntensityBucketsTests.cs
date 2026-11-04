@@ -52,7 +52,7 @@ public sealed class IntensityBucketsTests
 		}
 
 		buckets.ToSeries().Columns.Should().Equal(
-			new IntensityColumn(_from, expectedMin, expectedMax, values.Length, 0, values[^1], 0, 0, BoardState.None));
+			new IntensityColumn(_from, expectedMin, expectedMax, values.Length, 0, values[^1], 0, 0, 0, BoardState.None));
 	}
 
 	[Fact]
@@ -80,7 +80,7 @@ public sealed class IntensityBucketsTests
 	}
 
 	[Fact]
-	public void BreaksFoldIntoTheirColumnsWithTheirLostCounts()
+	public void BreaksFoldIntoTheirColumnsWithTheirLostAndSilenceCounts()
 	{
 		var buckets = new IntensityBuckets(Query(_from, _from.AddSeconds(3), TimeSpan.FromSeconds(1)));
 
@@ -91,6 +91,7 @@ public sealed class IntensityBucketsTests
 		var columns = buckets.ToSeries().Columns;
 		columns.Select(c => c.BreakCount).Should().Equal(2, 0, 1);
 		columns.Select(c => c.LostCount).Should().Equal(2, 0, 201);
+		columns.Select(c => c.NoSpectraCount).Should().Equal(1, 0, 0);
 		columns.Should().AllSatisfy(c => c.Count.Should().Be(0, "a break adds no value"));
 	}
 

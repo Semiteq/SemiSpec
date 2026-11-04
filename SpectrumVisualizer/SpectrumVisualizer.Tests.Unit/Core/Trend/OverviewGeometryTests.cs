@@ -333,6 +333,7 @@ public sealed class OverviewGeometryTests
 				column.Last,
 				0,
 				0,
+				0,
 				BoardState.None))
 		];
 

@@ -86,13 +86,29 @@ public sealed class TrendReadoutTests
 	public void ANoSpectraGapReadsNoSpectraAndTheFailureAHeartbeatInItCarried()
 	{
 		var heartbeat = Empty(2) with { Failed = BoardState.Atp8000MeasurementFailed };
-		var afterSilence = Value(4, 2.0) with { BreakCount = 1 };
+		var afterSilence = Value(4, 2.0) with { BreakCount = 1, NoSpectraCount = 1 };
 
 		var lines = Read([Value(0, 1.0), Empty(1), heartbeat, Empty(3), afterSilence], 1);
 
 		lines.Skip(1).Should().Equal(
 			Resources.TrendReadoutNoSpectra,
 			Resources.FormatTrendReadoutFailedFormat("ATP-8000"));
+	}
+
+	[Fact]
+	public void AColumnEndingASilenceWithALossReadsNoSpectraThenTheLostCount()
+	{
+		var afterSilence = Value(2, 2.0) with { BreakCount = 2, LostCount = 3, NoSpectraCount = 1 };
+
+		var gap = Read([Value(0, 1.0), Empty(1), afterSilence], 1);
+		var values = Read([Value(0, 1.0), Empty(1), afterSilence], 2);
+
+		gap.Skip(1).Should().Equal(Resources.TrendReadoutNoSpectra, Resources.FormatTrendReadoutLostFormat(Count(3)));
+		values.Skip(1).Should().Equal(
+			Number(2.0),
+			Resources.FormatTrendReadoutCountFormat(Count(1)),
+			Resources.TrendReadoutNoSpectra,
+			Resources.FormatTrendReadoutLostFormat(Count(3)));
 	}
 
 	[Fact]
@@ -136,12 +152,12 @@ public sealed class TrendReadoutTests
 
 	private static IntensityColumn Value(int second, double value)
 	{
-		return new IntensityColumn(At(second), value, value, 1, 0, value, 0, 0, BoardState.None);
+		return new IntensityColumn(At(second), value, value, 1, 0, value, 0, 0, 0, BoardState.None);
 	}
 
 	private static IntensityColumn Empty(int second)
 	{
-		return new IntensityColumn(At(second), double.NaN, double.NaN, 0, 0, double.NaN, 0, 0, BoardState.None);
+		return new IntensityColumn(At(second), double.NaN, double.NaN, 0, 0, double.NaN, 0, 0, 0, BoardState.None);
 	}
 
 	private static DateTimeOffset At(int second)

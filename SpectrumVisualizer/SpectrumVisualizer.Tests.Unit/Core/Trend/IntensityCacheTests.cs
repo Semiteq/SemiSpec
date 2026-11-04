@@ -198,6 +198,35 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 	}
 
 	[Fact]
+	public void AReturnToAKeyWhoseHistoryWasReadInFullRestoresItWithoutARead()
+	{
+		AddSpectra(0, 200);
+		_cache.Add(StoreSamples.Spectrum(At(200), nm: OtherNm, seq: 200));
+		_cache.LandHistory(1, Chunk(0, 80, value: 1));
+		_cache.CompleteHistory(1);
+		_cache.Add(StoreSamples.Spectrum(At(201), nm: ThirdNm, seq: 201));
+
+		_cache.Add(StoreSamples.Spectrum(At(202), nm: OtherNm, seq: 202));
+
+		_requests.Select(request => request.ReadsHistory).Should().Equal(true, true, false);
+		SecondColumns(0, 80).Sum(column => column.Count).Should().Be(80, "the landed history came back with the key");
+	}
+
+	[Fact]
+	public void ACompleteMarkOfAnOlderGenerationLeavesTheHistoryIncomplete()
+	{
+		AddSpectra(0, 200);
+		_cache.Add(StoreSamples.Spectrum(At(200), nm: OtherNm, seq: 200));
+		_cache.Add(StoreSamples.Spectrum(At(201), nm: ThirdNm, seq: 201));
+		_cache.CompleteHistory(1);
+		_cache.Add(StoreSamples.Spectrum(At(202), nm: SampleNm, seq: 202));
+
+		_cache.Add(StoreSamples.Spectrum(At(203), nm: ThirdNm, seq: 203));
+
+		_requests.Select(request => request.ReadsHistory).Should().Equal(true, true, true, true);
+	}
+
+	[Fact]
 	public void AChangeAfterAReturnAsksForAReRead()
 	{
 		AddSpectra(0, 200);
@@ -300,7 +329,7 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 			var stored = await History.IntensitySeriesAsync(query, Token);
 
 			var folded = _cache.Fold(query).Columns
-				.Select(column => column with { BreakCount = 0, LostCount = 0, Failed = BoardState.None });
+				.Select(column => column with { BreakCount = 0, LostCount = 0, NoSpectraCount = 0, Failed = BoardState.None });
 
 			folded.Should().Equal(stored.Value.Columns);
 		}

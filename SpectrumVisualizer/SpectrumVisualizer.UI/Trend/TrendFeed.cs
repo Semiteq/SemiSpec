@@ -8,6 +8,8 @@ using FluentResults;
 
 using Microsoft.Extensions.Logging;
 
+using ReactiveUI;
+
 using SpectrumVisualizer.Core.Store;
 using SpectrumVisualizer.Core.Trend;
 using SpectrumVisualizer.UI.Link;
@@ -18,7 +20,8 @@ namespace SpectrumVisualizer.UI.Trend;
 
 /// <summary>
 /// Fills the intensity cache from the distributor, re-reads the stored history after a key change and reads the
-/// spectrum of a clicked moment; a newer request cancels the read in flight of its pipeline.
+/// spectrum of a clicked moment; a newer request cancels the read in flight of its pipeline, and Back to live cancels
+/// the moment read in flight.
 /// </summary>
 public sealed class TrendFeed(
 	FrameDistributor distributor,
@@ -34,7 +37,8 @@ public sealed class TrendFeed(
 {
 	private static readonly TimeSpan _reReadThrottle = TimeSpan.FromMilliseconds(500);
 
-	private readonly Subject<DateTimeOffset> _momentRequests = new();
+	// A null request cancels the moment read in flight and reads nothing.
+	private readonly Subject<DateTimeOffset?> _momentRequests = new();
 	private readonly CompositeDisposable _subscriptions = [];
 
 	// Reads are added on the UI thread and removed on the pool thread that ends them; StopAsync awaits the rest.
@@ -56,6 +60,10 @@ public sealed class TrendFeed(
 		_started = true;
 		_subscriptions.Add(SubscribeToHistoryReads());
 		_subscriptions.Add(SubscribeToMomentReads());
+		_subscriptions.Add(source
+			.WhenAnyValue(switching => switching.ShownMoment)
+			.Where(shown => shown is null)
+			.Subscribe(_ => _momentRequests.OnNext(null), ReportPipelineFailure));
 		_subscriptions.Add(distributor.Frames.Subscribe(cache.Add, ReportPipelineFailure));
 		logger.LogDebug("The trend feed started");
 	}
@@ -136,6 +144,8 @@ public sealed class TrendFeed(
 
 				cache.LandHistory(request.Generation, chunk.Value);
 			}
+
+			cache.CompleteHistory(request.Generation);
 		}
 		catch (OperationCanceledException) when (token.IsCancellationRequested)
 		{
@@ -161,9 +171,14 @@ public sealed class TrendFeed(
 			.Subscribe(ShowRead, ReportPipelineFailure);
 	}
 
-	/// <summary>A moment inside the cache's recent spectra needs no store read.</summary>
-	private IObservable<MomentRead> ReadMomentFrom(DateTimeOffset moment)
+	/// <summary>A moment inside the cache's recent spectra needs no store read; Back to live reads nothing.</summary>
+	private IObservable<MomentRead> ReadMomentFrom(DateTimeOffset? requested)
 	{
+		if (requested is not { } moment)
+		{
+			return Observable.Empty<MomentRead>();
+		}
+
 		return cache.SpectrumAt(moment) is { } recent
 			? Observable.Return(new MomentRead(moment, Result.Ok<StoredSpectrum?>(recent)))
 			: Observable.Create<MomentRead>(async (observer, token) =>
