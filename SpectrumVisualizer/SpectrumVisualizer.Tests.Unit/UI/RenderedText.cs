@@ -6,9 +6,8 @@ using SkiaSharp;
 namespace SpectrumVisualizer.Tests.Unit.UI;
 
 /// <summary>
-/// Text widths in real faces, which the headless text stub does not give. A width is the widest of Inter and every
-/// installed family the control's font family names that holds every glyph of the text, so it holds whichever face
-/// the running app resolves.
+/// Text widths in real faces, which the headless text stub does not give; the widest candidate face wins, so it bounds
+/// whatever face the app resolves.
 /// </summary>
 internal static class RenderedText
 {

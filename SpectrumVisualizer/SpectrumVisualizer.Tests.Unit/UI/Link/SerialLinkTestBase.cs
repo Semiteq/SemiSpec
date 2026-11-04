@@ -14,9 +14,7 @@ using Xunit;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Link;
 
-/// <summary>
-/// A real link over the fake port in virtual time; xUnit builds one instance per test, so nothing is shared.
-/// </summary>
+/// <summary>A real link over the fake port in virtual time.</summary>
 public abstract class SerialLinkTestBase : IAsyncLifetime
 {
 	protected const string PortName = "COM3";

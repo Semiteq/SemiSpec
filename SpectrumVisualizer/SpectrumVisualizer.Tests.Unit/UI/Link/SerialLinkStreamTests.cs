@@ -9,7 +9,6 @@ using static SpectrumVisualizer.Tests.Unit.Core.Protocol.ProtocolSamples;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Link;
 
-/// <summary>The bytes of an open port: decoding, the health window, the drain and the lost total.</summary>
 [Trait("Component", "UI")]
 [Trait("Area", "Link")]
 [Trait("Category", "Unit")]

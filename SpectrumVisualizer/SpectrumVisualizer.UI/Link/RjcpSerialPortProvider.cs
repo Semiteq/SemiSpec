@@ -59,7 +59,6 @@ public sealed class RjcpSerialPortProvider(ILogger<RjcpSerialPortProvider> logge
 		}
 	}
 
-	/// <summary>Orders COM ports by their number, then every other name by ordinal comparison.</summary>
 	internal static IReadOnlyList<string> SortPortNames(IEnumerable<string> names)
 	{
 		return
@@ -70,9 +69,6 @@ public sealed class RjcpSerialPortProvider(ILogger<RjcpSerialPortProvider> logge
 		];
 	}
 
-	/// <summary>
-	/// A busy port is told apart; any other failure counts as a missing port and keeps its exception.
-	/// </summary>
 	internal static IError MapOpenFailure(string portName, Exception exception)
 	{
 		return exception switch

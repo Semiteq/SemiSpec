@@ -14,7 +14,6 @@ internal static class LinkHealth
 	/// </summary>
 	private static readonly int _largestFrameBytes = Spectrometer.Atp2000.FrameSize;
 
-	/// <summary>The reference is the last valid frame, or the port open before the first one.</summary>
 	public static LinkState Evaluate(
 		TimeSpan now,
 		TimeSpan openedAt,

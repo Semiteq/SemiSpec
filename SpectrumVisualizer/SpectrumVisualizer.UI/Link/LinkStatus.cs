@@ -15,5 +15,5 @@ public enum LinkState
 	OtherDevice,
 }
 
-/// <summary>What the link publishes; Fault is set only on the status that enters a fault.</summary>
+/// <summary>What the link publishes; Fault is set on the first status of a failure, null on repeats.</summary>
 public sealed record LinkStatus(LinkState State, string? PortName, BoardState? Board, long LostSpectra, IError? Fault);

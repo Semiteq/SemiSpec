@@ -4,9 +4,6 @@ using SpectrumVisualizer.UI.Link;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Link;
 
-/// <summary>
-/// Hands out the open results a test queues, counts opens and lists the ports a test sets or fails the listing.
-/// </summary>
 internal sealed class FakeSerialPortProvider : ISerialPortProvider
 {
 	// The test thread and the link's session thread both reach every field below; _gate guards them.

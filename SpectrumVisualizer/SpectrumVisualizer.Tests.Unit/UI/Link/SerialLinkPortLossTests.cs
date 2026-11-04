@@ -11,7 +11,6 @@ using static SpectrumVisualizer.Tests.Unit.Core.Protocol.ProtocolSamples;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Link;
 
-/// <summary>Every lost-port signal, the failed opens, and the reopen one second later.</summary>
 [Trait("Component", "UI")]
 [Trait("Area", "Link")]
 [Trait("Category", "Unit")]

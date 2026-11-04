@@ -17,8 +17,8 @@ using Xunit;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Di;
 
-// Dispatcher.UIThread is process-global. App.Run subscribes the same handler in AfterSetup; that wiring
-// cannot be covered here, because TestAppBuilder builds its own application and never calls Run.
+// App.Run subscribes the same handler in AfterSetup; that wiring cannot be covered here, because
+// TestAppBuilder builds its own application and never calls Run.
 [Collection(ProcessGlobalStateCollection.Name)]
 [Trait("Component", "UI")]
 [Trait("Area", "Di")]

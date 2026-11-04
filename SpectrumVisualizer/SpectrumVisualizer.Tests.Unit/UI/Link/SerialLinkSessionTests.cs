@@ -11,7 +11,6 @@ using static SpectrumVisualizer.Tests.Unit.Core.Protocol.ProtocolSamples;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Link;
 
-/// <summary>How a session ends, by Disconnect or by an exception, and the bounded frame channel.</summary>
 [Trait("Component", "UI")]
 [Trait("Area", "Link")]
 [Trait("Category", "Unit")]

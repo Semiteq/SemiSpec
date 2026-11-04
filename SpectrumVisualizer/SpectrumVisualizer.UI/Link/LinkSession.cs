@@ -10,9 +10,7 @@ using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.UI.Link;
 
-/// <summary>
-/// One Connect of the link: opens the port, reads, decodes, judges the health and publishes every status.
-/// </summary>
+/// <summary>One Connect of the link.</summary>
 internal sealed class LinkSession(
 	string portName,
 	ISerialPortProvider serialPortProvider,
@@ -235,9 +233,7 @@ internal sealed class LinkSession(
 		Deliver(now);
 	}
 
-	/// <summary>
-	/// Frames are stamped with the time they leave the decoder, which for a drain is the drain time.
-	/// </summary>
+	/// <summary>_lastFrameAt is when frames leave the decoder; for a drain, the drain time.</summary>
 	private void Deliver(TimeSpan now)
 	{
 		if (_decoded.Count == 0)
@@ -267,7 +263,6 @@ internal sealed class LinkSession(
 		_bytesSinceFrame = 0;
 	}
 
-	/// <summary>Nested, so a pipe failure cannot leak the port.</summary>
 	private async Task ClosePortAsync(Stream port)
 	{
 		try

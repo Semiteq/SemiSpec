@@ -13,14 +13,14 @@ public sealed class PortBusyError(string portName)
 public sealed class PortNotFoundError(string portName)
 	: LinkError($"Port {portName} was not found.");
 
-/// <summary>The open port stopped answering reads or left the port list.</summary>
+/// <summary>The open port had a read fail or return zero bytes, or the port left the port list.</summary>
 public sealed class PortLostError(string portName)
 	: LinkError($"Port {portName} was lost.");
 
-/// <summary>The port gave no valid frame and no data for the health window.</summary>
+/// <summary>The port gave no valid frame and no more than a frame's worth of bytes for the health window.</summary>
 public sealed class BoardNotRespondingError(string portName)
 	: LinkError($"The board on port {portName} is not responding.");
 
-/// <summary>The port gave data but no valid frame for the health window.</summary>
+/// <summary>The port gave more than a frame's worth of bytes but no valid frame for the health window.</summary>
 public sealed class UnrecognisedDataError(string portName)
 	: LinkError($"Port {portName} receives data that holds no valid frame.");
