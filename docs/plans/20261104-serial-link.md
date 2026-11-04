@@ -473,14 +473,14 @@ the same run do not.
 - Create: `SpectrumVisualizer/SpectrumVisualizer.UI/Link/LinkHealth.cs`, `LinkState.cs` (with `LinkStatus`)
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Link/LinkHealthTests.cs`
 
-- [ ] declare `LinkState` and the `LinkStatus` record of Solution Overview
-- [ ] implement `LinkHealth.Evaluate(now, openedAt, lastByteAt, lastFrameAt, bytesSinceFrame)` and
+- [x] declare `LinkState` and the `LinkStatus` record of Solution Overview
+- [x] implement `LinkHealth.Evaluate(now, openedAt, lastByteAt, lastFrameAt, bytesSinceFrame)` and
   `LinkHealth.IsDrainDue(now, reference, lastDrainAt, lastByteAt)` as pure static functions with the 10 s window and
   the 4120-byte rule
-- [ ] write table tests for every row of Acceptance Evidence item 2, `LinkHealthTests`, including the inclusive 10 s
+- [x] write table tests for every row of Acceptance Evidence item 2, `LinkHealthTests`, including the inclusive 10 s
   boundary, a byte older than 10 s giving NotResponding, and the mid-frame stop: a frame, 500 bytes, then silence
   gives NotResponding at 10 s and still NotResponding at 30 s
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 6: Serial link session and read loop
 **Files:**
