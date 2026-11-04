@@ -224,6 +224,25 @@ public sealed class SpectrumChartViewModelTests : IDisposable
 		ShouldSpanTheDeviceRange(Spectrometer.Atp2000);
 	}
 
+	[AvaloniaTheory]
+	[InlineData(false, false)]
+	[InlineData(true, false)]
+	[InlineData(false, true)]
+	[InlineData(true, true)]
+	public void ADarkFrameKeepsTheLastNonDarkYLimitsOnEveryDisplay(bool inverted, bool logarithmic)
+	{
+		_chart.SetDisplay(inverted, logarithmic);
+		_chart.Show(Atp8000Peak);
+		var kept = _chart.Plot.Axes.GetLimits();
+
+		_chart.Show(Dark(Spectrometer.Atp2000));
+
+		var limits = _chart.Plot.Axes.GetLimits();
+		limits.Bottom.Should().Be(kept.Bottom);
+		limits.Top.Should().Be(kept.Top);
+		ShouldSpanTheDeviceRange(Spectrometer.Atp2000);
+	}
+
 	[AvaloniaFact]
 	public void ShowNeverWritesTheFramesPixels()
 	{

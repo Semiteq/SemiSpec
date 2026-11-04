@@ -179,6 +179,56 @@ public sealed class AppLifecycleTests : IDisposable
 	}
 
 	[AvaloniaFact]
+	public async Task AfterTheCloseADistributorSubscriberReceivesNothingMore()
+	{
+		await using var firstPort = new FakePortStream();
+		await using var secondPort = new FakePortStream();
+		_portProvider.QueueOpen(firstPort);
+		_portProvider.QueueOpen(secondPort);
+		using var provider = BuildContainer();
+		var link = provider.GetRequiredService<SerialLink>();
+		var received = new List<ReceivedFrame>();
+		var firstReceived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+		using var subscription = provider.GetRequiredService<FrameDistributor>().Frames
+			.Subscribe(frame =>
+			{
+				lock (received)
+				{
+					received.Add(frame);
+				}
+
+				firstReceived.TrySetResult();
+			});
+		var window = ShowMainWindow(provider);
+		var closed = new TaskCompletionSource();
+		window.Closed += (_, _) => closed.TrySetResult();
+		link.Connect(PortName);
+		await firstPort.WaitForPendingReadAsync().WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		firstPort.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 1)));
+		await firstReceived.Task.WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		window.Close();
+		await closed.Task.WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+
+		// The link reconnects after the close and writes a frame; with the distributor stopped, the frame stays in the
+		// channel, so reading it back proves the write happened and that no subscriber was handed it.
+		link.Connect(PortName);
+		await secondPort.WaitForPendingReadAsync().WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		var lateFrame = SpectrumFrame(Spectrometer.Atp2000, 2);
+		secondPort.PushBytes(FrameEncoder.Encode(lateFrame));
+
+		await link.Frames.WaitToReadAsync(TestContext.Current.CancellationToken).AsTask()
+			.WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
+		link.Frames.TryRead(out var unread).Should().BeTrue();
+		unread!.Frame.Should().Be(lateFrame);
+		lock (received)
+		{
+			received.Should().ContainSingle();
+		}
+
+		await link.DisconnectAsync();
+	}
+
+	[AvaloniaFact]
 	public void OpeningTheWindowFillsThePortList()
 	{
 		using var provider = BuildContainer();

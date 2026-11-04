@@ -762,20 +762,51 @@ Data flow:
 - [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (479 of 479)
 
 ### Task 13: Verify acceptance criteria
-- [ ] run every command of Acceptance Evidence and record each result with its count (per Area, full suite, none
-  skipped; Release build 0 warnings; format and terse exit 0; old solution 13 of 13; both greps print nothing)
-- [ ] verify every Overview item maps to a named passing test: the line over wavelength, the band, the pane values,
+- [x] run every command of Acceptance Evidence and record each result with its count (per Area, full suite, none
+  skipped; Release build 0 warnings; format and terse exit 0; old solution 13 of 13; both greps print nothing).
+  Area=Chart 54, Area=Link 75, Area=Spectrum 86, Area=MainWindow 66, Area=Di 21, Area=Resources 9, all passed, 0
+  skipped; full suite 484 of 484 (479 after Task 12, plus the two tests below). Release build 0 warnings, 0 errors;
+  `dotnet format --verify-no-changes` and `dotnet terse SpectrumVisualizer` exit 0; both `ui-theme.md` greps print
+  nothing. Acceptance item 5 had a gap: no test showed that a subscriber gets nothing after the close.
+  `AppLifecycleTests.AfterTheCloseADistributorSubscriberReceivesNothingMore` closes it with no test-only writer: a
+  subscriber receives a frame, the window closes, the link connects again on a second `FakePortStream` and writes a
+  frame, the test reads that frame back from `SerialLink.Frames` (so the distributor never took it) and the subscriber
+  still holds one frame. With the distributor's stop removed from the close path the test fails
+- [x] verify every Overview item maps to a named passing test: the line over wavelength, the band, the pane values,
   inversion, the log axis and its floor, reset, stick to zero, the distributor as the one reader, the seam, the
-  frame-paced redraw and the cache
-- [ ] verify edge cases and their expected outcomes: a dark frame while following keeps the last non-dark Y limits
+  frame-paced redraw and the cache. Line over wavelength: `TheFirstSpectrumSetsTheXLimitsToTheDeviceRange`,
+  `AnAtp2000FrameAfterAnAtp8000FrameShowsTheAtp2000LineOnly`; band: `TheWindowBandSpansTheDeltaAroundTheWavelength`;
+  pane values: `ASpectrumShowsTheBoardValuesUnderTheCurrentCulture`, `TheUpdateTimeIsTheReceivedTimeInTheLocalZone`,
+  `EveryRowReadsNoValueBeforeASpectrum`; inversion and floor: `FillInvertsOverTheFrameMaximumThenTakesTheFlooredLog`;
+  log axis: `TheLogAxisRunsInDecades`, `TheLogAxisCarriesALogTickGeneratorAndMinorGridlinesAndTheLinearAxisNeither`;
+  reset: `ResetScaleReturnsToFollowing`, `ResetScaleShowsTheFrozenState`; stick to zero:
+  `StickToZeroSetsTheBottomToZeroAndFreezes`, `StuckToZeroRunsFromZeroToTheHeadroomOverTheRawMaximum`; distributor:
+  `EveryFrameReachesEverySubscriberInOrder`, `OpeningTheWindowStartsTheFrameDistributor`; seam:
+  `ASpectrumFrameUpdatesCurrentAndSignalsChanged`, `TwoReadsOfOneFrameReturnTheSameInstance`; redraw:
+  `ABurstOfRedrawRequestsJoinsOneFrame`; cache: `ThePlotIsCachedThroughItsOnlyAncestor`
+- [x] verify edge cases and their expected outcomes: a dark frame while following keeps the last non-dark Y limits
   and X follows its device, and with no earlier spectrum takes the flat-range limits, on both axis types, inverted and
   not; a device change while following moves X to the new device's range; a device change while frozen keeps the
   frozen limits, and the plot may stay blank until Reset scale; a band outside the device range is not drawn while the
   pane shows the wavelength; `delta` 0 draws the centre line only; a bare click keeps following; a heartbeat-only
-  stream keeps the last spectrum; a throwing subscriber leaves the frame to the others and is reported once
-- [ ] run the full suite: `dotnet test SpectrumVisualizer.slnx`; confirm the old solution builds and passes 13 of 13
-- [ ] start the app with `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI` and confirm the window shows
-  the empty-state line and the log gains its start line; leave the port-pair checklist to the owner
+  stream keeps the last spectrum; a throwing subscriber leaves the frame to the others and is reported once.
+  The kept Y limits were tested on the linear axis only; `ADarkFrameKeepsTheLastNonDarkYLimitsOnEveryDisplay` now covers
+  all four combinations of log and inversion. The flat range with no earlier spectrum:
+  `ADarkFrameWithNoEarlierSpectrumTakesTheFlatRangeLimits` (both axes; an inverted dark frame is all zero, as
+  `FillInvertsOverTheFrameMaximumThenTakesTheFlooredLog` shows) and the three render tests. Device change:
+  `AnAtp2000FrameAfterAnAtp8000FrameShowsTheAtp2000LineOnly`, `AFrameFromTheOtherDeviceWhileFrozenKeepsTheFrozenLimits`;
+  band: `ABandOutsideTheDeviceRangeIsHiddenAndTheXLimitsStayTheDeviceRange`; delta 0: `ADeltaOfZeroDrawsTheCentreLineOnly`;
+  bare click: `APressAndReleaseWithoutAMoveKeepsFollowing`; heartbeats: `TheLatestSpectrumSkipsHeartbeats`,
+  `AHeartbeatChangesNeitherCurrentNorChanged`; throwing subscriber: `AThrowingSubscriberDoesNotTakeTheFrameFromTheOthers`
+- [x] run the full suite: `dotnet test SpectrumVisualizer.slnx`; confirm the old solution builds and passes 13 of 13.
+  484 of 484; `dotnet build SpectrumVisualizer.sln` 0 errors (15 warnings, not gated; this slice changes no file of
+  the old app), `dotnet test SpectrumVisualizer.Tests` 13 of 13
+- [x] start the app with `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI` and confirm the window shows
+  the empty-state line and the log gains its start line; leave the port-pair checklist to the owner.
+  The app ran 25 s under `timeout` with no exception; the log gained "SpectrumVisualizer starting; log folder ...".
+  The empty-state line could not be seen: the workstation was locked, and the screenshot shows the lock screen. The
+  headless `TheEmptyStateShowsUntilTheFirstSpectrum` covers it. The port-pair checklist (com0com, real board) is
+  skipped as not automatable and stays with the owner
 
 ### Task 14: [Final] Update documentation
 - [ ] `docs/architecture/overview.md`: the purpose paragraph (`:5-11`, "No code reads the decoded frames" at `:10` is
