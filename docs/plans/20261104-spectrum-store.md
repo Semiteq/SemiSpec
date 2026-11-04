@@ -812,19 +812,51 @@ Note: Task 9 already added the dropped segment to the status sum and set `Minimu
 - [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (611 of 611)
 
 ### Task 12: Verify acceptance criteria
-- [ ] run every command of Acceptance Evidence and record each result with its count (per Area, full suite, none
-  skipped; Release build 0 warnings; format and terse exit 0; old solution 13 of 13; both greps print nothing)
-- [ ] confirm Acceptance Evidence item 8 holds measured numbers for every row, the kept strategies and the decision,
-  with no ASSUMPTION label left on a measured row
-- [ ] verify every Overview item maps to a named passing test: every frame stored, the file per instance and the wipe,
-  the sweep, data across reconnects, retention, WAL settings, the enqueue-only subscriber, both drop counts in one
-  segment, lost spectra separate, spectrum at a moment, the series with uncovered gaps, the stored range, the lifecycle
-- [ ] verify edge cases: NaN floats, equal stamps, a wavelength neither device covers (every column uncovered), a
-  `delta` of 0, a series range with no rows (every column NaN, `Count` 0), a failed open (history off, viewer works),
-  a failed batch counted once per frame, a stop with a full queue inside the 5 s limit
-- [ ] run the full suite: `dotnet test SpectrumVisualizer.slnx`; confirm the old solution builds and passes 13 of 13
-- [ ] start the app with `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI`, confirm the instance file
-  and its log line, close it and confirm the `-wal` file is absent or 0 bytes; leave the port-pair checklist to the owner
+- [x] run every command of Acceptance Evidence and record each result with its count (per Area, full suite, none
+  skipped; Release build 0 warnings; format and terse exit 0; old solution 13 of 13; both greps print nothing).
+  Results: `Area=Store` 95 of 95 (91 before this task's four tests), `Area=Link` 80 of 80, `Area=MainWindow` 70 of 70,
+  `Area=Di` 25 of 25, `Area=Resources` 9 of 9; full suite 615 of 615, 0 skipped (505 baseline + 110); Release build
+  `--no-incremental` 0 warnings; `dotnet format --verify-no-changes`, `dotnet terse SpectrumVisualizer` exit 0;
+  `dotnet build SpectrumVisualizer.sln` 0 errors (15 warnings in the old app, which this slice does not touch:
+  `git diff 12bef84 -- SpectrumVisualizer.Uart SpectrumVisualizer.Tests SpectrumVisualizer.sln` is empty) and 13 of 13;
+  the inset and colour greps print nothing (exit 1). All 61 test names of items 1 to 4 exist. A short tool run
+  (`--rows 2000 --change-at 0.5 --churn-rounds 2 --folder <scratch>`) exits 0, prints every row fresh and churned and
+  "Strategies agree"; the 24 h numbers stay those of Tasks 5 and 6
+- [x] confirm Acceptance Evidence item 8 holds measured numbers for every row, the kept strategies and the decision,
+  with no ASSUMPTION label left on a measured row (every row measured; `substr` kept, column removed, no slicing)
+- [x] verify every Overview item maps to a named passing test: every frame stored (`EveryFrameFromTheDistributorIsStored`,
+  `OpeningTheWindowStartsTheStore`), the file per instance and the wipe (`TheInstanceFileIsNamedForTheProcessId`,
+  `PrepareWipesTheOwnFileAndItsSidecars`), the sweep (`PrepareDeletesTheFileOfADeadInstance`,
+  `PrepareKeepsTheFileOfALiveInstance`, `PrepareDeletesOrphanSidecars`), data across reconnects
+  (`DataStaysAcrossLinkSessions`, `TheDropCountSurvivesAReconnect`), retention
+  (`RetentionDeletesRowsOlderThanTheCutoffFromBothTables`, `RetentionRunsOnceAMinuteAlsoWithoutFrames`), WAL settings
+  (`OpenSetsWalNormalSyncAndTheJournalLimit`, `CheckpointTruncatesTheWal`), the enqueue-only subscriber
+  (`TheSubscriberOnlyEnqueues`), both drop counts in one segment (`TheDroppedSegmentSumsTheLinkAndTheStore`), lost
+  spectra separate (`AChannelDropDoesNotCountAsLost`), spectrum at a moment (`SpectrumAtReturnsTheNearestRowAtOrBefore`),
+  the series with uncovered gaps (`TheSeriesOfAWavelengthOneDeviceDoesNotCoverLeavesItsColumnsUncovered`), the stored
+  range (`TheStoredRangeSpansTheFirstAndLastSpectrum`), the lifecycle (`ClosingTheWindowStopsTheStoreAfterTheDistributor`,
+  `AfterTheCloseTheStoreFileHasNoWal`)
+- [x] verify edge cases: NaN floats (`ANaNAmplitudeRoundTripsAsNaN`), equal stamps
+  (`SpectrumAtReturnsTheNearestRowAtOrBefore`), a wavelength neither device covers, a `delta` of 0
+  (`ADeltaOfZeroTakesOnePixel`), a series range with no rows, a failed open
+  (`AFailedOpenReportsOneErrorAndStoresNothing`), a failed batch counted once per frame
+  (`AFailedBatchCountsItsFramesAndReportsOnce`), a stop with a full queue inside the 5 s limit. ➕ Three had no test and
+  got one: `SpectrumHistoryTests.TheSeriesOfAWavelengthNeitherDeviceCoversLeavesEveryColumnUncovered` (3000 nm, both
+  devices stored), `ASeriesOverARangeWithNoRowsIsEmptyInEveryColumn`, and
+  `SpectrumStoreTests.AStopWithAFullQueueDrainsInsideTheCloseLimit` (1024 + 256 frames fed behind a held lock, the
+  4.5 s drain token of `App`, the stop under 5 s, at least 1024 stored)
+- [x] ➕ check that no test leaves files: after the full suite `%LOCALAPPDATA%\SpectrumVisualizer` holds `Logs` only and
+  `%TEMP%` holds no `spectrum-visualizer-*`, `spectrum-store-benchmark-*` or `local-app-data` entry. The tool itself
+  left its empty default folder under `%TEMP%` (the Task 6 run left one): `BenchmarkRun` now deletes the folder it
+  created when `--keep` is off, pinned by `StoreBenchmarkRunTests.ARunInItsOwnTempFolderDeletesTheFolder` (fails with
+  the delete removed)
+- [x] run the full suite: `dotnet test SpectrumVisualizer.slnx` (615 of 615); the old solution builds and passes 13 of 13
+- [x] start the app, confirm the instance file and its log line, close it and confirm the `-wal` file is absent or 0
+  bytes. Run as the built `SpectrumVisualizer.UI.exe` closed by `CloseMainWindow` (a clean close, not a kill): log
+  "Spectrum store file C:\Users\admin\AppData\Local\SpectrumVisualizer\Spectra\spectra-28568.db"; while running the
+  folder held the `.db`, `-wal` and `-shm`; after exit code 0 only `spectra-28568.db` (20 480 bytes) remained. The
+  smoke file and folder were deleted afterwards. The port-pair checklist (com0com, real board) stays with the owner
+  (skipped - needs com0com or hardware)
 
 ### Task 13: [Final] Update documentation
 - [ ] `docs/architecture/overview.md`: the purpose paragraph (`:5-12`) says frames are stored; the Stack list

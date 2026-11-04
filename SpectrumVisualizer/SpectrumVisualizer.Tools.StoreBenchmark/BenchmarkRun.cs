@@ -42,6 +42,10 @@ public static class BenchmarkRun
 			if (!options.Keep)
 			{
 				BenchmarkFile.DeleteFiles(file.Path);
+				if (options.Folder is null)
+				{
+					Directory.Delete(folder);
+				}
 			}
 		}
 

@@ -113,6 +113,41 @@ public sealed class SpectrumHistoryTests : IDisposable
 	}
 
 	[Fact]
+	public async Task TheSeriesOfAWavelengthNeitherDeviceCoversLeavesEveryColumnUncovered()
+	{
+		const ushort BeyondBothTables = 3000;
+		Store(
+			StoreSamples.Spectrum(_start.AddSeconds(1), Spectrometer.Atp2000, nm: 650),
+			StoreSamples.Spectrum(_start.AddSeconds(5), Spectrometer.Atp8000));
+
+		var series = await SeriesAsync(BeyondBothTables, StoreSamples.SampleDelta, columns: 2);
+
+		series.Columns.Should().AllSatisfy(column =>
+		{
+			column.Count.Should().Be(0);
+			column.UncoveredCount.Should().Be(1);
+			double.IsNaN(column.Min).Should().BeTrue();
+			double.IsNaN(column.Max).Should().BeTrue();
+		});
+	}
+
+	[Fact]
+	public async Task ASeriesOverARangeWithNoRowsIsEmptyInEveryColumn()
+	{
+		Store(StoreSamples.Spectrum(_start.AddSeconds(-1)), StoreSamples.Spectrum(_start.AddSeconds(10)));
+
+		var series = await SeriesAsync(StoreSamples.SampleNm, StoreSamples.SampleDelta, columns: 4);
+
+		series.Columns.Should().HaveCount(4).And.AllSatisfy(column =>
+		{
+			column.Count.Should().Be(0);
+			column.UncoveredCount.Should().Be(0);
+			double.IsNaN(column.Min).Should().BeTrue();
+			double.IsNaN(column.Max).Should().BeTrue();
+		});
+	}
+
+	[Fact]
 	public async Task ARowWithADifferentWavelengthReadsItsPixels()
 	{
 		Store(StoreSamples.Spectrum(_start.AddSeconds(1), Spectrometer.Atp2000, nm: 650, delta: 10));

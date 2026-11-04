@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 using AwesomeAssertions;
 
 using SpectrumVisualizer.Core.Protocol;
@@ -51,6 +53,21 @@ public sealed class StoreBenchmarkRunTests : IDisposable
 
 		text.Should().Contain("Strategies agree").And.NotContain("MISMATCH");
 		Directory.EnumerateFiles(_folder.Root).Should().BeEmpty();
+	}
+
+	[Fact]
+	public async Task ARunInItsOwnTempFolderDeletesTheFolder()
+	{
+		var output = new StringWriter();
+		var options = new BenchmarkOptions(1200, Spectrometer.Atp2000, 1, 0, Folder: null, Keep: false);
+
+		var exitCode = await BenchmarkRun.RunAsync(options, output, TestContext.Current.CancellationToken);
+
+		var text = output.ToString();
+		exitCode.Should().Be(0, text);
+		var folder = Regex.Match(text, @"Folder (?<path>.+)\.\r?\n").Groups["path"].Value;
+		folder.Should().StartWith(Path.GetTempPath());
+		Directory.Exists(folder).Should().BeFalse();
 	}
 
 	public void Dispose()

@@ -272,6 +272,32 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
+	public async Task AStopWithAFullQueueDrainsInsideTheCloseLimit()
+	{
+		const int QueueCapacity = 1024;
+		const int BatchSize = 256;
+		const int Fed = QueueCapacity + BatchSize;
+		var closeLimit = TimeSpan.FromSeconds(5);
+		var closeReserve = TimeSpan.FromSeconds(0.5);
+		_channel = Channel.CreateUnbounded<ReceivedFrame>();
+		await StartOpenedAsync();
+
+		using (HoldWriteLock())
+		{
+			await FeedAsync([.. Enumerable.Repeat(StoreSamples.Spectrum(StoreSamples.Start), Fed)]);
+		}
+
+		using var drain = new CancellationTokenSource(closeLimit - closeReserve);
+		var stopwatch = Stopwatch.StartNew();
+		await Store.StopAsync(drain.Token).WaitAsync(_stopLimit, TestContext.Current.CancellationToken);
+
+		stopwatch.Elapsed.Should().BeLessThan(closeLimit);
+		(Count("spectrum") + Store.DroppedFrames).Should().Be(Fed);
+		Store.DroppedFrames.Should().BeLessThanOrEqualTo(BatchSize, "only frames past the full queue are dropped");
+		Count("spectrum").Should().BeGreaterThanOrEqualTo(QueueCapacity, "the full queue drains before the drain token");
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
 	public async Task StopBeforeStartCompletesAtOnce()
 	{
 		CreateStore();
