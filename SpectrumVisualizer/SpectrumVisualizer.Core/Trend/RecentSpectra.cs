@@ -5,7 +5,9 @@ using SpectrumVisualizer.Core.Store;
 
 namespace SpectrumVisualizer.Core.Trend;
 
-/// <summary>The newest spectrum frames, oldest first by millisecond receive time; the pixel arrays are shared.</summary>
+/// <summary>
+/// The newest spectrum frames, oldest first by millisecond receive time; the pixel arrays are shared.
+/// </summary>
 internal sealed class RecentSpectra
 {
 	private readonly List<ReceivedFrame> _frames = [];
@@ -47,7 +49,9 @@ internal sealed class RecentSpectra
 		return points;
 	}
 
-	/// <summary>The latest held frame at or before the moment, ties to the later frame; null before the oldest one.</summary>
+	/// <summary>
+	/// The latest held frame at or before the moment, ties to the later frame; null before the oldest one.
+	/// </summary>
 	public StoredSpectrum? At(long unixMs)
 	{
 		if (StartMs is not { } startMs || unixMs < startMs)

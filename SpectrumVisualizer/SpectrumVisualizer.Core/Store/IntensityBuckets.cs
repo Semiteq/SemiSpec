@@ -60,7 +60,9 @@ public sealed class IntensityBuckets(IntensityQuery query)
 		}
 	}
 
-	/// <summary>Counts a spectrum the series cannot read: its device misses the wavelength, or the row is corrupt.</summary>
+	/// <summary>
+	/// Counts a spectrum the series cannot read: its device misses the wavelength, or the row is corrupt.
+	/// </summary>
 	public void AddUncovered(DateTimeOffset receivedAt)
 	{
 		var column = query.ColumnOf(receivedAt);
@@ -87,7 +89,9 @@ public sealed class IntensityBuckets(IntensityQuery query)
 		}
 	}
 
-	/// <summary>Merges a frame's measurement-failed bits into its column; the continuity rule passes only those bits.</summary>
+	/// <summary>
+	/// Merges a frame's measurement-failed bits into its column; the continuity rule passes only those bits.
+	/// </summary>
 	public void AddFailure(DateTimeOffset moment, BoardState state)
 	{
 		var column = query.ColumnOf(moment);
@@ -160,7 +164,9 @@ public sealed record IntensityQuery
 
 	public TimeSpan ColumnWidth => TimeSpan.FromMilliseconds(_widthMilliseconds);
 
-	/// <summary>The grid columns that intersect [From, To); the first and the last may stick out of the range.</summary>
+	/// <summary>
+	/// The grid columns that intersect [From, To); the first and the last may stick out of the range.
+	/// </summary>
 	public int ColumnCount { get; }
 
 	/// <summary>
@@ -238,9 +244,9 @@ public sealed record IntensitySeries(
 	DateTimeOffset From, DateTimeOffset To, TimeSpan ColumnWidth, IntensityColumn[] Columns);
 
 /// <summary>
-/// Min, max and latest value of the column's covered spectra, NaN when Count is 0; UncoveredCount counts the spectra of
-/// a device that does not cover the wavelength and the corrupt rows the series skipped; the break counts (NoSpectraCount
-/// of them end a silence) and the failed bits come from the trend's continuity rule, and the store leaves them at zero.
+/// Min, max and latest value of the covered spectra, NaN when Count is 0; UncoveredCount counts uncovered spectra and
+/// skipped corrupt rows; the break counts (NoSpectraCount of them end a silence) and the failed bits come from the
+/// trend's continuity rule, and the store leaves them at zero.
 /// </summary>
 public readonly record struct IntensityColumn(
 	DateTimeOffset Start,

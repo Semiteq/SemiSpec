@@ -31,7 +31,9 @@ internal static class RenderedText
 			: throw new InvalidOperationException($"No candidate face holds every glyph of '{text}'.");
 	}
 
-	/// <summary>The tallest candidate face's line spacing, the height a one-line text block takes in that face.</summary>
+	/// <summary>
+	/// The tallest candidate face's line spacing, the height a one-line text block takes in that face.
+	/// </summary>
 	public static double LineHeight(FontFamily family, double fontSize)
 	{
 		var tallest = 0d;

@@ -3,7 +3,9 @@ using SpectrumVisualizer.Core.Trend;
 
 namespace SpectrumVisualizer.UI.Trend;
 
-/// <summary>One envelope column at chart X: its min and max, and the centre value the line passes; NaN min is a gap.</summary>
+/// <summary>
+/// One envelope column at chart X: its min and max, and the centre value the line passes; NaN min is a gap.
+/// </summary>
 public readonly record struct EnvelopeColumn(double X, double Min, double Max, double Center)
 {
 	private const double VerticalPadding = 0.05;
@@ -33,7 +35,9 @@ public readonly record struct EnvelopeColumn(double X, double Min, double Max, d
 		return columns;
 	}
 
-	/// <summary>The drawn values padded by 5 % of their span, plus or minus 1 when flat; null when none is drawn.</summary>
+	/// <summary>
+	/// The drawn values padded by 5 % of their span, plus or minus 1 when flat; null when none is drawn.
+	/// </summary>
 	public static (double Bottom, double Top)? VerticalRange(IReadOnlyList<EnvelopeColumn> columns)
 	{
 		var bottom = double.PositiveInfinity;

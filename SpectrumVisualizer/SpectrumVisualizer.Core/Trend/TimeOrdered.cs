@@ -30,7 +30,9 @@ internal static class TimeOrdered
 		return LowerBound(items, unixMs + 1, timeOf);
 	}
 
-	/// <summary>Inserts after every item of the same or an earlier time, so equal times keep their arrival order.</summary>
+	/// <summary>
+	/// Inserts after every item of the same or an earlier time, so equal times keep their arrival order.
+	/// </summary>
 	public static void Insert<T>(List<T> items, T item, Func<T, long> timeOf)
 	{
 		var unixMs = timeOf(item);

@@ -33,7 +33,9 @@ public partial class MainWindow : Window
 		InitializeComponent();
 	}
 
-	/// <summary>A screen smaller than the opening size gets a window inside its work area, never below the minimum.</summary>
+	/// <summary>
+	/// A screen smaller than the opening size gets a window inside its work area, never below the minimum.
+	/// </summary>
 	protected override void OnOpened(EventArgs e)
 	{
 		base.OnOpened(e);

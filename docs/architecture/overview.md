@@ -206,8 +206,8 @@ counts and "Порт недоступен, переподключение" measu
 in Russian (English 595.4 px), and the signal pane plus a 400 px chart floor 792 px. At 400 px an ATP-8000 spectrum
 keeps at least four labelled wavelength ticks; the measured axis shows eight, 1000 to 2400 nm. The charts never get
 less than 864 px (1256 minus the 392 px pane), where 10 min of trend keep at least four labelled time ticks. The
-headless text stub gives no real widths, so `MainWindowTextFitTests` adds the realised row chrome to each text measured
-through SkiaSharp at 14 px in the widest of Inter and every installed family of Semi's font chain; on Windows the app
+headless text stub gives no real widths, so the `MainWindowTextFit*Tests` add the realised row chrome to each text
+measured through SkiaSharp at 14 px in the widest of Inter and every installed family of Semi's font chain; on Windows the app
 resolves that chain to Microsoft YaHei. The same test holds `MinimumWidth` at or under `OpeningWidth` and checks that
 the realised window opens `OpeningWidth` wide, so the window opens with every row whole. Both rows stay left-aligned at
 any width above the minimum, and no link state changes the set of rows or a row's height.
@@ -256,7 +256,7 @@ where no style reaches. `PaneWidth` is 392 px: the 1 px border, 16 padding, the 
 padding and 24 px slack, rounded up to the 8 px grid. Russian sets it: labels 117.5 px for "Окно измерения", field
 column 198.9 px for "Логарифмическая шкала", 385.4 px in all (English 91.0 and 140.6 px, 300.6 px). The longest values
 ("-1,23457E-38", "65535 nm", "±255 nm", "23:59:59.999") measure at most 92.1 px and fit the 120 px floor.
-`MainWindowTextFitTests` measures them the same way as the status bar, in the labels' face, which every label and value
+the `MainWindowTextFit*Tests` measure them the same way as the status bar, in the labels' face, which every label and value
 shares, together with the Trend section's label, Back to live, Follow live and the widest preset label in its box.
 
 The message panel row takes its height from the content row: the charts and the pane lose that height and keep their

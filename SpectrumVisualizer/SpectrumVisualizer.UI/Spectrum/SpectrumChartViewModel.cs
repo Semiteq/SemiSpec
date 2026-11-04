@@ -74,8 +74,8 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 	public IObservable<Unit> RedrawRequested => _redrawRequests.AsObservable();
 
 	/// <summary>
-	/// Draws the spectrum; the frame's pixel array is read, never written. A switch into or out of a historical spectrum
-	/// keeps a frozen scale only on the device it was frozen on.
+	/// Draws the spectrum; the frame's pixel array is read, never written. A switch into or out of a historical
+	/// spectrum keeps a frozen scale only on the device it was frozen on.
 	/// </summary>
 	public void Show(DisplayedSpectrum spectrum)
 	{

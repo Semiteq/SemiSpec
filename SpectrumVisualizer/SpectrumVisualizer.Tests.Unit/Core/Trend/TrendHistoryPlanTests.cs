@@ -32,7 +32,8 @@ public sealed class TrendHistoryPlanTests
 		var plan = TrendHistoryPlan.For(visibleFrom, visibleTo, _newest, _recentStart);
 
 		plan[1].Should().Be(new TimeRange(_recentStart - TimeSpan.FromHours(1), _recentStart));
-		plan.Skip(1).Should().AllSatisfy(range => (range.To - range.From).Should().BeLessThanOrEqualTo(TimeSpan.FromHours(1)));
+		plan.Skip(1).Should().AllSatisfy(range =>
+			(range.To - range.From).Should().BeLessThanOrEqualTo(TimeSpan.FromHours(1)));
 		plan.Skip(1).Select(range => range.From).Should().BeInDescendingOrder();
 		plan[^1].From.Should().Be(_dayStart);
 	}

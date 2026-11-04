@@ -4,7 +4,9 @@ using SkiaSharp;
 
 namespace SpectrumVisualizer.UI.Trend;
 
-/// <summary>The trend drawn as one stroked polyline through each visible column's min and max; no fill, no markers.</summary>
+/// <summary>
+/// The trend drawn as one stroked polyline through each visible column's min and max; no fill, no markers.
+/// </summary>
 public sealed class EnvelopeLine : IPlottable
 {
 	private readonly LineStyle _stroke = new() { Width = 1f, Color = Colors.Black };

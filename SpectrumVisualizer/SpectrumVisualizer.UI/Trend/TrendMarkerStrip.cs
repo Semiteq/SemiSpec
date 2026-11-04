@@ -4,7 +4,9 @@ using SpectrumVisualizer.Core.Trend;
 
 namespace SpectrumVisualizer.UI.Trend;
 
-/// <summary>A 4 px bar along the bottom of the data area over each marked column; it never steers the axis limits.</summary>
+/// <summary>
+/// A 4 px bar along the bottom of the data area over each marked column; it never steers the axis limits.
+/// </summary>
 public sealed class TrendMarkerStrip : IPlottable
 {
 	private const float Height = 4f;

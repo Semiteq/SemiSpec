@@ -67,7 +67,9 @@ public abstract class TrendChartViewTestBase : TrendFeedTestBase
 		Dispatcher.UIThread.RunJobs();
 	}
 
-	/// <summary>Thirty minutes of spectra on the realised view, rendered once so the pointer maths has a data area.</summary>
+	/// <summary>
+	/// Thirty minutes of spectra on the realised view, rendered once so the pointer maths has a data area.
+	/// </summary>
 	protected void ShowTrend()
 	{
 		Realise();

@@ -49,7 +49,9 @@ public sealed class FrameContinuity
 /// <summary>What one frame adds to the trend: a Loss break, a NoSpectra break, a failure mark, each optional.</summary>
 public readonly record struct Continuity(TrendBreak? Loss, TrendBreak? NoSpectra, TrendFailure? Failure);
 
-/// <summary>A cut in the trend line at a frame; Lost counts the spectra lost before it, 0 ends a stretch without spectra.</summary>
+/// <summary>
+/// A cut in the trend line at a frame; Lost counts the spectra lost before it, 0 ends a stretch without spectra.
+/// </summary>
 public readonly record struct TrendBreak(long UnixMs, int Lost);
 
 /// <summary>A frame whose state carried measurement-failed bits; State holds only those bits.</summary>

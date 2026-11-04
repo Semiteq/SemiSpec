@@ -56,7 +56,8 @@ public sealed class OverviewViewModel : ReactiveObject, IDisposable
 			.StartWith(Unit.Default)
 			.Subscribe(_ => Reporting(Refold), ReportFailure));
 		// The chart requests a redraw after every refresh, which is where its window and the cache's extent move.
-		_disposables.Add(chart.RedrawRequested.Subscribe(_ => Reporting(() => PlaceWindow(cache.Extent)), ReportFailure));
+		_disposables.Add(chart.RedrawRequested
+			.Subscribe(_ => Reporting(() => PlaceWindow(cache.Extent)), ReportFailure));
 	}
 
 	/// <summary>The cache folded to about 250 columns over its extent; null before the first spectrum.</summary>

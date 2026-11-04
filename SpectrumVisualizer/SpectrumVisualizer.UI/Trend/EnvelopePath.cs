@@ -3,7 +3,9 @@ namespace SpectrumVisualizer.UI.Trend;
 /// <summary>One vertex of the polyline the envelope columns are drawn as.</summary>
 public readonly record struct EnvelopePoint(double X, double Y, bool StartsSegment);
 
-/// <summary>The geometry EnvelopeLine strokes, kept free of Skia so the culling window and the gap break are testable.</summary>
+/// <summary>
+/// The geometry EnvelopeLine strokes, kept free of Skia so the culling window and the gap break are testable.
+/// </summary>
 public static class EnvelopePath
 {
 	// One column beyond each edge, so a segment entering the viewport is drawn rather than starting at it.

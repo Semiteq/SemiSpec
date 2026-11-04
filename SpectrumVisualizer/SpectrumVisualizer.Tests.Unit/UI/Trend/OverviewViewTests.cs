@@ -14,7 +14,9 @@ using Xunit;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Trend;
 
-/// <summary>The realised overview strip: the band, the window highlight, the hover line and the press navigation.</summary>
+/// <summary>
+/// The realised overview strip: the band, the window highlight, the hover line and the press navigation.
+/// </summary>
 [Collection(ProcessGlobalStateCollection.Name)]
 [Trait("Component", "UI")]
 [Trait("Area", "Trend")]
@@ -65,7 +67,9 @@ public sealed class OverviewViewTests : TrendChartTestBase
 
 		BandLayer.Figures.Should().ContainSingle();
 		BandLayer.Figures[0].Outline.Max(point => point.X).Should().BeApproximately(
-			WindowWidth, (double)WindowWidth / OverviewViewModel.BandColumns, "the last column starts within a column of the end");
+			WindowWidth,
+			(double)WindowWidth / OverviewViewModel.BandColumns,
+			"the last column starts within a column of the end");
 		BandLayer.Bounds.Size.Should().Be(Strip.Bounds.Size);
 		Highlight.IsVisible.Should().BeTrue();
 		Canvas.GetLeft(Highlight).Should().BeApproximately(WindowWidth * 2.0 / 3.0, 10.0);

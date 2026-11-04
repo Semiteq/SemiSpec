@@ -34,7 +34,9 @@ public sealed class TrendViewModel : ReactiveObject, IDisposable
 
 	public IReadOnlyList<TrendPreset> Presets { get; }
 
-	/// <summary>The preset of the chart's width, null after a zoom off every preset; a picked preset sets the width.</summary>
+	/// <summary>
+	/// The preset of the chart's width, null after a zoom off every preset; a picked preset sets the width.
+	/// </summary>
 	public TrendPreset? SelectedPreset
 	{
 		get => _selectedPreset.Value;

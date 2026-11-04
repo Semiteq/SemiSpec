@@ -5,7 +5,8 @@ namespace SpectrumVisualizer.Tests.Unit.UI.Trend;
 /// <summary>The pixel probe of a rendered plot: where the red channel dominates the other two.</summary>
 internal static class StrokeProbe
 {
-	// A channel this far above the other two is drawn data, not an antialiased edge of a grey grid line, label or frame.
+	// A channel this far above the other two is drawn data, not an antialiased edge of a grey grid line, label or
+	// frame.
 	private const int DominanceThreshold = 24;
 
 	public static bool IsRed(byte[,,] pixels, int row, int column)

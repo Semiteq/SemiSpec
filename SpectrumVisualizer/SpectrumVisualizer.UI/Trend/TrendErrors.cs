@@ -2,7 +2,9 @@ using FluentResults;
 
 namespace SpectrumVisualizer.UI.Trend;
 
-/// <summary>The stored points at a new trend key could not be read; the trend shows only the data since the change.</summary>
+/// <summary>
+/// The stored points at a new trend key could not be read; the trend shows only the data since the change.
+/// </summary>
 public sealed class TrendHistoryError()
 	: Error("The trend history at the new wavelength or window could not be read from the spectrum store.");
 

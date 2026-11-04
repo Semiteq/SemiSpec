@@ -21,7 +21,9 @@ public sealed class TrendNavigationModel(DateTimeOffset from, DateTimeOffset to,
 
 	public bool IsSticky { get; private set; } = true;
 
-	/// <summary>The pan floor: a pan or a zoom never moves From before it; a later move applies the new floor.</summary>
+	/// <summary>
+	/// The pan floor: a pan or a zoom never moves From before it; a later move applies the new floor.
+	/// </summary>
 	public DateTimeOffset FirstSample { get; set; } = firstSample;
 
 	public void Pan(TimeSpan delta, DateTimeOffset now)

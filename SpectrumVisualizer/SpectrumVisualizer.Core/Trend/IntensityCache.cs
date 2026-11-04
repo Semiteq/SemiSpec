@@ -16,7 +16,7 @@ public sealed class IntensityCache : IDisposable
 	/// <summary>The span of spectrum frames a key change recomputes; it covers the store writer's normal lag.</summary>
 	private const long RecentSpanMs = 120_000;
 
-	/// <summary>How long after a key change a return to the previous key still restores its points without a read.</summary>
+	/// <summary>How long after a key change a return to the previous key restores its points without a read.</summary>
 	private const long ReturnSpanMs = 120_000;
 
 	private static readonly long _retentionMs = (long)TimeSpan.FromDays(1).TotalMilliseconds;
@@ -32,7 +32,7 @@ public sealed class IntensityCache : IDisposable
 	private QueryWindows? _windows;
 	private int _generation;
 
-	/// <summary>True while the timeline holds every spectrum of the run at the key: no re-read of the key is pending.</summary>
+	/// <summary>True while the timeline holds every spectrum of the run at the key: no re-read is pending.</summary>
 	private bool _historyComplete;
 
 	private KeyBlock? _previous;
@@ -99,7 +99,9 @@ public sealed class IntensityCache : IDisposable
 		Emit(_changed, Unit.Default);
 	}
 
-	/// <summary>Inserts the points of a stored chunk read for the generation; a chunk of an older generation is ignored.</summary>
+	/// <summary>
+	/// Inserts the points of a stored chunk read for the generation; a chunk of an older generation is ignored.
+	/// </summary>
 	public void LandHistory(int generation, IntensityChunk chunk)
 	{
 		lock (_gate)
@@ -118,7 +120,7 @@ public sealed class IntensityCache : IDisposable
 		Emit(_changed, Unit.Default);
 	}
 
-	/// <summary>Marks the generation's history as read in full, so a later change keeps its points for a return.</summary>
+	/// <summary>Marks the generation's history read in full, so a later change keeps its points for a return.</summary>
 	public void CompleteHistory(int generation)
 	{
 		lock (_gate)
@@ -130,7 +132,7 @@ public sealed class IntensityCache : IDisposable
 		}
 	}
 
-	/// <summary>Folds the points, breaks and failure marks of the query's range; the query's key is not checked.</summary>
+	/// <summary>Folds the points, breaks and failure marks of the query's range; its key is not checked.</summary>
 	public IntensitySeries Fold(IntensityQuery query)
 	{
 		lock (_gate)
@@ -157,7 +159,7 @@ public sealed class IntensityCache : IDisposable
 		}
 	}
 
-	/// <summary>The recent spectrum at or before the moment, its measurement shared; null before the recent spectra.</summary>
+	/// <summary>The recent spectrum at or before the moment, measurement shared; null before the first.</summary>
 	public StoredSpectrum? SpectrumAt(DateTimeOffset moment)
 	{
 		lock (_gate)
@@ -166,7 +168,7 @@ public sealed class IntensityCache : IDisposable
 		}
 	}
 
-	/// <summary>Later frames and history chunks are ignored, so a read that outlives the container lands nothing.</summary>
+	/// <summary>Later frames and chunks are ignored, so a read that outlives the container lands nothing.</summary>
 	public void Dispose()
 	{
 		lock (_gate)
@@ -183,7 +185,7 @@ public sealed class IntensityCache : IDisposable
 		}
 	}
 
-	/// <summary>Emits nothing once the subjects are disposed, also when a subscriber of an earlier emit disposed them.</summary>
+	/// <summary>Emits nothing once the subjects are disposed, also by a subscriber of an earlier emit.</summary>
 	private void Emit<T>(Subject<T> subject, T value)
 	{
 		lock (_emitGate)
@@ -222,7 +224,7 @@ public sealed class IntensityCache : IDisposable
 		return null;
 	}
 
-	/// <summary>Keeps RecentSpanMs of spectra, and every spectrum since the last change while a return can restore it.</summary>
+	/// <summary>Keeps RecentSpanMs of spectra, and all since the last change while a return can restore them.</summary>
 	private void DropOldRecentSpectra(long newestMs)
 	{
 		var cutoffMs = newestMs - RecentSpanMs;

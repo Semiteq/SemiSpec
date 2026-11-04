@@ -8,7 +8,9 @@ using Pen = Avalonia.Media.Pen;
 
 namespace SpectrumVisualizer.UI.Trend;
 
-/// <summary>Draws the overview band: each figure's outline filled at 0.35 of the band colour and its centre line.</summary>
+/// <summary>
+/// Draws the overview band: each figure's outline filled at 0.35 of the band colour and its centre line.
+/// </summary>
 public sealed class OverviewBand : Control
 {
 	public static readonly StyledProperty<IReadOnlyList<BandFigure>> FiguresProperty =

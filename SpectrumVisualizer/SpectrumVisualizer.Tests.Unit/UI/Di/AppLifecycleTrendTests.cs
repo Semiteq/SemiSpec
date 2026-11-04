@@ -25,7 +25,9 @@ using static SpectrumVisualizer.Tests.Unit.Core.Protocol.ProtocolSamples;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Di;
 
-/// <summary>The window's open starts the trend feed before the distributor; its close stops the feed, then the store.</summary>
+/// <summary>
+/// The window's open starts the trend feed before the distributor; its close stops the feed, then the store.
+/// </summary>
 [Trait("Component", "UI")]
 [Trait("Area", "Di")]
 [Trait("Category", "Unit")]
@@ -91,14 +93,17 @@ public sealed class AppLifecycleTrendTests : AppLifecycleTestBase
 		readGate.SetResult();
 
 		await closed.Task.WaitAsync(WaitLimit, TestContext.Current.CancellationToken);
-		storeStoppedBeforeTheReadEnded.Should().BeFalse("the close awaits the trend feed's stop, which awaits its read");
+		storeStoppedBeforeTheReadEnded.Should()
+			.BeFalse("the close awaits the trend feed's stop, which awaits its read");
 		var templates = LoggedTemplates();
 		var feedStopped = templates.IndexOf(FeedStopped);
 		feedStopped.Should().BeGreaterThan(templates.IndexOf(DistributorStopped));
 		templates.IndexOf(StoreStopped).Should().BeGreaterThan(feedStopped);
 	}
 
-	/// <summary>Two spectra at different wavelengths, one second apart and ending now, so the feed starts a re-read.</summary>
+	/// <summary>
+	/// Two spectra at different wavelengths, one second apart and ending now, so the feed starts a re-read.
+	/// </summary>
 	private static void ChangeTheTrendKey(IntensityCache cache)
 	{
 		var now = TimeProvider.System.GetUtcNow();

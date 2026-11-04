@@ -11,7 +11,9 @@ namespace SpectrumVisualizer.UI.Trend;
 /// <summary>The trend's hover line over the data area and the readout box beside it; runs on the UI thread.</summary>
 internal sealed class TrendCursorOverlay(Canvas canvas, Line crosshairLine, Border readoutBox, TextBlock readoutText)
 {
-	/// <summary>Shows the line at the time with the readout; hides both outside the data area or without a readout.</summary>
+	/// <summary>
+	/// Shows the line at the time with the readout; hides both outside the data area or without a readout.
+	/// </summary>
 	public void ShowAt(Plot plot, DateTimeOffset time, string? readout)
 	{
 		var cursorPixelX = plot.GetPixel(new Coordinates(LocalTimeAxis.ToAxis(time), 0.0)).X;

@@ -7,7 +7,9 @@ using SpectrumVisualizer.UI.Localization;
 
 namespace SpectrumVisualizer.UI.Trend;
 
-/// <summary>The hover text of one column of the last fold: its local time, its value or gap reason, its failures.</summary>
+/// <summary>
+/// The hover text of one column of the last fold: its local time, its value or gap reason, its failures.
+/// </summary>
 public static class TrendReadout
 {
 	private const string ValueFormat = "G6";
@@ -93,7 +95,9 @@ public static class TrendReadout
 			: Resources.TrendReadoutNoData);
 	}
 
-	/// <summary>A column can end a stretch without spectra and count lost spectra too; both reasons show, in that order.</summary>
+	/// <summary>
+	/// A column can end a stretch without spectra and count lost spectra too; both reasons show, in that order.
+	/// </summary>
 	private static void AddBreakReasons(IntensityColumn column, List<string> lines)
 	{
 		if (column.NoSpectraCount > 0)

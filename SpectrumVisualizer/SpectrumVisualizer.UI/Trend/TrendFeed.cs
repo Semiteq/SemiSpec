@@ -53,7 +53,7 @@ public sealed class TrendFeed(
 	// UI thread only: the moment of the last click, null after Back to live; a read of any other moment shows nothing.
 	private DateTimeOffset? _requestedMoment;
 
-	/// <summary>Subscribes the distributor and both read pipelines once; does nothing after a start or a stop.</summary>
+	/// <summary>Subscribes the distributor and both read pipelines once; no-op after a start or a stop.</summary>
 	public void Start()
 	{
 		if (_started || _stopped)
@@ -73,7 +73,7 @@ public sealed class TrendFeed(
 		logger.LogDebug("The trend feed started");
 	}
 
-	/// <summary>Reads the spectrum at or before the moment and shows it, in place of the moment read in flight.</summary>
+	/// <summary>Reads and shows the spectrum at or before the moment, in place of the moment read in flight.</summary>
 	public void ReadMoment(DateTimeOffset moment)
 	{
 		if (_stopped)
@@ -139,7 +139,7 @@ public sealed class TrendFeed(
 			: Observable.Empty<Unit>();
 	}
 
-	/// <summary>Never throws: the first failed range reports once and ends the read, a cancel ends it quietly.</summary>
+	/// <summary>Never throws: the first failed range reports once and ends the read; a cancel ends it.</summary>
 	private async Task ReadHistoryAsync(HistoryRead read, CancellationToken token)
 	{
 		var (request, window) = read;
@@ -187,7 +187,7 @@ public sealed class TrendFeed(
 		_momentRequests.OnNext(moment);
 	}
 
-	/// <summary>Each read hops to the UI thread before Switch, so a newer request drops a read still queued for it.</summary>
+	/// <summary>Each read hops to the UI thread before Switch, so a newer request drops a read still queued.</summary>
 	private IDisposable SubscribeToMomentReads()
 	{
 		return _momentRequests
@@ -264,7 +264,7 @@ public sealed class TrendFeed(
 		}
 	}
 
-	/// <summary>Keeps the read for StopAsync until it ends; Untrack cannot throw, so its continuation is not observed.</summary>
+	/// <summary>Keeps the read for StopAsync until it ends; Untrack cannot throw, so nothing observes it.</summary>
 	private void Track(Task read)
 	{
 		lock (_readsGate)

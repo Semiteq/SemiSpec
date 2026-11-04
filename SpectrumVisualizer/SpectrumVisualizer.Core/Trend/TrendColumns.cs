@@ -3,7 +3,9 @@ using SpectrumVisualizer.Core.Store;
 
 namespace SpectrumVisualizer.Core.Trend;
 
-/// <summary>The trend's column rules on a folded intensity series: the column width, the gap rule, the failure ranges.</summary>
+/// <summary>
+/// The trend's column rules on a folded intensity series: the column width, the gap rule, the failure ranges.
+/// </summary>
 public static class TrendColumns
 {
 	public const int MaximumColumns = 2048;
@@ -15,7 +17,9 @@ public static class TrendColumns
 	// The fold's range is half-open, so a window ending exactly at the newest point would leave it out.
 	private static readonly TimeSpan _newestPointInclusion = TimeSpan.FromMilliseconds(1);
 
-	/// <summary>One column per pixel of the data area, 256 to 2048 columns, each a whole number of ms, at least 1.</summary>
+	/// <summary>
+	/// One column per pixel of the data area, 256 to 2048 columns, each a whole number of ms, at least 1.
+	/// </summary>
 	public static TimeSpan ColumnWidth(TimeSpan span, double dataAreaPixels)
 	{
 		var columns = Math.Clamp(Math.Round(dataAreaPixels), MinimumColumns, MaximumColumns);

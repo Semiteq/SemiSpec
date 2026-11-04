@@ -165,7 +165,9 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		Refresh();
 	}
 
-	/// <summary>The hover text of the last fold's column at the moment; null outside the window or before a point.</summary>
+	/// <summary>
+	/// The hover text of the last fold's column at the moment; null outside the window or before a point.
+	/// </summary>
 	public string? ReadoutAt(DateTimeOffset moment)
 	{
 		var index = _lastFold?.Query.ColumnOf(moment) ?? -1;

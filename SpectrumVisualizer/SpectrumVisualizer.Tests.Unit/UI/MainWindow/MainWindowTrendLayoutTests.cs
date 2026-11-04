@@ -25,7 +25,9 @@ using MainWindowView = SpectrumVisualizer.UI.MainWindow.MainWindow;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.MainWindow;
 
-/// <summary>The content area with the trend: its rows, the side pane across them and the trend section's form.</summary>
+/// <summary>
+/// The content area with the trend: its rows, the side pane across them and the trend section's form.
+/// </summary>
 [Trait("Component", "UI")]
 [Trait("Area", "MainWindow")]
 [Trait("Category", "Unit")]
@@ -41,7 +43,8 @@ public sealed class MainWindowTrendLayoutTests : MainWindowLayoutTestBase
 		var content = Named<Grid>(Realise(), "ContentArea");
 
 		content.RowDefinitions.Select(row => row.Height)
-			.Should().Equal(new GridLength(3, GridUnitType.Star), new GridLength(2, GridUnitType.Star), GridLength.Auto);
+			.Should().Equal(
+				new GridLength(3, GridUnitType.Star), new GridLength(2, GridUnitType.Star), GridLength.Auto);
 		content.RowDefinitions.Select(row => row.MinHeight)
 			.Should().Equal(MainWindowView.SpectrumRowMinHeight, MainWindowView.TrendRowMinHeight, 0);
 	}
@@ -193,7 +196,8 @@ public sealed class MainWindowTrendLayoutTests : MainWindowLayoutTestBase
 		var messageHeight = Named<Border>(window, "MessagePanel").Bounds.Height;
 		var scroll = Named<ScrollViewer>(window, "SidePaneScroll");
 		TestContext.Current.TestOutputHelper?.WriteLine(
-			$"{window.Bounds.Size} with the message panel ({messageHeight} px): side pane {failed.Pane.Height} px high, "
+			$"{window.Bounds.Size} with the message panel ({messageHeight} px): "
+			+ $"side pane {failed.Pane.Height} px high, "
 			+ $"scroll extent {scroll.Extent.Height} px in a {scroll.Viewport.Height} px viewport");
 		failed.Window.Should().Be(opening.Window, "a failed re-read never changes the window size");
 		failed.Pane.Should().Be(opening.Pane.WithHeight(opening.Pane.Height - messageHeight));

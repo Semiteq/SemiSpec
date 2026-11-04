@@ -72,7 +72,9 @@ public sealed class SpectrumHistory(string path)
 			token);
 	}
 
-	/// <summary>The window mean of every stored spectrum in [from, to), in receive order; NaN for an uncovered device.</summary>
+	/// <summary>
+	/// The window mean of every stored spectrum in [from, to), in receive order; NaN for an uncovered device.
+	/// </summary>
 	public Task<Result<IntensityChunk>> IntensityPointsAsync(
 		ushort wavelengthNm, byte delta, DateTimeOffset from, DateTimeOffset to, CancellationToken token)
 	{
@@ -207,7 +209,9 @@ public sealed class SpectrumHistory(string path)
 			(BoardState)reader.GetByte(9));
 	}
 
-	/// <summary>A row's device when it is a known spectrometer and the pixel blob has its length; null otherwise.</summary>
+	/// <summary>
+	/// A row's device when it is a known spectrometer and the pixel blob has its length; null otherwise.
+	/// </summary>
 	private static Spectrometer? IntactDevice(long device, long pixelBytes)
 	{
 		if (device is not ((long)Spectrometer.Atp2000 or (long)Spectrometer.Atp8000))

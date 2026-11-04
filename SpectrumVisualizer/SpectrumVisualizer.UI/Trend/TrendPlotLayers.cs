@@ -8,7 +8,9 @@ using SpectrumVisualizer.UI.Localization;
 
 namespace SpectrumVisualizer.UI.Trend;
 
-/// <summary>The trend's layers on its plot: the envelope, the failure strip, the shown-moment line and the axes.</summary>
+/// <summary>
+/// The trend's layers on its plot: the envelope, the failure strip, the shown-moment line and the axes.
+/// </summary>
 public sealed class TrendPlotLayers
 {
 	private readonly Plot _plot;
@@ -30,7 +32,9 @@ public sealed class TrendPlotLayers
 		plot.Font.Automatic();
 	}
 
-	/// <summary>Draws the fold over [from, to]; a null fold clears the line and the strip and keeps the Y range.</summary>
+	/// <summary>
+	/// Draws the fold over [from, to]; a null fold clears the line and the strip and keeps the Y range.
+	/// </summary>
 	public void Draw(TrendFold? fold, DateTimeOffset from, DateTimeOffset to)
 	{
 		var columns = fold is null ? [] : EnvelopeColumn.Map(fold.Series, LocalTimeAxis.ToAxis);

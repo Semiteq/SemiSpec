@@ -46,7 +46,9 @@ internal sealed class ChartFrames(
 		Request();
 	}
 
-	/// <summary>Asks for one animation frame; requests before it is served join it, and a detached view asks none.</summary>
+	/// <summary>
+	/// Asks for one animation frame; requests before it is served join it, and a detached view asks none.
+	/// </summary>
 	public void Request()
 	{
 		if (_pendingFrame is not null || TopLevel.GetTopLevel(plotControl) is not { } topLevel)
@@ -99,7 +101,8 @@ internal sealed class ChartFrames(
 		var plot = plotControl.Plot;
 		var colors = ChartPalette.Colors(application, variant);
 
-		// One hold of the lock, so no render sees new surfaces with old series colours; the series recolour re-enters it.
+		// One hold of the lock, so no render sees new surfaces with old series colours; the series recolour re-enters
+		// it.
 		lock (plot.Sync)
 		{
 			ChartPalette.Apply(plot, application, variant);

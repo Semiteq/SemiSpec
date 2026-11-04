@@ -92,7 +92,9 @@ public abstract class TrendFeedTestBase : TrendChartTestBase
 		Add(StoreSamples.Spectrum(At(second), nm: nm, seq: NextSeq()));
 	}
 
-	/// <summary>Twenty minutes of spectra at the sample key, the chart refreshed, then one spectrum at the new wavelength.</summary>
+	/// <summary>
+	/// Twenty minutes of spectra at the sample key, the chart refreshed, then one spectrum at the new wavelength.
+	/// </summary>
 	protected void ChangeKeyAfterTwentyMinutes(ushort nm)
 	{
 		AddSpectra(0, 1200);

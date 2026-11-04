@@ -4,7 +4,9 @@ using Xunit;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Trend;
 
-/// <summary>Draws frames on a pool thread while the test thread mutates the plottable, then joins the render task.</summary>
+/// <summary>
+/// Draws frames on a pool thread while the test thread mutates the plottable, then joins the render task.
+/// </summary>
 internal static class RenderWhileMutating
 {
 	private const int FrameBudget = 300;

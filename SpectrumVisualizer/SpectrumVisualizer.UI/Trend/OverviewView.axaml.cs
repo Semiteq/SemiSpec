@@ -43,10 +43,17 @@ public partial class OverviewView : UserControl
 		}
 
 		_subscriptions.Add(viewModel
-			.WhenAnyValue(model => model.HasExtent, model => model.ExtentFirst, model => model.ExtentLast, model => model.Band)
+			.WhenAnyValue(
+				model => model.HasExtent,
+				model => model.ExtentFirst,
+				model => model.ExtentLast,
+				model => model.Band)
 			.Subscribe(_ => LayoutBand()));
 		_subscriptions.Add(viewModel
-			.WhenAnyValue(model => model.WindowStartFraction, model => model.WindowWidthFraction, model => model.HasExtent)
+			.WhenAnyValue(
+				model => model.WindowStartFraction,
+				model => model.WindowWidthFraction,
+				model => model.HasExtent)
 			.Subscribe(_ => PlaceHighlight()));
 	}
 
@@ -76,7 +83,10 @@ public partial class OverviewView : UserControl
 		}
 
 		var (left, width) = OverviewGeometry.HighlightSpan(
-			viewModel.WindowStartFraction, viewModel.WindowWidthFraction, StripCanvas.Bounds.Width, MinimumHighlightWidth);
+			viewModel.WindowStartFraction,
+			viewModel.WindowWidthFraction,
+			StripCanvas.Bounds.Width,
+			MinimumHighlightWidth);
 		WindowHighlight.IsVisible = true;
 		Canvas.SetLeft(WindowHighlight, left);
 		WindowHighlight.Width = width;

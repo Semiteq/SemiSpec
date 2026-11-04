@@ -69,18 +69,24 @@ internal sealed class TrendTimeline
 		TimeOrdered.DropBefore(_failures, unixMs, TimeOf);
 	}
 
-	/// <summary>Folds the points, breaks and failure marks of the query's range; the query's key is not checked.</summary>
+	/// <summary>
+	/// Folds the points, breaks and failure marks of the query's range; the query's key is not checked.
+	/// </summary>
 	public IntensitySeries Fold(IntensityQuery query)
 	{
 		var fromMs = query.From.ToUnixTimeMilliseconds();
 		var toMs = query.To.ToUnixTimeMilliseconds();
 		var buckets = new IntensityBuckets(query);
-		for (var i = TimeOrdered.LowerBound(_points, fromMs, TimeOf); i < _points.Count && _points[i].UnixMs < toMs; i++)
+		for (var i = TimeOrdered.LowerBound(_points, fromMs, TimeOf);
+			i < _points.Count && _points[i].UnixMs < toMs;
+			i++)
 		{
 			buckets.Add(_points[i]);
 		}
 
-		for (var i = TimeOrdered.LowerBound(_breaks, fromMs, TimeOf); i < _breaks.Count && _breaks[i].UnixMs < toMs; i++)
+		for (var i = TimeOrdered.LowerBound(_breaks, fromMs, TimeOf);
+			i < _breaks.Count && _breaks[i].UnixMs < toMs;
+			i++)
 		{
 			buckets.AddBreak(DateTimeOffset.FromUnixTimeMilliseconds(_breaks[i].UnixMs), _breaks[i].Lost);
 		}

@@ -115,7 +115,8 @@ public class App : Application
 		{
 			services.Logger.LogError(
 				exception,
-				"Stopping the link, the frame distributor, the trend feed and the spectrum store on window close failed");
+				"Stopping the link, the frame distributor, the trend feed and the spectrum store on window close "
+				+ "failed");
 		}
 	}
 

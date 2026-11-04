@@ -17,7 +17,9 @@ using BitmapCache = Avalonia.Media.BitmapCache;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Trend;
 
-/// <summary>The realised trend view: cache layout, frame pacing, empty state, and pointer input through Avalonia.</summary>
+/// <summary>
+/// The realised trend view: cache layout, frame pacing, empty state, and pointer input through Avalonia.
+/// </summary>
 [Collection(ProcessGlobalStateCollection.Name)]
 [Trait("Component", "UI")]
 [Trait("Area", "Trend")]

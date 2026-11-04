@@ -6,7 +6,9 @@ using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.UI.Spectrum;
 
-/// <summary>One spectrometer's line on the spectrum plot: its calibrated wavelengths and the projected intensities.</summary>
+/// <summary>
+/// One spectrometer's line on the spectrum plot: its calibrated wavelengths and the projected intensities.
+/// </summary>
 internal sealed class DeviceLine
 {
 	private DeviceLine(SignalXY plottable, double[] xs, double[] ys)

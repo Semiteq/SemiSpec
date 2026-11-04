@@ -8,7 +8,9 @@ using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.UI.Spectrum;
 
-/// <summary>Shows the live source's spectrum, or a spectrum of a past moment until the operator returns to live.</summary>
+/// <summary>
+/// Shows the live source's spectrum, or a spectrum of a past moment until the operator returns to live.
+/// </summary>
 public sealed class SwitchingSpectrumSource : ReactiveObject, IDisplayedSpectrumSource, IDisposable
 {
 	private readonly IDisplayedSpectrumSource _liveSource;
@@ -21,7 +23,9 @@ public sealed class SwitchingSpectrumSource : ReactiveObject, IDisplayedSpectrum
 		CurrentChanged = liveSource.CurrentChanged.Merge(_modeChanges.AsObservable());
 	}
 
-	/// <summary>The historical spectrum while one is shown, the same record on every read; the live one otherwise.</summary>
+	/// <summary>
+	/// The historical spectrum while one is shown, the same record on every read; the live one otherwise.
+	/// </summary>
 	public DisplayedSpectrum? Current => _historical ?? _liveSource.Current;
 
 	/// <summary>The live source's signal merged with one signal per switch between live and a past moment.</summary>

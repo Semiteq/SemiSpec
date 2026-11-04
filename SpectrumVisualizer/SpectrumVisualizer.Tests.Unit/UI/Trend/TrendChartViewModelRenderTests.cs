@@ -58,7 +58,8 @@ public sealed class TrendChartViewModelRenderTests : TrendChartTestBase
 	{
 		Chart.Plot.RenderInMemory(640, 480);
 		var limits = Chart.Plot.Axes.GetLimits();
-		new[] { limits.Left, limits.Right, limits.Bottom, limits.Top }.Should().OnlyContain(edge => double.IsFinite(edge));
+		new[] { limits.Left, limits.Right, limits.Bottom, limits.Top }
+			.Should().OnlyContain(edge => double.IsFinite(edge));
 		return limits;
 	}
 }

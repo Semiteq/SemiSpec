@@ -20,7 +20,10 @@ public partial class SpectrumChartView : UserControl
 	{
 		InitializeComponent();
 		_frames = new ChartFrames(
-			PlotControl, () => _viewModel is not null, colors => _viewModel?.ApplyPalette(colors), frameServed: () => { });
+			PlotControl,
+			() => _viewModel is not null,
+			colors => _viewModel?.ApplyPalette(colors),
+			frameServed: () => { });
 		DataContextChanged += OnDataContextChanged;
 
 		// Only pan and zoom stay: autoscale and keyboard responses would move the limits behind the scale.
