@@ -295,8 +295,7 @@ the count into each status before it compares the status with the last one, so t
 and survives Connect, because the channel lives across sessions and the stored history covers the run. The callback
 runs inside `TryWrite` on the session task, and `Publish` runs on the same task, so the count needs no lock. The tracker
 observes each frame before the channel write, so a frame the channel drops leaves no `seq` gap and never counts as a
-lost spectrum. The
-status bar adds this count to the spectrum store's (`overview.md`, Status bar).
+lost spectrum. The status bar adds this count to the spectrum store's (`overview.md`, Status bar).
 
 ### Stop
 

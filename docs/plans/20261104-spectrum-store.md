@@ -135,47 +135,63 @@ Automatable (baseline 505 of 505 at `12bef84`):
    - `StoreFilesTests`: `TheInstanceFileIsNamedForTheProcessId` (`spectra-1234.db` under the store folder),
      `PrepareWipesTheOwnFileAndItsSidecars`, `PrepareDeletesTheFileOfADeadInstance`,
      `PrepareKeepsTheFileOfALiveInstance` (a second `SqliteConnection` holds the file open; it and its `-wal` survive),
-     `PrepareDeletesOrphanSidecars`, `PrepareCreatesAMissingFolder`.
+     `PrepareDeletesOrphanSidecars`, `PrepareKeepsAStoreNameWhoseMiddleIsNotAProcessId` (`spectra-1234 - Copy.db`
+     and its `-wal` survive), `PrepareCreatesAMissingFolder`.
    - `SpectrumDatabaseTests`: `OpenSetsWalNormalSyncAndTheJournalLimit` (reads back `journal_mode` = `wal`,
      `synchronous` = 1, `journal_size_limit` = 67108864); `ASpectrumRoundTripsEveryField` (pixels, device, wavelength,
      `delta`, amplitude, SNR, Q, `seq`, `state`, `ReceivedAt` to the millisecond);
-     `ANaNAmplitudeRoundTripsAsNaN`; `AHeartbeatGoesToTheHeartbeatTable`; `ABatchIsOneTransaction` (a batch whose
+     `NaNFloatsAreStoredAsNull`; `AHeartbeatGoesToTheHeartbeatTable`; `ABatchIsOneTransaction` (a batch whose
      last frame fails leaves no row of it); `RetentionDeletesRowsOlderThanTheCutoffFromBothTables`;
      `CheckpointTruncatesTheWal` (the `-wal` file is 0 bytes after `CheckpointAndClose`);
      `AWriteAgainstAHeldLockFailsAfterTheDefaultTimeout` (a second connection holds `BEGIN IMMEDIATE`; `Write`
-     returns a failed `Result` after 1.9 to 2.5 s); `ACheckpointBesideAnOpenReaderReturnsBusyAtOnce` (a reader holds
-     a read transaction; `CheckpointAndClose` returns within 100 ms with busy reported and the connection closed);
+     returns a failed `Result` after 1.9 to 2.5 s); `AfterShortenBusyTimeoutAWriteAgainstAHeldLockFailsAfterOneSecond`
+     (0.9 to 1.5 s); `ACheckpointBesideAnOpenReaderReturnsBusyAtOnce` (a reader holds
+     a read transaction; `CheckpointAndClose` returns within 1 s, not after the 2 s busy timeout, with busy reported and the connection closed);
      `TheIntensityColumnHoldsTheMeanOfTheOwnWindow` is gone: Task 5 removed the `intensity` column.
-   - `SpectrumIntensityTests`: `CoversFollowsTheFirmwareTableRange` (ATP-2000 189 and 1028 in, 188 and 1029 out;
-     ATP-8000 898 and 2461 in); `MeanAveragesTheInclusiveWindow`; `ADarkSpectrumHasMeanZero`; `ADeltaOfZeroTakesOnePixel`.
+   - `QueryWindowsTests` (review phase 1 folded `SpectrumIntensity` into `QueryWindows`):
+     `CoversFollowsTheFirmwareTableRange` (ATP-2000 189 and 1028 in, 188 and 1029 out; ATP-8000 898 and 2461 in,
+     897 and 2462 out);
+     `MeanOfAveragesTheWindowPixels`; `ADarkWindowHasMeanZero`; `ADeltaOfZeroTakesOnePixel`.
    - `IntensityBucketsTests`: `ARowLandsInTheColumnOfItsTime` (half-open columns, a row at `To` excluded);
      `ARowNearToStaysInTheLastColumn` (a 10 ms range, 3 columns, a row at 9 ms lands in column 2);
      `AColumnKeepsMinMaxAndCount`; `AnEmptyColumnIsNaNWithCountZero`; `AnUncoveringRowCountsAsUncoveredOnly`;
      `TheColumnWidthIsTheRangeOverTheColumnsFlooredAtOneMillisecond`.
    - `SpectrumHistoryTests`: `SpectrumAtReturnsTheNearestRowAtOrBefore` (equal stamps resolve to the later id),
-     `SpectrumAtBeforeTheFirstRowReturnsNone`, `TheStoredSpectrumRebuildsTheMeasurement`;
-     `TheSeriesMeansTheWindowPerSpectrum`; `TheSeriesOfAWavelengthOneDeviceDoesNotCoverLeavesItsColumnsUncovered`;
+     `SpectrumAtBeforeTheFirstRowReturnsNone`, `TheStoredSpectrumRebuildsTheMeasurement`,
+     `ANaNAmplitudeAndQReadBackAsNaN`; `TheSeriesMeansTheWindowPerSpectrum`;
+     `ARowInsideTheLastMillisecondBeforeToIsInTheSeries` (`To` half a millisecond after the row's stamp); `TheSeriesOfAWavelengthOneDeviceDoesNotCoverLeavesItsColumnsUncovered`;
      `ARowWithADifferentWavelengthReadsItsPixels` (the stored window differs from the queried one, the mean comes from
      the pixels); `AMixedWavelengthRangeMergesBothReads` is not written: Task 5 removed the column, so no
      second read exists to merge; `DarkFramesPullTheColumnMinimumToZero`; `ACancelledSeriesThrowsOperationCanceled` (a token cancelled before the
      call) and `ASeriesCancelledMidReadThrowsAtTheNextCheck` (cancelled at row 300, thrown at the row-512 check);
-     `TheStoredRangeSpansTheFirstAndLastSpectrum`; `TheHistoryReadsWhileTheWriterWrites` (WAL: a series runs between
-     two writer batches without a busy error).
+     `TheStoredRangeSpansTheFirstAndLastSpectrum`; `AReadOfAFileWithoutTheSchemaFails` (an empty file);
+     `AReadOfAMissingFileFailsAndCreatesNoFile`; `TheHistoryReadsBesideAnOpenWriteTransaction` (the series finishes
+     under 1 s and sees the last commit); `TheWriterCommitsBesideAnOpenReadSnapshot` (a reader inside `BEGIN` holds its
+     snapshot, and `Write` commits under 1 s; only WAL allows that, and the `journal_mode=DELETE` mutant failed
+     it in review phase 1).
    - `SpectrumStoreTests`: `EveryFrameFromTheDistributorIsStored` (spectra and heartbeats, in order);
      `TheSubscriberOnlyEnqueues` (with the writer held by `BEGIN IMMEDIATE` on a second connection, `OnNext` returns
-     within 50 ms); `AFullQueueCountsEachDroppedFrame` (writer held, more frames fed than the queue holds; after the
+     within 50 ms, also once the queue is full and the frames count as dropped); `AFullQueueCountsEachDroppedFrame` (writer held, more frames fed than the queue holds; after the
      lock is released and `StopAsync` has drained, stored rows + `DroppedFrames` = frames fed, `DroppedFrames` > 0
      and `DroppedFramesChanged` signalled; no exact drop count, because it depends on when the writer's batches fail);
      `DisposeOnlyCancelsAndTheWriterClosesTheConnection` (after `Dispose`, the writer task ends and the file can be
      deleted; no exception reaches the log from a closed connection); `AFailedBatchCountsItsFramesAndReportsOnce` (two
      failed batches, one Warning entry in a real panel); `AWriteAfterAFailureRunReportsAgainOnlyAfterASuccess`;
-     `RetentionRunsOnceAMinuteAlsoWithoutFrames` (`ManualClock` advanced by 61 s fires the retention timer);
+     `RetentionRunsOnceAMinuteAlsoWithoutFrames` (`ManualClock` advanced by 59 s deletes nothing; at 61 s the pass
+     deletes the rows older than 24 h and keeps one 23 h 59 min old);
      `AStopPastItsBudgetCountsTheUndrainedFramesAsDropped` (writer held, `StopAsync` with a cancelled drain token:
-     stored + dropped = fed); `DataStaysAcrossLinkSessions` (frames from two
-     connects in one file); `StopDrainsTheQueueThenCheckpoints`; `StopBeforeStartCompletesAtOnce`;
-     `AFailedOpenReportsOneErrorAndStoresNothing` (the store folder path is a file).
+     stored + dropped = fed); `AStopAgainstALockHeldThroughItEndsInsideTheCloseLimit` (a drain token at 3.5 s, the
+     stop ends under 5 s, stored + dropped = fed, and a batch after the stop gives up after 1 s);
+     `AStopWithAFullQueueDrainsInsideTheCloseLimit`; `FramesFromTwoSequenceRunsShareOneFile` (two runs of `seq` from
+     0 land in one file; the store sees no link session, so no reconnect is involved);
+     `StopDrainsTheQueueThenCheckpoints` (an idle connection holds the file across the stop, the `-wal` is 0 bytes,
+     and the stopped line ends with "checkpoint Truncated"); `DisposeCountsTheQueuedFramesAsDropped`;
+     `StopBeforeStartCompletesAtOnce`; `AFailedOpenReportsOneErrorAndCountsEveryFrameAsDropped` (the store folder
+     path is a file); `AnOpenThatThrowsReportsOneErrorAndCountsEveryFrameAsDropped` (a path with a NUL character
+     throws `ArgumentException`); `AFailureAfterTheOpenReportsOnceAndCountsEveryLaterFrameAsDropped` (a clock that
+     throws in the retention pass; one `StoreWriteError`, the later frames dropped, the file closed).
    - `StoreBenchmarkCommandTests` and `StoreBenchmarkRunTests.ASmallRunPrintsEveryMeasurementAndTheStrategiesAgree`
-     (`--rows 2000 --change-at 0.5 --churn-rounds 2`: exit code 0, every metric row printed fresh and churned, the
+     (`--rows 2000 --churn-rounds 2`: exit code 0, every metric row printed fresh and churned, the
      `substr` and `SqliteBlob` reads give equal min, max and counts per column to 1e-9; the precomputed and merged
      reads left the tool with the column in Task 5).
 2. `dotnet test SpectrumVisualizer.slnx --filter "Area=Link"` passes, including `SerialLinkDropTests`:
@@ -191,15 +207,16 @@ Automatable (baseline 505 of 505 at `12bef84`):
 4. `dotnet test SpectrumVisualizer.slnx --filter "Area=Di"` passes, including: the store resolves as one instance
    with the instance file under the test root; `AppLifecycleTests.OpeningTheWindowStartsTheStore` (a frame fed through
    `FakePortStream` lands in the instance file); `ClosingTheWindowStopsTheStoreAfterTheDistributor` (the store's stop
-   line follows the distributor's "The frame distributor stopped"); `AfterTheCloseTheStoreFileHasNoWal` (the `-wal`
-   file is absent or 0 bytes).
+   line follows the distributor's "The frame distributor stopped"); `AfterTheCloseTheStoreFileHasAnEmptyWal` (an idle
+   connection holds the file across the close, so the `-wal` file stays, at 0 bytes).
 5. `dotnet test SpectrumVisualizer.slnx --filter "Area=Resources"` passes with every new key in the Russian set.
 6. `dotnet test SpectrumVisualizer.slnx` passes 505 plus every test this slice adds, none skipped.
 7. `dotnet build SpectrumVisualizer.slnx -c Release` 0 warnings; `dotnet format SpectrumVisualizer.slnx
    --verify-no-changes` and `dotnet terse SpectrumVisualizer` exit 0; `dotnet build SpectrumVisualizer.sln` and
    `dotnet test SpectrumVisualizer.Tests` pass 13 of 13.
-8. Storage benchmark: `dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark --
-   --rows 172800 --change-at 0.875` prints one table. It fills 24 h of ATP-2000 spectra at 2 per second (650 nm,
+8. Storage benchmark: `dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark`
+   prints one table. The numbers below were measured with `--change-at 0.875`, which review phase 1 removed with the
+   wavelength change; every kept read takes the window from the pixels, so the stored wavelength changes none of them. It fills 24 h of ATP-2000 spectra at 2 per second (650 nm,
    `delta` 10; from 7/8 of the rows on, 3 h before the end, 700 nm), then measures. It runs the churn: 24 rounds of
    "delete the oldest hour, insert one more hour", so the file reaches the steady state of a day-long run, with
    freed pages reused. Each series row is measured before and after the churn; the budgets are judged on the churned
@@ -212,9 +229,9 @@ Automatable (baseline 505 of 505 at `12bef84`):
 
    | Metric | Target | Measured | Verdict |
    | --- | --- | --- | --- |
-   | Insert throughput, batches of 256 | at least 2 000 spectra/s | F 44 473, C 51 859 spectra/s | pass |
-   | File size per 1000 ATP-2000 spectra, after checkpoint | at most 5 MB | F 4.428 MB, C 4.428 MB; ATP-8000 (`--device 8000`): F 1.338 MB, C 1.339 MB | pass |
-   | File size for 24 h, before and after the churn | recorded | ATP-2000: F 765.1 MB, C 765.2 MB (the churn adds 0.01 %); ATP-8000: F 231.3 MB, C 231.3 MB. Measured with the `intensity` column and the five-column index, which Task 5 then removed | recorded |
+   | Insert throughput, batches of 256 | at least 2 000 spectra/s | F 44 473, C 51 859 spectra/s; current schema: F 42 444, C 53 225 spectra/s | pass |
+   | File size per 1000 ATP-2000 spectra, after checkpoint | at most 5 MB | F 4.428 MB, C 4.428 MB; ATP-8000 (`--device 8000`): F 1.338 MB, C 1.339 MB; current schema, ATP-2000: F 4.412 MB, C 4.412 MB | pass |
+   | File size for 24 h, before and after the churn | recorded | ATP-2000: F 765.1 MB, C 765.2 MB (the churn adds 0.01 %); ATP-8000: F 231.3 MB, C 231.3 MB; current schema, ATP-2000: F 762.4 MB, C 762.5 MB | recorded |
    | Series, 10 min (1 200 rows) to 1 000 columns, warm | at most 50 ms for the kept pixel strategy | `substr` F 5.3 (5.2 to 5.8), 10.2; C 5.1 (5.0 to 5.3), 5.2 ms. `SqliteBlob` F 6.3 (6.0 to 6.5), 7.8; C 6.5 (6.2 to 7.3), 6.0 ms | pass (`substr`) |
    | Series, 24 h (172 800 rows) to 1 000 columns, every row at the queried wavelength, warm | at most 10 s for the kept pixel strategy; at most 500 ms for the precomputed read | precomputed F 54.0 (52.9 to 64.6), 66.6; C 64.3 (62.5 to 66.9), 61.9 ms. `substr` F 520.7 (515.9 to 523.7), 554.8; C 647.3 (630.3 to 772.2), 622.7 ms. `SqliteBlob` F 559.9 (558.1 to 564.3), 576.0; C 709.1 (694.1 to 805.4), 703.8 ms | pass (`substr`) |
    | Series, 24 h, wavelength changed 3 h ago, query at the new wavelength, warm | recorded; feeds the decision rule | merged with `substr` F 476.1 (474.8 to 477.5), 475.8; C 585.8 (578.5 to 593.8), 567.8 ms. Merged with `SqliteBlob` F 520.8 (519.1 to 587.7), 526.8; C 647.8 (639.2 to 702.8), 653.6 ms. Pixels only `substr` F 631.4 (623.7 to 634.8), 625.3; C 634.6 (630.8 to 681.9), 635.6 ms. Pixels only `SqliteBlob` F 805.4 (711.8 to 866.2), 958.6; C 715.4 (698.3 to 737.1), 713.0 ms | recorded |
@@ -222,6 +239,14 @@ Automatable (baseline 505 of 505 at `12bef84`):
    | `SpectrumHistory.SpectrumAtAsync`, warm | at most 5 ms | at the end of the range: F 0.6 (0.6 to 0.8), 3.0; C 0.5 (0.5 to 0.5), 0.8 ms | pass |
    | One retention pass over a minute of rows (120) | at most 50 ms | F 0.3 (0.3 to 0.8), 2.2; C 0.3 (0.2 to 0.4), 15.7 ms | pass |
    | WAL size after a 24 h series read beside a running writer at 2 spectra/s | at most 16 MB, or the series gains slicing | F 0.035 MB, C 0.035 MB (`substr` pixel read) | pass, no slicing |
+
+   The first numbers of the throughput and both size rows were measured with the `intensity` column and the
+   five-column index, which Task 5 then removed. The "current schema" numbers come from one default run of the tool
+   on 2026-11-04 during review phase 1, on top of `c78f3bc`, same machine, every row at 650 nm: the schema without the
+   column holds 0.4 % less per 1000 spectra. The throughput moved by -4.6 % fresh and +2.6 % churned; one run gives
+   no spread for it, so that difference is not a finding.
+   That run's other rows repeat the table within the same spread (24 h churned: `substr` 651.9, `SqliteBlob`
+   725.2, `SpectrumHistory` 652.8 ms), and the two reads agreed column for column.
 
    The two `SpectrumHistory` rows were measured 2026-11-04 by the Task 6 tool on top of `0767c5b`, same machine, in
    one run of `--rows 172800 --change-at 0.875`; that run's churned `substr` and `SqliteBlob` rows (24 h: 647.6 and
@@ -247,18 +272,20 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
 3. Restart the emulator with `--rate 0` for 10 s: the heartbeat count rises by about 3. Restart it with `--rate 1`.
 4. Press Disconnect, wait 15 s, press Connect. The spectrum count keeps rising from its value before the Disconnect;
    no row is deleted.
-5. Close the app. The `-wal` file next to `spectra-<pid>.db` is absent or 0 bytes. Start the app again: a new file
-   with the new process id appears, and the previous file is gone; the new file has 0 spectra.
+5. Before the close, run `sqlite3 spectra-<pid>.db` and type `select count(*) from spectrum;`, and keep that shell
+   open. Close the app: the `-wal` file next to `spectra-<pid>.db` stays, at 0 bytes. Quit the shell, which holds the
+   file open and would keep it through the next sweep. Start the app again: a new file with the new process id
+   appears, and the previous file is gone; the new file has 0 spectra.
 6. Start a second copy of the app while the first runs. Both files exist, and the first app keeps storing (its count
    rises). Close the first copy, start a third: the first copy's file is gone, the second's stays.
 7. Run `emu --port COM10 --bad-crc-every 5 --rate 1`: "Lost spectra" rises, "Dropped frames" stays 0.
-8. Slow store: run `sqlite3 spectra-<pid>.db`, type `BEGIN IMMEDIATE;`, wait 10 s, type `ROLLBACK;`. Within 3 s of the
+8. Slow store: run `sqlite3 spectra-<pid>.db`, type `BEGIN IMMEDIATE;`, wait 10 s, type `ROLLBACK;`. Within 4 s of the
    `BEGIN` the message panel shows one Warning "Spectrum history write failed", and "Dropped frames" rises by the
    frames of the failed batches (about 10 at `--rate 1`). After `ROLLBACK` the count stops rising, and no second entry
    appears for the same incident.
 9. Retention, on a test machine only: with the app storing, move the Windows clock 25 h forward. Within 70 s
    `select count(*) from spectrum where received_at < (strftime('%s','now') - 86400) * 1000` prints 0. Move the clock
-   back.
+   back; the rows stamped during the 25 h ahead stay, now in the future, so restart the app before any later step.
 10. Resize the window to its minimum width with an English and with a Russian Windows UI: every status segment shows
     whole on one line, "Dropped frames: 0" / "Отброшено кадров: 0" last.
 
@@ -280,7 +307,8 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   The instance file is `spectra-<process id>.db`. Two live processes never share a process id, so two running copies
   never share a file. `StoreFiles.Prepare` runs before the open: it creates the folder, deletes the own file and its
   `-wal` and `-shm` sidecars (a dead process with the same id left them; this is the wipe at start), then tries to
-  delete every other `spectra-*.db`. A delete that fails with `IOException` or `UnauthorizedAccessException` means a
+  delete every other `spectra-<digits>.db`; a name like `spectra-1234 - Copy.db` stays. A folder that cannot be listed
+  skips the sweep, and the store logs that at Warning. A delete that fails with `IOException` or `UnauthorizedAccessException` means a
   live instance holds the file open, and the file stays; a delete that succeeds also deletes that file's sidecars.
   Sidecars whose `.db` is gone are deleted the same way. ASSUMPTION: SQLite on Windows opens the database without
   `FILE_SHARE_DELETE`, so `File.Delete` on a live instance's file fails; `PrepareKeepsTheFileOfALiveInstance` pins
@@ -319,8 +347,8 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   `id` orders rows with equal stamps. The float columns are nullable: SQLite stores a NaN double as NULL
   (ASSUMPTION, pinned by `ANaNAmplitudeRoundTripsAsNaN`), and a board float can be NaN. `pixels` is last, so a read of
   the narrow columns never touches the blob's overflow page. A Microsoft.Data.Sqlite parameter takes a `byte[]`, so
-  `Write` copies each frame's pixels into one reused `byte[]` per device size
-  (`MemoryMarshal.AsBytes(pixels.AsSpan()).CopyTo(buffer)`); there is no zero-copy write. A read turns the bytes back
+  `Write` copies each frame's pixels into a new array (`MemoryMarshal.AsBytes(pixels.AsSpan()).ToArray()`); there is
+  no zero-copy write. A read turns the bytes back
   with `MemoryMarshal.Cast<byte, ushort>`. The app runs on x64 Windows only (`README.md:24`), so the bytes are
   little-endian on both sides.
 - **Connection settings.** `Data Source=<file>;Mode=ReadWriteCreate;Pooling=False;Default Timeout=2`. Every connection
@@ -329,19 +357,21 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   can lose the last transactions but not corrupt the file; the data is disposable. The journal limit truncates the
   WAL back to 64 MB after a checkpoint, so a WAL that grew during a long read does not keep its size.
   `Default Timeout=2` bounds Microsoft.Data.Sqlite's retry on `SQLITE_BUSY` to 2 s (ASSUMPTION, pinned by
-  `AWriteAgainstAHeldLockFailsAfterTheDefaultTimeout`, which asserts 1.9 to 2.5 s). Reader connections add
-  `PRAGMA query_only=ON`.
+  `AWriteAgainstAHeldLockFailsAfterTheDefaultTimeout`, which asserts 1.9 to 2.5 s). Reader connections open with
+  `Mode=ReadWrite`, so a read of a missing file fails and creates nothing, and run `PRAGMA query_only=ON` only: the
+  file keeps its WAL mode, and a WAL reader writes the `-shm` file.
 - **Database.** `SpectrumDatabase` (Core) owns the writer connection: `Open(path)` (pragmas, schema),
   `Write(IReadOnlyList<ReceivedFrame>)` in one `BEGIN IMMEDIATE` transaction with one reused parameterised command
   per table, `DeleteBefore(DateTimeOffset cutoff)` in its own `BEGIN IMMEDIATE` transaction over both tables,
-  `CheckpointAndClose()` running `PRAGMA wal_checkpoint(TRUNCATE)` then closing. `BEGIN IMMEDIATE` takes the write
+  `CheckpointAndClose()` running `PRAGMA wal_checkpoint(TRUNCATE)` then closing, and `ShortenBusyTimeout()`, which
+  drops the busy timeout of every later statement to 1 s: Microsoft.Data.Sqlite counts it in whole seconds and waits
+  forever on 0. `BEGIN IMMEDIATE` takes the write
   lock at one explicit point, the start of the transaction, so a held lock fails the batch there after the busy
   timeout and never halfway through it. Each returns a FluentResults `Result`; a `SqliteException` or `IOException`
-  becomes an `ExceptionalError`. `Write` computes `intensity` from the frame's own wavelength and `delta` through
-  `SpectrumIntensity`; Task 5 removed the `intensity` column, so `Write` computes nothing per row. `wal_checkpoint(TRUNCATE)` invokes no busy handler: when a reader holds a snapshot it returns
-  at once with its `busy` column set to 1 (ASSUMPTION, pinned by `ACheckpointBesideAnOpenReaderReturnsBusyAtOnce`).
-  `CheckpointAndClose` returns `WalCheckpoint.Busy` and closes anyway (Core has no logger; `SpectrumStore` logs a busy
-  checkpoint at Debug); the WAL stays, and the next start deletes it with the file.
+  becomes an `ExceptionalError`. Task 5 removed the `intensity` column, so `Write` computes nothing per row.
+  `wal_checkpoint(TRUNCATE)` invokes no busy handler: when a reader holds a snapshot it returns at once with its `busy` column set to 1 (ASSUMPTION, pinned by `ACheckpointBesideAnOpenReaderReturnsBusyAtOnce`).
+  `CheckpointAndClose` returns `WalCheckpoint.Busy` and closes anyway (Core has no logger; the stopped line of
+  `SpectrumStore` names the checkpoint); the WAL stays, and the next start deletes it with the file.
 - **Background writer.** `SpectrumStore` (UI) is a singleton:
   - `SpectrumStore(FrameDistributor, StoreFile, MessagePanelViewModel, IScheduler uiScheduler, TimeProvider,
     ILogger<SpectrumStore>)`, where `StoreFile(string Path)` is the instance file registered by `AddUi`.
@@ -352,9 +382,12 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
     `TryWrite` (queue full) adds 1 to the drop count. The subscriber never touches SQLite, never waits and never
     throws. Then it starts the writer task. `Start` after a start or a stop does nothing.
   - The writer task runs `StoreFiles.Prepare` and `SpectrumDatabase.Open` on the thread pool, so the UI thread does
-    no file I/O. Frames that arrive meanwhile wait in the queue. A failed prepare or open logs at Error, reports one
-    `StoreOpenError` through `TryReportFailure`, disposes the subscription and ends the task: history is off for the
-    run, and no drop is counted, because no history exists to have holes.
+    no file I/O. Frames that arrive meanwhile wait in the queue.
+  - One failure path ends history for the run: a failed prepare or open, or any exception before the file is open,
+    logs at Error and reports one `StoreOpenError`; any exception after the open, outside a failed batch, logs at
+    Error and reports one `StoreWriteError`. The writer closes the file without a checkpoint, keeps the subscription
+    and counts every frame still queued and every later frame as dropped, so "Dropped frames" keeps growing while
+    history is off.
   - Loop: wait for the queue or the next retention time, whichever comes first; take up to 256 frames with `TryRead`
     and write them as one batch. A failed batch adds its frame count to the drop count and logs at Error. The first
     failure after a success reports one `StoreWriteError` (Warning) through `TryReportFailure`; later failures stay
@@ -368,20 +401,26 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
     and `IObservable<Unit> DroppedFramesChanged`, a private `Subject<Unit>` behind `Synchronize()`, exposed with
     `AsObservable()`, signalled after each increment. A reader reads `DroppedFrames` after the signal, the shape of
     `IDisplayedSpectrumSource` (`overview.md:57`); a value in the signal could arrive out of order from two threads.
-  - The writer task alone owns the `SpectrumDatabase` and its `SqliteConnection`: it opens it, and it closes it in its
-    own `finally`, with `CheckpointAndClose()` on a normal end and a plain close after a cancellation. No other thread
+  - The writer task alone owns the `SpectrumDatabase` and its `SqliteConnection`: it opens it, and it closes it, with
+    `CheckpointAndClose()` on a normal end and a plain close after a failure or a cancellation. Its stopped line at
+    Debug names the stored and dropped counts and the checkpoint: `Truncated`, `Busy`, `Failed` or `Skipped`. No other thread
     closes or disposes the connection, so no close can land while the writer is inside a write, a retention pass or a
     checkpoint.
   - `StopAsync(CancellationToken drainToken)`: dispose the subscription (no more enqueues), complete the queue's
     writer, then await the writer task. The writer keeps writing what is still queued and checks `drainToken`
-    between batches, never inside one. When the token fires, the frames still queued are added to the drop count, and
-    the writer checkpoints and closes. `StopAsync` completes at once when nothing started. `Dispose()` only cancels
-    the writer's token without waiting, for the container's synchronous dispose; the writer then ends and closes in
-    its `finally`.
-  - Stop budget: the close chain has one 5 s limit (`App.axaml.cs:27`). The link's stop can take up to 2 s on a
+    between batches, never inside one; from the stop on it calls `ShortenBusyTimeout`, so a batch against a held lock
+    fails after 1 s instead of 2 s. When the token fires, the frames still queued are added to the drop count, and
+    the writer checkpoints and closes. `StopAsync` completes at once when nothing started. `Dispose()` disposes the
+    subscription and cancels the writer's token without waiting, for the container's synchronous dispose, also while
+    a stop runs; the writer then counts the frames still queued as dropped and closes the file. The writer disposes
+    its cancellation sources when it ends, under a lock that `Dispose` and the drain token also take.
+  - Stop budget: the close chain has one 5 s limit (`App.axaml.cs:28`). The link's stop can take up to 2 s on a
     driver that hangs in dispose (`LinkSession.cs:27`, `:287-310`), and the distributor stops at once, so the store
-    gets the rest: `App` passes a drain token that fires 0.5 s before the 5 s limit ends, so the checkpoint and close
-    fit inside the limit. Whatever does not drain by then is counted as dropped.
+    gets the rest: `App` passes a drain token that fires 1.5 s before the 5 s limit ends. After it the writer finishes
+    at most the one batch or retention pass already running and starts no other; a held lock fails it after the 1 s busy timeout of the stop (Microsoft.Data.Sqlite retries
+    every 150 ms, so up to about 1.15 s), then checkpoints, which never waits, and closes, inside the limit. Whatever
+    does not drain by then is counted as dropped. Review phase 1 measured the earlier 0.5 s reserve against a held
+    lock: the stop ended at 5.96 s, because each batch waited out the full 2 s.
 - **Link drop counter.** `SerialLink` counts the frames its channel drops: `OnFrameDropped` adds 1 to
   `_droppedFrames` before its log-once check. `LinkStatus` gains `public long DroppedFrames { get; init; }`, a
   non-positional member, so the existing positional constructions keep compiling. `Publish` stamps it:
@@ -393,7 +432,7 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
 - **Status bar segment.** One more segment after Lost spectra: "Dropped frames: {0}" / "Отброшено кадров: {0}", the
   link's count plus the store's. It shows a number in every state, also while disconnected, because both counts
   describe the run's stored history, not the current connection. `DroppedFramesText` is an `ObservableAsPropertyHelper`
-  over `CombineLatest(serialLink.StatusUpdates(uiScheduler).Select(s => s.DroppedFrames),
+  over `CombineLatest(this.WhenAnyValue(bar => bar.Status).Select(s => s.DroppedFrames),
   store.DroppedFramesChanged.ObserveOn(uiScheduler).StartWith(Unit.Default).Select(_ => store.DroppedFrames))`, summed
   and formatted with `Resources.Culture` as `LostSpectraText` is (`AppStatusBarViewModel.cs:94-95`). Its subscription
   joins `_disposables`. Lost spectra keep their meaning: board spectra that never arrived.
@@ -453,8 +492,9 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
 
   Final state after Task 5 (numbers in Acceptance Evidence item 8): `substr` is the kept pixel strategy, the
   `intensity` column and the precomputed read are gone, and the series runs the `substr` read alone. The tool keeps
-  the two pixel strategies (`substr`, `SqliteBlob`) on one file; the precomputed and merged reads left it with the
-  column, because the schema has no column for them to read.
+  the two pixel strategies on one file: `SpectrumHistory.ReadSeries` (`substr`) and its own `BlobSeries.Read`
+  (`SqliteBlob`); the precomputed and merged reads left it with the column, because the schema has no column for them
+  to read.
 - **Lifecycle.** `Opened` starts the store before the distributor, so the store's subscription exists before the
   first frame is read. The close chain becomes link, then distributor, then store, each in a `finally` of the one
   before, all inside the existing 5 s limit, with the store's drain token of the stop budget above. A full queue of
@@ -466,10 +506,12 @@ Write path per frame (writer task):
 
 | Frame | Table | Values |
 | --- | --- | --- |
-| Spectrum | `spectrum` | `received_at` = `ReceivedAt.ToUnixTimeMilliseconds()`, device byte, wavelength, `delta`, amplitude, SNR, Q (NaN as NULL), `seq`, `state` byte, `intensity`, pixels |
+| Spectrum | `spectrum` | `received_at` = `ReceivedAt.ToUnixTimeMilliseconds()`, device byte, wavelength, `delta`, amplitude, SNR, Q (NaN as NULL), `seq`, `state` byte, pixels |
 | Heartbeat | `heartbeat` | `received_at`, `seq`, `state` byte |
 
-Intensity of one row for a query (`SpectrumIntensity`):
+Intensity of one row for a query (`QueryWindows`; the SQL bounds, `IntensityQuery.FromMilliseconds` and
+`ToMilliseconds`, round `From` down and `To` up to whole milliseconds, so the SQL range keeps every row the fold
+keeps):
 - covered: `calibration.FirstNm <= nm <= calibration.LastNm` for the row's device;
 - window: `calibration.Window(nm, delta)`, inclusive `First..Last`;
 - value: `sum(pixels[First..Last]) / (Last - First + 1)` as a double, one pass, no LINQ.
@@ -486,8 +528,7 @@ Benchmark tool (`SpectrumVisualizer.Tools.StoreBenchmark`, System.CommandLine 2.
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `--rows <n>` | 172800 | spectra to insert, 500 ms apart, ending at the tool's start time |
-| `--device 2000\|8000` | 2000 | the device of every row |
-| `--change-at <fraction>` | 0.875 | from this fraction of the rows on, the rows carry 700 nm instead of 650 nm; 1 never changes. 0.875 of 24 h is a change 3 h before the end |
+| `--device 2000\|8000` | 2000 | the device of every row: ATP-2000 at 650 nm or ATP-8000 at 1550 nm |
 | `--churn-rounds <n>` | 24 | rounds of "delete the oldest 1/24 of the filled span, insert it again one span later" after the fill; at 172 800 rows a round is one hour; 0 skips the churn |
 | `--folder <path>` | a new folder under `%TEMP%` | where the file goes |
 | `--keep` | off | keep the file after the run |
@@ -495,10 +536,10 @@ Benchmark tool (`SpectrumVisualizer.Tools.StoreBenchmark`, System.CommandLine 2.
 It writes through `SpectrumDatabase.Write` in batches of 256 (`delta` 10, pixels from a fixed-seed random generator),
 checkpoints, measures the series rows (the fresh file), runs the churn through `SpectrumDatabase.DeleteBefore` and
 `Write`, checkpoints, and measures every row again. Each churn round inserts the deleted rows again, one span
-later, with their own wavelength, so after 24 rounds the file has the fill's shape (21 h at 650 nm, then 3 h at
-700 nm) on pages freed and reused by the deletes. The all-match case is a second file filled with `--change-at 1`
-(every row at 650 nm), churned the same way and queried at 650 nm; the mixed case is the main file queried at
-700 nm over 24 h. It prints one row per metric of Acceptance Evidence item 8 with the median and the min/max of the
+later, so after 24 rounds the file has the fill's shape on pages freed and reused by the deletes. Every row carries
+the device's one wavelength, and every series reads the pixels, so a wavelength change would change no measured
+read; review phase 1 removed `--change-at` for that reason. The Task 5 run still had it, with a mixed-wavelength
+file, for the precomputed and merged reads that left with the column. It prints one row per metric of Acceptance Evidence item 8 with the median and the min/max of the
 5 warm runs. The OS file cache cannot be dropped without administrator rights, so the tool reports the first run after a
 fresh connection and the warm median of 5, and says so in its header line.
 
@@ -508,11 +549,11 @@ New resx keys (en / ru):
 | --- | --- | --- |
 | `StatusDroppedFramesFormat` | Dropped frames: {0} | Отброшено кадров: {0} |
 | `StoreOpenTitle` | Spectrum history is off | История спектров отключена |
-| `StoreOpenDetail` | The application could not create its spectrum history file. The spectrum view works; nothing is stored. | Приложение не смогло создать файл истории спектров. Спектр отображается, но не сохраняется. |
-| `StoreOpenRemedy` | Restart the application. If the failure repeats, send the log file to the developer. | Перезапустите приложение. Если ошибка повторится, отправьте файл журнала разработчику. |
+| `StoreOpenDetail` | The application could not create its spectrum history file. The spectrum view works; nothing is stored. | Программа не смогла создать файл истории спектров. Спектр отображается, но не сохраняется. |
+| `StoreOpenRemedy` | Restart the application. If the failure repeats, send the log file to the developer. | Перезапустите программу. Если ошибка повторится, передайте файл журнала разработчику. |
 | `StoreWriteTitle` | Spectrum history write failed | Не удалось записать историю спектров |
-| `StoreWriteDetail` | Received frames could not be written to the history file; they count as dropped frames. | Принятые кадры не записались в файл истории; они учтены как отброшенные. |
-| `StoreWriteRemedy` | Check the free space on the system drive. The application keeps trying. | Проверьте свободное место на системном диске. Приложение продолжает попытки. |
+| `StoreWriteDetail` | Received frames could not be written to the history file; they count as dropped frames. | Принятые кадры не удалось записать в файл истории; они учтены как отброшенные. |
+| `StoreWriteRemedy` | Check the free space on the system drive, and close any program that opened the spectrum history file. The application keeps trying. | Проверьте свободное место на системном диске и закройте программы, открывшие файл истории спектров. Программа продолжает попытки записи. |
 
 Errors (`SpectrumVisualizer.UI/Store/StoreErrors.cs`): `StoreOpenError(string path)` mapped to Error severity,
 `StoreWriteError()` mapped to Warning; each carries the cause as an `ExceptionalError` reason. The view leaves the path
@@ -778,6 +819,8 @@ Data flow:
   `AfterTheCloseTheStoreFileHasNoWal` and the singleton check of Acceptance Evidence item 4
 - [x] ➕ a second `SpectrumStore.StopAsync`, called while the first still drains, now completes with the writer, so a
   test's cleanup can await it after a window close it did not wait for and only then delete its root
+- [x] ➕ review phase 1: the drain token now fires 1.5 s before the limit (a 3.5 s delay), and the store shortens its
+  busy timeout to 1 s from the stop on; with 0.5 s and the 2 s timeout a held lock pushed the stop to 5.96 s
 - [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (611 of 611)
 
 ### Task 11: Status bar pre-handover checklist (`dev:desktop-ui`)
@@ -828,15 +871,16 @@ Note: Task 9 already added the dropped segment to the status sum and set `Minimu
   `OpeningTheWindowStartsTheStore`), the file per instance and the wipe (`TheInstanceFileIsNamedForTheProcessId`,
   `PrepareWipesTheOwnFileAndItsSidecars`), the sweep (`PrepareDeletesTheFileOfADeadInstance`,
   `PrepareKeepsTheFileOfALiveInstance`, `PrepareDeletesOrphanSidecars`), data across reconnects
-  (`DataStaysAcrossLinkSessions`, `TheDropCountSurvivesAReconnect`), retention
+  (`FramesFromTwoSequenceRunsShareOneFile`, renamed in review phase 1, `TheDropCountSurvivesAReconnect`), retention
   (`RetentionDeletesRowsOlderThanTheCutoffFromBothTables`, `RetentionRunsOnceAMinuteAlsoWithoutFrames`), WAL settings
   (`OpenSetsWalNormalSyncAndTheJournalLimit`, `CheckpointTruncatesTheWal`), the enqueue-only subscriber
   (`TheSubscriberOnlyEnqueues`), both drop counts in one segment (`TheDroppedSegmentSumsTheLinkAndTheStore`), lost
   spectra separate (`AChannelDropDoesNotCountAsLost`), spectrum at a moment (`SpectrumAtReturnsTheNearestRowAtOrBefore`),
   the series with uncovered gaps (`TheSeriesOfAWavelengthOneDeviceDoesNotCoverLeavesItsColumnsUncovered`), the stored
   range (`TheStoredRangeSpansTheFirstAndLastSpectrum`), the lifecycle (`ClosingTheWindowStopsTheStoreAfterTheDistributor`,
-  `AfterTheCloseTheStoreFileHasNoWal`)
-- [x] verify edge cases: NaN floats (`ANaNAmplitudeRoundTripsAsNaN`), equal stamps
+  `AfterTheCloseTheStoreFileHasAnEmptyWal`, renamed in review phase 1)
+- [x] verify edge cases: NaN floats (`ANaNAmplitudeRoundTripsAsNaN`, since review phase 1 `NaNFloatsAreStoredAsNull`
+  and `ANaNAmplitudeAndQReadBackAsNaN`), equal stamps
   (`SpectrumAtReturnsTheNearestRowAtOrBefore`), a wavelength neither device covers, a `delta` of 0
   (`ADeltaOfZeroTakesOnePixel`), a series range with no rows, a failed open
   (`AFailedOpenReportsOneErrorAndStoresNothing`), a failed batch counted once per frame

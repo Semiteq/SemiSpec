@@ -20,7 +20,7 @@ All commands run from the repo root.
 dotnet build SpectrumVisualizer.slnx -c Release       # new app; warnings are errors
 dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI
 dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator -- --help
-dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark -- --rows 172800
+dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark -- --help
 dotnet build SpectrumVisualizer.sln                   # old app
 ```
 

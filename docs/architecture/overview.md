@@ -50,9 +50,9 @@ and reads.
 | `SpectrumScale` | Core | The axis limits of the shown spectrum while following and after Stick to zero, as pure functions (`Core/Spectrum/`) |
 | `LogAxis` | Core | The ticks of an axis that runs in decades: major and minor positions for the limits and the axis length (`Core/Chart/`) |
 | `StoreFiles` | Core | Names the instance file `spectra-<process id>.db` and prepares the store folder: wipes the own file, deletes the files of dead instances and orphan sidecars (`Core/Store/`) |
-| `StoreConnection` | Core | Opens a connection to a store file with the store's connection string and pragmas; `OpenReader` adds `query_only` (`Core/Store/`) |
+| `StoreConnection` | Core | Opens the writer's connection to a store file, creating it, with the store's connection string and pragmas; `OpenReader` opens an existing file only, with `query_only` (`Core/Store/`) |
 | `SpectrumDatabase` | Core | The writer connection: the schema, a batch of frames in one transaction, the deletion of rows older than a cutoff, and the closing checkpoint (`Core/Store/`) |
-| `SpectrumIntensity`, `QueryWindows` | Core | Whether a device covers a wavelength and the mean of a pixel window; the queried window of each device as byte offsets in the stored pixels (`Core/Store/`) |
+| `QueryWindows` | Core | The queried window of each device as byte offsets in the stored pixels, whether the device covers the wavelength, and the mean of a window's pixels (`Core/Store/`) |
 | `IntensityQuery`, `IntensityBuckets`, `IntensitySeries` | Core | The validated series request, the fold of window means into min/max columns of equal time spans, and its result (`Core/Store/`) |
 | `SpectrumHistory` | Core | The query service: the stored spectrum at a moment, the intensity series and the stored range, each on its own reader connection (`Core/Store/`) |
 | `FrameSchedule`, `SpectrumGenerator` | Tools.BoardEmulator | Which frame the emulated board sends at a tick and its `state`, and the synthetic and dark spectra |
@@ -60,7 +60,7 @@ and reads.
 | `Program` (emulator) | Tools.BoardEmulator | Opens the port, checks every 10 ms which frame is due and writes it, until Ctrl+C |
 | `BenchmarkCommand` | Tools.StoreBenchmark | Parses and range-checks the command line into a `BenchmarkOptions` record |
 | `BenchmarkRun`, `BenchmarkFile` | Tools.StoreBenchmark | Fills a store file through `SpectrumDatabase`, churns it, measures inserts, size, series reads, `SpectrumHistory`, retention and WAL growth, and prints one table |
-| `ReadStrategies` | Tools.StoreBenchmark | The two pixel reads it compares: the `substr` read of `SpectrumHistory` and a per-row `SqliteBlob` partial read |
+| `BlobSeries` | Tools.StoreBenchmark | The per-row `SqliteBlob` partial read it compares with the `substr` read of `SpectrumHistory.ReadSeries` |
 | `ISerialPortProvider`, `RjcpSerialPortProvider` | UI | Lists the COM ports and opens one for the link, mapping open failures to typed errors |
 | `SerialLink` | UI | The link's surface: Connect, Disconnect, the published status and the bounded frame channel |
 | `LinkSession` | UI | One Connect: opens, reads, decodes, judges the health, drains, reopens and publishes every status, in one task |
@@ -77,7 +77,7 @@ and reads.
 | `ChartPalette` | UI | Paints ScottPlot's figure, data area, grid and axes from the palette, and resolves the colours of the line, the band and the centre line |
 | `LogTickGenerator` | UI | ScottPlot's tick generator over `LogAxis`: the labels under the current culture, and a cache of the last two results keyed on the limits, the length and the culture |
 | `SpectrumStore`, `StoreFile` | UI | The background writer: enqueues every distributor frame, writes the queue to the instance file in batches, deletes rows older than 24 h once a minute and counts the frames it loses; `StoreFile` is the instance file's path (`UI/Store/`) |
-| `StoreOpenError`, `StoreWriteError` | UI | The store file could not be prepared or opened; a batch could not be written (`UI/Store/`) |
+| `StoreOpenError`, `StoreWriteError` | UI | The store file could not be prepared or opened; a batch could not be written, or the writer failed after the open (`UI/Store/`) |
 | `AppLogging` | UI | Creates the log folder and the Serilog logger: `spectrum-visualizer.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
 | `AddUi(LoggingSetup, AppDataPaths)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` of this process under the store folder, `SpectrumStore`, `LiveSpectrumSource` as the `IDisplayedSpectrumSource`, the message panel, the connection row, the status bar, the spectrum view model and the main window view model, all singletons |
@@ -129,8 +129,9 @@ a timeout logs a Warning. The link stops first, so no frame enters the channel a
 reading it, and the distributor stops before the store, so no frame reaches the store after its queue has closed. Each
 stop runs in a `finally` of the one before, so the distributor and the store stop even when an earlier stop throws;
 any failure logs an Error, and the window closes anyway, because the stop task never faults. The store's drain token
-fires 0.5 s before the 5 s limit ends, so the store's checkpoint and close fit inside the limit; what the store has not
-written by then counts as dropped.
+fires 1.5 s before the 5 s limit ends. After it the store finishes at most the one batch or retention pass already
+running, which a held lock fails after the 1 s busy timeout of the stop, starts no other, counts what is still queued
+as dropped and checkpoints, which never waits; so the store's close fits inside the limit.
 
 - When the stop has completed by the time the first `Closing` checks it, the close goes ahead. That happens only when
   neither ran, before `Opened`.
@@ -159,17 +160,17 @@ stopped"), and those lines are not guaranteed to reach the log file. The process
 | Message panel | `Auto` | `MessagePanelView`; the row is hidden while the list is empty |
 | Status bar | `Auto` | `AppStatusBar`: dot and link text, port, ATP-2000, ATP-8000, lost spectra, dropped frames |
 
-The window opens centred at `MainWindow.OpeningWidth` 1280 by 800. Exit is view work: the view model emits on `ExitRequests`, and the window
-subscribes in `OnLoaded`, unsubscribes in `OnUnloaded`, and closes itself.
+The window opens centred at `MainWindow.OpeningWidth` 1280 by 800. Exit is view work: the view model emits on
+`ExitRequests`, and the window subscribes in `OnLoaded`, unsubscribes in `OnUnloaded`, and closes itself.
 
 `MainWindow.MinimumWidth` is 1256 px, the window's `MinWidth`. It is the widest of the rows with their longest texts and
 the content row's floor, rounded up to the 8 px grid: the Russian status bar with `COM256`, six-digit lost and dropped
-counts and "Порт недоступен, переподключение" measures 1252.2 px (English 1085.2 px), the connection row 654.9 px in
-Russian (English 595.4 px), and the signal pane plus a 400 px chart floor 792 px. At 400 px an ATP-8000 spectrum keeps at least
-four labelled wavelength ticks; the measured axis shows eight, 1000 to 2400 nm. The headless text stub gives no real
-widths, so `MainWindowTextFitTests` adds the realised row chrome to each text measured through SkiaSharp at 14 px in the
-widest of Inter and every installed family of Semi's font chain; on Windows the app resolves that chain to Microsoft
-YaHei. The same test holds `MinimumWidth` at or under `OpeningWidth` and checks that the realised window opens
+counts and "Порт недоступен, переподключение" measures 1252.2 px (English 1085.2 px), the connection row 654.9 px
+in Russian (English 595.4 px), and the signal pane plus a 400 px chart floor 792 px. At 400 px an ATP-8000 spectrum
+keeps at least four labelled wavelength ticks; the measured axis shows eight, 1000 to 2400 nm. The headless text stub
+gives no real widths, so `MainWindowTextFitTests` adds the realised row chrome to each text measured through SkiaSharp
+at 14 px in the widest of Inter and every installed family of Semi's font chain; on Windows the app resolves that
+chain to Microsoft YaHei. The same test holds `MinimumWidth` at or under `OpeningWidth` and checks that the realised window opens
 `OpeningWidth` wide, so the window opens with every row whole. Both rows stay left-aligned at any width above the
 minimum, and no link state changes the set of rows or a row's height.
 
@@ -213,7 +214,7 @@ listed. Connect and Refresh are synchronous commands; Disconnect awaits `Disconn
 ### Status bar
 
 `AppStatusBarViewModel` follows `SerialLink.StatusUpdates(uiScheduler)` the same way as the connection row and holds the
-latest `LinkStatus`; every text but the dropped count derives from it:
+latest `LinkStatus`; every text derives from it, and the dropped count adds the store's count to it:
 
 | Segment | Text |
 | --- | --- |
@@ -225,8 +226,8 @@ latest `LinkStatus`; every text but the dropped count derives from it:
 
 Lost spectra are board spectra that never arrived, counted from `seq`. Dropped frames arrived but are missing from the
 stored history, so the count covers the run, not the connection. `DroppedFramesText` is an
-`ObservableAsPropertyHelper` over `CombineLatest` of `LinkStatus.DroppedFrames` from `StatusUpdates(uiScheduler)` and
-`SpectrumStore.DroppedFrames`, read after each `DroppedFramesChanged` signal moved to the UI scheduler and once at
+`ObservableAsPropertyHelper` over `CombineLatest` of `DroppedFrames` of the `Status` property, through `WhenAnyValue`,
+and `SpectrumStore.DroppedFrames`, read after each `DroppedFramesChanged` signal moved to the UI scheduler and once at
 construction, summed, with repeats dropped, and formatted with `Resources.Culture`.
 
 The dot is `AppConnectionOkBrush` in Receiving, `AppConnectionFaultBrush` in PortUnavailable, NotResponding and
@@ -247,8 +248,8 @@ flag, so the first Receiving after a fault-free Connect adds none. A throw insid
 2. `FrameDistributor` reads it. For a frame that carries a measurement it publishes `LatestSpectrum` with
    `Volatile.Write`; then it calls each subscriber's `OnNext` inside its own try/catch (distributor task).
 3. `LiveSpectrumSource` passes spectrum frames on as `Changed` (distributor task).
-4. `SpectrumViewModel` moves the signal to the UI scheduler, reads `Current`, drops a repeat of the same measurement, calls
-   `Chart.Show` and sets `SignalInfo.Spectrum` (UI thread).
+4. `SpectrumViewModel` moves the signal to the UI scheduler, reads `Current`, drops a repeat of the same measurement,
+   calls `Chart.Show` and sets `SignalInfo.Spectrum` (UI thread).
 5. `Chart.Show` fills the line's buffer and the limits under `lock (Plot.Sync)` and requests a redraw.
 6. The view serves one redraw in the next display frame.
 
@@ -372,11 +373,13 @@ SNR has no unit, because the board sends a ratio. The update time is `ReceivedAt
 The store folder is `%LOCALAPPDATA%\SpectrumVisualizer\Spectra`, and the instance file is `spectra-<process id>.db`.
 Two live processes never share a process id, so two running copies never share a file. Before the open,
 `StoreFiles.Prepare` creates the folder, deletes the own file and its `-wal` and `-shm` sidecars (left by a dead
-process with the same id), then tries to delete every other `spectra-*.db`. SQLite on Windows opens a file without
-delete sharing, so the delete of a live instance's file fails, and that file stays; a delete that succeeds also
-deletes the file's sidecars. Sidecars whose `.db` is gone are deleted too. A failure on the folder or the own file fails
-`Prepare`; a failure on any other file only keeps that file. The result carries the counts of deleted and kept files,
-which the store logs at Debug. No process-id probing exists, so a reused id cannot keep a dead file alive.
+process with the same id), then tries to delete every other `spectra-<digits>.db`; a name with anything else between
+`spectra-` and `.db`, such as `spectra-1234 - Copy.db`, stays. SQLite on Windows opens a file without delete sharing,
+so the delete of a live instance's file fails, and that file stays; a delete that succeeds also deletes the file's
+sidecars. Sidecars whose `.db` is gone are deleted too. A failure on the folder or the own file fails `Prepare`; a
+failure on any other file only keeps that file, and a folder that cannot be listed skips the sweep. The result carries
+the counts of deleted and kept files, which the store logs at Debug, or the listing failure, which it logs as a
+Warning. No process-id probing exists, so a reused id cannot keep a dead file alive.
 
 A clean exit checkpoints and closes the file and leaves it; the next start's sweep deletes it. A crash leaves the same
 state, so one cleanup path covers both, and a closed run's file can still be copied for diagnosis until the next start.
@@ -417,14 +420,17 @@ marks 3 s without a spectrum (`board-protocol.md`).
 WAL lets the query service read while the writer writes. `synchronous=NORMAL` skips the fsync per commit: a power loss
 can lose the last transactions but not corrupt the file, and the data is disposable. The journal limit truncates the
 WAL back to 64 MB after a checkpoint. `Default Timeout=2` bounds Microsoft.Data.Sqlite's retry on a busy file to 2 s.
-`OpenReader` adds `PRAGMA query_only=ON`.
+`OpenReader` uses `Mode=ReadWrite` instead, so a read of a missing file fails and creates nothing, and runs only
+`PRAGMA query_only=ON`: the file keeps its WAL mode, and a WAL reader needs write access to the `-shm` file.
 
 ### Writes
 
 `SpectrumDatabase` owns the writer connection. `Open` creates the schema. `Write` writes a batch in one
 `BEGIN IMMEDIATE` transaction with one reused parameterised command per table; `BEGIN IMMEDIATE` takes the write lock
 at the start, so a held lock fails the batch there after the busy timeout and never halfway through it. A parameter
-takes a `byte[]`, so each frame's pixels are copied into one reused buffer per device size. `DeleteBefore(cutoff)`
+takes a `byte[]`, so each frame's pixels are copied into a new array. `ShortenBusyTimeout` drops the busy timeout of
+every later statement to 1 s, the shortest Microsoft.Data.Sqlite counts, since it counts whole seconds and waits
+forever on 0. `DeleteBefore(cutoff)`
 deletes from both tables in one `BEGIN IMMEDIATE` transaction. `CheckpointAndClose` runs
 `PRAGMA wal_checkpoint(TRUNCATE)` and closes the connection whatever the outcome; it returns `WalCheckpoint.Busy` when
 a reader's snapshot kept the WAL, because that checkpoint calls no busy handler and returns at once. Each operation
@@ -438,16 +444,19 @@ returns a FluentResults `Result`, with a `SqliteException` or `IOException` as a
 - `Start()` subscribes `FrameDistributor.Frames` with an observer whose `OnNext` is one `TryWrite` to the store's
   queue, `Channel.CreateBounded<ReceivedFrame>(1024)` with `FullMode = Wait`, one writer and one reader. A full queue
   counts the frame as dropped. The subscriber never touches SQLite, never waits and never throws. 1024 frames hold
-  about 6 min of ATP-2000 spectra at the port's cap of about 2.8 per second. Then `Start` runs the writer task. `Start` after a start or a stop
-  does nothing.
+  about 6 min of ATP-2000 spectra at the port's cap of about 2.8 per second. Then `Start` runs the writer task.
+  `Start` after a start or a stop does nothing.
 - The writer task prepares and opens the file on the thread pool, so the UI thread does no file I/O; frames that
-  arrive meanwhile wait in the queue. The log line "Spectrum store file <path>" names the opened file. A failed
-  prepare or open logs at Error, reports one `StoreOpenError` through `TryReportFailure`, disposes the subscription
-  and ends the task: nothing is stored for the run, and no drop is counted, because no history exists to have holes.
+  arrive meanwhile wait in the queue. The log line "Spectrum store file <path>" names the opened file.
 - The loop waits for the queue or the next retention time, whichever comes first, takes up to 256 frames and writes
   them as one batch. A failed batch counts its frames as dropped and logs at Error. The first failure after a success
   reports one `StoreWriteError` through `TryReportFailure`; later failures stay quiet until a batch succeeds again, so
   the panel gets one entry per incident.
+- Any other failure ends history for the run. A failed prepare or open, or any exception before the file is open,
+  logs at Error and reports one `StoreOpenError`; any exception after the open, outside a failed batch, logs at Error
+  and reports one `StoreWriteError`. The writer closes the file without a checkpoint, keeps the subscription, and from
+  then on counts every frame still queued and every later frame as dropped, so "Dropped frames" keeps growing while
+  nothing is stored.
 - Retention runs once a minute, also while no frame arrives: `DeleteBefore(now - 24 h)`, where the wait is
   `Task.Delay` on the `TimeProvider`, raced with `WaitToReadAsync`, and `now` is `TimeProvider.GetUtcNow()`, the same
   UTC wall clock as `ReceivedAt`. No `VACUUM` runs: the freed pages are reused, so the file stays at about one day of
@@ -455,14 +464,19 @@ returns a FluentResults `Result`, with a `SqliteException` or `IOException` as a
 - `DroppedFrames` is an `Interlocked` count written by the distributor task and the writer task. `DroppedFramesChanged`
   is a synchronized private subject exposed with `AsObservable()`, signalled after each increment; a reader reads the
   count after the signal, because a value in the signal could arrive out of order from two threads.
-- The writer task alone owns the `SpectrumDatabase`: it opens it and closes it in its own `finally`, with
-  `CheckpointAndClose` after a normal end and a plain close after a cancellation. A busy checkpoint logs at Debug; the
-  WAL stays, and the next start deletes it with the file. No other thread closes the connection, so no close lands
-  inside a write, a retention pass or a checkpoint.
+- The writer task alone owns the `SpectrumDatabase`: it opens it and closes it, with `CheckpointAndClose` after a
+  normal end and a plain close after a failure or a cancellation. No other thread closes the connection, so no close
+  lands inside a write, a retention pass or a checkpoint. The writer's last line, at Debug, names the stored and
+  dropped counts and the checkpoint: `Truncated`, `Busy` (a reader's snapshot kept the WAL, which the next start
+  deletes with the file), `Failed` or `Skipped`.
 - `StopAsync(drainToken)` disposes the subscription, completes the queue and awaits the writer, which writes what is
-  still queued and checks the token between batches, never inside one. When the token fires, the frames still queued
-  count as dropped, and the writer checkpoints and closes. `StopAsync` completes at once when nothing started; a later
-  call awaits the writer of the first. `Dispose()` only cancels the writer, for the container's synchronous dispose.
+  still queued and checks the token between batches, never inside one. From the stop on, the writer calls
+  `ShortenBusyTimeout`, so a batch against a held lock fails after 1 s instead of 2 s. When the token fires, the frames
+  still queued count as dropped, no retention pass starts, and the writer checkpoints and closes. `StopAsync` completes at once when nothing
+  started; a later call awaits the writer of the first. `Dispose()` disposes the subscription and cancels the writer
+  without waiting, for the container's synchronous dispose, also while a stop runs; the writer counts the frames still
+  queued as dropped and closes the file without a checkpoint. The writer disposes its cancellation sources when it
+  ends, under the lock `Dispose` and the drain token take, so no cancel meets a disposed source.
 
 The link's channel drops are the other half of the dropped count (`board-protocol.md`, Frames out).
 
@@ -495,12 +509,21 @@ so the schema holds no such column. A 24 h read beside the running writer grows 
 the series is not sliced by time. The store benchmark measures these reads again:
 
 ```powershell
-dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark -- --rows 172800 --change-at 0.875
+dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark
 ```
 
-It fills a day of ATP-2000 spectra at 2 per second with a wavelength change 3 h before the end, churns the file through
+With the defaults it fills a day of ATP-2000 spectra at 2 per second, every row at 650 nm, churns the file through
 24 rounds of retention and refill, and prints one table of inserts, file size, series reads, `SpectrumHistory` calls,
-retention and WAL growth, fresh and churned.
+retention and WAL growth, fresh and churned. Every series reads the rows' pixels, so the stored wavelength changes no
+read the benchmark measures. A run deletes its file and its temp folder unless `--keep` is given.
+
+| Option | Default | Range | Effect |
+| --- | --- | --- | --- |
+| `--rows <n>` | 172800 | 1200 and up | Spectra to insert, 500 ms apart, ending at the start time; 1200 is the 10 min the short series needs |
+| `--device 2000\|8000` | 2000 | 2000, 8000 | The device of every row: ATP-2000 at 650 nm or ATP-8000 at 1550 nm |
+| `--churn-rounds <n>` | 24 | 0 to 24 | Rounds of "delete the oldest 1/24 of the span, insert it again one span later" after the fill; at 172800 rows a round is one hour; 0 skips the churn |
+| `--folder <path>` | a new folder under `%TEMP%` | any path | Where the file goes |
+| `--keep` | off | flag | Keeps the file after the run |
 
 ## Error route
 
@@ -520,7 +543,7 @@ extensions:
 | `PortLostError`, `BoardNotRespondingError`, `UnrecognisedDataError` | Warning: the link retries and the operator watches |
 | `PortListError` | Warning: the operator presses Refresh |
 | `StoreOpenError` | Error: nothing is stored for the run |
-| `StoreWriteError` | Warning: the store keeps trying, and the lost frames count as dropped |
+| `StoreWriteError` | Warning: the lost frames count as dropped; after a failed batch the store keeps trying |
 | an exception error | Error; the detail keeps the exception type and message |
 | any other error | Error; the detail keeps the error's own message |
 
