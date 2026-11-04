@@ -135,8 +135,7 @@
 Automatable (baseline 172 of 172 at `2237e5e`):
 1. `dotnet test SpectrumVisualizer.slnx --filter "Area=Protocol"` passes, including the existing `FrameReaderTests` and
    the new `FrameReader.DecodeBuffered` tests: frames across many writes come out in order; a partial frame stays
-   buffered; with the writer completed, the frames behind a stalled false candidate come out and the call reports
-   completion.
+   buffered; with the writer completed, the frames behind a stalled false candidate come out of the same call.
 2. `dotnet test SpectrumVisualizer.slnx --filter "Area=Link"` passes, including:
    - `LinkHealthTests`: no frame yet and under 10 s since open is Waiting; a frame under 10 s ago is Receiving; 10 s
      with no frame and no byte in the last 10 s is NotResponding; 10 s with no frame, a byte in the last 10 s and more
@@ -199,11 +198,15 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
    connected, ATP-2000 not connected, lost spectra 0. The port list and Connect are disabled; Disconnect is enabled.
 3. Restart the emulator with `--both-connected --failed 2000`. ATP-2000 reads "measurement failed", ATP-8000
    "connected".
-4. Restart it with `--rate 0`. The status stays "Receiving data" on heartbeats alone.
+4. Restart it with `--rate 0`. From the first heartbeat on, the status reads "Receiving data" on heartbeats alone. The
+   first heartbeat comes 3 s after the emulator starts; when it arrives 10 s or more after the old emulator's last
+   frame (`dotnet run` startup counts), the status reads "Board not responding" until then. That heartbeat carries
+   `seq` 0, and the tracker counts a heartbeat's step without the -1, so the lost count rises once by (0 - last seq)
+   mod 256 (OptoskyProj#20) and then stays.
 5. Silence: stop the emulator with Ctrl+C. 10 s later the status reads "Board not responding" and the panel shows one
-   Warning entry. Start it again: the status returns to "Receiving data" and one Info entry "Receiving data" appears.
+   Warning entry; its row shows no "repeated N times" marker. Start it again: the status returns to "Receiving data" and one Info entry "Receiving data" appears.
 6. Garbage: run `emu --port COM10 --bad-crc-every 1`. 10 s after the last valid frame the status reads "Other device"
-   with one Warning entry, provided more than 4120 bytes arrived since that frame. A slow emulator restart or a few
+   with one Warning entry and no "repeated N times" marker, provided more than 4120 bytes arrived since that frame. A slow emulator restart or a few
    characters typed into a terminal arrive under that count, so the status reads "Board not responding" first and
    moves to "Other device" once the count passes 4120, with a Warning entry for each. A wrong baud rate needs a real
    USB-UART pair (ASSUMPTION: com0com delivers bytes whatever the baud setting, so it cannot produce baud garbage);
@@ -214,19 +217,26 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
    (1 - last seq) mod 256 - 1 spectra (OptoskyProj#20).
 8. Dark frames: run `emu --port COM10 --dark-every 3`, then press Disconnect and Connect. The status stays "Receiving
    data"; the lost count stays 0.
-9. Unplug (a real USB-UART pair; com0com cannot emulate a removal): unplug the app-side adapter. Within 1 s the status
-   reads "Port unavailable, retrying" and the panel shows one "connection lost" Warning. Plug it back: the status
+9. Unplug (a real USB-UART pair; com0com cannot emulate a removal): press Disconnect, run `emu --port <board-side
+   adapter's port>`, press Refresh, select the app-side adapter's port, Connect, and wait for "Receiving data". Unplug
+   the app-side adapter. Within 1 s the status reads "Port unavailable, retrying" and the panel shows one "connection
+   lost" Warning with no "repeated N times" marker. Plug it back: the status
    returns to "Receiving data" and an Info "Receiving data" entry appears above it. Unplug again: a new "connection
    lost" row appears, because the panel coalesces only against the newest entry. The panel then reads, newest first:
    connection lost, receiving data, connection lost.
-10. Port busy: with the com0com pair, open `COM11` in a serial terminal, then Connect in the app on `COM11`. The panel
-    shows one "Port is busy" Error and the status reads "Port unavailable, retrying"; the app retries every second
-    without a new entry. Close the terminal: the app connects within 1 s, the status reads "Receiving data" and one
-    Info entry "Receiving data" appears.
-11. Disconnect while retrying: switch on View, Verbose logging first, because open attempts log at Debug. Hold the
-    port as in step 10, Connect, then Disconnect: the status reads "Not connected" and the log shows no open attempt
-    after the Disconnect.
-12. Close the window while connected: the process ends within 1 s and the log holds the link's stop line.
+10. Port busy: press Disconnect, so the app releases `COM11`. Keep the step-8 emulator running on `COM10`; without it,
+    closing the terminal leads to "Waiting" and then "Board not responding" instead of "Receiving data". Open `COM11`
+    in a serial terminal, then Connect in the app on `COM11`. The panel shows one "Port is busy" Error and the status
+    reads "Port unavailable, retrying"; the app retries every second without a new entry, and the row shows no
+    "repeated N times" marker. Close the terminal: the app connects within 1 s, the status reads "Receiving data" and
+    one Info entry "Receiving data" appears.
+11. Disconnect while retrying: switch on View, Verbose logging first, because open attempts log at Debug. Press
+    Disconnect, keep the emulator running on `COM10`, open `COM11` in a serial terminal as in step 10, Connect, then
+    Disconnect. The status reads "Not connected", the panel gets no new entry and the busy row shows no "repeated N
+    times" marker. In the log, after the Information line "The link on port COM11 stopped", no Debug line "Opening port
+    COM11" appears for several seconds.
+12. Close the window while connected: the process ends within 1 s and the log holds the Information line "The link on
+    port COM11 stopped".
 13. With a Russian Windows UI every new text is Russian; with English, English. The connection row and the status bar
     fit at the window's opening width in both languages.
 
@@ -245,10 +255,9 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
   115200 baud, 8N1, `ReadTimeout = 1000` ms, `ThrowOnReadError = true`. `Open` maps `UnauthorizedAccessException` and
   an `IOException` with `HResult` 32 (sharing violation) to `PortBusyError`, and any other `IOException` or a name
   missing from `GetPortNames()` to `PortNotFoundError`.
-- **Synchronous decode step in Core.** `FrameReader` gains `bool DecodeBuffered(PipeReader reader,
+- **Synchronous decode step in Core.** `FrameReader` gains `void DecodeBuffered(PipeReader reader,
   ICollection<BoardFrame> frames)`: it calls `TryRead`, decodes every whole frame with the existing `DecodeAll`, and
-  when the writer has completed runs the existing `DrainAfterCompletion`; it then calls `AdvanceTo(consumed, end)` and
-  returns whether the writer had completed. `ReadAllAsync` stays as it is with its tests.
+  when the writer has completed runs the existing `DrainAfterCompletion`; it then calls `AdvanceTo(consumed, end)`. `ReadAllAsync` stays as it is with its tests.
 - **One session task.** `SerialLink` runs one session task per Connect, and that task does everything: it opens the
   port, reads, writes the pipe, decodes, feeds `SequenceTracker`, writes the channel, evaluates the health, drains,
   reopens, and publishes every status. No second task, no shared hand-off fields and no lock: each piece of session
