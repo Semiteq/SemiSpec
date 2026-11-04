@@ -1078,7 +1078,9 @@ the types named in Solution Overview, Folders.
   0-100.
 - ask Optosky whether the idle spectrometer's measurement-failed bit should clear when the other device is selected
   (OptoskyProj#20 follow-up): the firmware sets it at `main.c:502` and clears it only on that device's own successful
-  spectrum at `main.c:1064`. The trend shows only the measuring device's bit; no firmware change in this slice.
+  spectrum at `main.c:1064`. The trend shows only the measuring device's bit; no firmware change in this slice. After a
+  wavelength change across 904 nm, the newly selected device's failed bit is not marked until its first spectrum, so
+  a new device that fails every attempt shows in the status bar only.
 - the operator PC's display scaling: at 125 % on 1366 x 768 the window's 688 DIP `MinHeight` and 1256 DIP
   `MinimumWidth` exceed the screen; the owner decides the floors once the scaling is known.
 - the trend collapses to the last 2 min for about 0.5 s on every SCADA key change, until the visible chunk lands (the

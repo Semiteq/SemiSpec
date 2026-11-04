@@ -12,10 +12,7 @@ public sealed class FrameContinuity
 	private DateTimeOffset? _lastFrameAt;
 	private DateTimeOffset? _lastSpectrumAt;
 
-	/// <summary>
-	/// The board measures with one spectrometer at a time and keeps the idle one's failed bit until that one measures
-	/// again, so only the measuring device's bit marks a failure.
-	/// </summary>
+	/// <summary>The board keeps the idle device's failed bit, so only the latest spectrum's device marks.</summary>
 	private Spectrometer? _measuringDevice;
 
 	public Continuity Observe(ReceivedFrame received)
