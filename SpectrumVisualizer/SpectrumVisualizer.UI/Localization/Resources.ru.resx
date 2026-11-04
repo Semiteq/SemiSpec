@@ -177,4 +177,52 @@
   <data name="SpectrumAxisIntensity" xml:space="preserve">
     <value>Интенсивность</value>
   </data>
+  <data name="SpectrumEmpty" xml:space="preserve">
+    <value>Спектра пока нет. Подключитесь к плате в строке выше.</value>
+  </data>
+  <data name="SignalTitle" xml:space="preserve">
+    <value>Сигнал</value>
+  </data>
+  <data name="SignalDevice" xml:space="preserve">
+    <value>Спектрометр</value>
+  </data>
+  <data name="SignalWavelength" xml:space="preserve">
+    <value>Длина волны</value>
+  </data>
+  <data name="SignalWindow" xml:space="preserve">
+    <value>Окно</value>
+  </data>
+  <data name="SignalAmplitude" xml:space="preserve">
+    <value>Амплитуда</value>
+  </data>
+  <data name="SignalSnr" xml:space="preserve">
+    <value>Сигнал/шум</value>
+  </data>
+  <data name="SignalQ" xml:space="preserve">
+    <value>Добротность</value>
+  </data>
+  <data name="SignalUpdated" xml:space="preserve">
+    <value>Обновлено</value>
+  </data>
+  <data name="SignalWavelengthFormat" xml:space="preserve">
+    <value>{0} нм</value>
+  </data>
+  <data name="SignalWindowFormat" xml:space="preserve">
+    <value>±{0} нм</value>
+  </data>
+  <data name="ChartTitle" xml:space="preserve">
+    <value>График</value>
+  </data>
+  <data name="ChartInvert" xml:space="preserve">
+    <value>Инвертировать спектр</value>
+  </data>
+  <data name="ChartLogScale" xml:space="preserve">
+    <value>Логарифмическая шкала</value>
+  </data>
+  <data name="ChartResetScale" xml:space="preserve">
+    <value>Сбросить масштаб</value>
+  </data>
+  <data name="ChartStickToZero" xml:space="preserve">
+    <value>Прижать к нулю</value>
+  </data>
 </root>

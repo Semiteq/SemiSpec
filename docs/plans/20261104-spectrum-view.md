@@ -628,14 +628,14 @@ Data flow:
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.UI/Localization/Resources.resx`, `Resources.ru.resx`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Spectrum/SignalInfoViewModelTests.cs`
 
-- [ ] add every new resx key of Technical Details in English and Russian; remove `ContentPlaceholder` from both sets
+- [x] add every new resx key of Technical Details in English and Russian; remove `ContentPlaceholder` from both sets
   only in Task 11, where its last reader goes
-- [ ] implement `SignalInfoViewModel(TimeProvider)` with `Spectrum` and the seven computed texts of Technical Details,
+- [x] implement `SignalInfoViewModel(TimeProvider)` with `Spectrum` and the seven computed texts of Technical Details,
   each raised from the `Spectrum` setter
-- [ ] write `SignalInfoViewModelTests` of Acceptance Evidence item 3 under `CultureScope("en")` and
+- [x] write `SignalInfoViewModelTests` of Acceptance Evidence item 3 under `CultureScope("en")` and
   `CultureScope("ru")` with a `FakeTimeProvider` in a fixed zone (`Microsoft.Extensions.Diagnostics.Testing` is
   referenced by the test project, `SpectrumVisualizer.Tests.Unit.csproj:10`); compare texts with the generated accessor, never literals
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 9: Spectrum view model
 **Files:**

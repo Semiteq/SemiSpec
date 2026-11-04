@@ -177,4 +177,52 @@
   <data name="SpectrumAxisIntensity" xml:space="preserve">
     <value>Intensity</value>
   </data>
+  <data name="SpectrumEmpty" xml:space="preserve">
+    <value>No spectrum yet. Connect to the board in the row above.</value>
+  </data>
+  <data name="SignalTitle" xml:space="preserve">
+    <value>Signal</value>
+  </data>
+  <data name="SignalDevice" xml:space="preserve">
+    <value>Spectrometer</value>
+  </data>
+  <data name="SignalWavelength" xml:space="preserve">
+    <value>Wavelength</value>
+  </data>
+  <data name="SignalWindow" xml:space="preserve">
+    <value>Window</value>
+  </data>
+  <data name="SignalAmplitude" xml:space="preserve">
+    <value>Amplitude</value>
+  </data>
+  <data name="SignalSnr" xml:space="preserve">
+    <value>SNR</value>
+  </data>
+  <data name="SignalQ" xml:space="preserve">
+    <value>Q factor</value>
+  </data>
+  <data name="SignalUpdated" xml:space="preserve">
+    <value>Updated</value>
+  </data>
+  <data name="SignalWavelengthFormat" xml:space="preserve">
+    <value>{0} nm</value>
+  </data>
+  <data name="SignalWindowFormat" xml:space="preserve">
+    <value>±{0} nm</value>
+  </data>
+  <data name="ChartTitle" xml:space="preserve">
+    <value>Chart</value>
+  </data>
+  <data name="ChartInvert" xml:space="preserve">
+    <value>Invert spectrum</value>
+  </data>
+  <data name="ChartLogScale" xml:space="preserve">
+    <value>Logarithmic scale</value>
+  </data>
+  <data name="ChartResetScale" xml:space="preserve">
+    <value>Reset scale</value>
+  </data>
+  <data name="ChartStickToZero" xml:space="preserve">
+    <value>Stick to zero</value>
+  </data>
 </root>
