@@ -25,7 +25,6 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 	private readonly MessagePanelViewModel _messagePanel;
 	private readonly IScheduler _uiScheduler;
 	private readonly ILogger<SpectrumViewModel> _logger;
-	private readonly ObservableAsPropertyHelper<string> _historicalText;
 
 	public SpectrumViewModel(
 		SwitchingSpectrumSource source,
@@ -58,7 +57,7 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 		var shownMoment = source.WhenAnyValue(switching => switching.ShownMoment);
 		_disposables.Add(shownMoment
 			.Select(HistoricalTextOf)
-			.ToProperty(this, spectrum => spectrum.HistoricalText, out _historicalText, initialValue: string.Empty));
+			.BindTo(Chart, chart => chart.HistoricalText));
 
 		var canStickToZero = Chart.WhenAnyValue(chart => chart.HasSpectrum);
 		var canResetScale = Chart.WhenAnyValue(
@@ -95,9 +94,6 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 	public ReactiveCommand<Unit, Unit> StickToZeroCommand { get; }
 
 	public ReactiveCommand<Unit, Unit> BackToLiveCommand { get; }
-
-	/// <summary>"Spectrum from HH:mm:ss" in local time while a past moment is shown; empty while live.</summary>
-	public string HistoricalText => _historicalText.Value;
 
 	public void Dispose()
 	{

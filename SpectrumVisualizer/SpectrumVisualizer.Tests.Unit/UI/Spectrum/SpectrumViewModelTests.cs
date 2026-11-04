@@ -245,16 +245,16 @@ public sealed class SpectrumViewModelTests : IDisposable
 	[AvaloniaFact]
 	public void TheHistoricalLineShowsTheMomentInLocalTime()
 	{
-		ViewModel.HistoricalText.Should().BeEmpty("the live spectrum is shown");
+		ViewModel.Chart.HistoricalText.Should().BeEmpty("the live spectrum is shown");
 
 		_switching.ShowMoment(Atp8000Peak.Measurement, _moment);
 
 		var localTime = _moment.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture);
-		ViewModel.HistoricalText.Should().Be(Resources.FormatSpectrumHistoricalFormat(localTime));
+		ViewModel.Chart.HistoricalText.Should().Be(Resources.FormatSpectrumHistoricalFormat(localTime));
 
 		_switching.ReturnToLive();
 
-		ViewModel.HistoricalText.Should().BeEmpty();
+		ViewModel.Chart.HistoricalText.Should().BeEmpty();
 	}
 
 	public void Dispose()

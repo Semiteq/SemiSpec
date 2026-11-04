@@ -47,7 +47,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 	protected static readonly string[] PaneHeaders = ["SignalHeader", "ChartHeader"];
 
 	protected static readonly string[] PaneControls =
-		["InvertSpectrum", "LogarithmicScale", "ResetScale", "StickToZero"];
+		["InvertSpectrum", "LogarithmicScale", "ResetScale", "StickToZero", "BackToLive"];
 
 	private ConnectionBarViewModel? _connectionBar;
 	private AppStatusBarViewModel? _statusBar;

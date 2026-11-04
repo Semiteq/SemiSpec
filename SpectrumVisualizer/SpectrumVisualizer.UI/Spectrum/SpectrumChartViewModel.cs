@@ -64,6 +64,13 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		private set => this.RaiseAndSetIfChanged(ref field, value);
 	}
 
+	/// <summary>"Spectrum from HH:mm:ss" in local time while a past moment is shown; empty while live.</summary>
+	public string HistoricalText
+	{
+		get;
+		set => this.RaiseAndSetIfChanged(ref field, value);
+	} = string.Empty;
+
 	/// <summary>One signal per redraw request, raised at once on the caller's thread; completes on dispose.</summary>
 	public IObservable<Unit> RedrawRequested => _redrawRequests.AsObservable();
 

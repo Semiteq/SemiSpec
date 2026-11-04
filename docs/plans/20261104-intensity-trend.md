@@ -828,15 +828,16 @@ Data flow:
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/MainWindow/MainWindowViewTests.cs`,
   `MainWindowLayoutTestBase.cs`, `MainWindowSignalPaneTests.cs`
 
-- [ ] load the `dev:desktop-ui` skill before changing the AXAML
-- [ ] `ContentArea` (`MainWindow.axaml:34-55`) gets the rows and panes of Solution Overview; the side pane spans the
+- [x] load the `dev:desktop-ui` skill before changing the AXAML
+- [x] `ContentArea` (`MainWindow.axaml:34-55`) gets the rows and panes of Solution Overview; the side pane spans the
   rows and wraps a `StackPanel` of `SpectrumPanel` and `TrendPanel` in a vertical `ScrollViewer`
-- [ ] add the "Back to live" row to `SpectrumPanel.axaml` after `:127`; write `TrendPanel` on the same form grid (label
+- [x] add the "Back to live" row to `SpectrumPanel.axaml` after `:127`; write `TrendPanel` on the same form grid (label
   column, 12 px gap, field column, 8 px rows, header 16 above and 8 below)
-- [ ] add the historical line to `SpectrumChartView.axaml` beside the empty-state line, bound to
-  `HistoricalText`
-- [ ] write `MainWindowTrendLayoutTests`; update the view and signal pane tests for the new rows
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+- [x] add the historical line to `SpectrumChartView.axaml` beside the empty-state line, bound to
+  `HistoricalText`; `HistoricalText` moved to `SpectrumChartViewModel` (the view's DataContext), written by
+  `SpectrumViewModel` through `BindTo` from `ShownMoment`
+- [x] write `MainWindowTrendLayoutTests`; update the view and signal pane tests for the new rows
+- [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (886 of 886)
 
 ### Task 14: Desktop UI pre-handover checklist
 **Files:**

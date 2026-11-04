@@ -63,9 +63,11 @@ public sealed class MainWindowSignalPaneTests : MainWindowLayoutTestBase
 
 		var resetScale = Named<Button>(panel, "ResetScale");
 		var stickToZero = Named<Button>(panel, "StickToZero");
+		var backToLive = Named<Button>(panel, "BackToLive");
 		resetScale.Content.Should().Be(Resources.ChartResetScale);
 		stickToZero.Content.Should().Be(Resources.ChartStickToZero);
-		new[] { resetScale, stickToZero }
+		backToLive.Content.Should().Be(Resources.ChartBackToLive);
+		new[] { resetScale, stickToZero, backToLive }
 			.Should().OnlyContain(button => button.IsEffectivelyVisible && !button.IsEffectivelyEnabled);
 	}
 
@@ -85,6 +87,27 @@ public sealed class MainWindowSignalPaneTests : MainWindowLayoutTestBase
 		Spectrum.Chart.Plot.Axes.Left.TickGenerator.Should().BeOfType<LogTickGenerator>();
 		Named<TextBlock>(panel, "DeviceValue").Text.Should().Be(Atp8000Peak.Measurement.Device.DisplayName);
 		Named<Button>(panel, "StickToZero").IsEffectivelyEnabled.Should().BeTrue("a spectrum is shown");
+	}
+
+	[AvaloniaFact]
+	public void BackToLiveIsEnabledOnlyWhileAMomentIsShown()
+	{
+		var window = Realise();
+		SpectrumSource.Current = Atp2000Peak;
+		SpectrumSource.Signal();
+		Dispatcher.UIThread.RunJobs();
+		var backToLive = Named<Button>(SignalPanel(window), "BackToLive");
+		backToLive.IsEffectivelyEnabled.Should().BeFalse("the live spectrum is shown");
+
+		SwitchingSource.ShowMoment(Atp8000Peak.Measurement, ReceivedAt);
+		Dispatcher.UIThread.RunJobs();
+		backToLive.IsEffectivelyEnabled.Should().BeTrue();
+
+		backToLive.Command!.Execute(null);
+		Dispatcher.UIThread.RunJobs();
+
+		backToLive.IsEffectivelyEnabled.Should().BeFalse();
+		SwitchingSource.ShownMoment.Should().BeNull();
 	}
 
 	[AvaloniaFact]
@@ -236,7 +259,7 @@ public sealed class MainWindowSignalPaneTests : MainWindowLayoutTestBase
 
 	private static SpectrumPanel SignalPanel(Window window)
 	{
-		return Named<Border>(window, "SignalPane").Child.Should().BeOfType<SpectrumPanel>().Which;
+		return Named<Border>(window, "SignalPane").GetVisualDescendants().OfType<SpectrumPanel>().Single();
 	}
 
 	private sealed record PaneShape(Size Window, Rect Pane, Rect Chart);

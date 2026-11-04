@@ -23,6 +23,7 @@ using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
 using SpectrumVisualizer.UI.Spectrum;
+using SpectrumVisualizer.UI.Trend;
 
 using Xunit;
 
@@ -100,8 +101,10 @@ public sealed class MainWindowViewTests : IDisposable
 		new Control[] { spectrumPane, signalPane }.Select(Grid.GetColumn).Should().Equal(0, 1);
 		spectrumPane.Child.Should().BeOfType<SpectrumChartView>()
 			.Which.DataContext.Should().BeSameAs(_spectrum.Chart);
-		signalPane.Child.Should().BeOfType<SpectrumPanel>()
-			.Which.DataContext.Should().BeSameAs(_spectrum);
+		var sideForms = signalPane.Child.Should().BeOfType<ScrollViewer>()
+			.Which.Content.Should().BeOfType<StackPanel>().Which.Children;
+		sideForms.Select(form => form.GetType()).Should().Equal(typeof(SpectrumPanel), typeof(TrendPanel));
+		sideForms.Select(form => form.DataContext).Should().Equal(_spectrum, _trend.Trend);
 		signalPane.Bounds.Width.Should().Be(SpectrumPanel.PaneWidth);
 		_window.GetVisualDescendants().OfType<Control>()
 			.Should().NotContain(control => control.Name == "ContentPlaceholder");
