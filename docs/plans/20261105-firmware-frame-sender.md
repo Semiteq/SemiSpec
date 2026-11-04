@@ -114,7 +114,7 @@
   listed by name at the start of that checklist.
 
 ## Acceptance Evidence
-Today the board sends the `01 FF…1E` ladder high byte first (`main.c:901-923`, `:948`); the app's `FrameDecoder` finds
+Today the board sends the `01 FF…1E` ladder high byte first (`main.c:901-923`, `:948` at df5201f); the app's `FrameDecoder` finds
 no `AA 55` frame in it, and nothing outside the app's own encoder pins the byte order of a spectrum frame.
 
 Automatable, on this machine:
@@ -154,7 +154,7 @@ Automatable, on this machine:
    and `grep -n "pc_link" OptoskyEncoder/OptoskyEncoder/OptoskyEncoder.cproj` prints the two new `Compile Include`
    lines.
 
-Manual board checklist (owner, after building `OptoskyEncoder.atsln` in Atmel Studio and flashing per `README.md:112-124`,
+Manual board checklist (owner, after building `OptoskyEncoder.atsln` in Atmel Studio and flashing per `README.md:115-127`,
 with the app from this branch on the USARTC0 adapter at 115200).
 
 The host check leaves three things unverified; the steps below cover them:
@@ -162,7 +162,7 @@ The host check leaves three things unverified; the steps below cover them:
   spectra alternate, no frame is cut);
 - the bit pattern of the target's `(float)uint16_t`: step 2 (Amplitude, SNR and Q in the app equal the PLC values);
 - the main-loop pass rate that keeps the 2-byte USARTC0 TX buffer fed: step 4. Throughput is passes x 2 bytes per
-  pass, as today; the 32-byte budget at `main.c:945` never delivers 32 bytes in one pass, because the loop stops when
+  pass, as today; the 32-byte budget at `main.c:920` never delivers 32 bytes in one pass, because the loop stops when
   `DREIF` clears. A slow pass rate never shows as the 1000 ms abandon or a `seq` gap, because every byte written
   restarts the 1000 ms limit. It shows only as a longer frame time, so step 4 measures it.
 
@@ -202,7 +202,7 @@ ATP-8000 connected (`Ready_8000`), bit 2 ATP-2000 fault, bit 3 ATP-8000 fault. D
    "spectra lost" line, and the link never shows "other device". Then stop pulse mode for at least 3 s after some
    spectra: heartbeat rows arrive every 3 s and repeat the last spectrum's non-zero `seq`. The first spectrum after a
    restart of pulse mode carries that `seq` + 1.
-4. Set the PLC wavelength to 650 nm (below 904 nm, `main.c:394-402`). The next spectrum rows are ATP-2000 rows with
+4. Set the PLC wavelength to 650 nm (below 904 nm, `main.c:393-401`). The next spectrum rows are ATP-2000 rows with
    `frame_bytes` 4120 and wavelength 650; the spectrum and trend follow. Measure the frame time with a logic analyser
    or an oscilloscope on USARTC0 TX: one ATP-2000 frame from the first `AA` to the last CRC byte takes about 358 ms
    (4120 bytes x 10 bits at 115200 baud), one ATP-8000 frame about 91 ms. A clearly longer frame means the main loop
@@ -276,10 +276,10 @@ Decisions:
   starts. A frame abandoned after 1000 ms without progress keeps its `seq`, so the app sees the loss.
 - The state byte is built when a frame starts: bit 0 `Ready_2000`, bit 1 `Ready_8000`, bit 2 `SpectrumFault[0]`, bit 3
   `SpectrumFault[1]`, bits 4-7 zero. `Q_factor()` clears the measuring device's fault before it queues the frame
-  (`main.c:1064`, `:1068`), so a spectrum frame never carries its own device's fault bit.
+  (`main.c:1064`, `:1068` at df5201f), so a spectrum frame never carries its own device's fault bit.
 - The values come from the moment `Q_factor()` queues the spectrum. Pixels are not copied: no new spectrum starts
   while `PcSenderBusy()` is true, and `Send2Aplication()` starts a queued spectrum in the same pass that finishes a
-  heartbeat, before `RequstAtp()` runs (`main.c:1698-1701`).
+  heartbeat, before `RequstAtp()` runs (`main.c:1698-1701` at df5201f).
 - A queued spectrum has priority over a due heartbeat. The 3000 ms heartbeat timer runs from the end of the last
   frame (the `TXCIF` moment or the abandon), and from `PcSenderInit` at boot, so the first heartbeat comes 3 s after
   power-up, as in the emulator.
@@ -301,12 +301,16 @@ Decisions:
 
 ```c
 #define PC_LINK_HEARTBEAT_MS 3000UL
+#define PC_DEVICE_2000 1
+#define PC_DEVICE_8000 2
+#define PC_MEASUREMENT_SIZE 16
+#define PC_FRAME_COMMON_MAX (4 + PC_MEASUREMENT_SIZE)
 
 typedef uint8_t (*PcPixelReader)(uint8_t device, uint16_t byteIndex); /* byte k of the pixel area, k < 2 * P */
 
 typedef struct
 {
-    uint8_t device;      /* 1 = ATP-2000, 2 = ATP-8000 */
+    uint8_t device;      /* PC_DEVICE_2000 or PC_DEVICE_8000 */
     uint16_t wavelength; /* nm */
     uint8_t delta;
     float amplitude, snr, q;
@@ -324,7 +328,7 @@ void PcSenderQueueSpectrum(PcSender *sender, const PcMeasurement *measurement);
 bool PcSenderStartNext(PcSender *sender, uint32_t now, uint8_t state); /* true when a frame started */
 PcFrame *PcSenderFrame(PcSender *sender);
 bool PcSenderFinish(PcSender *sender, uint32_t now);                   /* true when the finished frame was a spectrum */
-bool PcSenderActive(const PcSender *sender);                           /* true while a frame is going out */
+bool PcSenderActive(const PcSender *sender);
 bool PcSenderBusy(const PcSender *sender);
 ```
 
@@ -350,7 +354,7 @@ Frame bytes, positions from 0:
 
 Frame sizes: heartbeat 8, ATP-2000 4120, ATP-8000 1048.
 
-`main.c` glue, in place of `main.c:234-237` and `:888-964`:
+`main.c` glue, in place of `main.c:234-237` and `:888-964` at df5201f:
 
 ```c
 static PcSender PcLink;
@@ -371,12 +375,12 @@ static uint8_t PcStateByte(void)
 - `Send2Aplication()`, per pass: when no frame is active, `PcSenderStartNext(&PcLink, now, PcStateByte())`; on a start,
   clear `TXCIF` and set `PcLastProgressMs = now`. While the frame is not done and `DREIF` is set, up to 32 bytes:
   `USARTC0.DATA = PcFrameNextByte(PcSenderFrame(&PcLink), ReadPcPixelByte)`; every byte written sets
-  `PcLastProgressMs = now`, as `main.c:952` does today. When the frame is done and `TXCIF` is set,
+  `PcLastProgressMs = now`, as `main.c:952` does at df5201f. When the frame is done and `TXCIF` is set,
   or 1000 ms pass without progress, `PcSenderFinish`; if it returns true and `SEQ == SendToAplication_50`, set
   `SEQ = Beginning`. After a finish, try `PcSenderStartNext` once more in the same pass, so a queued spectrum goes
   out before `RequstAtp()` runs.
-- `main()` calls `PcSenderInit(&PcLink, GetMilliseconds())` after `sei()` (`main.c:1679`).
-- `RequstAtp()`: `if (PcActive) return;` (`main.c:1494-1495`) becomes `if (PcSenderBusy(&PcLink)) return;`.
+- `main()` calls `PcSenderInit(&PcLink, GetMilliseconds())` after `sei()` (`main.c:1679` at df5201f).
+- `RequstAtp()`: `if (PcActive) return;` (`main.c:1494-1495` at df5201f) becomes `if (PcSenderBusy(&PcLink)) return;`.
 
 Golden frames (the C program writes them; the C# test builds the same frames independently):
 
@@ -565,11 +569,11 @@ Repositories: OptoskyProj (commit `docs(readme): описать протокол
 - The SpectrumVisualizer branch carries only the golden frames, their test and the doc paragraph; it ships with the
   app's stacked PRs.
 - Merge: no PRs are open in OptoskyProj. A revived `fix/watchdog` or `fix/dma-fault-reset` branch conflicts in two
-  lines around the `PcSenderInit` call after `sei()` (`main.c:1679`); `fix/encoder-i2c-timeout` touches `main.c:1367`.
+  lines around the `PcSenderInit` call after `sei()` (`main.c:1647`, `:1648`); `fix/encoder-i2c-timeout` touches `main.c:1367`.
 
 **Follow-up question for the owner:**
-- The idle spectrometer's fault bit (`SpectrumFault[d]`, set at `main.c:502` and `:996`, cleared only by that device's
-  next good spectrum at `:1064`) stays set while the PLC measures on the other device, so heartbeats keep reporting an
+- The idle spectrometer's fault bit (`SpectrumFault[d]`, set at `main.c:501` and `:964`, cleared only by that device's
+  next good spectrum at `:1032`) stays set while the PLC measures on the other device, so heartbeats keep reporting an
   old failure. Should the board clear it on a device switch or after a successful service request? The app shows only
   the measuring device's bit until then.
 

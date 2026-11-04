@@ -16,18 +16,15 @@ public sealed class FirmwareFrameTests
 {
 	private static readonly Dictionary<string, BoardFrame> _expectedFrames = new()
 	{
-		["heartbeat-example"] = new BoardFrame(
-			BoardState.Atp2000Connected | BoardState.Atp8000Connected,
-			42,
-			null),
+		["heartbeat-example"] = ProtocolSamples.Heartbeat(42),
 		["atp2000"] = new BoardFrame(
 			BoardState.Atp2000Connected | BoardState.Atp8000MeasurementFailed,
 			1,
-			new SpectrumMeasurement(Spectrometer.Atp2000, 650, 10, 4660f, 258f, 7f, Ramp(Spectrometer.Atp2000))),
+			new SpectrumMeasurement(Spectrometer.Atp2000, 650, 10, 4660f, 258f, 7f, FirmwareRamp(Spectrometer.Atp2000))),
 		["atp8000"] = new BoardFrame(
 			BoardState.Atp8000Connected | BoardState.Atp2000MeasurementFailed,
 			255,
-			new SpectrumMeasurement(Spectrometer.Atp8000, 1550, 100, 65535f, 1f, 0f, Ramp(Spectrometer.Atp8000))),
+			new SpectrumMeasurement(Spectrometer.Atp8000, 1550, 100, 65535f, 1f, 0f, FirmwareRamp(Spectrometer.Atp8000))),
 		["atp8000-dark"] = new BoardFrame(
 			BoardState.Atp2000Connected | BoardState.Atp8000Connected,
 			0,
@@ -43,6 +40,8 @@ public sealed class FirmwareFrameTests
 
 	private static readonly Dictionary<string, byte[]> _firmwareFrames = ReadFirmwareFrames();
 
+	public static TheoryData<string> FrameNames => [.. _expectedFrames.Keys];
+
 	[Fact]
 	public void TheFileHoldsExactlyTheExpectedFrames()
 	{
@@ -50,10 +49,7 @@ public sealed class FirmwareFrameTests
 	}
 
 	[Theory]
-	[InlineData("heartbeat-example")]
-	[InlineData("atp2000")]
-	[InlineData("atp8000")]
-	[InlineData("atp8000-dark")]
+	[MemberData(nameof(FrameNames))]
 	public void AFirmwareFrameDecodesToTheExpectedFrame(string name)
 	{
 		var buffer = new ReadOnlySequence<byte>(_firmwareFrames[name]);
@@ -67,10 +63,7 @@ public sealed class FirmwareFrameTests
 	}
 
 	[Theory]
-	[InlineData("heartbeat-example")]
-	[InlineData("atp2000")]
-	[InlineData("atp8000")]
-	[InlineData("atp8000-dark")]
+	[MemberData(nameof(FrameNames))]
 	public void AFirmwareFrameEqualsTheAppEncoding(string name)
 	{
 		var encoded = FrameEncoder.Encode(_expectedFrames[name]);
@@ -79,7 +72,7 @@ public sealed class FirmwareFrameTests
 	}
 
 	/// <summary>The ramp of the firmware host program: every pixel has different high and low bytes.</summary>
-	private static ushort[] Ramp(Spectrometer device)
+	private static ushort[] FirmwareRamp(Spectrometer device)
 	{
 		return [.. Enumerable.Range(0, device.PixelCount).Select(i => (ushort)((i * 257) + 0x1234))];
 	}
