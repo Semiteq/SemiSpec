@@ -18,7 +18,7 @@
   no change to the old app.
 
 ## Context (from discovery)
-- Roadmap: docs/plans/roadmaps/20261104-avalonia-rewrite-roadmap.md — slice spectrum-store
+- Roadmap: docs/plans/roadmaps/20261104-avalonia-rewrite-roadmap.md, slice spectrum-store
 - Stacking base: local branch `spectrum-view` at `12bef84`; this slice works on the local branch `spectrum-store`
   created from it. Local commits only.
 - Verified 2026-11-04 at `12bef84`: `dotnet test SpectrumVisualizer.slnx` passes 505 of 505.
@@ -147,9 +147,8 @@ Automatable (baseline 505 of 505 at `12bef84`):
      `AWriteAgainstAHeldLockFailsAfterTheDefaultTimeout` (a second connection holds `BEGIN IMMEDIATE`; `Write`
      returns a failed `Result` after 1.9 to 2.5 s); `AfterShortenBusyTimeoutAWriteAgainstAHeldLockFailsAfterOneSecond`
      (0.9 to 1.5 s); `ACheckpointBesideAnOpenReaderReturnsBusyAtOnce` (a reader holds
-     a read transaction; `CheckpointAndClose` returns within 1 s, not after the 2 s busy timeout, with busy reported and the connection closed);
-     `TheIntensityColumnHoldsTheMeanOfTheOwnWindow` is gone: Task 5 removed the `intensity` column.
-   - `QueryWindowsTests` (review phase 1 folded `SpectrumIntensity` into `QueryWindows`):
+     a read transaction; `CheckpointAndClose` returns within 1 s, not after the 2 s busy timeout, with busy reported and the connection closed).
+   - `QueryWindowsTests`:
      `CoversFollowsTheFirmwareTableRange` (ATP-2000 189 and 1028 in, 188 and 1029 out; ATP-8000 898 and 2461 in,
      897 and 2462 out);
      `MeanOfAveragesTheWindowPixels`; `ADarkWindowHasMeanZero`; `ADeltaOfZeroTakesOnePixel`.
@@ -157,20 +156,23 @@ Automatable (baseline 505 of 505 at `12bef84`):
      `ARowNearToStaysInTheLastColumn` (a 10 ms range, 3 columns, a row at 9 ms lands in column 2);
      `AColumnKeepsMinMaxAndCount`; `AnEmptyColumnIsNaNWithCountZero`; `AnUncoveringRowCountsAsUncoveredOnly`;
      `TheColumnWidthIsTheRangeOverTheColumnsFlooredAtOneMillisecond`.
-   - `SpectrumHistoryTests`: `SpectrumAtReturnsTheNearestRowAtOrBefore` (equal stamps resolve to the later id),
+   - `SpectrumHistorySpectrumTests` and `SpectrumHistorySeriesTests` (over `SpectrumHistoryTestBase`):
+     `SpectrumAtReturnsTheNearestRowAtOrBefore` (equal stamps resolve to the later id),
      `SpectrumAtBeforeTheFirstRowReturnsNone`, `TheStoredSpectrumRebuildsTheMeasurement`,
      `ANaNAmplitudeAndQReadBackAsNaN`; `TheSeriesMeansTheWindowPerSpectrum`;
      `ARowInsideTheLastMillisecondBeforeToIsInTheSeries` (`To` half a millisecond after the row's stamp); `TheSeriesOfAWavelengthOneDeviceDoesNotCoverLeavesItsColumnsUncovered`;
      `ARowWithADifferentWavelengthReadsItsPixels` (the stored window differs from the queried one, the mean comes from
-     the pixels); `AMixedWavelengthRangeMergesBothReads` is not written: Task 5 removed the column, so no
-     second read exists to merge; `DarkFramesPullTheColumnMinimumToZero`; `ACancelledSeriesThrowsOperationCanceled` (a token cancelled before the
+     the pixels; the series is one `substr` read, so no mixed-wavelength merge exists);
+     `TheSeriesOfAWavelengthNeitherDeviceCoversLeavesEveryColumnUncovered` (3000 nm, both devices stored);
+     `ASeriesOverARangeWithNoRowsIsEmptyInEveryColumn`; `DarkFramesPullTheColumnMinimumToZero`; `ACancelledSeriesThrowsOperationCanceled` (a token cancelled before the
      call) and `ASeriesCancelledMidReadThrowsAtTheNextCheck` (cancelled at row 300, thrown at the row-512 check);
      `TheStoredRangeSpansTheFirstAndLastSpectrum`; `AReadOfAFileWithoutTheSchemaFails` (an empty file);
      `AReadOfAMissingFileFailsAndCreatesNoFile`; `TheHistoryReadsBesideAnOpenWriteTransaction` (the series finishes
      under 1 s and sees the last commit); `TheWriterCommitsBesideAnOpenReadSnapshot` (a reader inside `BEGIN` holds its
      snapshot, and `Write` commits under 1 s; only WAL allows that, and the `journal_mode=DELETE` mutant failed
      it in review phase 1).
-   - `SpectrumStoreTests`: `EveryFrameFromTheDistributorIsStored` (spectra and heartbeats, in order);
+   - `SpectrumStoreWriteTests`, `SpectrumStoreStopTests` and `SpectrumStoreFailureTests` (over
+     `SpectrumStoreTestBase`): `EveryFrameFromTheDistributorIsStored` (spectra and heartbeats, in order);
      `TheSubscriberOnlyEnqueues` (with the writer held by `BEGIN IMMEDIATE` on a second connection, `OnNext` returns
      within 50 ms, also once the queue is full and the frames count as dropped); `AFullQueueCountsEachDroppedFrame` (writer held, more frames fed than the queue holds; after the
      lock is released and `StopAsync` has drained, stored rows + `DroppedFrames` = frames fed, `DroppedFrames` > 0
@@ -179,7 +181,7 @@ Automatable (baseline 505 of 505 at `12bef84`):
      deleted; no exception reaches the log from a closed connection); `AFailedBatchCountsItsFramesAndReportsOnce` (three
      failed batches, one Warning entry in a real panel, one Warning log line and two Debug lines without a stack);
      `ASuccessAfterFailedBatchesLogsTheRecoveryWithItsCounts`; `AWriteAfterAFailureRunReportsAgainOnlyAfterASuccess`;
-     `RetentionRunsOnceAMinuteAlsoWithoutFrames` (`ManualClock` advanced by 59 s deletes nothing; at 61 s the pass
+     `RetentionRunsOnceAMinuteAlsoWithoutFrames` (`RetentionClock` advanced by 59 s deletes nothing; at 61 s the pass
      deletes the rows older than 24 h and keeps one 23 h 59 min old);
      `AStopPastItsBudgetCountsTheUndrainedFramesAsDropped` (writer held, `StopAsync` with a cancelled drain token:
      stored + dropped = fed); `AStopAgainstALockHeldThroughItEndsInsideTheCloseLimit` (a drain token at 3.5 s, the
@@ -197,25 +199,28 @@ Automatable (baseline 505 of 505 at `12bef84`):
      throws in the retention pass; one `StoreStoppedError`, the later frames dropped, the file closed).
    - `StoreBenchmarkCommandTests` and `StoreBenchmarkRunTests.ASmallRunPrintsEveryMeasurementAndTheStrategiesAgree`
      (`--rows 2000 --churn-rounds 2`: exit code 0, every metric row printed fresh and churned, the
-     `substr` and `SqliteBlob` reads give equal min, max and counts per column to 1e-9; the precomputed and merged
-     reads left the tool with the column in Task 5).
+     `substr` and `SqliteBlob` reads give equal min, max and counts per column to 1e-9; the tool has no precomputed
+     or merged read); `StoreBenchmarkRunTests.ARunInItsOwnTempFolderDeletesTheFolder`.
 2. `dotnet test SpectrumVisualizer.slnx --filter "Area=Link"` passes, including `SerialLinkDropTests`:
    `AChannelDropCountsInTheStatus` (a reader that does not read, 64 + 3 frames written, `Status.DroppedFrames` = 3
    after the next health publish), `TheDropCountSurvivesAReconnect`, `TheDisconnectedStatusCarriesTheDropCount`,
    `AChannelDropDoesNotCountAsLost` (`LostSpectra` stays 0).
 3. `dotnet test SpectrumVisualizer.slnx --filter "Area=MainWindow"` passes, including
-   `AppStatusBarViewModelTests.TheDroppedSegmentSumsTheLinkAndTheStore`, `AFreshAppShowsZeroDroppedFramesNotTheNoValueDash`,
+   `AppStatusBarDroppedFramesTests.TheDroppedSegmentSumsTheLinkAndTheStore`, `AFreshAppShowsZeroDroppedFramesNotTheNoValueDash`,
   `TheDroppedCountStaysAfterADisconnect`,
    `AStoreDropOnAnotherThreadReachesTheTextOnTheUiScheduler`, `MainWindowLayoutTests` with the new segment realised,
    and `MainWindowTextFitTests.TheMinimumWidthHoldsTheConnectionRowAndTheLongestStatusTextsOnOneLine` with the
    dropped segment in the sum.
 4. `dotnet test SpectrumVisualizer.slnx --filter "Area=Di"` passes, including: the store resolves as one instance
-   with the instance file under the test root; `AppLifecycleTests.OpeningTheWindowStartsTheStore` (a frame fed through
+   with the instance file under the test root
+   (`CompositionRootTests.TheStoreIsOneInstanceOverTheInstanceFileUnderTheStoreFolder`);
+   `AppLifecycleStoreTests.OpeningTheWindowStartsTheStore` (a frame fed through
    `FakePortStream` lands in the instance file); `ClosingTheWindowStopsTheStoreAfterTheDistributor` (the store's stop
    line follows the distributor's "The frame distributor stopped"); `AfterTheCloseTheStoreFileHasAnEmptyWal` (an idle
    connection holds the file across the close, so the `-wal` file stays, at 0 bytes).
 5. `dotnet test SpectrumVisualizer.slnx --filter "Area=Resources"` passes with every new key in the Russian set.
-6. `dotnet test SpectrumVisualizer.slnx` passes 505 plus every test this slice adds, none skipped.
+6. `dotnet test SpectrumVisualizer.slnx` passes 505 plus every test this slice adds, none skipped: 629 of 629 at the
+   end of the run.
 7. `dotnet build SpectrumVisualizer.slnx -c Release` 0 warnings; `dotnet format SpectrumVisualizer.slnx
    --verify-no-changes` and `dotnet terse SpectrumVisualizer` exit 0; `dotnet build SpectrumVisualizer.sln` and
    `dotnet test SpectrumVisualizer.Tests` pass 13 of 13.
@@ -354,7 +359,7 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
 
   `received_at` is not unique, because the frames of one decode pass share a stamp (`LinkSession.cs:241-251`), so
   `id` orders rows with equal stamps. The float columns are nullable: SQLite stores a NaN double as NULL
-  (ASSUMPTION, pinned by `ANaNAmplitudeRoundTripsAsNaN`), and a board float can be NaN. `pixels` is last, so a read of
+  (pinned by `NaNFloatsAreStoredAsNull` and `ANaNAmplitudeAndQReadBackAsNaN`), and a board float can be NaN. `pixels` is last, so a read of
   the narrow columns never touches the blob's overflow page. A Microsoft.Data.Sqlite parameter takes a `byte[]`, so
   `Write` copies each frame's pixels into a new array (`MemoryMarshal.AsBytes(pixels.AsSpan()).ToArray()`); there is
   no zero-copy write. A read turns the bytes back
@@ -377,7 +382,7 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   forever on 0. `BEGIN IMMEDIATE` takes the write
   lock at one explicit point, the start of the transaction, so a held lock fails the batch there after the busy
   timeout and never halfway through it. Each returns a FluentResults `Result`; a `SqliteException` or `IOException`
-  becomes an `ExceptionalError`. Task 5 removed the `intensity` column, so `Write` computes nothing per row.
+  becomes an `ExceptionalError`. The schema has no `intensity` column, so `Write` computes nothing per row.
   `wal_checkpoint(TRUNCATE)` invokes no busy handler: when a reader holds a snapshot it returns at once with its `busy` column set to 1 (ASSUMPTION, pinned by `ACheckpointBesideAnOpenReaderReturnsBusyAtOnce`).
   `CheckpointAndClose` returns `WalCheckpoint.Busy` and closes anyway (Core has no logger; the stopped line of
   `SpectrumStore` names the checkpoint); the WAL stays, and the next start deletes it with the file.
@@ -475,7 +480,8 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
     read holds one snapshot, and the WAL grows behind it while the writer appends. The benchmark row "WAL size after
     a 24 h series read beside a running writer" measures that growth. ASSUMPTION: at 2 ATP-2000 spectra per second
     the WAL gains about 10 KB per second of read (two rows plus index pages), so a 10 s read adds about 100 KB. The
-    series is sliced by time only if that row shows more than 16 MB; Task 5 records the number.
+    series is sliced by time only if that row shows more than 16 MB; it measured 0.035 MB, so the series has no
+    slicing.
 - **Series result.** `IntensitySeries(DateTimeOffset From, TimeSpan ColumnWidth, IntensityColumn[] Columns)` with
   `IntensityColumn(double Min, double Max, int Count, int UncoveredCount)`. Column `i` covers
   `[From + i x width, From + (i + 1) x width)`, `width = (To - From) / Columns` floored at 1 ms, as SemiPlot's
@@ -487,7 +493,8 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   from the other spectrometer. Gaps from lost frames come from `seq`, `state` and the heartbeat table; intensity-trend
   adds that query, since it owns the marker rules (`roadmap:238` allows query additions).
 - **Three read strategies and the decision rule.** The window intensity can come from:
-  - the precomputed `intensity` column, read from the covering index `spectrum_time`, valid only for rows whose own
+  - the precomputed `intensity` column (measured in Task 5, then removed), read from the covering index
+    `spectrum_time`, valid only for rows whose own
     `wavelength_nm` and `delta` equal the query's (the common case: SCADA rarely changes the wavelength);
   - `substr(pixels, 2 x First + 1, 2 x count)` in the SQL, per device through a `CASE device`;
   - a true partial read through `SqliteBlob` (`sqlite3_blob_open` on the row's `id`, `sqlite3_blob_read` of the
@@ -909,12 +916,12 @@ Note: Task 9 already added the dropped segment to the status sum and set `Minimu
   and `ANaNAmplitudeAndQReadBackAsNaN`), equal stamps
   (`SpectrumAtReturnsTheNearestRowAtOrBefore`), a wavelength neither device covers, a `delta` of 0
   (`ADeltaOfZeroTakesOnePixel`), a series range with no rows, a failed open
-  (`AFailedOpenReportsOneErrorAndStoresNothing`), a failed batch counted once per frame
+  (`AFailedOpenReportsOneErrorAndCountsEveryFrameAsDropped`), a failed batch counted once per frame
   (`AFailedBatchCountsItsFramesAndReportsOnce`), a stop with a full queue inside the 5 s limit. ➕ Three had no test and
   got one: `SpectrumHistoryTests.TheSeriesOfAWavelengthNeitherDeviceCoversLeavesEveryColumnUncovered` (3000 nm, both
   devices stored), `ASeriesOverARangeWithNoRowsIsEmptyInEveryColumn`, and
   `SpectrumStoreTests.AStopWithAFullQueueDrainsInsideTheCloseLimit` (1024 + 256 frames fed behind a held lock, the
-  4.5 s drain token of `App`, the stop under 5 s, at least 1024 stored)
+  3.5 s drain token of `App`, the stop under 5 s, at least 1024 stored)
 - [x] ➕ check that no test leaves files: after the full suite `%LOCALAPPDATA%\SpectrumVisualizer` holds `Logs` only and
   `%TEMP%` holds no `spectrum-visualizer-*`, `spectrum-store-benchmark-*` or `local-app-data` entry. The tool itself
   left its empty default folder under `%TEMP%` (the Task 6 run left one): `BenchmarkRun` now deletes the folder it
@@ -964,3 +971,119 @@ Note: Task 9 already added the dropped segment to the status sum and set `Minimu
 - firmware-frame-sender: the OptoskyProj#20 frame sender in the board firmware, verified on the board against the app.
 - release-3-0: the 3.0.0 installer over the self-contained publish folder, the release workflow, and removal of the
   old app.
+
+**Executed by exec:**
+- branch: spectrum-store
+
+Run note: 29 commits on `spectrum-store` (`761cebd`..`e89e997`) before this record, stacked on `spectrum-view` at
+`12bef84`; 19 of them add or revise this plan. Review phase 1 (5 agents) found 0 critical, 4 major and about 28
+minor findings, all fixed in fix iteration 1 (`c78f3bc`, `c089a3b`, `5c47e7a`, `64e514d`). Its critical re-check found
+2 more major findings: a stop could run a retention pass and a batch at 2 s each after the drain token, and smoke step
+7 used an unconnected copy. Both were fixed in `d684c1e`. Phase 2 (smells) fixed 23 minor findings in `aad1856`,
+`ed07e99`, `c043027`, `ccc5977`, `bdd3709` and `cf1a3da`. Phase 3 (codex) was skipped because codex is not installed.
+Phase 3b (comments) fixed 11 minor comment findings in `f9c59fd`. Phase 4 (critical) found 2 major findings and fixed
+both: a background report's log line was lost once the dispatcher stopped (`82bd506`), and every failed batch after
+the first logged a Warning with its stack (`e89e997`). Final state: 629/629 tests in `SpectrumVisualizer.slnx`, 13/13
+in `SpectrumVisualizer.sln`, Release build 0 warnings, format and terse clean. The com0com smoke checklist was not
+run: this machine has no com0com pair. The app start and close check of Task 12 ran on the built exe, closed by
+`CloseMainWindow`.
+
+**Decisions made autonomously:**
+- `ReceivedFrame` lives in `SpectrumVisualizer.Core.Protocol`; Core references Microsoft.Data.Sqlite 10.0.14.
+- `StoreFiles.Prepare` returns `Result<StoreSweep>` with `DeletedFiles`, `KeptFiles` and an `ExceptionalError?`
+  `Failure`. A failed wipe of the own file fails it; a folder that cannot be listed is not fatal, and the store logs
+  that at Warning. The sweep matches `spectra-<digits>.db` only, by an ordinal-ignore-case suffix check.
+- `CheckpointAndClose` returns `Result<WalCheckpoint>`, because Core has no logger. The stopped line names the
+  checkpoint: `Truncated`, `Busy`, `Failed` or `Skipped`.
+- `IntensityQuery.Create` is the only way to build a query, so a `with` cannot skip its checks. `ColumnWidth`
+  truncates to whole milliseconds, the stored time resolution.
+- `substr` is the kept pixel read: churned 24 h, `SqliteBlob` took 709.1 ms against 647.3 ms. The `intensity` column
+  is gone: the merged read took 0.92 of the pixel-only time, above the 0.5 rule. The series has no slicing: the WAL
+  grew 0.035 MB.
+- The `substr` read lives once, in `SpectrumHistory.ReadSeries`; the tool calls it and adds its own `BlobSeries`.
+  The window rules live in `QueryWindows`. The tool has no `--change-at`; `--device 8000` fills 1550 nm.
+- The mid-read cancellation test shadows `substr` with a per-connection function that cancels at row 300. No test
+  hook exists in production code.
+- `StoreWriter` is the writer task; `SpectrumStore` keeps the queue, the cancellation gate and the drop count. The
+  pending queue wait and retention delay are kept across loop iterations, so the single-reader queue sees one wait.
+- One failure path: `StoreOpenError` (Error) before the open, `StoreStoppedError` (Error) after it, `StoreWriteError`
+  (Warning) for the first failed batch of an incident. History off keeps the subscription and counts every frame as
+  dropped.
+- `ResultReporting.TryReportFailure` maps and logs at once on the calling thread; the UI job only adds the panel
+  entry. A coalesced repeat logs at full severity, because the calling thread cannot read the panel. The log line
+  carries the deepest exception of the cause chain (`ResultReporting.CauseOf`).
+- A failure incident logs one Warning with the stack, Debug lines without it for each repeat, and one Information
+  line "Spectrum store writes recovered after {Failures} failed batches, {Dropped} frames dropped". A failed
+  retention or checkpoint logs a Warning and reaches no panel.
+- The stop shortens the busy timeout to 1 s right before each statement, because Microsoft.Data.Sqlite counts it in
+  whole seconds and waits forever on 0. `App` fires the drain token 1.5 s before the 5 s limit, at 3.5 s. No retention
+  pass starts after the stop.
+- A second `StopAsync` completes with the writer of the first. `Dispose` cancels under the cancellation gate, also
+  during a stop, and the writer counts the queued frames as dropped.
+- The drop count's add and its `OnNext` share one lock over a plain `Subject<long>`, exposed as
+  `IObservable<long> DroppedFramesChanged`, so the counts of two threads arrive in order.
+- The link's drop count runs for the process and survives Connect. The status bar takes the link half from
+  `WhenAnyValue(Status)`.
+- `MainWindow.MinimumWidth` is 1256 (Russian bar 1252.2 px, English 1085.2 px). `MainWindow.OpeningWidth` is 1280,
+  bound in `MainWindow.axaml`, and the text-fit test asserts `MinimumWidth <= OpeningWidth` with the realised opening
+  width.
+- `AddUi(LoggingSetup, AppDataPaths)` registers `StoreFile` and `SpectrumStore`. Each container test has its own temp
+  root and awaits every store's `StopAsync` before it deletes the root.
+- Tests use `FakeTimeProvider` from Microsoft.Extensions.TimeProvider.Testing 10.6.0, the dotnet/extensions train
+  of Diagnostics.Testing. `RetentionClock` subclasses it to count `GetUtcNow` reads and to throw from them; the
+  throw is how `AFailureAfterTheOpenReportsOnceAndCountsEveryLaterFrameAsDropped` reaches the post-open path.
+- Large test classes split over abstract bases: `SpectrumStore{Write,Stop,Failure}Tests`,
+  `AppStatusBar{Link,DroppedFrames}Tests`, `AppLifecycle{Link,Store}Tests`, `SpectrumHistory{Spectrum,Series}Tests`.
+  `TempFolder` sits at the test project root; `UnstartedStore` serves view tests that only read the count.
+- `ToolCommandLine` is one internal source file under `SpectrumVisualizer/Shared/`, linked into both tool projects.
+- `ACheckpointBesideAnOpenReaderReturnsBusyAtOnce` allows 1 s: a loaded full run measured 632 ms, and 1 s still
+  proves no 2 s busy wait.
+- The benchmark deletes the temp folder it created unless `--keep` is given.
+- The start order (store before distributor) has no deterministic test, because the distributor reads on a pool
+  thread; `testing-strategy.md` records the gap.
+- `overview.md` states the kept read and why without numbers; the measured numbers stay in Acceptance Evidence
+  item 8.
+
+## Verify it yourself
+
+Automated, from the repo root on branch `spectrum-store`:
+
+1. `dotnet build SpectrumVisualizer.slnx -c Release` gives 0 warnings, 0 errors.
+2. `dotnet test SpectrumVisualizer.slnx` passes 629 of 629. Per area with `--filter "Area=X"`: Spectrum 110,
+   Store 104, Link 80, MainWindow 70, Protocol 56, Emulator 56, Chart 50, Messages 39, Di 25, Calibration 15,
+   Resources 9, Paths 8, Logging 7.
+3. `dotnet format SpectrumVisualizer.slnx --verify-no-changes`, then `dotnet tool restore` and
+   `dotnet terse SpectrumVisualizer`; both gates exit 0.
+4. `dotnet build SpectrumVisualizer.sln` gives 0 errors, and `dotnet test SpectrumVisualizer.Tests` passes 13 of 13.
+5. `dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark` fills 24 h of
+   ATP-2000 spectra, runs the churn and prints one table; it runs for minutes. Key churned numbers on the dev laptop
+   (Acceptance Evidence item 8): about 52 000 spectra/s insert, 765 MB for 24 h, 10 min series 5.1 ms and 24 h series
+   647 ms with `substr`, `SpectrumAtAsync` 0.5 ms, a retention pass 0.3 ms, WAL 0.035 MB after a 24 h read beside the
+   writer. The OS cache held the whole file, so every number is warm. Cold-cache numbers on the operator PC are
+   unmeasured: run the tool there. `--rows 2000 --churn-rounds 2` is a quick run.
+6. The store behaviour is pinned by these test classes:
+   - `StoreFilesTests`: the file per process id, the wipe at start, the sweep that keeps a live instance's file.
+   - `SpectrumDatabaseTests`: WAL with `synchronous=NORMAL` and the 64 MB journal limit, the round trip, one
+     transaction per batch, retention, the truncating checkpoint, the 2 s and 1 s busy timeouts.
+   - `QueryWindowsTests`, `IntensityBucketsTests`: coverage, the window mean, the column fold.
+   - `SpectrumHistorySpectrumTests`, `SpectrumHistorySeriesTests`: the spectrum at a moment, the series, the stored
+     range, cancellation, reads beside the writer.
+   - `SpectrumStoreWriteTests`, `SpectrumStoreStopTests`, `SpectrumStoreFailureTests`: the enqueue-only subscriber,
+     the drop count, retention once a minute, the stop inside the close limit, one report per failure incident and
+     the recovery line.
+   - `SerialLinkDropTests`, `AppStatusBarDroppedFramesTests`: the link's drop count and the one segment.
+   - `AppLifecycleStoreTests`, `CompositionRootTests`: the store starts with the window, stops after the distributor
+     and leaves an empty WAL.
+   - `MainWindowTextFitTests`: the 1256 px minimum width in English and Russian, under the 1280 px opening width.
+   - `StoreBenchmarkCommandTests`, `StoreBenchmarkRunTests`: the tool's options and a small run.
+
+By hand: run the manual smoke checklist in Acceptance Evidence over the com0com pair. The highest-value checks, with
+the emulator on `COM10` and the app on `COM11`:
+
+1. Steps 2 and 4: the store fills at about 1 spectrum per second, and the count keeps rising across a Disconnect and
+   Connect.
+2. Step 5: after a close, the `-wal` file is 0 bytes; a restart deletes the previous file and starts an empty one.
+3. Step 6: two running copies keep separate files, and the first keeps storing.
+4. Step 8: a `BEGIN IMMEDIATE` held for 10 s in `sqlite3` gives one Warning "Spectrum history write failed", and
+   "Dropped frames" rises by the frames of the failed batches, then stops.
+5. Step 10: at the minimum width every status segment shows whole in English and Russian.
