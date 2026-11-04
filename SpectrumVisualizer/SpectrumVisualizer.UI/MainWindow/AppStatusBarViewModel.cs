@@ -1,6 +1,5 @@
 using System.Reactive.Concurrency;
 using System.Reactive.Disposables;
-using System.Reactive.Linq;
 
 using FluentResults;
 
@@ -47,14 +46,8 @@ public sealed class AppStatusBarViewModel : ReactiveObject, IDisposable
 		_logger = logger;
 		Status = serialLink.Status;
 
-		// The seed follows the scheduler hop, so the bar shows the link's state from construction on.
-		_disposables.Add(Observable
-			.FromEventPattern<LinkStatus>(
-				handler => serialLink.StatusChanged += handler,
-				handler => serialLink.StatusChanged -= handler)
-			.Select(pattern => pattern.EventArgs)
-			.ObserveOn(uiScheduler)
-			.StartWith(serialLink.Status)
+		_disposables.Add(serialLink
+			.StatusUpdates(uiScheduler)
 			.Subscribe(Apply, exception => _logger.LogError(exception, "The status bar stopped following the link")));
 	}
 
@@ -92,7 +85,7 @@ public sealed class AppStatusBarViewModel : ReactiveObject, IDisposable
 		_ => LinkTone.Neutral
 	};
 
-	public string PortText => IsDisconnected ? Resources.StatusNoValue : Status.PortName ?? Resources.StatusNoValue;
+	public string PortText => Status.PortName ?? Resources.StatusNoValue;
 
 	public string Atp2000Text => Resources.FormatStatusSpectrometerFormat(
 		"ATP-2000",

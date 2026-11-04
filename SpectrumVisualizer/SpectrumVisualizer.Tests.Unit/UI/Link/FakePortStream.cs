@@ -18,6 +18,9 @@ internal sealed class FakePortStream : Stream
 	// Written by the link's session thread, read by the test thread.
 	private volatile bool _isDisposed;
 
+	// Released by default; a test that holds it releases it from the test thread, the session thread awaits it.
+	private volatile TaskCompletionSource _disposeRelease = CompletedRelease();
+
 	public bool IsDisposed => _isDisposed;
 
 	public override bool CanRead => true;
@@ -32,6 +35,17 @@ internal sealed class FakePortStream : Stream
 	{
 		get => throw new NotSupportedException();
 		set => throw new NotSupportedException();
+	}
+
+	/// <summary>Holds the next DisposeAsync until <see cref="ReleaseDispose"/>.</summary>
+	public void HoldDispose()
+	{
+		_disposeRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+	}
+
+	public void ReleaseDispose()
+	{
+		_disposeRelease.TrySetResult();
 	}
 
 	public void PushBytes(params byte[] bytes)
@@ -150,9 +164,22 @@ internal sealed class FakePortStream : Stream
 		}
 	}
 
+	public override async ValueTask DisposeAsync()
+	{
+		await _disposeRelease.Task;
+		await base.DisposeAsync();
+	}
+
 	protected override void Dispose(bool disposing)
 	{
 		_isDisposed = true;
 		base.Dispose(disposing);
+	}
+
+	private static TaskCompletionSource CompletedRelease()
+	{
+		var release = new TaskCompletionSource();
+		release.SetResult();
+		return release;
 	}
 }

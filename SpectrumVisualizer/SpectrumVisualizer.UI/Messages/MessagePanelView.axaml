@@ -59,9 +59,9 @@
                                      Height="8"
                                      Margin="0,4,8,0"
                                      VerticalAlignment="Top"
-                                     Classes.severity-error="{Binding View.Severity, Converter={x:Static messages:SeverityMatchConverter.Instance}, ConverterParameter=Error}"
-                                     Classes.severity-warning="{Binding View.Severity, Converter={x:Static messages:SeverityMatchConverter.Instance}, ConverterParameter=Warning}"
-                                     Classes.severity-info="{Binding View.Severity, Converter={x:Static messages:SeverityMatchConverter.Instance}, ConverterParameter=Info}" />
+                                     Classes.severity-error="{Binding View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Error}}"
+                                     Classes.severity-warning="{Binding View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Warning}}"
+                                     Classes.severity-info="{Binding View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Info}}" />
 
                             <TextBlock Grid.Column="1"
                                        Name="EntryTime"

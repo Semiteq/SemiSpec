@@ -64,7 +64,7 @@
     <value>Another program holds the port, or Windows denied access to it.</value>
   </data>
   <data name="PortBusyRemedy" xml:space="preserve">
-    <value>Close the program that uses the port, or select another port. The application retries every second.</value>
+    <value>Close the program that uses the port, or press Disconnect and select another port.</value>
   </data>
   <data name="PortNotFoundTitle" xml:space="preserve">
     <value>Port not found</value>
@@ -73,7 +73,7 @@
     <value>The selected port is not on this computer.</value>
   </data>
   <data name="PortNotFoundRemedy" xml:space="preserve">
-    <value>Check the cable and the adapter, then refresh the port list. The application retries every second.</value>
+    <value>Check the cable and the adapter. The application retries every second; to pick another port, press Disconnect.</value>
   </data>
   <data name="PortLostTitle" xml:space="preserve">
     <value>Connection lost</value>
@@ -100,13 +100,13 @@
     <value>Data arrives on the port, but no valid frame came for 10 seconds.</value>
   </data>
   <data name="UnrecognisedDataRemedy" xml:space="preserve">
-    <value>Check that the port belongs to the spectrometer board and runs at 115200 baud.</value>
+    <value>Check that the spectrometer board is connected to this port and sends at 115200 baud.</value>
   </data>
   <data name="LinkRestoredTitle" xml:space="preserve">
-    <value>Data restored</value>
+    <value>Receiving data</value>
   </data>
   <data name="LinkRestoredDetail" xml:space="preserve">
-    <value>Data from the board restored: valid frames arrive again.</value>
+    <value>The board sends valid frames.</value>
   </data>
   <data name="ConnectionPortLabel" xml:space="preserve">
     <value>Port</value>

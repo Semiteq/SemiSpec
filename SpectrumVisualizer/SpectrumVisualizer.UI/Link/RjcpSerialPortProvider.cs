@@ -22,26 +22,28 @@ public sealed class RjcpSerialPortProvider : ISerialPortProvider
 		return SortPortNames(enumerator.GetPortNames());
 	}
 
+	/// <summary>Every failure, the constructor's brief probe open included, is a retryable link error.</summary>
 	public Result<Stream> Open(string portName)
 	{
-		if (!PortNames().Contains(portName, StringComparer.OrdinalIgnoreCase))
-		{
-			return Result.Fail<Stream>(new PortNotFoundError(portName));
-		}
-
-		var port = new SerialPortStream(portName, BaudRate, DataBits, Parity.None, StopBits.One)
-		{
-			ReadTimeout = ReadTimeoutMilliseconds,
-			ThrowOnReadError = true
-		};
+		SerialPortStream? port = null;
 		try
 		{
+			if (!PortNames().Contains(portName, StringComparer.OrdinalIgnoreCase))
+			{
+				return Result.Fail<Stream>(new PortNotFoundError(portName));
+			}
+
+			port = new SerialPortStream(portName, BaudRate, DataBits, Parity.None, StopBits.One)
+			{
+				ReadTimeout = ReadTimeoutMilliseconds,
+				ThrowOnReadError = true
+			};
 			port.Open();
 			return Result.Ok<Stream>(port);
 		}
-		catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+		catch (Exception exception) when (exception is not OperationCanceledException)
 		{
-			port.Dispose();
+			port?.Dispose();
 			return Result.Fail<Stream>(MapOpenFailure(portName, exception));
 		}
 	}
@@ -52,13 +54,14 @@ public sealed class RjcpSerialPortProvider : ISerialPortProvider
 		return [.. names.OrderBy(name => ComNumber(name) ?? int.MaxValue).ThenBy(name => name, StringComparer.Ordinal)];
 	}
 
-	internal static LinkError MapOpenFailure(string portName, Exception exception)
+	/// <summary>A busy port is told apart; any other failure counts as a missing port and keeps its exception.</summary>
+	internal static IError MapOpenFailure(string portName, Exception exception)
 	{
 		return exception switch
 		{
 			UnauthorizedAccessException => new PortBusyError(portName),
 			IOException { HResult: SharingViolation } => new PortBusyError(portName),
-			_ => new PortNotFoundError(portName)
+			_ => new PortNotFoundError(portName).CausedBy(exception)
 		};
 	}
 

@@ -43,12 +43,12 @@ public sealed class FrameReader
 		}
 	}
 
-	/// <summary>Decodes the bytes already in the pipe without waiting; returns whether the writer has completed.</summary>
-	public bool DecodeBuffered(PipeReader reader, ICollection<BoardFrame> frames)
+	/// <summary>Decodes the bytes already in the pipe without waiting.</summary>
+	public void DecodeBuffered(PipeReader reader, ICollection<BoardFrame> frames)
 	{
 		if (!reader.TryRead(out var result))
 		{
-			return false;
+			return;
 		}
 
 		var buffer = result.Buffer;
@@ -59,7 +59,6 @@ public sealed class FrameReader
 		}
 
 		reader.AdvanceTo(buffer.Start, buffer.End);
-		return result.IsCompleted;
 	}
 
 	private void DecodeAll(ref ReadOnlySequence<byte> buffer, ICollection<BoardFrame> frames)

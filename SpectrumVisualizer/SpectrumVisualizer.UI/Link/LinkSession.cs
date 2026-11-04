@@ -29,6 +29,8 @@ internal sealed class LinkSession(
 		resumeWriterThreshold: 32768,
 		useSynchronizationContext: false);
 
+	// Monotonic, so a wall clock step never fakes or hides a silence.
+	private readonly IStopwatch _stopwatch = scheduler.StartStopwatch();
 	private readonly SequenceTracker _sequenceTracker = new();
 	private readonly List<BoardFrame> _decoded = [];
 	private long _lostSpectra;
@@ -38,10 +40,10 @@ internal sealed class LinkSession(
 
 	private Pipe _pipe = new(_pipeOptions);
 	private FrameReader _frameReader = new();
-	private DateTimeOffset _openedAt;
-	private DateTimeOffset? _lastByteAt;
-	private DateTimeOffset? _lastFrameAt;
-	private DateTimeOffset? _lastDrainAt;
+	private TimeSpan _openedAt;
+	private TimeSpan? _lastByteAt;
+	private TimeSpan? _lastFrameAt;
+	private TimeSpan? _lastDrainAt;
 	private long _bytesSinceFrame;
 	private BoardState? _board;
 	private LinkState _state;
@@ -55,8 +57,7 @@ internal sealed class LinkSession(
 			while (true)
 			{
 				cancellationToken.ThrowIfCancellationRequested();
-				var failure = await OpenAndReadAsync(cancellationToken).ConfigureAwait(false);
-				await WaitForReopenAsync(failure, cancellationToken).ConfigureAwait(false);
+				await OpenAndReadAsync(cancellationToken).ConfigureAwait(false);
 			}
 		}
 		catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -70,25 +71,40 @@ internal sealed class LinkSession(
 		}
 	}
 
-	/// <summary>Returns the error that ended this attempt: the failed open, or the loss of the open port.</summary>
-	private async Task<IError> OpenAndReadAsync(CancellationToken cancellationToken)
+	/// <summary>One open attempt: reads until the port is lost, then waits out the reopen interval.</summary>
+	private async Task OpenAndReadAsync(CancellationToken cancellationToken)
 	{
 		logger.LogDebug("Opening port {Port}", portName);
 		var opened = serialPortProvider.Open(portName);
 		if (opened.IsFailed)
 		{
 			logger.LogDebug("Opening port {Port} failed: {Reason}", portName, opened.Errors[0].Message);
-			return opened.Errors[0];
+			await WaitForReopenAsync(opened.Errors[0], cancellationToken).ConfigureAwait(false);
+			return;
 		}
 
-		await ReadPortAsync(opened.Value, cancellationToken).ConfigureAwait(false);
-		return new PortLostError(portName);
+		var port = opened.Value;
+		Task reopen;
+		try
+		{
+			await ReadPortAsync(port, cancellationToken).ConfigureAwait(false);
+
+			// Started before the port closes, so a driver that blocks in dispose cannot hold the last status.
+			reopen = WaitForReopenAsync(new PortLostError(portName), cancellationToken);
+		}
+		finally
+		{
+			await ClosePortAsync(port).ConfigureAwait(false);
+		}
+
+		await reopen.ConfigureAwait(false);
 	}
 
 	/// <summary>Arms the reopen timer before publishing PortUnavailable, so a status reader may move the clock.</summary>
 	private async Task WaitForReopenAsync(IError failure, CancellationToken cancellationToken)
 	{
-		var reopen = new TaskCompletionSource();
+		cancellationToken.ThrowIfCancellationRequested();
+		var reopen = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 		using var timer = scheduler.Schedule(_reopenInterval, () => reopen.TrySetResult());
 		using var cancellation = cancellationToken.Register(() => reopen.TrySetCanceled(cancellationToken));
 
@@ -100,38 +116,30 @@ internal sealed class LinkSession(
 		await reopen.Task.ConfigureAwait(false);
 	}
 
-	/// <summary>Returns when the port is lost; tears the pipe down and closes the port on every exit.</summary>
+	/// <summary>Returns when the port is lost; an exception or cancellation leaves through the caller's teardown.</summary>
 	private async Task ReadPortAsync(Stream port, CancellationToken cancellationToken)
 	{
-		try
+		StartReading();
+		while (true)
 		{
-			StartReading();
-			while (true)
+			var count = await ReadOnceAsync(port, cancellationToken).ConfigureAwait(false);
+			if (count == EndOfStream)
 			{
-				var count = await ReadOnceAsync(port, cancellationToken).ConfigureAwait(false);
-				if (count == EndOfStream)
-				{
-					return;
-				}
-
-				var now = scheduler.Now;
-				if (count is { } byteCount)
-				{
-					await AcceptBytesAsync(byteCount, now, cancellationToken).ConfigureAwait(false);
-				}
-				else if (!serialPortProvider.PortNames().Contains(portName, StringComparer.OrdinalIgnoreCase))
-				{
-					logger.LogDebug("Port {Port} left the port list", portName);
-					return;
-				}
-
-				await UpdateHealthAsync(now).ConfigureAwait(false);
+				return;
 			}
-		}
-		finally
-		{
-			await CompletePipeAsync().ConfigureAwait(false);
-			await port.DisposeAsync().ConfigureAwait(false);
+
+			var now = _stopwatch.Elapsed;
+			if (count is { } byteCount)
+			{
+				await AcceptBytesAsync(byteCount, now, cancellationToken).ConfigureAwait(false);
+			}
+			else if (!IsPortStillListed())
+			{
+				logger.LogDebug("Port {Port} left the port list", portName);
+				return;
+			}
+
+			await UpdateHealthAsync(now).ConfigureAwait(false);
 		}
 	}
 
@@ -140,7 +148,7 @@ internal sealed class LinkSession(
 		_pipe = new Pipe(_pipeOptions);
 		_sequenceTracker.Reset();
 		_frameReader = new FrameReader();
-		_openedAt = scheduler.Now;
+		_openedAt = _stopwatch.Elapsed;
 		_lastByteAt = null;
 		_lastFrameAt = null;
 		_lastDrainAt = null;
@@ -169,7 +177,21 @@ internal sealed class LinkSession(
 		}
 	}
 
-	private async Task AcceptBytesAsync(int count, DateTimeOffset now, CancellationToken cancellationToken)
+	/// <summary>A port list that cannot be read is no proof of a loss, so the port counts as listed.</summary>
+	private bool IsPortStillListed()
+	{
+		try
+		{
+			return serialPortProvider.PortNames().Contains(portName, StringComparer.OrdinalIgnoreCase);
+		}
+		catch (Exception exception) when (exception is not OperationCanceledException)
+		{
+			logger.LogDebug(exception, "Listing the ports failed; port {Port} counts as listed", portName);
+			return true;
+		}
+	}
+
+	private async Task AcceptBytesAsync(int count, TimeSpan now, CancellationToken cancellationToken)
 	{
 		_pipe.Writer.Advance(count);
 		await _pipe.Writer.FlushAsync(cancellationToken).ConfigureAwait(false);
@@ -180,7 +202,7 @@ internal sealed class LinkSession(
 	}
 
 	/// <summary>Drains before judging, so a stall that hid real frames never shows a fault state.</summary>
-	private async Task UpdateHealthAsync(DateTimeOffset now)
+	private async Task UpdateHealthAsync(TimeSpan now)
 	{
 		if (LinkHealth.IsDrainDue(now, _lastFrameAt ?? _openedAt, _lastDrainAt, _lastByteAt))
 		{
@@ -199,7 +221,7 @@ internal sealed class LinkSession(
 	}
 
 	/// <summary>Releases the frames behind a stalled candidate and drops the partial frame in flight.</summary>
-	private async Task DrainAsync(DateTimeOffset now)
+	private async Task DrainAsync(TimeSpan now)
 	{
 		await _pipe.Writer.CompleteAsync().ConfigureAwait(false);
 		_frameReader.DecodeBuffered(_pipe.Reader, _decoded);
@@ -211,7 +233,7 @@ internal sealed class LinkSession(
 	}
 
 	/// <summary>Frames are stamped with the time they leave the decoder, which for a drain is the drain time.</summary>
-	private void Deliver(DateTimeOffset now)
+	private void Deliver(TimeSpan now)
 	{
 		if (_decoded.Count == 0)
 		{
@@ -236,10 +258,18 @@ internal sealed class LinkSession(
 		_bytesSinceFrame = 0;
 	}
 
-	private async Task CompletePipeAsync()
+	/// <summary>Nested, so a pipe failure cannot leak the port.</summary>
+	private async Task ClosePortAsync(Stream port)
 	{
-		await _pipe.Writer.CompleteAsync().ConfigureAwait(false);
-		await _pipe.Reader.CompleteAsync().ConfigureAwait(false);
+		try
+		{
+			await _pipe.Writer.CompleteAsync().ConfigureAwait(false);
+			await _pipe.Reader.CompleteAsync().ConfigureAwait(false);
+		}
+		finally
+		{
+			await port.DisposeAsync().ConfigureAwait(false);
+		}
 	}
 
 	private LinkError? FaultOnEntry(LinkState state)

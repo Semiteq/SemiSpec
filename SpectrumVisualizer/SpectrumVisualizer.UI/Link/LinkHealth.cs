@@ -2,7 +2,7 @@ using SpectrumVisualizer.Core.Protocol;
 
 namespace SpectrumVisualizer.UI.Link;
 
-/// <summary>The OptoskyProj#20 health rules of an open port, as pure functions of the read loop's timestamps.</summary>
+/// <summary>The OptoskyProj#20 health rules of an open port, as pure functions of the read loop's monotonic stamps.</summary>
 internal static class LinkHealth
 {
 	public static readonly TimeSpan Window = TimeSpan.FromSeconds(10);
@@ -12,10 +12,10 @@ internal static class LinkHealth
 
 	/// <summary>The reference is the last valid frame, or the port open before the first one.</summary>
 	public static LinkState Evaluate(
-		DateTimeOffset now,
-		DateTimeOffset openedAt,
-		DateTimeOffset? lastByteAt,
-		DateTimeOffset? lastFrameAt,
+		TimeSpan now,
+		TimeSpan openedAt,
+		TimeSpan? lastByteAt,
+		TimeSpan? lastFrameAt,
 		long bytesSinceFrame)
 	{
 		var reference = lastFrameAt ?? openedAt;
@@ -29,10 +29,10 @@ internal static class LinkHealth
 	}
 
 	public static bool IsDrainDue(
-		DateTimeOffset now,
-		DateTimeOffset reference,
-		DateTimeOffset? lastDrainAt,
-		DateTimeOffset? lastByteAt)
+		TimeSpan now,
+		TimeSpan reference,
+		TimeSpan? lastDrainAt,
+		TimeSpan? lastByteAt)
 	{
 		var since = lastDrainAt is { } drainAt && drainAt > reference ? drainAt : reference;
 		var byteSinceReference = lastByteAt is { } byteAt && byteAt > reference;

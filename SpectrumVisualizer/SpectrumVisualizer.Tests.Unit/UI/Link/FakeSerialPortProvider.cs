@@ -4,7 +4,7 @@ using SpectrumVisualizer.UI.Link;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Link;
 
-/// <summary>Hands out the open results a test queues, counts opens and lists the ports a test sets.</summary>
+/// <summary>Hands out the open results a test queues, counts opens and lists the ports a test sets or throws its failure.</summary>
 internal sealed class FakeSerialPortProvider : ISerialPortProvider
 {
 	// The test thread and the link's session thread both reach every field below; _gate guards them.
@@ -12,6 +12,7 @@ internal sealed class FakeSerialPortProvider : ISerialPortProvider
 	private readonly Queue<Result<Stream>> _openResults = new();
 	private readonly List<string> _portNames = [];
 	private int _openCount;
+	private Exception? _portNamesFailure;
 
 	public FakeSerialPortProvider(params string[] portNames)
 	{
@@ -38,6 +39,14 @@ internal sealed class FakeSerialPortProvider : ISerialPortProvider
 		}
 	}
 
+	public void FailPortNames(Exception failure)
+	{
+		lock (_gate)
+		{
+			_portNamesFailure = failure;
+		}
+	}
+
 	public void QueueOpen(Stream stream)
 	{
 		QueueOpen(Result.Ok(stream));
@@ -52,7 +61,7 @@ internal sealed class FakeSerialPortProvider : ISerialPortProvider
 	{
 		lock (_gate)
 		{
-			return [.. _portNames];
+			return _portNamesFailure is { } failure ? throw failure : [.. _portNames];
 		}
 	}
 

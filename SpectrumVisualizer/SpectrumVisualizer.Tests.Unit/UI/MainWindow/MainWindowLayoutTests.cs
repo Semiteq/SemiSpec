@@ -107,9 +107,10 @@ public sealed class MainWindowLayoutTests : IDisposable
 			$"{culture}: faces {string.Join(", ", RenderedText.InstalledFamilies(family))} + Inter at {fontSize} px; "
 			+ $"connection row {connectionWidth:0.#} px, status bar {statusWidth:0.#} px, "
 			+ $"window minimum {MainWindowView.MinimumWidth} px");
+		var faces = $"measured in {string.Join(", ", RenderedText.InstalledFamilies(family))} and Inter";
 		window.MinWidth.Should().Be(MainWindowView.MinimumWidth);
-		connectionWidth.Should().BeLessThanOrEqualTo(MainWindowView.MinimumWidth, "the whole connection row shows");
-		statusWidth.Should().BeLessThanOrEqualTo(MainWindowView.MinimumWidth, "every status segment shows whole");
+		connectionWidth.Should().BeLessThanOrEqualTo(MainWindowView.MinimumWidth, $"the whole connection row shows, {faces}");
+		statusWidth.Should().BeLessThanOrEqualTo(MainWindowView.MinimumWidth, $"every status segment shows whole, {faces}");
 	}
 
 	[AvaloniaTheory]
@@ -263,9 +264,13 @@ public sealed class MainWindowLayoutTests : IDisposable
 	/// <summary>The row's natural width less its texts' stub widths: padding, margins, spacing, borders, the fixed controls.</summary>
 	private static double ChromeWidth(Border row, IReadOnlyCollection<TextBlock> texts)
 	{
-		row.DesiredSize.Width.Should().BeLessThanOrEqualTo(row.Bounds.Width, "nothing in the row is clipped at the opening width");
+		// Avalonia clamps DesiredSize to the space offered, so only an unbounded measure shows an overflow.
+		row.Measure(Size.Infinity);
+		var naturalWidth = row.DesiredSize.Width;
+		var textWidths = texts.Sum(text => text.DesiredSize.Width - text.Margin.Left - text.Margin.Right);
+		naturalWidth.Should().BeLessThanOrEqualTo(row.Bounds.Width, "nothing in the row is clipped at the opening width");
 
-		return row.DesiredSize.Width - texts.Sum(text => text.Bounds.Width);
+		return naturalWidth - textWidths;
 	}
 
 	private static IEnumerable<Control> Parts(Window window)

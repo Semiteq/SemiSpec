@@ -186,7 +186,7 @@ public sealed class FrameReaderTests
 			var size = Math.Min(random.Next(1, 600), stream.Length - offset);
 			await pipe.Writer.WriteAsync(stream.AsMemory(offset, size), ct);
 			offset += size;
-			reader.DecodeBuffered(pipe.Reader, decoded).Should().BeFalse();
+			reader.DecodeBuffered(pipe.Reader, decoded);
 		}
 
 		decoded.Should().BeEquivalentTo(frames, options => options.WithStrictOrdering());
@@ -203,22 +203,22 @@ public sealed class FrameReaderTests
 		var bytes = FrameEncoder.Encode(Heartbeat(5));
 
 		await pipe.Writer.WriteAsync(bytes.AsMemory(0, 5), ct);
-		reader.DecodeBuffered(pipe.Reader, decoded).Should().BeFalse();
+		reader.DecodeBuffered(pipe.Reader, decoded);
 		decoded.Should().BeEmpty();
 
 		await pipe.Writer.WriteAsync(bytes.AsMemory(5), ct);
-		reader.DecodeBuffered(pipe.Reader, decoded).Should().BeFalse();
+		reader.DecodeBuffered(pipe.Reader, decoded);
 		decoded.Should().Equal(Heartbeat(5));
 		reader.DiscardedBytes.Should().Be(0);
 	}
 
 	[Fact]
-	public void DecodeBufferedOnAnEmptyPipeReturnsNoFrame()
+	public void DecodeBufferedOnAnEmptyPipeAddsNoFrame()
 	{
 		var pipe = new Pipe();
 		var decoded = new List<BoardFrame>();
 
-		new FrameReader().DecodeBuffered(pipe.Reader, decoded).Should().BeFalse();
+		new FrameReader().DecodeBuffered(pipe.Reader, decoded);
 
 		decoded.Should().BeEmpty();
 	}
@@ -231,7 +231,7 @@ public sealed class FrameReaderTests
 		var decoded = new List<BoardFrame>();
 		await pipe.Writer.WriteAsync(Concat(FrameEncoder.Encode(Heartbeat(1)), FrameEncoder.Encode(Heartbeat(2))), ct);
 
-		new FrameReader().DecodeBuffered(pipe.Reader, decoded).Should().BeFalse();
+		new FrameReader().DecodeBuffered(pipe.Reader, decoded);
 
 		decoded.Should().Equal(Heartbeat(1), Heartbeat(2));
 	}
@@ -248,11 +248,11 @@ public sealed class FrameReaderTests
 			Concat(falseCandidate, FrameEncoder.Encode(Heartbeat(6)), FrameEncoder.Encode(Heartbeat(7))),
 			ct);
 
-		reader.DecodeBuffered(pipe.Reader, decoded).Should().BeFalse();
+		reader.DecodeBuffered(pipe.Reader, decoded);
 		decoded.Should().BeEmpty();
 
 		await pipe.Writer.CompleteAsync();
-		reader.DecodeBuffered(pipe.Reader, decoded).Should().BeTrue();
+		reader.DecodeBuffered(pipe.Reader, decoded);
 
 		decoded.Should().Equal(Heartbeat(6), Heartbeat(7));
 		reader.DiscardedBytes.Should().Be(falseCandidate.Length);
@@ -268,11 +268,11 @@ public sealed class FrameReaderTests
 		var partial = FrameEncoder.Encode(Heartbeat(4))[..5];
 
 		await pipe.Writer.WriteAsync(Concat([0x01, 0x02, 0x03], FrameEncoder.Encode(Heartbeat(3)), partial), ct);
-		reader.DecodeBuffered(pipe.Reader, decoded).Should().BeFalse();
+		reader.DecodeBuffered(pipe.Reader, decoded);
 		reader.DiscardedBytes.Should().Be(3);
 
 		await pipe.Writer.CompleteAsync();
-		reader.DecodeBuffered(pipe.Reader, decoded).Should().BeTrue();
+		reader.DecodeBuffered(pipe.Reader, decoded);
 
 		decoded.Should().Equal(Heartbeat(3));
 		reader.DiscardedBytes.Should().Be(3 + partial.Length);

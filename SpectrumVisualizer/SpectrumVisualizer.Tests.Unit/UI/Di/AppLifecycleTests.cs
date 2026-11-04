@@ -48,6 +48,7 @@ public sealed class AppLifecycleTests : IDisposable
 	public async Task ClosingTheWindowWaitsUntilTheLinkReportsDisconnected()
 	{
 		await using var port = new FakePortStream();
+		port.HoldDispose();
 		_portProvider.QueueOpen(port);
 		using var provider = BuildContainer();
 		var link = provider.GetRequiredService<SerialLink>();
@@ -55,9 +56,14 @@ public sealed class AppLifecycleTests : IDisposable
 		link.Connect(PortName);
 		await port.WaitForPendingReadAsync().WaitAsync(_waitLimit, TestContext.Current.CancellationToken);
 
-		// Subscribed after the app's handler, so each entry is the decision the app made for that close.
+		// Subscribed after the app's handler, so each entry is the decision the app made for that close. The held
+		// dispose keeps the session running until the app has decided the first close.
 		var closeCancelled = new List<bool>();
-		window.Closing += (_, e) => closeCancelled.Add(e.Cancel);
+		window.Closing += (_, e) =>
+		{
+			closeCancelled.Add(e.Cancel);
+			port.ReleaseDispose();
+		};
 		var stateAtClose = new TaskCompletionSource<LinkState>();
 		window.Closed += (_, _) => stateAtClose.TrySetResult(link.Status.State);
 

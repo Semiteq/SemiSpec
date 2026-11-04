@@ -1,4 +1,5 @@
 using System.Reactive.Concurrency;
+using System.Reactive.Linq;
 using System.Threading.Channels;
 
 using Microsoft.Extensions.Logging;
@@ -25,7 +26,9 @@ public sealed class SerialLink : IDisposable
 
 	// Written by the session task only, read from any thread.
 	private LinkStatus _status = _disconnected;
-	private long _droppedFrames;
+
+	// Reset by Connect while no session runs, then written by the session task only.
+	private bool _frameDropLogged;
 
 	public SerialLink(ISerialPortProvider serialPortProvider, IScheduler scheduler, ILogger<SerialLink> logger)
 	{
@@ -41,35 +44,53 @@ public sealed class SerialLink : IDisposable
 		_frames = Channel.CreateBounded<BoardFrame>(options, OnFrameDropped);
 	}
 
-	/// <summary>Raised on the session task's thread, only when the status differs from the last one.</summary>
+	/// <summary>Raised on a thread-pool thread of the session task, never inside Connect or DisconnectAsync.</summary>
 	public event EventHandler<LinkStatus>? StatusChanged;
 
 	public ChannelReader<BoardFrame> Frames => _frames.Reader;
 
 	public LinkStatus Status => Volatile.Read(ref _status);
 
-	public long DroppedFrames => Interlocked.Read(ref _droppedFrames);
+	/// <summary>The status at subscription, then every change, delivered on the given scheduler.</summary>
+	public IObservable<LinkStatus> StatusUpdates(IScheduler scheduler)
+	{
+		return Observable
+			.FromEventPattern<LinkStatus>(
+				handler => StatusChanged += handler,
+				handler => StatusChanged -= handler)
+			.Select(pattern => pattern.EventArgs)
+			.ObserveOn(scheduler)
+			.StartWith(Status);
+	}
 
 	/// <summary>Starts a session on the port; does nothing while a session runs.</summary>
 	public void Connect(string portName)
 	{
 		if (!_session.IsCompleted)
 		{
+			_logger.LogDebug("Connect to port {Port} ignored: the previous session is still stopping", portName);
 			return;
 		}
 
 		_sessionCancellation?.Dispose();
 		_sessionCancellation = new CancellationTokenSource();
+		_frameDropLogged = false;
 		var cancellationToken = _sessionCancellation.Token;
 		var session = new LinkSession(portName, _serialPortProvider, _scheduler, _frames.Writer, Publish, _logger);
 		_session = Task.Run(() => RunSessionAsync(session, portName, cancellationToken), CancellationToken.None);
 	}
 
-	/// <summary>Cancels the session and completes once it has published Disconnected.</summary>
-	public Task DisconnectAsync()
+	/// <summary>Cancels the session and completes once it has published Disconnected; an idle link completes at once.</summary>
+	public async Task DisconnectAsync()
 	{
-		_sessionCancellation?.Cancel();
-		return _session;
+		var session = _session;
+		if (session.IsCompleted || _sessionCancellation is null)
+		{
+			return;
+		}
+
+		await _sessionCancellation.CancelAsync().ConfigureAwait(false);
+		await session.ConfigureAwait(false);
 	}
 
 	/// <summary>Cancels the session without waiting, for the container's synchronous dispose.</summary>
@@ -104,9 +125,15 @@ public sealed class SerialLink : IDisposable
 		StatusChanged?.Invoke(this, status);
 	}
 
+	/// <summary>A reader that falls behind drops many frames in a row, so only the first drop of a session is logged.</summary>
 	private void OnFrameDropped(BoardFrame frame)
 	{
-		Interlocked.Increment(ref _droppedFrames);
-		_logger.LogDebug("The frame channel is full; dropped the frame with seq {Seq}", frame.Seq);
+		if (_frameDropLogged)
+		{
+			return;
+		}
+
+		_frameDropLogged = true;
+		_logger.LogDebug("The frame channel is full; dropping the oldest frames from seq {Seq} on", frame.Seq);
 	}
 }

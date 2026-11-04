@@ -24,14 +24,8 @@ public sealed class ConnectionBarViewModel : ReactiveObject, IDisposable
 		_serialPortProvider = serialPortProvider;
 		_serialLink = serialLink;
 
-		// The seed follows the scheduler hop, so IsIdle holds the link's state from construction on.
-		_disposables.Add(Observable
-			.FromEventPattern<LinkStatus>(
-				handler => serialLink.StatusChanged += handler,
-				handler => serialLink.StatusChanged -= handler)
-			.Select(pattern => pattern.EventArgs)
-			.ObserveOn(uiScheduler)
-			.StartWith(serialLink.Status)
+		_disposables.Add(serialLink
+			.StatusUpdates(uiScheduler)
 			.Select(status => status.State == LinkState.Disconnected)
 			.ToProperty(this, bar => bar.IsIdle, out _isIdle));
 

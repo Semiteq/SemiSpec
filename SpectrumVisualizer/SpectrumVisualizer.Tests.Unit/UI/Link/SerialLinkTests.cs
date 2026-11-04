@@ -1,3 +1,5 @@
+using System.Reactive.Concurrency;
+
 using AwesomeAssertions;
 
 using FluentResults;
@@ -24,7 +26,7 @@ public sealed class SerialLinkTests : IAsyncLifetime
 
 	private static readonly TimeSpan _waitLimit = TimeSpan.FromSeconds(5);
 
-	private readonly TestScheduler _scheduler = new();
+	private readonly TimerCountingScheduler _scheduler = new();
 	private readonly FakeSerialPortProvider _provider = new(PortName);
 	private readonly FakePortStream _port = new();
 	private readonly SerialLink _link;
@@ -95,7 +97,7 @@ public sealed class SerialLinkTests : IAsyncLifetime
 		var notResponding = Statuses().Where(status => status.State == LinkState.NotResponding).ToList();
 		notResponding.Should().ContainSingle();
 		notResponding[0].Fault.Should().BeOfType<BoardNotRespondingError>()
-			.Which.Metadata[LinkError.PortKey].Should().Be(PortName);
+			.Which.Message.Should().Contain(PortName);
 		_link.Status.State.Should().Be(LinkState.NotResponding);
 	}
 
@@ -186,7 +188,6 @@ public sealed class SerialLinkTests : IAsyncLifetime
 		await AtAsync(0, port => port.PushBytes(Concat(frames.Select(FrameEncoder.Encode))));
 
 		TakeFrames().Should().Equal(frames[1..]);
-		_link.DroppedFrames.Should().Be(1);
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
@@ -245,6 +246,34 @@ public sealed class SerialLinkTests : IAsyncLifetime
 		_port.PushTimeout();
 
 		await ShouldReportPortLostAsync();
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task APortListThatCannotBeReadKeepsThePortOpen()
+	{
+		await ConnectAsync();
+		_provider.FailPortNames(new IOException("the port registry key is gone"));
+
+		await AtAsync(1, port => port.PushTimeout());
+
+		_link.Status.State.Should().Be(LinkState.Waiting);
+		Statuses().Should().NotContain(status => status.State == LinkState.PortUnavailable);
+		_port.IsDisposed.Should().BeFalse();
+		_provider.OpenCount.Should().Be(1);
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task PortUnavailableIsPublishedWhileTheLostPortIsStillClosing()
+	{
+		await ConnectAsync();
+		_port.HoldDispose();
+
+		_port.PushZeroRead();
+		await WaitForStateAsync(LinkState.PortUnavailable);
+
+		_port.IsDisposed.Should().BeFalse();
+		_port.ReleaseDispose();
+		await WaitUntilAsync(() => _port.IsDisposed);
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
@@ -354,7 +383,7 @@ public sealed class SerialLinkTests : IAsyncLifetime
 		Statuses().Select(status => status.State).Should().Equal(
 			LinkState.Connecting, LinkState.PortUnavailable, LinkState.Waiting);
 		Faults().Should().ContainSingle().Which.Should().BeOfType<PortBusyError>()
-			.Which.Metadata[LinkError.PortKey].Should().Be(PortName);
+			.Which.Message.Should().Contain(PortName);
 		_provider.OpenCount.Should().Be(3);
 	}
 
@@ -367,7 +396,7 @@ public sealed class SerialLinkTests : IAsyncLifetime
 		await WaitForStateAsync(LinkState.PortUnavailable);
 
 		_link.Status.Fault.Should().BeOfType<PortNotFoundError>()
-			.Which.Metadata[LinkError.PortKey].Should().Be(PortName);
+			.Which.Message.Should().Contain(PortName);
 		await ReopenAsync(_port, 1);
 
 		_link.Status.State.Should().Be(LinkState.Waiting);
@@ -501,7 +530,7 @@ public sealed class SerialLinkTests : IAsyncLifetime
 		_scheduler.AdvanceTo(Ticks(seconds));
 		port.PushZeroRead();
 		await WaitUntilAsync(() => CountOf(LinkState.PortUnavailable) > losses);
-		port.IsDisposed.Should().BeTrue();
+		await WaitUntilAsync(() => port.IsDisposed);
 	}
 
 	private Task ReadPendingAsync()
@@ -516,12 +545,13 @@ public sealed class SerialLinkTests : IAsyncLifetime
 		await port.WaitForPendingReadAsync().WaitAsync(_waitLimit);
 	}
 
+	/// <summary>A retry publishes nothing new, so the wait ends when the next reopen timer is armed.</summary>
 	private async Task FailReopenAsync(double seconds, IError failure)
 	{
-		var opens = _provider.OpenCount;
+		var timers = _scheduler.TimerCount;
 		_provider.QueueOpenFailure(failure);
 		_scheduler.AdvanceTo(Ticks(seconds));
-		await WaitUntilAsync(() => _provider.OpenCount > opens);
+		await WaitUntilAsync(() => _scheduler.TimerCount > timers);
 	}
 
 	private Task WaitForStateAsync(LinkState state)
@@ -535,8 +565,8 @@ public sealed class SerialLinkTests : IAsyncLifetime
 
 		_link.Status.State.Should().Be(LinkState.PortUnavailable);
 		_link.Status.Fault.Should().BeOfType<PortLostError>()
-			.Which.Metadata[LinkError.PortKey].Should().Be(PortName);
-		_port.IsDisposed.Should().BeTrue();
+			.Which.Message.Should().Contain(PortName);
+		await WaitUntilAsync(() => _port.IsDisposed);
 		_provider.OpenCount.Should().Be(1);
 	}
 
@@ -575,5 +605,24 @@ public sealed class SerialLinkTests : IAsyncLifetime
 		}
 
 		return frames;
+	}
+
+	/// <summary>Counts the timers the link arms, so a test can wait for a retry that changes no status.</summary>
+	private sealed class TimerCountingScheduler : TestScheduler
+	{
+		// Incremented on the link's session thread, read on the test thread.
+		private int _timerCount;
+
+		public int TimerCount => Volatile.Read(ref _timerCount);
+
+		public override IDisposable ScheduleAbsolute<TState>(
+			TState state,
+			long dueTime,
+			Func<IScheduler, TState, IDisposable> action)
+		{
+			var timer = base.ScheduleAbsolute(state, dueTime, action);
+			Interlocked.Increment(ref _timerCount);
+			return timer;
+		}
 	}
 }

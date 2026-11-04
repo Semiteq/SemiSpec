@@ -45,7 +45,7 @@ the board emulator, writes protocol frames to a serial port for manual runs.
 | `LinkSession` | UI | One Connect: opens, reads, decodes, judges the health, drains, reopens and publishes every status, in one task |
 | `LinkHealth` | UI | The 10 s health rules and the drain rule, as pure functions of timestamps |
 | `LinkState`, `LinkStatus` | UI | What the link publishes: the state, the port, the latest `state` bits, the lost total and the fault on entry |
-| `LinkError` and its five errors | UI | `PortBusyError`, `PortNotFoundError`, `PortLostError`, `BoardNotRespondingError`, `UnrecognisedDataError`, each with the port in its metadata |
+| `LinkError` and its five errors | UI | `PortBusyError`, `PortNotFoundError`, `PortLostError`, `BoardNotRespondingError`, `UnrecognisedDataError`, each with the port in its message |
 | `AppLogging` | UI | Creates the log folder and the Serilog logger: `spectrum-visualizer.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
 | `AddUi(LoggingSetup)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, the message panel, the connection row, the status bar and the main window view model, all singletons |
@@ -55,7 +55,7 @@ the board emulator, writes protocol frames to a serial port for manual runs.
 | `ConnectionBarViewModel` | UI | The port list, the selection and the Refresh, Connect and Disconnect commands |
 | `AppStatusBarViewModel` | UI | The status bar texts and dot tone from `SerialLink.Status`; reports each fault and the restored entry to the panel |
 | `MessagePanelViewModel` | UI | The bounded, newest-first list of messages the operator reads |
-| `MessageSeverity`, `SeverityMatchConverter` | UI | Info, Warning or Error on a message, and the dot class it selects |
+| `MessageSeverity` | UI | Info, Warning or Error on a message; the panel picks the dot class with `ObjectConverters.Equal` against each value |
 | `ResultReporting`, `ErrorMessageMapper` | UI | The route from a failed `Result` to the panel and the log |
 | `UnhandledErrorObserver` | UI | ReactiveUI's last-resort exception handler and the dispatcher's unhandled-exception handler |
 
@@ -84,15 +84,18 @@ no-op. The view models come from the container inside `AfterSetup` for this reas
 The window's `Opened` event refreshes the port list once. The window's `Closing` event is where an operator close (the
 close button, File, Exit) stops the link:
 
-- When the link is idle, `DisconnectAsync` is already complete and the close goes ahead.
-- Otherwise the first `Closing` cancels the close, awaits `SerialLink.DisconnectAsync()` for at most 5 s of real time
-  (a timeout logs a Warning) and closes the window again. A close that arrives while the stop runs stays cancelled and
-  issues no second close.
+- When the link is idle, `DisconnectAsync` completes at once and the close goes ahead.
+- When the stop has not completed by the time the first `Closing` checks it, that `Closing` cancels the close, awaits
+  `SerialLink.DisconnectAsync()` for at most 5 s of real time (a timeout logs a Warning) and closes the window again.
+  For an active link this is the usual case, because `DisconnectAsync` cancels through `CancelAsync` and the session
+  finishes on the thread pool. A close that arrives while the stop runs stays cancelled and issues no second close.
 - An OS shutdown closes the window through the same event, but a window cannot prevent it, so the stop is best-effort
   there.
 
 The container's dispose after `App.Run` returns calls `SerialLink.Dispose()`, which cancels a session that is still
-running without waiting for it.
+running without waiting for it. After a 5 s timeout the session can outlive the window: `Program` then calls
+`Log.CloseAndFlush()` while the session may still write its last lines (the port close, "The link on port ... stopped"),
+and those lines are not guaranteed to reach the log file. The process exits regardless.
 
 ## Main window
 
@@ -109,12 +112,13 @@ running without waiting for it.
 The window is 1280 by 800 and opens centred. Exit is view work: the view model emits on `ExitRequests`, and the window
 subscribes in `OnLoaded`, unsubscribes in `OnUnloaded`, and closes itself.
 
-`MainWindow.MinimumWidth` is 968 px, the window's `MinWidth`. It is the widest row with its longest texts, rounded up
-to the 8 px grid: the Russian status bar with `COM256` and a six-digit lost count measures 962.3 px (English 900.8 px),
-the connection row 654.9 px in Russian (English 595.4 px). The headless text stub gives no real widths, so
-`MainWindowLayoutTests` adds the realised row chrome to each text measured through SkiaSharp at 14 px in the widest of
-Inter and every installed family of Semi's font chain; on Windows the app resolves that chain to Microsoft YaHei. Both
-rows stay left-aligned at any width above the minimum, and no link state changes the set of rows or a row's height.
+`MainWindow.MinimumWidth` is 1048 px, the window's `MinWidth`. It is the widest row with its longest texts, rounded up
+to the 8 px grid: the Russian status bar with `COM256`, a six-digit lost count and "Порт недоступен, переподключение"
+measures 1042.4 px (English 900.8 px), the connection row 654.9 px in Russian (English 595.4 px). The headless text stub
+gives no real widths, so `MainWindowLayoutTests` adds the realised row chrome to each text measured through SkiaSharp at
+14 px in the widest of Inter and every installed family of Semi's font chain; on Windows the app resolves that chain to
+Microsoft YaHei. Both rows stay left-aligned at any width above the minimum, and no link state changes the set of rows
+or a row's height.
 
 The Verbose logging item reads `IsVerboseLogging` one-way and writes only through `ToggleVerboseLoggingCommand`, so the
 command is the level's single writer. `LogLevelControl` raises no notification; the command raises
@@ -125,16 +129,16 @@ toggle turned verbose logging on, so the operator sees the switch take effect in
 ### Connection row
 
 The port list and Connect are enabled only while the link is Disconnected; Connect also needs a selected port.
-Disconnect is enabled in every other state, and Refresh in every state. `IsIdle` follows `SerialLink.StatusChanged`
-moved to the UI scheduler and seeded with `SerialLink.Status`, so it is right from construction. Refresh reads the
-port list again and keeps the selection when its port is still listed. With no ports the list shows the placeholder
-"No ports found"; the placeholder is empty while ports are listed. Connect and Refresh are synchronous commands;
-Disconnect awaits `DisconnectAsync`.
+Disconnect is enabled in every other state, and Refresh in every state. `IsIdle` follows
+`SerialLink.StatusUpdates(uiScheduler)`, which starts with `SerialLink.Status` and moves every later change to the UI
+scheduler, so it is right from construction. Refresh reads the port list again and keeps the selection when its port is
+still listed. With no ports the list shows the placeholder "No ports found"; the placeholder is empty while ports are
+listed. Connect and Refresh are synchronous commands; Disconnect awaits `DisconnectAsync`.
 
 ### Status bar
 
-`AppStatusBarViewModel` follows `SerialLink.StatusChanged` the same way as the connection row and holds the latest
-`LinkStatus`; every text derives from it:
+`AppStatusBarViewModel` follows `SerialLink.StatusUpdates(uiScheduler)` the same way as the connection row and holds the
+latest `LinkStatus`; every text derives from it:
 
 | Segment | Text |
 | --- | --- |
@@ -147,9 +151,11 @@ The dot is `AppConnectionOkBrush` in Receiving, `AppConnectionFaultBrush` in Por
 OtherDevice, and `AppSecondaryForegroundBrush` otherwise. The link text always names the state, so colour never carries
 it alone.
 
-A status with a fault reports it through `ReportFailure`. The first Receiving after a fault adds one Info entry, "Data
-restored". A Connecting status clears the seen-fault flag, so the first Receiving after a Connect adds none. A throw
-inside the handler goes to `TryReportFailure`.
+A status with a fault reports it through `ReportFailure`. The first Receiving after a fault adds one Info entry,
+"Receiving data" with the detail "The board sends valid frames.". The text holds both when data returns after a loss
+and when a Connect that first met a busy or missing port starts receiving. A Connecting status clears the seen-fault
+flag, so the first Receiving after a fault-free Connect adds none. A throw inside the handler goes to
+`TryReportFailure`.
 
 ## Error route
 

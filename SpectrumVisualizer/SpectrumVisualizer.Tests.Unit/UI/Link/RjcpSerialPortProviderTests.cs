@@ -1,5 +1,7 @@
 using AwesomeAssertions;
 
+using FluentResults;
+
 using SpectrumVisualizer.UI.Link;
 
 using Xunit;
@@ -19,7 +21,9 @@ public sealed class RjcpSerialPortProviderTests
 		{ new IOException($"Sharing violation: {PortName}", 32), typeof(PortBusyError) },
 		{ new IOException($"Port not found: {PortName}", 2), typeof(PortNotFoundError) },
 		{ new IOException($"Unknown error 0x1F: {PortName}", 31), typeof(PortNotFoundError) },
-		{ new PathTooLongException($"Path too long: {PortName}"), typeof(PortNotFoundError) }
+		{ new PathTooLongException($"Path too long: {PortName}"), typeof(PortNotFoundError) },
+		{ new ArgumentException("Must provide a valid name for a COM port"), typeof(PortNotFoundError) },
+		{ new InvalidOperationException("Serial Port already opened"), typeof(PortNotFoundError) }
 	};
 
 	public static TheoryData<LinkError> LinkErrors =>
@@ -46,7 +50,19 @@ public sealed class RjcpSerialPortProviderTests
 		var error = RjcpSerialPortProvider.MapOpenFailure(PortName, exception);
 
 		error.Should().BeOfType(expected);
-		error.Metadata[LinkError.PortKey].Should().Be(PortName);
+		error.Message.Should().Contain(PortName);
+	}
+
+	[Fact]
+	public void MapOpenFailureKeepsTheExceptionOfAFailureThatIsNotABusyPort()
+	{
+		var thrown = new InvalidOperationException("the driver refused the settings");
+
+		var error = RjcpSerialPortProvider.MapOpenFailure(PortName, thrown);
+
+		error.Should().BeOfType<PortNotFoundError>();
+		error.Reasons.Should().ContainSingle().Which.Should().BeOfType<ExceptionalError>()
+			.Which.Exception.Should().BeSameAs(thrown);
 	}
 
 	[Fact]
@@ -58,14 +74,13 @@ public sealed class RjcpSerialPortProviderTests
 
 		result.IsFailed.Should().BeTrue();
 		result.Errors.Should().ContainSingle().Which.Should().BeOfType<PortNotFoundError>()
-			.Which.Metadata[LinkError.PortKey].Should().Be(MissingPort);
+			.Which.Message.Should().Contain(MissingPort);
 	}
 
 	[Theory]
 	[MemberData(nameof(LinkErrors))]
-	public void EveryLinkErrorNamesItsPortInTheMessageAndTheMetadata(LinkError error)
+	public void EveryLinkErrorNamesItsPortInTheMessage(LinkError error)
 	{
 		error.Message.Should().Contain(PortName);
-		error.Metadata[LinkError.PortKey].Should().Be(PortName);
 	}
 }

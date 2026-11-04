@@ -11,7 +11,8 @@ namespace SpectrumVisualizer.Tests.Unit.UI.Link;
 [Trait("Category", "Unit")]
 public sealed class LinkHealthTests
 {
-	private static readonly DateTimeOffset _openedAt = new(2026, 11, 4, 12, 0, 0, TimeSpan.Zero);
+	// The stamps are elapsed session time; the port opened 3 s into the session, so only differences matter.
+	private static readonly TimeSpan _openedAt = TimeSpan.FromSeconds(3);
 
 	/// <summary>Times are seconds after the port open; null means the event has not happened.</summary>
 	public static TheoryData<double, double?, double?, long, LinkState> HealthRows => new()
@@ -82,12 +83,12 @@ public sealed class LinkHealthTests
 			.Should().Be(expected);
 	}
 
-	private static DateTimeOffset At(double seconds)
+	private static TimeSpan At(double seconds)
 	{
 		return _openedAt + TimeSpan.FromSeconds(seconds);
 	}
 
-	private static DateTimeOffset? At(double? seconds)
+	private static TimeSpan? At(double? seconds)
 	{
 		return seconds is { } value ? At(value) : null;
 	}

@@ -26,16 +26,12 @@ public class App : Application
 
 	private static readonly TimeSpan _linkStopLimit = TimeSpan.FromSeconds(5);
 
-	private MainWindowViewModel? _mainWindowViewModel;
-	private SerialLink? _serialLink;
-	private ILogger<App>? _logger;
-
 	// Started by the first close of the main window; a later close passes once the stop completes.
 	private Task? _linkStop;
 
 	// Written once on the UI thread in Configure; read by UnhandledErrorObserver on whichever thread
 	// ReactiveUI raises the exception, so the write is published with volatile.
-	private volatile MessagePanelViewModel? _messagePanel;
+	private volatile ConfiguredServices? _services;
 
 	public override void Initialize()
 	{
@@ -64,21 +60,21 @@ public class App : Application
 
 	internal Window CreateMainWindow()
 	{
-		if (_mainWindowViewModel is not { } viewModel)
+		if (_services is not { } services)
 		{
 			throw new InvalidOperationException(
 				"The main window view model is not set. Call Run() before starting the app.");
 		}
 
-		var window = new MainWindow.MainWindow { DataContext = viewModel };
-		window.Opened += (_, _) => viewModel.ConnectionBar.RefreshPorts();
-		window.Closing += OnMainWindowClosing;
+		var window = new MainWindow.MainWindow { DataContext = services.MainWindow };
+		window.Opened += (_, _) => services.MainWindow.ConnectionBar.RefreshPorts();
+		window.Closing += (sender, e) => OnMainWindowClosing(services, sender, e);
 
 		return window;
 	}
 
 	/// <summary>Holds an operator close until the link has stopped, at most for the stop limit.</summary>
-	private async void OnMainWindowClosing(object? sender, WindowClosingEventArgs e)
+	private async void OnMainWindowClosing(ConfiguredServices services, object? sender, WindowClosingEventArgs e)
 	{
 		try
 		{
@@ -88,7 +84,7 @@ public class App : Application
 				return;
 			}
 
-			_linkStop = StopLinkAsync();
+			_linkStop = StopLinkAsync(services);
 
 			// An idle link stops at once; re-closing from inside Closing would re-enter Close.
 			if (_linkStop.IsCompleted || sender is not Window window)
@@ -102,24 +98,19 @@ public class App : Application
 		}
 		catch (Exception exception)
 		{
-			_logger?.LogError(exception, "Stopping the link on window close failed");
+			services.Logger.LogError(exception, "Stopping the link on window close failed");
 		}
 	}
 
-	private async Task StopLinkAsync()
+	private static async Task StopLinkAsync(ConfiguredServices services)
 	{
-		if (_serialLink is null)
-		{
-			return;
-		}
-
 		try
 		{
-			await _serialLink.DisconnectAsync().WaitAsync(_linkStopLimit);
+			await services.SerialLink.DisconnectAsync().WaitAsync(_linkStopLimit);
 		}
 		catch (TimeoutException)
 		{
-			_logger?.LogWarning("The link did not stop within {Limit}; the window closes anyway", _linkStopLimit);
+			services.Logger.LogWarning("The link did not stop within {Limit}; the window closes anyway", _linkStopLimit);
 		}
 	}
 
@@ -145,10 +136,11 @@ public class App : Application
 
 	internal void Configure(IServiceProvider services)
 	{
-		_mainWindowViewModel = services.GetRequiredService<MainWindowViewModel>();
-		_messagePanel = services.GetRequiredService<MessagePanelViewModel>();
-		_serialLink = services.GetRequiredService<SerialLink>();
-		_logger = services.GetRequiredService<ILogger<App>>();
+		_services = new ConfiguredServices(
+			services.GetRequiredService<MainWindowViewModel>(),
+			services.GetRequiredService<MessagePanelViewModel>(),
+			services.GetRequiredService<SerialLink>(),
+			services.GetRequiredService<ILogger<App>>());
 	}
 
 	internal static AppBuilder BuildAvaloniaApp(IObserver<Exception> unhandledErrors)
@@ -166,6 +158,12 @@ public class App : Application
 	/// <summary>The panel of the configured app; before Configure a failure is only logged.</summary>
 	internal static MessagePanelViewModel? ResolveMessagePanel()
 	{
-		return (Current as App)?._messagePanel;
+		return (Current as App)?._services?.MessagePanel;
 	}
+
+	private sealed record ConfiguredServices(
+		MainWindowViewModel MainWindow,
+		MessagePanelViewModel MessagePanel,
+		SerialLink SerialLink,
+		ILogger<App> Logger);
 }

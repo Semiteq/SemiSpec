@@ -64,7 +64,7 @@
     <value>Порт открыт другой программой, или Windows запретила доступ к нему.</value>
   </data>
   <data name="PortBusyRemedy" xml:space="preserve">
-    <value>Закройте программу, которая использует порт, или выберите другой порт. Программа повторяет попытку каждую секунду.</value>
+    <value>Закройте программу, которая использует порт, или нажмите «Отключить» и выберите другой порт.</value>
   </data>
   <data name="PortNotFoundTitle" xml:space="preserve">
     <value>Порт не найден</value>
@@ -73,7 +73,7 @@
     <value>Выбранного порта нет на этом компьютере.</value>
   </data>
   <data name="PortNotFoundRemedy" xml:space="preserve">
-    <value>Проверьте кабель и адаптер, затем обновите список портов. Программа повторяет попытку каждую секунду.</value>
+    <value>Проверьте кабель и адаптер. Программа повторяет попытку каждую секунду; чтобы выбрать другой порт, нажмите «Отключить».</value>
   </data>
   <data name="PortLostTitle" xml:space="preserve">
     <value>Связь потеряна</value>
@@ -88,7 +88,7 @@
     <value>Плата не отвечает</value>
   </data>
   <data name="BoardNotRespondingDetail" xml:space="preserve">
-    <value>От платы 10 секунд нет данных.</value>
+    <value>Данные от платы не поступают 10 секунд.</value>
   </data>
   <data name="BoardNotRespondingRemedy" xml:space="preserve">
     <value>Проверьте питание платы и кабель.</value>
@@ -97,16 +97,16 @@
     <value>Нераспознанные данные</value>
   </data>
   <data name="UnrecognisedDataDetail" xml:space="preserve">
-    <value>Данные приходят в порт, но за 10 секунд не пришло ни одного верного кадра.</value>
+    <value>Данные приходят в порт, но за 10 секунд не пришло ни одного корректного кадра.</value>
   </data>
   <data name="UnrecognisedDataRemedy" xml:space="preserve">
-    <value>Проверьте, что порт принадлежит плате спектрометра и работает на скорости 115200 бод.</value>
+    <value>Проверьте, что к этому порту подключена плата спектрометра и она передаёт на скорости 115200 бод.</value>
   </data>
   <data name="LinkRestoredTitle" xml:space="preserve">
-    <value>Данные восстановлены</value>
+    <value>Идёт приём данных</value>
   </data>
   <data name="LinkRestoredDetail" xml:space="preserve">
-    <value>Данные от платы восстановлены: верные кадры снова приходят.</value>
+    <value>Плата присылает корректные кадры.</value>
   </data>
   <data name="ConnectionPortLabel" xml:space="preserve">
     <value>Порт</value>
@@ -127,7 +127,7 @@
     <value>Подключение</value>
   </data>
   <data name="StatusPortUnavailable" xml:space="preserve">
-    <value>Порт недоступен, повтор</value>
+    <value>Порт недоступен, переподключение</value>
   </data>
   <data name="StatusWaiting" xml:space="preserve">
     <value>Ожидание данных</value>
