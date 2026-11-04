@@ -1,5 +1,7 @@
 using AwesomeAssertions;
 
+using Microsoft.Extensions.Time.Testing;
+
 using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Spectrum;
@@ -18,7 +20,7 @@ public sealed class SignalInfoViewModelTests
 
 	private static readonly DateTimeOffset _receivedAt = new(2026, 11, 4, 9, 15, 30, 123, TimeSpan.Zero);
 
-	private readonly SignalInfoViewModel _viewModel = new(new FixedZoneClock(_plusThree));
+	private readonly SignalInfoViewModel _viewModel = new(PlusThreeClock());
 
 	[Theory]
 	[InlineData("en")]
@@ -124,8 +126,10 @@ public sealed class SignalInfoViewModelTests
 		];
 	}
 
-	private sealed class FixedZoneClock(TimeZoneInfo localTimeZone) : TimeProvider
+	private static FakeTimeProvider PlusThreeClock()
 	{
-		public override TimeZoneInfo LocalTimeZone => localTimeZone;
+		var clock = new FakeTimeProvider();
+		clock.SetLocalTimeZone(_plusThree);
+		return clock;
 	}
 }

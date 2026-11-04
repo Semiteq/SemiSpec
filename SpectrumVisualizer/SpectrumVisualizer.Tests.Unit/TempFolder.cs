@@ -1,8 +1,8 @@
 using Microsoft.Data.Sqlite;
 
-namespace SpectrumVisualizer.Tests.Unit.Core.Store;
+namespace SpectrumVisualizer.Tests.Unit;
 
-/// <summary>A fresh folder under the system temp folder that a store test owns and deletes on dispose.</summary>
+/// <summary>A fresh folder under the system temp folder that a test owns and deletes on dispose.</summary>
 internal sealed class TempFolder : IDisposable
 {
 	public TempFolder()

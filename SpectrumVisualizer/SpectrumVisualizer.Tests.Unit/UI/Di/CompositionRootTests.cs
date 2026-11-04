@@ -14,7 +14,6 @@ using Serilog;
 using Serilog.Events;
 
 using SpectrumVisualizer.Core;
-using SpectrumVisualizer.Tests.Unit.Core.Store;
 using SpectrumVisualizer.Tests.Unit.UI.Logging;
 using SpectrumVisualizer.UI;
 using SpectrumVisualizer.UI.Link;

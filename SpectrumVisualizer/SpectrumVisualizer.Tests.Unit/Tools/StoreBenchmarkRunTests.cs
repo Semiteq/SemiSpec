@@ -3,7 +3,6 @@ using System.Text.RegularExpressions;
 using AwesomeAssertions;
 
 using SpectrumVisualizer.Core.Protocol;
-using SpectrumVisualizer.Tests.Unit.Core.Store;
 using SpectrumVisualizer.Tools.StoreBenchmark;
 
 using Xunit;
