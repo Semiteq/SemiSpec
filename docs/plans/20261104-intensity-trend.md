@@ -608,13 +608,13 @@ Data flow:
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Core/Trend/IntensityChunk.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Store/SpectrumHistoryPointsTests.cs`
 
-- [ ] extract the row loop of `ReadSeries` (`SpectrumHistory.cs:79-109`) into one private loop over
+- [x] extract the row loop of `ReadSeries` (`SpectrumHistory.cs:79-109`) into one private loop over
   `(receivedAt, device, windowBytes)` that both reads use; `ReadSeries` keeps its signature and result
-- [ ] add `IntensityPointsAsync(wavelengthNm, delta, from, to, token)` returning `Result<IntensityChunk>`: the series
+- [x] add `IntensityPointsAsync(wavelengthNm, delta, from, to, token)` returning `Result<IntensityChunk>`: the series
   statement unchanged, one `TrendPoint` per row in receive order, NaN for an uncovered device or a corrupt row; no
   heartbeat read
-- [ ] write `SpectrumHistoryPointsTests` of Acceptance Evidence item 2 over `SpectrumHistoryTestBase`
-- [ ] run the existing `SpectrumHistorySeriesTests` unchanged; run `dotnet test SpectrumVisualizer.slnx` - must pass
+- [x] write `SpectrumHistoryPointsTests` of Acceptance Evidence item 2 over `SpectrumHistoryTestBase`
+- [x] run the existing `SpectrumHistorySeriesTests` unchanged; run `dotnet test SpectrumVisualizer.slnx` - must pass
   before next task
 
 ### Task 3: Intensity cache and history plan
