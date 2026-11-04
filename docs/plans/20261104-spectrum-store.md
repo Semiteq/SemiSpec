@@ -117,9 +117,10 @@
 - Traits: `Component=Core, Area=Store` for `Core/Store/`; `Component=UI, Area=Store` for `UI/Store/`;
   `Component=Tools, Area=Store` for the benchmark tool; `Area=Link` for the link's drop counter; `Area=MainWindow`
   for the status bar segment and widths; `Area=Di` for composition and lifecycle; `Area=Resources` for the keys.
-- Time: the writer reads a `TimeProvider`; tests pass a private manual `TimeProvider` subclass, as
-  `FrameScheduleTests.ManualTimeProvider` does (`FrameScheduleTests.cs:254`). Every wait on the writer has a 5 s
-  real-time limit (`Waits`, `UI/Waits.cs:11`).
+- Time: the writer reads the wall clock and builds its retention wait on a `TimeProvider`
+  (`Task.Delay(delay, timeProvider, token)`). Tests pass a private `ManualClock : TimeProvider` that overrides
+  `GetUtcNow` and `CreateTimer`; its timers fire when the test calls `Advance(TimeSpan)`. Every wait on the writer
+  has a 5 s real-time limit (`Waits`, `UI/Waits.cs:11`).
 - A slow store is made with real SQLite, not a test hook: a second connection on the same file holds
   `BEGIN IMMEDIATE`, so the writer's batch waits for the busy timeout and fails, and the queue fills behind it.
 - Frames come from `ProtocolSamples.SpectrumFrame` and `Heartbeat` (`ProtocolSamples.cs:15-29`); its spectrum carries
@@ -140,37 +141,50 @@ Automatable (baseline 505 of 505 at `12bef84`):
      `delta`, amplitude, SNR, Q, `seq`, `state`, `ReceivedAt` to the millisecond);
      `ANaNAmplitudeRoundTripsAsNaN`; `AHeartbeatGoesToTheHeartbeatTable`; `ABatchIsOneTransaction` (a batch whose
      last frame fails leaves no row of it); `RetentionDeletesRowsOlderThanTheCutoffFromBothTables`;
-     `CheckpointTruncatesTheWal` (the `-wal` file is 0 bytes after `CheckpointAndClose`); `TheIntensityColumnHoldsTheMeanOfTheOwnWindow`
-     (NULL when the device does not cover its own wavelength), unless Task 4 removes the column.
+     `CheckpointTruncatesTheWal` (the `-wal` file is 0 bytes after `CheckpointAndClose`);
+     `AWriteAgainstAHeldLockFailsAfterTheDefaultTimeout` (a second connection holds `BEGIN IMMEDIATE`; `Write`
+     returns a failed `Result` after 1.9 to 2.5 s); `ACheckpointBesideAnOpenReaderReturnsBusyAtOnce` (a reader holds
+     a read transaction; `CheckpointAndClose` returns within 100 ms with busy reported and the connection closed);
+     `TheIntensityColumnHoldsTheMeanOfTheOwnWindow` (NULL when the device does not cover its own wavelength), unless
+     Task 5 removes the column.
    - `SpectrumIntensityTests`: `CoversFollowsTheFirmwareTableRange` (ATP-2000 189 and 1028 in, 188 and 1029 out;
      ATP-8000 898 and 2461 in); `MeanAveragesTheInclusiveWindow`; `ADarkSpectrumHasMeanZero`; `ADeltaOfZeroTakesOnePixel`.
    - `IntensityBucketsTests`: `ARowLandsInTheColumnOfItsTime` (half-open columns, a row at `To` excluded);
+     `ARowNearToStaysInTheLastColumn` (a 10 ms range, 3 columns, a row at 9 ms lands in column 2);
      `AColumnKeepsMinMaxAndCount`; `AnEmptyColumnIsNaNWithCountZero`; `AnUncoveringRowCountsAsUncoveredOnly`;
      `TheColumnWidthIsTheRangeOverTheColumnsFlooredAtOneMillisecond`.
    - `SpectrumHistoryTests`: `SpectrumAtReturnsTheNearestRowAtOrBefore` (equal stamps resolve to the later id),
      `SpectrumAtBeforeTheFirstRowReturnsNone`, `TheStoredSpectrumRebuildsTheMeasurement`;
      `TheSeriesMeansTheWindowPerSpectrum`; `TheSeriesOfAWavelengthOneDeviceDoesNotCoverLeavesItsColumnsUncovered`;
      `ARowWithADifferentWavelengthReadsItsPixels` (the stored window differs from the queried one, the mean comes from
-     the pixels); `DarkFramesPullTheColumnMinimumToZero`; `ACancelledSeriesThrowsOperationCanceled`;
+     the pixels); `AMixedWavelengthRangeMergesBothReads` (rows before a wavelength change come from the pixel read,
+     rows after it from the precomputed read, one series equal to an all-pixel fold; only while the column stays after
+     Task 5); `DarkFramesPullTheColumnMinimumToZero`; `ACancelledSeriesThrowsOperationCanceled`;
      `TheStoredRangeSpansTheFirstAndLastSpectrum`; `TheHistoryReadsWhileTheWriterWrites` (WAL: a series runs between
      two writer batches without a busy error).
    - `SpectrumStoreTests`: `EveryFrameFromTheDistributorIsStored` (spectra and heartbeats, in order);
      `TheSubscriberOnlyEnqueues` (with the writer held by `BEGIN IMMEDIATE` on a second connection, `OnNext` returns
-     within 50 ms); `AFullQueueCountsEachDroppedFrame` (writer held, 1024 + 5 frames, `DroppedFrames` = 5 plus the
-     frames of failed batches, `DroppedFramesChanged` signalled); `AFailedBatchCountsItsFramesAndReportsOnce` (two
+     within 50 ms); `AFullQueueCountsEachDroppedFrame` (writer held, more frames fed than the queue holds; after the
+     lock is released and `StopAsync` has drained, stored rows + `DroppedFrames` = frames fed, `DroppedFrames` > 0
+     and `DroppedFramesChanged` signalled; no exact drop count, because it depends on when the writer's batches fail);
+     `DisposeOnlyCancelsAndTheWriterClosesTheConnection` (after `Dispose`, the writer task ends and the file can be
+     deleted; no exception reaches the log from a closed connection); `AFailedBatchCountsItsFramesAndReportsOnce` (two
      failed batches, one Warning entry in a real panel); `AWriteAfterAFailureRunReportsAgainOnlyAfterASuccess`;
-     `RetentionRunsOnceAMinuteAlsoWithoutFrames` (manual `TimeProvider`); `DataStaysAcrossLinkSessions` (frames from two
+     `RetentionRunsOnceAMinuteAlsoWithoutFrames` (`ManualClock` advanced by 61 s fires the retention timer);
+     `AStopPastItsBudgetCountsTheUndrainedFramesAsDropped` (writer held, `StopAsync` with a cancelled drain token:
+     stored + dropped = fed); `DataStaysAcrossLinkSessions` (frames from two
      connects in one file); `StopDrainsTheQueueThenCheckpoints`; `StopBeforeStartCompletesAtOnce`;
      `AFailedOpenReportsOneErrorAndStoresNothing` (the store folder path is a file).
    - `StoreBenchmarkCommandTests` and `StoreBenchmarkRunTests.ASmallRunPrintsEveryMeasurementAndTheStrategiesAgree`
-     (`--rows 2000`: exit code 0, every metric row printed, the three read strategies give equal means per column to
-     1e-9).
+     (`--rows 2000 --change-at 0.5 --churn-rounds 2`: exit code 0, every metric row printed, the three read strategies
+     and the merged mixed-wavelength read give equal means per column to 1e-9).
 2. `dotnet test SpectrumVisualizer.slnx --filter "Area=Link"` passes, including `SerialLinkDropTests`:
    `AChannelDropCountsInTheStatus` (a reader that does not read, 64 + 3 frames written, `Status.DroppedFrames` = 3
    after the next health publish), `TheDropCountSurvivesAReconnect`, `TheDisconnectedStatusCarriesTheDropCount`,
    `AChannelDropDoesNotCountAsLost` (`LostSpectra` stays 0).
 3. `dotnet test SpectrumVisualizer.slnx --filter "Area=MainWindow"` passes, including
-   `AppStatusBarViewModelTests.TheDroppedSegmentSumsTheLinkAndTheStore`, `TheDroppedSegmentShowsZeroWhileDisconnected`,
+   `AppStatusBarViewModelTests.TheDroppedSegmentSumsTheLinkAndTheStore`, `AFreshAppShowsZeroDroppedFramesNotTheNoValueDash`,
+  `TheDroppedCountStaysAfterADisconnect`,
    `AStoreDropOnAnotherThreadReachesTheTextOnTheUiScheduler`, `MainWindowLayoutTests` with the new segment realised,
    and `MainWindowTextFitTests.TheMinimumWidthHoldsTheConnectionRowAndTheLongestStatusTextsOnOneLine` with the
    dropped segment in the sum.
@@ -185,24 +199,28 @@ Automatable (baseline 505 of 505 at `12bef84`):
    --verify-no-changes` and `dotnet terse SpectrumVisualizer` exit 0; `dotnet build SpectrumVisualizer.sln` and
    `dotnet test SpectrumVisualizer.Tests` pass 13 of 13.
 8. Storage benchmark: `dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark --
-   --rows 172800` prints one table. It fills 24 h of ATP-2000 spectra at 2 per second (650 nm, `delta` 10), then
-   measures; "warm" is the median of 5 runs after one discarded run. The targets below are ASSUMPTION until Task 4
-   and Task 6 record the measured values next to them:
+   --rows 172800 --change-at 0.875` prints one table. It fills 24 h of ATP-2000 spectra at 2 per second (650 nm,
+   `delta` 10; from 7/8 of the rows on, 3 h before the end, 700 nm), then measures. It runs the churn: 24 rounds of
+   "delete the oldest hour, insert one more hour", so the file reaches the steady state of a day-long run, with
+   freed pages reused. Each series row is measured before and after the churn; the budgets are judged on the churned
+   number. "Warm" is the median of 5 runs after one discarded run, printed with the run-to-run spread (min and max of
+   the 5). The targets below are ASSUMPTION until Task 5 and Task 6 record the measured values next to them:
 
    | Metric | Target |
    | --- | --- |
    | Insert throughput, batches of 256 | at least 2 000 spectra/s |
    | File size per 1000 ATP-2000 spectra, after checkpoint | at most 5 MB (ASSUMPTION: about 4.6 MB, one 4 KB overflow page per row plus an eighth of a leaf page) |
-   | File size for 24 h | recorded; ASSUMPTION: about 800 MB at 2 per second, 1.1 GB at the 2.8 per second port cap (`board-protocol.md:334-335`) |
-   | Series, 10 min (1 200 rows) to 1 000 columns, each strategy, warm | at most 50 ms for the kept pixel strategy |
-   | Series, 24 h (172 800 rows) to 1 000 columns, each strategy, warm | at most 10 s for the kept pixel strategy; at most 500 ms for the precomputed column |
+   | File size for 24 h, before and after the churn | recorded; ASSUMPTION: about 800 MB at 2 per second, 1.1 GB at the 2.8 per second port cap (`board-protocol.md:334-335`); the churn adds under 10 % |
+   | Series, 10 min (1 200 rows) to 1 000 columns, pixel strategies (`substr`, `SqliteBlob`), warm | at most 50 ms for the kept pixel strategy |
+   | Series, 24 h (172 800 rows) to 1 000 columns, every row at the queried wavelength: precomputed, `substr`, `SqliteBlob`, warm | at most 10 s for the kept pixel strategy; at most 500 ms for the precomputed read |
+   | Series, 24 h, wavelength changed 3 h ago, query at the new wavelength: merged read (precomputed for 3 h, pixels for 21 h) against pixels only, warm | recorded; feeds the decision rule |
    | `SpectrumHistory.IntensitySeriesAsync`, 10 min and 24 h, warm | within 10 % of its strategy's row |
    | `SpectrumHistory.SpectrumAtAsync`, warm | at most 5 ms |
    | One retention pass over a minute of rows (120) | at most 50 ms |
-   | WAL size after the 24 h series runs beside a writer at 2 spectra/s | recorded; stays under the 64 MB journal limit |
+   | WAL size after a 24 h series read beside a running writer at 2 spectra/s | recorded; at most 16 MB, or the series gains slicing (Solution Overview) |
 
-   The decision rule of Task 4 picks the kept strategies from these numbers. A target the kept strategy misses is a
-   blocker recorded with ⚠️ in Task 4 or Task 6, not a silent pass.
+   The decision rules of Task 5 pick the kept strategies from these numbers. A target the kept strategy misses is a
+   blocker recorded with ⚠️ in Task 5 or Task 6, not a silent pass.
 9. The `git grep` commands of `ui-theme.md:86` (insets) and `:99` (colours) print nothing.
 
 Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `COM10`, the app on `COM11`; `emu` stands
@@ -286,22 +304,30 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
   `received_at` is not unique, because the frames of one decode pass share a stamp (`LinkSession.cs:241-251`), so
   `id` orders rows with equal stamps. The float columns are nullable: SQLite stores a NaN double as NULL
   (ASSUMPTION, pinned by `ANaNAmplitudeRoundTripsAsNaN`), and a board float can be NaN. `pixels` is last, so a read of
-  the narrow columns never touches the blob's overflow page. `pixels` is written from
-  `MemoryMarshal.AsBytes(pixels.AsSpan())` without a copy and read back with `MemoryMarshal.Cast<byte, ushort>`; the
-  app runs on x64 Windows only (`README.md:24`), so the bytes are little-endian on both sides.
+  the narrow columns never touches the blob's overflow page. A Microsoft.Data.Sqlite parameter takes a `byte[]`, so
+  `Write` copies each frame's pixels into one reused `byte[]` per device size
+  (`MemoryMarshal.AsBytes(pixels.AsSpan()).CopyTo(buffer)`); there is no zero-copy write. A read turns the bytes back
+  with `MemoryMarshal.Cast<byte, ushort>`. The app runs on x64 Windows only (`README.md:24`), so the bytes are
+  little-endian on both sides.
 - **Connection settings.** `Data Source=<file>;Mode=ReadWriteCreate;Pooling=False;Default Timeout=2`. Every connection
   runs `PRAGMA journal_mode=WAL` (persistent in the file), `PRAGMA synchronous=NORMAL` and
   `PRAGMA journal_size_limit=67108864`. `synchronous=NORMAL` in WAL mode skips the fsync per commit, and a power loss
   can lose the last transactions but not corrupt the file; the data is disposable. The journal limit truncates the
   WAL back to 64 MB after a checkpoint, so a WAL that grew during a long read does not keep its size.
-  ASSUMPTION: `Default Timeout` bounds Microsoft.Data.Sqlite's retry on `SQLITE_BUSY` to 2 s; the slow-store tests
-  depend on it. Reader connections add `PRAGMA query_only=ON`.
+  `Default Timeout=2` bounds Microsoft.Data.Sqlite's retry on `SQLITE_BUSY` to 2 s (ASSUMPTION, pinned by
+  `AWriteAgainstAHeldLockFailsAfterTheDefaultTimeout`, which asserts 1.9 to 2.5 s). Reader connections add
+  `PRAGMA query_only=ON`.
 - **Database.** `SpectrumDatabase` (Core) owns the writer connection: `Open(path)` (pragmas, schema),
-  `Write(IReadOnlyList<ReceivedFrame>)` in one transaction with one reused parameterised command per table,
-  `DeleteBefore(DateTimeOffset cutoff)` in its own transaction over both tables, `CheckpointAndClose()` running
-  `PRAGMA wal_checkpoint(TRUNCATE)` then closing. Each returns a FluentResults `Result`; a `SqliteException` or
-  `IOException` becomes an `ExceptionalError`. `Write` computes `intensity` from the frame's own wavelength and
-  `delta` through `SpectrumIntensity`.
+  `Write(IReadOnlyList<ReceivedFrame>)` in one `BEGIN IMMEDIATE` transaction with one reused parameterised command
+  per table, `DeleteBefore(DateTimeOffset cutoff)` in its own `BEGIN IMMEDIATE` transaction over both tables,
+  `CheckpointAndClose()` running `PRAGMA wal_checkpoint(TRUNCATE)` then closing. `BEGIN IMMEDIATE` takes the write
+  lock at one explicit point, the start of the transaction, so a held lock fails the batch there after the busy
+  timeout and never halfway through it. Each returns a FluentResults `Result`; a `SqliteException` or `IOException`
+  becomes an `ExceptionalError`. `Write` computes `intensity` from the frame's own wavelength and `delta` through
+  `SpectrumIntensity`. `wal_checkpoint(TRUNCATE)` invokes no busy handler: when a reader holds a snapshot it returns
+  at once with its `busy` column set to 1 (ASSUMPTION, pinned by `ACheckpointBesideAnOpenReaderReturnsBusyAtOnce`).
+  `CheckpointAndClose` logs that at Debug and closes anyway; the WAL stays, and the next start deletes it with the
+  file.
 - **Background writer.** `SpectrumStore` (UI) is a singleton:
   - `SpectrumStore(FrameDistributor, StoreFile, MessagePanelViewModel, IScheduler uiScheduler, TimeProvider,
     ILogger<SpectrumStore>)`, where `StoreFile(string Path)` is the instance file registered by `AddUi`.
@@ -319,18 +345,29 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
     and write them as one batch. A failed batch adds its frame count to the drop count and logs at Error. The first
     failure after a success reports one `StoreWriteError` (Warning) through `TryReportFailure`; later failures stay
     quiet until a batch succeeds again, as the link's one entry per incident (`board-protocol.md:275-277`).
-  - Retention: once a minute by the `TimeProvider`, also while no frame arrives, `DeleteBefore(now - 24 h)`. The
+  - Retention: once a minute, also while no frame arrives, `DeleteBefore(now - 24 h)`. The wait is
+    `Task.Delay(untilNextRetention, timeProvider, token)` raced with `WaitToReadAsync`, and `now` is
+    `timeProvider.GetUtcNow()`, so a test drives both through one `TimeProvider`. The
     cutoff uses the same wall clock as `ReceivedAt` (`DefaultScheduler.Now` and `TimeProvider.System` both read UTC
     wall time). No `VACUUM`: the freed pages are reused, so the file stays at about one day of data.
   - Drop count: `long DroppedFrames` (an `Interlocked` counter written by the distributor task and the writer task)
     and `IObservable<Unit> DroppedFramesChanged`, a private `Subject<Unit>` behind `Synchronize()`, exposed with
     `AsObservable()`, signalled after each increment. A reader reads `DroppedFrames` after the signal, the shape of
     `IDisplayedSpectrumSource` (`overview.md:57`); a value in the signal could arrive out of order from two threads.
-  - `StopAsync()`: dispose the subscription (no more enqueues), complete the queue's writer, await the writer task,
-    which writes what is still queued, then `CheckpointAndClose()`. A checkpoint that reports busy (a reader holds an
-    old snapshot) logs at Debug and the connection closes anyway; the WAL stays and the next start deletes it with the
-    file. `StopAsync` completes at once when nothing started. `Dispose()` cancels without waiting, for the container's
-    synchronous dispose.
+  - The writer task alone owns the `SpectrumDatabase` and its `SqliteConnection`: it opens it, and it closes it in its
+    own `finally`, with `CheckpointAndClose()` on a normal end and a plain close after a cancellation. No other thread
+    closes or disposes the connection, so no close can land while the writer is inside a write, a retention pass or a
+    checkpoint.
+  - `StopAsync(CancellationToken drainToken)`: dispose the subscription (no more enqueues), complete the queue's
+    writer, then await the writer task. The writer keeps writing what is still queued and checks `drainToken`
+    between batches, never inside one. When the token fires, the frames still queued are added to the drop count, and
+    the writer checkpoints and closes. `StopAsync` completes at once when nothing started. `Dispose()` only cancels
+    the writer's token without waiting, for the container's synchronous dispose; the writer then ends and closes in
+    its `finally`.
+  - Stop budget: the close chain has one 5 s limit (`App.axaml.cs:27`). The link's stop can take up to 2 s on a
+    driver that hangs in dispose (`LinkSession.cs:27`, `:287-310`), and the distributor stops at once, so the store
+    gets the rest: `App` passes a drain token that fires 0.5 s before the 5 s limit ends, so the checkpoint and close
+    fit inside the limit. Whatever does not drain by then is counted as dropped.
 - **Link drop counter.** `SerialLink` counts the frames its channel drops: `OnFrameDropped` adds 1 to
   `_droppedFrames` before its log-once check. `LinkStatus` gains `public long DroppedFrames { get; init; }`, a
   non-positional member, so the existing positional constructions keep compiling. `Publish` stamps it:
@@ -353,40 +390,59 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
     source of intensity-trend wraps in a `DisplayedSpectrum`.
   - `IntensitySeriesAsync(IntensityQuery query, CancellationToken)` returns `Result<IntensitySeries>`, with
     `IntensityQuery(ushort WavelengthNm, byte Delta, DateTimeOffset From, DateTimeOffset To, int Columns)`. For each
-    spectrum in `[From, To)` it computes the mean of the pixels in `SpectrometerCalibration.Window(nm, delta)` of the
+    spectrum in `[From, To)` it takes the mean of the pixels in `SpectrometerCalibration.Window(nm, delta)` of the
     row's device, dark frames included, and folds it into the column of its time. A row whose device does not cover
     the wavelength (`FirstNm <= nm <= LastNm` fails) counts as uncovered and adds no value.
+  - Mixed wavelengths: SCADA can change the wavelength mid-run, which is why every row keeps its full pixels. While
+    the precomputed column stays, the series runs two statements over the range and folds both into one
+    `IntensityBuckets`: an index-only read of `intensity` for rows `WHERE wavelength_nm = $nm AND delta = $delta`,
+    and the kept pixel read for rows `WHERE NOT (wavelength_nm = $nm AND delta = $delta)`. The fold is
+    order-independent (min, max, count), so the two reads need no merge by time.
   - `StoredRangeAsync(CancellationToken)` returns `Result<StoredRange?>` with the first and last spectrum's
     `ReceivedAt`, the extent of the 24 h overview.
   - Cancellation throws `OperationCanceledException`, never a failed result, as SemiPlot's provider does
     (`PostgresDataProvider.cs:183-186`). The series checks the token every 256 rows.
-  - Long reads and WAL growth: a series over more than 1 h runs as one statement per hour of range, each its own read
-    transaction, so no reader holds one snapshot for the whole 24 h and the writer's automatic checkpoints keep
-    pace. Each slice folds into the same columns.
+  - Long reads and WAL growth: each strategy's read is one statement over the whole range, with no slicing. A long
+    read holds one snapshot, and the WAL grows behind it while the writer appends. The benchmark row "WAL size after
+    a 24 h series read beside a running writer" measures that growth. ASSUMPTION: at 2 ATP-2000 spectra per second
+    the WAL gains about 10 KB per second of read (two rows plus index pages), so a 10 s read adds about 100 KB. The
+    series is sliced by time only if that row shows more than 16 MB; Task 5 records the number.
 - **Series result.** `IntensitySeries(DateTimeOffset From, TimeSpan ColumnWidth, IntensityColumn[] Columns)` with
   `IntensityColumn(double Min, double Max, int Count, int UncoveredCount)`. Column `i` covers
   `[From + i x width, From + (i + 1) x width)`, `width = (To - From) / Columns` floored at 1 ms, as SemiPlot's
-  `BucketFor` (`PostgresDataProvider.cs:334-344`). A column with `Count` 0 has NaN `Min` and `Max`, the gap SemiPlot
+  `BucketFor` (`PostgresDataProvider.cs:334-344`). The width truncates, so `ColumnWidth` describes the columns for
+  drawing, but the fold never divides by it: a row's column is
+  `(t - From).Ticks x Columns / (To - From).Ticks` in integer arithmetic, which stays below `Columns` for every
+  `t < To`. A column with `Count` 0 has NaN `Min` and `Max`, the gap SemiPlot
   draws (`PostgresDataProvider.cs:416-421`); `UncoveredCount > 0` with `Count` 0 tells intensity-trend the gap comes
   from the other spectrometer. Gaps from lost frames come from `seq`, `state` and the heartbeat table; intensity-trend
   adds that query, since it owns the marker rules (`roadmap:238` allows query additions).
 - **Three read strategies and the decision rule.** The window intensity can come from:
   - the precomputed `intensity` column, read from the covering index `spectrum_time`, valid only for rows whose own
     `wavelength_nm` and `delta` equal the query's (the common case: SCADA rarely changes the wavelength);
-  - a blob range read: `SqliteDataReader.GetBytes(ordinal, 2 x First, buffer, 0, 2 x count)` on `pixels`;
-  - `substr(pixels, 2 x First + 1, 2 x count)` in the SQL, per device through a `CASE device`.
+  - `substr(pixels, 2 x First + 1, 2 x count)` in the SQL, per device through a `CASE device`;
+  - a true partial read through `SqliteBlob` (`sqlite3_blob_open` on the row's `id`, `sqlite3_blob_read` of the
+    window's `2 x count` bytes at offset `2 x First`) after a statement that returns `id`, `received_at` and
+    `device`. `SqliteDataReader.GetBytes` is not a candidate: it materialises the whole blob before it copies the
+    range, so it is no range read.
 
-  The benchmark measures all three on one file. The pixel path keeps the faster of the blob range read and `substr`
-  by the 24 h warm median. The `intensity` column and the index's last four columns stay when the precomputed read is
-  at most half the kept pixel strategy's 24 h time; otherwise they are removed, and `spectrum_time` indexes
-  `received_at` only. A kept column makes the series use it for matching rows and the pixel path for the others. The
-  tool keeps all three strategies as raw SQL of its own, so the numbers can be measured again; `SpectrumHistory` holds
-  the kept ones only.
+  The benchmark measures all three on one file. Rules:
+  - Pixel path: `SqliteBlob` replaces `substr` only when its churned 24 h warm median is below `substr`'s by more
+    than the larger of the two run-to-run spreads (max minus min of the 5 warm runs). A smaller difference is a tie,
+    and a tie keeps `substr`, which needs no per-row blob handle or buffer code.
+  - Precomputed column: it stays only when both hold on the churned file: the all-match 24 h precomputed read takes
+    at most half the kept pixel strategy's all-match 24 h time, and the "wavelength changed 3 h ago, show 24 h" merged
+    read takes at most half the pixel-only read of the same query. Both numbers are recorded. Otherwise the column and
+    the index's last four columns go, `spectrum_time` indexes `received_at` only, and the series runs the pixel read
+    alone.
+
+  The tool keeps all three strategies as raw SQL of its own, so the numbers can be measured again; `SpectrumHistory`
+  holds the kept ones only.
 - **Lifecycle.** `Opened` starts the store before the distributor, so the store's subscription exists before the
   first frame is read. The close chain becomes link, then distributor, then store, each in a `finally` of the one
-  before, all inside the existing 5 s limit: the store's stop drains at most 1024 frames at the measured insert
-  rate (target: under 1 s) and checkpoints at most a 64 MB WAL. After the limit the window closes anyway, and the
-  container's dispose cancels the writer.
+  before, all inside the existing 5 s limit, with the store's drain token of the stop budget above. A full queue of
+  1024 frames drains in about 0.5 s at the 2 000 spectra/s insert target. After the limit the window closes anyway,
+  and the container's dispose cancels the writer, which closes its connection itself.
 
 ## Technical Details
 Write path per frame (writer task):
@@ -401,8 +457,11 @@ Intensity of one row for a query (`SpectrumIntensity`):
 - window: `calibration.Window(nm, delta)`, inclusive `First..Last`;
 - value: `sum(pixels[First..Last]) / (Last - First + 1)` as a double, one pass, no LINQ.
 
-Series fold (`IntensityBuckets`, pure, Core): `column = (int)((t - From).Ticks / width.Ticks)`; rows with
-`t < From` or `t >= To` are skipped; a covered row updates `Min`, `Max`, `Count`; an uncovered row adds 1 to
+Series fold (`IntensityBuckets`, pure, Core): rows with `t < From` or `t >= To` are skipped;
+`column = (int)((t - From).Ticks * Columns / (To - From).Ticks)` as `Int128` arithmetic (24 h of ticks times
+`Columns` can pass `long`), so `column <= Columns - 1` for every kept row. Example: a 10 ms range with 3 columns has a
+3.333 ms width, which truncates to 3 ms, and `t - From` of 9 ms divided by 3 ms would give column 3; the product
+form gives `9 x 3 / 10` = 2. A covered row updates `Min`, `Max`, `Count`; an uncovered row adds 1 to
 `UncoveredCount`.
 
 Benchmark tool (`SpectrumVisualizer.Tools.StoreBenchmark`, System.CommandLine 2.0.2):
@@ -411,13 +470,20 @@ Benchmark tool (`SpectrumVisualizer.Tools.StoreBenchmark`, System.CommandLine 2.
 | --- | --- | --- |
 | `--rows <n>` | 172800 | spectra to insert, 500 ms apart, ending at the tool's start time |
 | `--device 2000\|8000` | 2000 | the device of every row |
+| `--change-at <fraction>` | 0.875 | from this fraction of the rows on, the rows carry 700 nm instead of 650 nm; 1 never changes. 0.875 of 24 h is a change 3 h before the end |
+| `--churn-rounds <n>` | 24 | rounds of "delete the oldest 1/24 of the filled span, insert it again one span later" after the fill; at 172 800 rows a round is one hour; 0 skips the churn |
 | `--folder <path>` | a new folder under `%TEMP%` | where the file goes |
 | `--keep` | off | keep the file after the run |
 
-It writes through `SpectrumDatabase.Write` in batches of 256 (650 nm, `delta` 10, pixels from a fixed-seed random
-generator), checkpoints, then prints one row per metric of Acceptance Evidence item 8. The OS file cache cannot be
-dropped without administrator rights, so the tool reports the first run after a fresh connection and the warm median
-of 5, and says so in its header line.
+It writes through `SpectrumDatabase.Write` in batches of 256 (`delta` 10, pixels from a fixed-seed random generator),
+checkpoints, measures the series rows (the fresh file), runs the churn through `SpectrumDatabase.DeleteBefore` and
+`Write`, checkpoints, and measures every row again. Each churn round inserts the deleted rows again, one span
+later, with their own wavelength, so after 24 rounds the file has the fill's shape (21 h at 650 nm, then 3 h at
+700 nm) on pages freed and reused by the deletes. The all-match case is a second file filled with `--change-at 1`
+(every row at 650 nm), churned the same way and queried at 650 nm; the mixed case is the main file queried at
+700 nm over 24 h. It prints one row per metric of Acceptance Evidence item 8 with the median and the min/max of the
+5 warm runs. The OS file cache cannot be dropped without administrator rights, so the tool reports the first run after a
+fresh connection and the warm median of 5, and says so in its header line.
 
 New resx keys (en / ru):
 
@@ -491,8 +557,13 @@ Data flow:
 - [ ] implement `SpectrumIntensity.Covers(Spectrometer, ushort nm)` and `Mean(ReadOnlySpan<ushort>, PixelWindow)` of
   Technical Details
 - [ ] implement `SpectrumDatabase` of Solution Overview: connection string, the three pragmas, the schema, `Write`
-  with two reused parameterised commands inside one transaction, `DeleteBefore`, `CheckpointAndClose`; NaN floats
-  bind as `DBNull`
+  with two reused parameterised commands inside one `BEGIN IMMEDIATE` transaction and one reused `byte[]` per device
+  size for the pixels, `DeleteBefore` in its own `BEGIN IMMEDIATE` transaction, `CheckpointAndClose` reading the
+  checkpoint's `busy` column and logging a busy checkpoint at Debug; NaN floats bind as `DBNull`
+- [ ] write `AWriteAgainstAHeldLockFailsAfterTheDefaultTimeout` (a `Stopwatch` around `Write` while a second
+  connection holds `BEGIN IMMEDIATE`: failed `Result`, 1.9 to 2.5 s) and
+  `ACheckpointBesideAnOpenReaderReturnsBusyAtOnce` (a second connection inside a read transaction: busy reported,
+  under 100 ms, the connection closed)
 - [ ] write `StoreSamples` (spectra at given times, wavelengths, devices and dark, heartbeats) over `ProtocolSamples`
 - [ ] write the `SpectrumIntensityTests` and `SpectrumDatabaseTests` of Acceptance Evidence item 1, reading rows back
   with plain SQL on a second connection
@@ -501,7 +572,22 @@ Data flow:
   `Write` returns a failed `Result`, and no row of the batch exists
 - [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
-### Task 4: Storage benchmark tool and the read decision
+### Task 4: Series fold
+**Files:**
+- Create: `SpectrumVisualizer/SpectrumVisualizer.Core/Store/IntensityBuckets.cs` (with `IntensitySeries`,
+  `IntensityColumn`, `IntensityQuery`)
+- Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Store/IntensityBucketsTests.cs`
+
+- [ ] declare `IntensityQuery`, `IntensitySeries`, `IntensityColumn` of Solution Overview; the query rejects
+  `Columns < 1` and `To <= From` with a failed `Result` from a factory, since the trend passes view geometry
+- [ ] implement `IntensityBuckets` (`ColumnWidth`, `Add(t, value)`, `AddUncovered(t)`, `ToSeries()`) as single-pass
+  arithmetic with no allocation per row; the column index is the `Int128` product form of Technical Details, never a
+  division by the truncated width
+- [ ] write the `IntensityBucketsTests` of Acceptance Evidence item 1 as table tests (`Component=Core`, `Area=Store`),
+  including `ARowNearToStaysInTheLastColumn` (10 ms range, 3 columns, a row at 9 ms: column 2)
+- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
+
+### Task 5: Storage benchmark tool and the read decision
 **Files:**
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark/SpectrumVisualizer.Tools.StoreBenchmark.csproj`,
   `Program.cs`, `BenchmarkCommand.cs`, `BenchmarkOptions.cs`, `ReadStrategies.cs`, `BenchmarkRun.cs`
@@ -513,33 +599,25 @@ Data flow:
   `EmulatorCommand.cs:84`), referencing Core and System.CommandLine; add it to `SpectrumVisualizer.slnx` and to the
   test project's references
 - [ ] implement the options of Technical Details with range checks (`--rows` at least 1 200, so the 10 min series has
-  data), the fill through `SpectrumDatabase.Write`, and the three strategies of Solution Overview as raw SQL in
-  `ReadStrategies`, each returning the same `IntensityColumn[]`
-- [ ] measure and print insert throughput, file size per 1000 spectra, 24 h file size, the 10 min and 24 h series per
-  strategy (first run and warm median), one retention pass, and the WAL size after a 24 h series that runs beside a
-  writer thread at 2 spectra/s
-- [ ] write `StoreBenchmarkCommandTests` (defaults, a rejected `--rows 10`, `--device 8000`) and
-  `StoreBenchmarkRunTests.ASmallRunPrintsEveryMeasurementAndTheStrategiesAgree` (`Component=Tools`, `Area=Store`)
+  data; `--change-at` in 0..1; `--churn-rounds` 0..24), the fill and the churn through `SpectrumDatabase`, and in
+  `ReadStrategies` as raw SQL: the precomputed read, `substr`, the `SqliteBlob` partial read, and the merged
+  mixed-wavelength read (precomputed for matching rows plus a pixel strategy for the rest), each folding through
+  `IntensityBuckets`
+- [ ] measure and print, for the fresh and the churned file: insert throughput, file size per 1000 spectra, 24 h file
+  size, the 10 min and 24 h series per strategy for the all-match case, the 24 h mixed case (merged read against
+  pixels only), one retention pass, and the WAL size after a 24 h series read beside a writer thread at 2 spectra/s;
+  every timing as first run, warm median and warm min/max
+- [ ] write `StoreBenchmarkCommandTests` (defaults, a rejected `--rows 10`, a rejected `--change-at 1.5`,
+  `--device 8000`) and `StoreBenchmarkRunTests.ASmallRunPrintsEveryMeasurementAndTheStrategiesAgree`
+  (`Component=Tools`, `Area=Store`)
 - [ ] run `dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark -- --rows
-  172800` and record every number in Acceptance Evidence item 8 with the date, the machine (CPU, disk) and the
-  commit; also run `--device 8000` once and record its file size per 1000 spectra
-- [ ] apply the decision rule of Solution Overview: name the kept pixel strategy and whether the `intensity` column
-  stays; if it goes, remove it and the index columns from the schema and from `SpectrumDatabaseTests`; record the
-  decision in Solution Overview as the final state
-- [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
-
-### Task 5: Series fold
-**Files:**
-- Create: `SpectrumVisualizer/SpectrumVisualizer.Core/Store/IntensityBuckets.cs` (with `IntensitySeries`,
-  `IntensityColumn`, `IntensityQuery`)
-- Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Store/IntensityBucketsTests.cs`
-
-- [ ] declare `IntensityQuery`, `IntensitySeries`, `IntensityColumn` of Solution Overview; the query rejects
-  `Columns < 1` and `To <= From` with a failed `Result` from a factory, since the trend passes view geometry
-- [ ] implement `IntensityBuckets` (column width, `Add(t, value)`, `AddUncovered(t)`, `ToSeries()`) as single-pass
-  arithmetic with no allocation per row
-- [ ] make `ReadStrategies` in the tool fold through `IntensityBuckets`, so the tool and the service share one fold
-- [ ] write the `IntensityBucketsTests` of Acceptance Evidence item 1 as table tests (`Component=Core`, `Area=Store`)
+  172800 --change-at 0.875` and record every number in Acceptance Evidence item 8 (fresh and churned) with the date,
+  the machine (CPU, disk) and the commit; also run `--device 8000` once and record its file size per 1000 spectra
+- [ ] apply the decision rules of Solution Overview on the churned numbers: `SqliteBlob` replaces `substr` only when
+  faster by more than the larger spread, and a tie keeps `substr`; the `intensity` column stays only when both the
+  all-match and the "changed 3 h ago" merged read take at most half their pixel-only time; if it goes, remove it and
+  the index columns from the schema and from `SpectrumDatabaseTests`. If the WAL row passes 16 MB, add time slicing
+  to the series and record why. Record the decisions in Solution Overview as the final state
 - [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 6: Query service
@@ -548,15 +626,17 @@ Data flow:
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark/BenchmarkRun.cs`
 - Create: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Core/Store/SpectrumHistoryTests.cs`
 
-- [ ] implement `SpectrumAtAsync`, `IntensitySeriesAsync` (the strategies kept in Task 4, hour slices, the token
+- [ ] implement `SpectrumAtAsync`, `IntensitySeriesAsync` (the strategies kept in Task 5, one statement per kept
+  strategy over the whole range, both folded into one `IntensityBuckets` when the precomputed column stays, the token
   checked every 256 rows) and `StoredRangeAsync` on reader connections with `query_only`
 - [ ] map `SqliteException` to a failed `Result`; let `OperationCanceledException` pass
 - [ ] add `SpectrumHistory.IntensitySeriesAsync` (10 min, 24 h) and `SpectrumAtAsync` rows to the tool's table; run
   the 172 800-row benchmark again and record those rows in Acceptance Evidence item 8
 - [ ] write the `SpectrumHistoryTests` of Acceptance Evidence item 1 (`Component=Core`, `Area=Store`), including
   `TheHistoryReadsWhileTheWriterWrites` with a `SpectrumDatabase` writing on a second thread
-- [ ] write `ACancelledSeriesThrowsOperationCanceled` with a token cancelled before the call and one cancelled after
-  the first slice of a 2 h range
+- [ ] write `ACancelledSeriesThrowsOperationCanceled` with a token cancelled before the call and one cancelled while
+  the read is past its first 256 rows of a 2 h range; write `AMixedWavelengthRangeMergesBothReads` while the column
+  stays
 - [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
 ### Task 7: Background writer service
@@ -569,9 +649,13 @@ Data flow:
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/Messages/ErrorMessageMapperTests.cs`
 
 - [ ] implement `SpectrumStore` of Solution Overview: queue, enqueue-only subscriber, writer loop with batches of 256,
-  retention by the `TimeProvider`, the drop counter and `DroppedFramesChanged`, `Start`, `StopAsync`, `Dispose`; log
-  the file path at Information on open, the sweep result at Debug, the stop with the stored and dropped totals at
-  Debug
+  retention on `Task.Delay(delay, timeProvider, token)` raced with `WaitToReadAsync`, the drop counter and
+  `DroppedFramesChanged`, `Start`, `StopAsync(drainToken)` checking the token between batches and counting the
+  undrained frames as dropped, `Dispose` that only cancels; the writer task alone opens and closes the connection,
+  in its own `finally`; log the file path at Information on open, the sweep result at Debug, the stop with the
+  stored and dropped totals at Debug
+- [ ] write the private `ManualClock : TimeProvider` (overrides `GetUtcNow` and `CreateTimer`; `Advance` moves the
+  clock and fires the due timers) for `RetentionRunsOnceAMinuteAlsoWithoutFrames`
 - [ ] add `StoreOpenError` and `StoreWriteError`, their mapping (Error, Warning) and the six `Store*` resx keys of
   Technical Details in both sets
 - [ ] write the `SpectrumStoreTests` of Acceptance Evidence item 1 (`Component=UI`, `Area=Store`) over a
@@ -580,7 +664,10 @@ Data flow:
 - [ ] write `TheSubscriberOnlyEnqueues` and `AFullQueueCountsEachDroppedFrame` with a second connection holding
   `BEGIN IMMEDIATE` on the instance file; `AFullQueueCountsEachDroppedFrame` feeds the distributor through an
   unbounded test channel, because a 64-slot `DropOldest` channel would drop before the store queue fills, and this
-  test counts the store's drops, not the link's
+  test counts the store's drops, not the link's. It asserts stored + dropped = fed after the lock is released and
+  `StopAsync` has drained, never an exact drop count
+- [ ] write `DisposeOnlyCancelsAndTheWriterClosesTheConnection` and
+  `AStopPastItsBudgetCountsTheUndrainedFramesAsDropped`
 - [ ] write `ErrorMessageMapperTests` rows for both errors (severity, title, no path in the detail)
 - [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
 
@@ -609,7 +696,8 @@ Data flow:
   `ObservableAsPropertyHelper` with its subscription in `_disposables`
 - [ ] add a separator and `DroppedFramesText` after `LostSpectraText` (`AppStatusBar.axaml:71-77`; the grid gains two
   `Auto` columns)
-- [ ] write `TheDroppedSegmentSumsTheLinkAndTheStore`, `TheDroppedSegmentShowsZeroWhileDisconnected`,
+- [ ] write `TheDroppedSegmentSumsTheLinkAndTheStore`, `AFreshAppShowsZeroDroppedFramesNotTheNoValueDash`,
+  `TheDroppedCountStaysAfterADisconnect`,
   `AStoreDropOnAnotherThreadReachesTheTextOnTheUiScheduler`; extend the realised-segment assertions in
   `MainWindowLayoutTests`
 - [ ] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task
@@ -624,7 +712,9 @@ Data flow:
 - [ ] add the store to `ConfiguredServices` (`App.axaml.cs:197-202`) and `Configure` (`:169-177`); start it in
   `Opened` before the distributor (`:70-74`)
 - [ ] rename `StopLinkThenDistributorAsync` (`:132-145`) to `StopLinkDistributorThenStoreAsync`: link, distributor in
-  a `finally`, store in a `finally` of that; the limit stays 5 s (`:27`); every log line names the three services
+  a `finally`, store in a `finally` of that; the limit stays 5 s (`:27`); the store gets a drain token that fires
+  0.5 s before the limit ends (a `CancellationTokenSource` with a 4.5 s delay, started with the stop); every log
+  line names the three services
 - [ ] the container tests pass `AppDataPaths.Under(<temp root>)` to `AddUi` (`CompositionRootTests.cs:51`, `:166`,
   `AppLifecycleTests.cs:242-247`), so no test writes under the real local app data. Every test in one process gets
   the same `spectra-<pid>.db` name, so each test has its own temp root (an instance field), and `Dispose` awaits
