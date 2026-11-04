@@ -102,6 +102,13 @@ public abstract class TrendFeedTestBase : TrendChartTestBase
 		return TrendHistoryPlan.For(from, to, Cache.NewestAt!.Value, Requests[^1].RecentStart);
 	}
 
+	/// <summary>A stored ATP-8000 spectrum at the sample key, received at the moment.</summary>
+	protected static StoredSpectrum Stored(DateTimeOffset receivedAt)
+	{
+		var frame = StoreSamples.Spectrum(receivedAt).Frame;
+		return new StoredSpectrum(frame.Measurement!, receivedAt, frame.Seq, frame.State);
+	}
+
 	protected static IEnumerable<TimeRange> RangesOf(IEnumerable<PointsCall> calls)
 	{
 		return calls.Select(call => new TimeRange(call.From, call.To));

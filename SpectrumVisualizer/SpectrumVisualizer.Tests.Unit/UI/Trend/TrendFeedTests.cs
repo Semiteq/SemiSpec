@@ -1,3 +1,5 @@
+using System.Reactive.Concurrency;
+
 using Avalonia.Headless.XUnit;
 
 using AwesomeAssertions;
@@ -7,6 +9,7 @@ using FluentResults;
 using SpectrumVisualizer.Core.Store;
 using SpectrumVisualizer.Tests.Unit.Core.Store;
 using SpectrumVisualizer.UI.Localization;
+using SpectrumVisualizer.UI.Trend;
 
 using Xunit;
 
@@ -141,6 +144,55 @@ public sealed class TrendFeedTests : TrendFeedTestBase
 		MessagePanel.Entries.Should().ContainSingle().Which.View.Title.Should().Be(Resources.TrendHistoryTitle);
 		var query = IntensityQuery.Create(OtherNm, SampleDelta, At(0), At(1201), TimeSpan.FromSeconds(1)).Value;
 		Cache.Fold(query).Columns.Sum(column => column.Count).Should().Be(121, "the recent spectra stay at the new key");
+	}
+
+	[AvaloniaFact]
+	public async Task ARereadBeforeTheStoreFileExistsReportsOnceAndCreatesNoFile()
+	{
+		using var folder = new TempFolder();
+		var missing = folder.FileIn("spectra-1.db");
+		var history = new SpectrumHistory(missing);
+		using var feed = new TrendFeed(
+			Distributor,
+			Cache,
+			Chart,
+			Switching,
+			history.IntensityPointsAsync,
+			history.SpectrumAtAsync,
+			MessagePanel,
+			ImmediateScheduler.Instance,
+			Throttle,
+			FeedLogger);
+		feed.Start();
+		ChangeKeyAfterTwentyMinutes(OtherNm);
+
+		PassThrottle();
+
+		await Waits.UntilAsync(() => MessagePanel.Entries.Count == 1);
+		await feed.StopAsync().WaitAsync(Waits.Limit);
+		MessagePanel.Entries.Should().ContainSingle().Which.View.Title.Should().Be(Resources.TrendHistoryTitle);
+		File.Exists(missing).Should().BeFalse();
+	}
+
+	[AvaloniaFact]
+	public async Task AClickDuringARereadShowsTheMomentAndLeavesTheRereadRunning()
+	{
+		Feed.Start();
+		ChangeKeyAfterTwentyMinutes(OtherNm);
+		var plan = PlanFor(Chart.From, Chart.To);
+		SpectrumResult = call => Result.Ok<StoredSpectrum?>(Stored(call.Moment));
+		HoldPoints();
+		PassThrottle();
+		await Waits.UntilAsync(() => PointsCalls.Count == 1);
+		var held = PointsCalls.Single();
+
+		Feed.ReadMoment(At(10));
+
+		await Waits.UntilAsync(() => Switching.ShownMoment == At(10));
+		held.Token.IsCancellationRequested.Should().BeFalse("the click runs in its own pipeline");
+		ReleasePoints();
+		await Waits.UntilAsync(() => PointsCalls.Count == plan.Count);
+		RangesOf(PointsCalls).Should().Equal(plan);
 	}
 
 	[AvaloniaFact]

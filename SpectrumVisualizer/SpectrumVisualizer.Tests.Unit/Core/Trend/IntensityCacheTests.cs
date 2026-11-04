@@ -72,6 +72,29 @@ public sealed class IntensityCacheTests : SpectrumHistoryTestBase
 	}
 
 	[Fact]
+	public void BothDevicesAlternatingAtAWavelengthBothCoverDrawOneLine()
+	{
+		const ushort CoveredByBothNm = 950;
+		for (var i = 0; i < 20; i++)
+		{
+			var device = i % 2 == 0 ? Spectrometer.Atp2000 : Spectrometer.Atp8000;
+			_cache.Add(StoreSamples.Spectrum(At(i), device, nm: CoveredByBothNm, seq: (byte)i));
+		}
+
+		var series = _cache.Fold(Query(CoveredByBothNm, SampleDelta, At(0), At(20), _second));
+
+		series.Columns.Should().AllSatisfy(column =>
+		{
+			column.Count.Should().Be(1);
+			column.UncoveredCount.Should().Be(0);
+			column.BreakCount.Should().Be(0);
+		});
+		TrendColumns.Map(series, time => time.ToUnixTimeMilliseconds()).Should().HaveCount(20)
+			.And.OnlyContain(column => !double.IsNaN(column.Min), "no gap column breaks the line");
+		_requests.Should().BeEmpty("the key stays the same across the device switch");
+	}
+
+	[Fact]
 	public void AHeartbeatAddsNoPoint()
 	{
 		_cache.Add(Heartbeat(Start));

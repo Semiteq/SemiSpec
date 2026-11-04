@@ -903,20 +903,51 @@ Data flow:
 - [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (904 of 904)
 
 ### Task 15: Verify acceptance criteria
-- [ ] run every command of Acceptance Evidence and record each result with its count (per Area, full suite against the
+- [x] run every command of Acceptance Evidence and record each result with its count (per Area, full suite against the
   baseline, none skipped; Release build 0 warnings; format and terse exit 0; old solution 13 of 13; both greps print
-  nothing; the four benchmark rows against their targets)
-- [ ] verify every Overview item maps to a named passing test: the intensity at the key, dark frames at zero, the
-  envelope, the gaps of each kind, the failure strip, live follow, zoom, pan, presets, the overview, the readout, the
-  re-read with the visible range first and its cancellation, the click and Back to live, the two chart rules
-- [ ] verify edge cases: a key change during a re-read cancels it; a click during a re-read; a re-read before the store
+  nothing; the four benchmark rows against their targets). Measured 2026-11-04: Area=Trend 213, Store 121, Spectrum 123,
+  MainWindow 95, Di 31, Resources 9, all passed, none skipped; full suite 907 of 907 against the 635 baseline; Release
+  build 0 warnings; `dotnet format --verify-no-changes` and `dotnet terse SpectrumVisualizer` exit 0; the
+  `ui-theme.md:86` and `:99` greps print nothing; `dotnet build SpectrumVisualizer.sln` succeeds with 15 warnings that
+  predate the slice (no diff under `SpectrumVisualizer.Uart`, `SpectrumVisualizer.Tests` or the `.sln` since
+  `9070dfb`), `dotnet test SpectrumVisualizer.Tests` 13 of 13. Benchmark: a short run (`--rows 20000 --churn-rounds 2`)
+  prints the four trend rows (churned warm medians: fold 2.78 h 0.2 ms, fold 10 min 0.1 ms, visible landing 3.6 ms,
+  whole plan 74.7 ms) and deletes its files; the 24 h numbers of Task 4 stand, all four targets met
+- [x] verify every Overview item maps to a named passing test: intensity at the key
+  `ASpectrumAddsOnePointAtTheFrameMean`, `TheFoldEqualsTheStoreSeriesOverTheSameFrames`; dark frames at zero
+  `ADarkSpectrumAddsAPointAtZero`; envelope `AColumnWithValuesBecomesAnEnvelopeColumnAtItsCentre`, `EnvelopePathTests`;
+  gaps: loss `ASeqStepOfThreeBreaksWithTwoLost`, silence `AGapOverTenSecondsWithoutAnyFrameBreaksAndIgnoresTheSeqStep`,
+  uncovered `AnUncoveredEmptyColumnBecomesAGap`, break in a value column `ABreakInAColumnWithValuesPutsAGapBeforeIt`;
+  failure strip `AFailedBitMarksAFailure`, `AFailureColumnDrawsTheStrip`; live follow
+  `ANewFrameMovesTheWindowWhileFollowing`, `FollowLiveReturnsToTheNewestFrame`; zoom
+  `AWheelStepZoomsAroundTheCursorTime`; pan `ADragPastFourPixelsPansAndStopsFollowing`; presets
+  `ThePresetSetsTheWidthAndKeepsFollowing`, `ThePresetsAreFiveWidthsWithTenMinutesSelected`; overview
+  `TheBandSpansTheCacheExtent`, `APressNavigatesTheTrendToThatTimeAndStopsFollowing`; readout `TrendReadoutTests`,
+  `TheHoverOverlayFollowsThePointerAndHidesOnExit`; re-read `AKeyChangeReadsTheVisibleRangeFirst`,
+  `ASecondKeyChangeCancelsTheReadInFlight`; click and Back to live `AClickWithinFourPixelsShowsTheMoment`,
+  `AClickBeforeTheRecentSpectraShowsTheStoredSpectrum`, `BackToLiveIsEnabledOnlyWhileHistorical`,
+  `ReturnToLiveShowsTheLatestLiveSpectrum`; chart rules `AHistoricalSpectrumDoesNotWriteLastNonDark`,
+  `AHistoricalSpectrumOfTheOtherDeviceReturnsToFollowing`
+- [x] verify edge cases: a key change during a re-read cancels it; a click during a re-read; a re-read before the store
   file exists reports once; a day-old point leaves the cache; both devices alternating at a covered wavelength draw one
   line; a heartbeat-only stretch adds no point and, past 10 s since the last spectrum, breaks the line at the next
   spectrum with "No spectra" (`HeartbeatsOnlyForOverTenSecondsBreakAtTheNextSpectrum`); a return to the previous key
-  inside the throttle starts no read
-- [ ] run the full suite: `dotnet test SpectrumVisualizer.slnx`; confirm the old solution builds and passes 13 of 13
-- [ ] start the app with `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI` and confirm the window shows
-  the trend's empty state and the log gains its start line; leave the port-pair checklist to the owner
+  inside the throttle starts no read. Tests: `ASecondKeyChangeCancelsTheReadInFlight`;
+  ➕ `AClickDuringARereadShowsTheMomentAndLeavesTheRereadRunning`; ➕
+  `ARereadBeforeTheStoreFileExistsReportsOnceAndCreatesNoFile` (the real `SpectrumHistory` over a missing path);
+  `PointsBreaksAndMarksOlderThanADayBeforeNowAreDropped`; ➕ `BothDevicesAlternatingAtAWavelengthBothCoverDrawOneLine`;
+  `AHeartbeatAddsNoPoint`, `HeartbeatsOnlyForOverTenSecondsBreakAtTheNextSpectrum`,
+  `ANoSpectraGapReadsNoSpectraAndTheFailureAHeartbeatInItCarried`; `AReturnToThePreviousKeyCancelsThePendingReadAndStartsNone`.
+  The `ObjectDisposedException` of `TrendChartView.ReportDataAreaWidthTo` after dispose (Task 14) was not hit
+- [x] run the full suite: `dotnet test SpectrumVisualizer.slnx`; confirm the old solution builds and passes 13 of 13
+  (907 of 907; 13 of 13). A test run leaves no file in `%LOCALAPPDATA%\SpectrumVisualizer\Spectra` and no
+  `spectrum-visualizer-*` entry in temp
+- [x] start the app with `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI` and confirm the window shows
+  the trend's empty state and the log gains its start line; leave the port-pair checklist to the owner (the built exe
+  ran under `timeout 25`: the log gained "SpectrumVisualizer starting" and the store file line; the empty state was not
+  seen on screen, a screenshot was not permitted, `TheEmptyStateShowsUntilTheFirstPoint` covers it headless; the hard
+  kill left that run's `spectra-47652.db` with its WAL and SHM, removed by hand; the port-pair checklist needs com0com
+  and stays with the owner, skipped here)
 
 ### Task 16: [Final] Update documentation
 - [ ] `docs/architecture/overview.md`: the purpose paragraph (`:3-15`); the components table (`:34-92`) gains

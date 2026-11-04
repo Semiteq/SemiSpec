@@ -9,7 +9,6 @@ using AwesomeAssertions;
 using FluentResults;
 
 using SpectrumVisualizer.Core.Store;
-using SpectrumVisualizer.Tests.Unit.Core.Store;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Trend;
 
@@ -161,11 +160,5 @@ public sealed class TrendViewModelTests : TrendFeedTestBase
 	private static bool CanExecute(ICommand command)
 	{
 		return command.CanExecute(null);
-	}
-
-	private static StoredSpectrum Stored(DateTimeOffset receivedAt)
-	{
-		var frame = StoreSamples.Spectrum(receivedAt).Frame;
-		return new StoredSpectrum(frame.Measurement!, receivedAt, frame.Seq, frame.State);
 	}
 }
