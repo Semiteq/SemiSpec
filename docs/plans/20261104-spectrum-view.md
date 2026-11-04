@@ -256,6 +256,9 @@ Manual smoke checklist (owner; com0com pair `COM10`-`COM11`, the emulator on `CO
 - add newly discovered tasks with ➕ prefix
 - document issues/blockers with ⚠️ prefix
 - update plan if implementation deviates from original scope
+- ➕ review phase 1: the completed task bodies below predate the review fixes (`TickCache`, `LogAxis.Project`,
+  `IsLogarithmic`, the per-frame cache, the kept dark-frame limits, `ReportFailureOf`, the old test names); Acceptance
+  Evidence, Solution Overview and Technical Details describe the final behaviour
 
 ## Solution Overview
 - **Folders.** `SpectrumVisualizer.UI/Chart/` holds the chart pieces copied from SemiPlot (palette, log axis, tick
