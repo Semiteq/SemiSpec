@@ -25,7 +25,7 @@ public sealed class FrameReader
 			DecodeAll(ref buffer, frames);
 			if (result.IsCompleted)
 			{
-				Interlocked.Add(ref _discardedBytes, buffer.Length);
+				DrainAfterCompletion(ref buffer, frames);
 			}
 
 			reader.AdvanceTo(buffer.Start, buffer.End);
@@ -53,5 +53,16 @@ public sealed class FrameReader
 		}
 
 		Interlocked.Add(ref _discardedBytes, discarded);
+	}
+
+	/// <summary>No more bytes will come, so a pending candidate is invalid: drop one byte and decode again.</summary>
+	private void DrainAfterCompletion(ref ReadOnlySequence<byte> buffer, List<BoardFrame> frames)
+	{
+		while (!buffer.IsEmpty)
+		{
+			buffer = buffer.Slice(1);
+			Interlocked.Increment(ref _discardedBytes);
+			DecodeAll(ref buffer, frames);
+		}
 	}
 }

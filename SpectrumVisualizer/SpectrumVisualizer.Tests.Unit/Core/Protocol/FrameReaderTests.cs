@@ -81,6 +81,22 @@ public sealed class FrameReaderTests
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
+	public async Task WriterCompletionYieldsTheFramesBehindAStalledFalseCandidate()
+	{
+		var ct = TestContext.Current.CancellationToken;
+		var pipe = new Pipe();
+		var reader = new FrameReader();
+		byte[] falseCandidate = [0xAA, 0x55, 0x12, 0x10];
+		await pipe.Writer.WriteAsync(Concat(falseCandidate, FrameEncoder.Encode(Heartbeat(6))), ct);
+		await pipe.Writer.CompleteAsync();
+
+		var yielded = await CollectAsync(reader, pipe.Reader, ct);
+
+		yielded.Should().Equal(Heartbeat(6));
+		reader.DiscardedBytes.Should().Be(falseCandidate.Length);
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
 	public async Task APartialFrameMakesTheNextReadWaitForNewBytes()
 	{
 		var ct = TestContext.Current.CancellationToken;

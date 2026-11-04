@@ -91,8 +91,9 @@ because the next read may complete the sync.
 `FrameReader.ReadAllAsync(PipeReader, CancellationToken)` runs the decoder over a pipe. It yields every whole frame in
 the buffer before it reads again, marks the rest of the buffer examined so the next read waits for new bytes, ends when
 the writer completes, and surfaces cancellation as `OperationCanceledException`. Malformed input never throws; it adds
-to `DiscardedBytes`, a running count that any thread may read. The bytes of a partial frame left when the writer
-completes are added to `DiscardedBytes` too.
+to `DiscardedBytes`, a running count that any thread may read. When the writer completes, no candidate can grow any
+more: the reader drops one byte at each pending candidate and decodes again, so a false candidate cannot hide the whole
+frames behind it. Only the bytes that belong to no frame are added to `DiscardedBytes`.
 
 A false candidate whose `len` reads as a valid value stalls the decoder: it waits for the whole frame before the CRC
 can fail. Three inputs produce one: a corrupted header that keeps a valid `len`, a false `AA 55` followed by a valid
