@@ -108,9 +108,9 @@ public sealed class SpectrumStore : IDisposable
 	}
 
 	/// <summary>
-	/// Stops taking frames and completes once the writer has written the queue and closed the file; from the stop on a
-	/// held lock fails a batch after 1 s, and when drainToken fires the frames still queued count as dropped. Completes
-	/// at once when nothing started; a later call completes with the writer of the first.
+	/// Stops taking frames and completes once the writer has written the queue and closed the file; from the stop on no
+	/// retention pass starts, a held lock fails a batch after 1 s, and when drainToken fires the frames still queued count
+	/// as dropped. Completes at once when nothing started; a later call completes with the writer of the first.
 	/// </summary>
 	public async Task StopAsync(CancellationToken drainToken = default)
 	{
@@ -275,7 +275,7 @@ public sealed class SpectrumStore : IDisposable
 		}
 
 		_logger.LogError(exception, "The spectrum store writer failed; every later frame counts as dropped");
-		_messagePanel.TryReportFailure(new StoreWriteError().CausedBy(exception), _logger, _uiScheduler);
+		_messagePanel.TryReportFailure(new StoreStoppedError().CausedBy(exception), _logger, _uiScheduler);
 	}
 
 	private async Task WriteQueuedAsync(
@@ -292,15 +292,10 @@ public sealed class SpectrumStore : IDisposable
 				// Each pending wait is kept until it completes: the queue allows one reader wait at a time.
 				readable ??= _queue.Reader.WaitToReadAsync(cancellationToken).AsTask();
 				await Task.WhenAny(readable, retentionDue).ConfigureAwait(false);
-				if (_stopped)
-				{
-					database.ShortenBusyTimeout();
-				}
-
 				if (retentionDue.IsCompleted)
 				{
 					await retentionDue.ConfigureAwait(false);
-					if (!drainToken.IsCancellationRequested)
+					if (!_stopped)
 					{
 						DeleteExpired(database);
 					}
@@ -336,6 +331,7 @@ public sealed class SpectrumStore : IDisposable
 
 	private void WriteBatch(SpectrumDatabase database, List<ReceivedFrame> batch)
 	{
+		ShortenBusyTimeoutOnceStopped(database);
 		batch.Clear();
 		while (batch.Count < BatchSize && _queue.Reader.TryRead(out var received))
 		{
@@ -398,8 +394,18 @@ public sealed class SpectrumStore : IDisposable
 		return discarded;
 	}
 
+	/// <summary>Called right before each statement, so a statement started after the stop gives up on a held lock after 1 s.</summary>
+	private void ShortenBusyTimeoutOnceStopped(SpectrumDatabase database)
+	{
+		if (_stopped)
+		{
+			database.ShortenBusyTimeout();
+		}
+	}
+
 	private void CheckpointAndClose(SpectrumDatabase database)
 	{
+		ShortenBusyTimeoutOnceStopped(database);
 		var closed = database.CheckpointAndClose();
 		if (closed.IsFailed)
 		{

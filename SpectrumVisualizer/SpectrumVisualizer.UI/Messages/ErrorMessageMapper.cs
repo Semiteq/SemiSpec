@@ -57,6 +57,11 @@ public static class ErrorMessageMapper
 				Resources.StoreWriteDetail,
 				Resources.StoreWriteRemedy,
 				MessageSeverity.Warning),
+			StoreStoppedError => new MessageView(
+				Resources.StoreStoppedTitle,
+				Resources.StoreStoppedDetail,
+				Resources.StoreStoppedRemedy,
+				MessageSeverity.Error),
 			IExceptionalError thrown => MapThrown(thrown),
 			_ => MapUnknown(error)
 		};

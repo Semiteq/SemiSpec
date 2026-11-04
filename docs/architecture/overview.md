@@ -77,7 +77,7 @@ and reads.
 | `ChartPalette` | UI | Paints ScottPlot's figure, data area, grid and axes from the palette, and resolves the colours of the line, the band and the centre line |
 | `LogTickGenerator` | UI | ScottPlot's tick generator over `LogAxis`: the labels under the current culture, and a cache of the last two results keyed on the limits, the length and the culture |
 | `SpectrumStore`, `StoreFile` | UI | The background writer: enqueues every distributor frame, writes the queue to the instance file in batches, deletes rows older than 24 h once a minute and counts the frames it loses; `StoreFile` is the instance file's path (`UI/Store/`) |
-| `StoreOpenError`, `StoreWriteError` | UI | The store file could not be prepared or opened; a batch could not be written, or the writer failed after the open (`UI/Store/`) |
+| `StoreOpenError`, `StoreWriteError`, `StoreStoppedError` | UI | The store file could not be prepared or opened; a batch could not be written; an unexpected failure after the open ended the writer (`UI/Store/`) |
 | `AppLogging` | UI | Creates the log folder and the Serilog logger: `spectrum-visualizer.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
 | `AddUi(LoggingSetup, AppDataPaths)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` of this process under the store folder, `SpectrumStore`, `LiveSpectrumSource` as the `IDisplayedSpectrumSource`, the message panel, the connection row, the status bar, the spectrum view model and the main window view model, all singletons |
@@ -129,9 +129,12 @@ a timeout logs a Warning. The link stops first, so no frame enters the channel a
 reading it, and the distributor stops before the store, so no frame reaches the store after its queue has closed. Each
 stop runs in a `finally` of the one before, so the distributor and the store stop even when an earlier stop throws;
 any failure logs an Error, and the window closes anyway, because the stop task never faults. The store's drain token
-fires 1.5 s before the 5 s limit ends. After it the store finishes at most the one batch or retention pass already
-running, which a held lock fails after the 1 s busy timeout of the stop, starts no other, counts what is still queued
-as dropped and checkpoints, which never waits; so the store's close fits inside the limit.
+fires 1.5 s before the 5 s limit ends. From the store's stop on it starts no retention pass, and a held lock fails
+each statement it starts after about 1.15 s (the 1 s busy timeout of the stop plus Microsoft.Data.Sqlite's 150 ms
+retry step); a statement already running when the store's stop begins, at most 2 s into the close, keeps up to 2.15 s.
+After the drain token the store starts no batch, counts what is still queued as dropped and checkpoints, which never
+waits. Worst case a batch starts just before the drain token at 3.5 s and ends at about 4.65 s, so the store's close
+ends about 0.35 s inside the limit.
 
 - When the stop has completed by the time the first `Closing` checks it, the close goes ahead. That happens only when
   neither ran, before `Opened`.
@@ -454,7 +457,7 @@ returns a FluentResults `Result`, with a `SqliteException` or `IOException` as a
   the panel gets one entry per incident.
 - Any other failure ends history for the run. A failed prepare or open, or any exception before the file is open,
   logs at Error and reports one `StoreOpenError`; any exception after the open, outside a failed batch, logs at Error
-  and reports one `StoreWriteError`. The writer closes the file without a checkpoint, keeps the subscription, and from
+  and reports one `StoreStoppedError`. The writer closes the file without a checkpoint, keeps the subscription, and from
   then on counts every frame still queued and every later frame as dropped, so "Dropped frames" keeps growing while
   nothing is stored.
 - Retention runs once a minute, also while no frame arrives: `DeleteBefore(now - 24 h)`, where the wait is
@@ -470,9 +473,10 @@ returns a FluentResults `Result`, with a `SqliteException` or `IOException` as a
   dropped counts and the checkpoint: `Truncated`, `Busy` (a reader's snapshot kept the WAL, which the next start
   deletes with the file), `Failed` or `Skipped`.
 - `StopAsync(drainToken)` disposes the subscription, completes the queue and awaits the writer, which writes what is
-  still queued and checks the token between batches, never inside one. From the stop on, the writer calls
-  `ShortenBusyTimeout`, so a batch against a held lock fails after 1 s instead of 2 s. When the token fires, the frames
-  still queued count as dropped, no retention pass starts, and the writer checkpoints and closes. `StopAsync` completes at once when nothing
+  still queued and checks the token between batches, never inside one. From the stop on, no retention pass starts,
+  and the writer calls `ShortenBusyTimeout` right before each batch and the checkpoint, so a statement it starts
+  against a held lock fails after 1 s instead of 2 s. When the token fires, the frames still queued count as dropped,
+  and the writer checkpoints and closes. `StopAsync` completes at once when nothing
   started; a later call awaits the writer of the first. `Dispose()` disposes the subscription and cancels the writer
   without waiting, for the container's synchronous dispose, also while a stop runs; the writer counts the frames still
   queued as dropped and closes the file without a checkpoint. The writer disposes its cancellation sources when it
@@ -544,6 +548,7 @@ extensions:
 | `PortListError` | Warning: the operator presses Refresh |
 | `StoreOpenError` | Error: nothing is stored for the run |
 | `StoreWriteError` | Warning: the lost frames count as dropped; after a failed batch the store keeps trying |
+| `StoreStoppedError` | Error: nothing more is stored for the run, and every later frame counts as dropped |
 | an exception error | Error; the detail keeps the exception type and message |
 | any other error | Error; the detail keeps the error's own message |
 

@@ -126,6 +126,15 @@
   <data name="StoreWriteRemedy" xml:space="preserve">
     <value>Проверьте свободное место на системном диске и закройте программы, открывшие файл истории спектров. Программа продолжает попытки записи.</value>
   </data>
+  <data name="StoreStoppedTitle" xml:space="preserve">
+    <value>Запись истории спектров остановлена</value>
+  </data>
+  <data name="StoreStoppedDetail" xml:space="preserve">
+    <value>Программа прекратила запись истории спектров после непредвиденной ошибки. Спектр отображается; новые кадры учитываются как отброшенные.</value>
+  </data>
+  <data name="StoreStoppedRemedy" xml:space="preserve">
+    <value>Перезапустите программу. Если ошибка повторится, передайте файл журнала разработчику.</value>
+  </data>
   <data name="LinkRestoredTitle" xml:space="preserve">
     <value>Идёт приём данных</value>
   </data>

@@ -268,6 +268,41 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
+	public async Task AStopDuringARetentionPassEndsInsideTheCloseLimitAndStartsNoOther()
+	{
+		const int Fed = 600;
+		_channel = Channel.CreateUnbounded<ReceivedFrame>();
+		var clock = new ManualClock(StoreSamples.Start);
+		await StartOpenedAsync(clock);
+		TimeSpan elapsed;
+
+		using (HoldWriteLock())
+		{
+			// The due timer resumes the writer inline on the advancing thread, so the pass runs off the test thread.
+			var retentionPass = Task.Run(() => clock.Advance(TimeSpan.FromSeconds(61)), TestContext.Current.CancellationToken);
+			await Waits.UntilAsync(() => clock.Reads == 1);
+			await FeedAsync([.. Enumerable.Repeat(StoreSamples.Spectrum(StoreSamples.Start), Fed)]);
+			await Distributor.StopAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
+			using var drain = new CancellationTokenSource(_closeLimit - _closeReserve);
+			var stopwatch = Stopwatch.StartNew();
+			var stop = Store.StopAsync(drain.Token);
+			await Waits.UntilAsync(() => LogTimes("The spectrum store rows").Count == 1);
+			var nextRetention = Task.Run(() => clock.Advance(TimeSpan.FromSeconds(61)), TestContext.Current.CancellationToken);
+			await stop.WaitAsync(_stopLimit, TestContext.Current.CancellationToken);
+			elapsed = stopwatch.Elapsed;
+			await Task.WhenAll(retentionPass, nextRetention).WaitAsync(_stopLimit, TestContext.Current.CancellationToken);
+		}
+
+		elapsed.Should().BeLessThan(_closeLimit);
+		(Count("spectrum") + Store.DroppedFrames).Should().Be(Fed);
+		var retention = LogTimes("The spectrum store rows").Should().ContainSingle(
+			"no retention pass starts after the stop").Subject;
+		var firstFailedBatch = LogTimes("A batch of").Should().NotBeEmpty().And.Subject.First();
+		(firstFailedBatch - retention).Should().BeLessThan(
+			TimeSpan.FromSeconds(1.6), "the batch after the stop gives up after the 1 s busy timeout, not 2 s");
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
 	public async Task DisposeCountsTheQueuedFramesAsDropped()
 	{
 		const int Fed = 600;
@@ -437,7 +472,8 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 		await StopAsync();
 
 		var entry = _panel.Entries.Should().ContainSingle().Subject;
-		entry.View.Title.Should().Be(Resources.StoreWriteTitle);
+		entry.View.Title.Should().Be(Resources.StoreStoppedTitle);
+		entry.View.Severity.Should().Be(MessageSeverity.Error);
 		Count("spectrum").Should().Be(1);
 		Store.DroppedFrames.Should().Be(2);
 		_logger.Failures().Should().ContainSingle().Which.Should().BeSameAs(failure);
@@ -503,6 +539,13 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 		return _logger.Collector.GetSnapshot()
 			.Select(record => record.Message)
 			.LastOrDefault(message => message.StartsWith("The spectrum store stopped", StringComparison.Ordinal));
+	}
+
+	private List<DateTimeOffset> LogTimes(string messageStart)
+	{
+		return [.. _logger.Collector.GetSnapshot()
+			.Where(record => record.Message.StartsWith(messageStart, StringComparison.Ordinal))
+			.Select(record => record.Timestamp)];
 	}
 
 	private void Feed(params ReceivedFrame[] frames)
@@ -580,12 +623,17 @@ public sealed class SpectrumStoreTests : IAsyncLifetime
 		private readonly Lock _gate = new();
 		private readonly List<ManualTimer> _timers = [];
 		private DateTimeOffset _now = start;
+		private int _reads;
 
 		/// <summary>When set, every later GetUtcNow throws it.</summary>
 		public Exception? NowFailure { get; set; }
 
+		/// <summary>The GetUtcNow calls so far; the store reads the clock only right before a retention delete.</summary>
+		public int Reads => Volatile.Read(ref _reads);
+
 		public override DateTimeOffset GetUtcNow()
 		{
+			Interlocked.Increment(ref _reads);
 			if (NowFailure is { } failure)
 			{
 				throw failure;

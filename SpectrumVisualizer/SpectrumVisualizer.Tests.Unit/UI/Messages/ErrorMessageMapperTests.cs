@@ -140,6 +140,18 @@ public sealed class ErrorMessageMapperTests
 	}
 
 	[Fact]
+	public void MapGivesAStoppedStoreItsOwnTextAtError()
+	{
+		var view = ErrorMessageMapper.Map(new StoreStoppedError().CausedBy(new InvalidOperationException("the clock failed")));
+
+		view.Should().Be(new MessageView(
+			Resources.StoreStoppedTitle,
+			Resources.StoreStoppedDetail,
+			Resources.StoreStoppedRemedy,
+			MessageSeverity.Error));
+	}
+
+	[Fact]
 	public void MapGivesTwoPortLostErrorsOnDifferentPortsEqualViews()
 	{
 		var first = ErrorMessageMapper.Map(new PortLostError("COM3"));

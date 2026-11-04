@@ -182,6 +182,9 @@ Automatable (baseline 505 of 505 at `12bef84`):
      `AStopPastItsBudgetCountsTheUndrainedFramesAsDropped` (writer held, `StopAsync` with a cancelled drain token:
      stored + dropped = fed); `AStopAgainstALockHeldThroughItEndsInsideTheCloseLimit` (a drain token at 3.5 s, the
      stop ends under 5 s, stored + dropped = fed, and a batch after the stop gives up after 1 s);
+     `AStopDuringARetentionPassEndsInsideTheCloseLimitAndStartsNoOther` (a held lock, a retention pass running when
+     `StopAsync` starts with frames queued and a drain token at 3.5 s: the stop ends under 5 s, the batch after the
+     pass gives up after 1 s, and a retention due after the stop never runs);
      `AStopWithAFullQueueDrainsInsideTheCloseLimit`; `FramesFromTwoSequenceRunsShareOneFile` (two runs of `seq` from
      0 land in one file; the store sees no link session, so no reconnect is involved);
      `StopDrainsTheQueueThenCheckpoints` (an idle connection holds the file across the stop, the `-wal` is 0 bytes,
@@ -189,7 +192,7 @@ Automatable (baseline 505 of 505 at `12bef84`):
      `StopBeforeStartCompletesAtOnce`; `AFailedOpenReportsOneErrorAndCountsEveryFrameAsDropped` (the store folder
      path is a file); `AnOpenThatThrowsReportsOneErrorAndCountsEveryFrameAsDropped` (a path with a NUL character
      throws `ArgumentException`); `AFailureAfterTheOpenReportsOnceAndCountsEveryLaterFrameAsDropped` (a clock that
-     throws in the retention pass; one `StoreWriteError`, the later frames dropped, the file closed).
+     throws in the retention pass; one `StoreStoppedError`, the later frames dropped, the file closed).
    - `StoreBenchmarkCommandTests` and `StoreBenchmarkRunTests.ASmallRunPrintsEveryMeasurementAndTheStrategiesAgree`
      (`--rows 2000 --churn-rounds 2`: exit code 0, every metric row printed fresh and churned, the
      `substr` and `SqliteBlob` reads give equal min, max and counts per column to 1e-9; the precomputed and merged
@@ -278,11 +281,15 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
    appears, and the previous file is gone; the new file has 0 spectra.
 6. Start a second copy of the app while the first runs. Both files exist, and the first app keeps storing (its count
    rises). Close the first copy, start a third: the first copy's file is gone, the second's stays.
-7. Run `emu --port COM10 --bad-crc-every 5 --rate 1`: "Lost spectra" rises, "Dropped frames" stays 0.
-8. Slow store: run `sqlite3 spectra-<pid>.db`, type `BEGIN IMMEDIATE;`, wait 10 s, type `ROLLBACK;`. Within 4 s of the
-   `BEGIN` the message panel shows one Warning "Spectrum history write failed", and "Dropped frames" rises by the
-   frames of the failed batches (about 10 at `--rate 1`). After `ROLLBACK` the count stops rising, and no second entry
-   appears for the same incident.
+7. No copy is connected now. Close the third copy and press Connect in the second one; from here on `<pid>` is the
+   second copy's process id, from its own log line. Run `emu --port COM10 --bad-crc-every 5 --rate 1`: "Lost spectra"
+   rises, "Dropped frames" stays 0.
+8. Slow store: run `sqlite3 spectra-<pid>.db`, type `BEGIN IMMEDIATE;`, wait 10 s, type `ROLLBACK;`. The sqlite3 shell
+   has busy timeout 0, so a `BEGIN IMMEDIATE;` typed during the app's short commit can print "database is locked";
+   type it again. Within 4 s of the `BEGIN` the message panel shows one Warning "Spectrum history write failed", and
+   "Dropped frames" rises by the frames of the failed batches (about 7 to 9 at `--rate 1`: the frames that arrive
+   during the last wait are written by the first batch after `ROLLBACK`). After `ROLLBACK` the count stops rising, and
+   no second entry appears for the same incident.
 9. Retention, on a test machine only: with the app storing, move the Windows clock 25 h forward. Within 70 s
    `select count(*) from spectrum where received_at < (strftime('%s','now') - 86400) * 1000` prints 0. Move the clock
    back; the rows stamped during the 25 h ahead stay, now in the future, so restart the app before any later step.
@@ -385,7 +392,7 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
     no file I/O. Frames that arrive meanwhile wait in the queue.
   - One failure path ends history for the run: a failed prepare or open, or any exception before the file is open,
     logs at Error and reports one `StoreOpenError`; any exception after the open, outside a failed batch, logs at
-    Error and reports one `StoreWriteError`. The writer closes the file without a checkpoint, keeps the subscription
+    Error and reports one `StoreStoppedError`. The writer closes the file without a checkpoint, keeps the subscription
     and counts every frame still queued and every later frame as dropped, so "Dropped frames" keeps growing while
     history is off.
   - Loop: wait for the queue or the next retention time, whichever comes first; take up to 256 frames with `TryRead`
@@ -416,10 +423,13 @@ for `dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmula
     its cancellation sources when it ends, under a lock that `Dispose` and the drain token also take.
   - Stop budget: the close chain has one 5 s limit (`App.axaml.cs:28`). The link's stop can take up to 2 s on a
     driver that hangs in dispose (`LinkSession.cs:27`, `:287-310`), and the distributor stops at once, so the store
-    gets the rest: `App` passes a drain token that fires 1.5 s before the 5 s limit ends. After it the writer finishes
-    at most the one batch or retention pass already running and starts no other; a held lock fails it after the 1 s busy timeout of the stop (Microsoft.Data.Sqlite retries
-    every 150 ms, so up to about 1.15 s), then checkpoints, which never waits, and closes, inside the limit. Whatever
-    does not drain by then is counted as dropped. Review phase 1 measured the earlier 0.5 s reserve against a held
+    gets the rest: `App` passes a drain token that fires 1.5 s before the 5 s limit ends. From the store's stop on no
+    retention pass starts, and the writer shortens the busy timeout to 1 s right before each statement it starts, so
+    a held lock fails such a statement after about 1.15 s (Microsoft.Data.Sqlite retries every 150 ms). A statement
+    already running when the store's stop begins, at most 2 s into the close, keeps up to 2.15 s and ends by about
+    4.15 s. After the drain token the writer starts no batch. Worst case a batch starts just before the drain token at
+    3.5 s and ends at about 4.65 s; the checkpoint never waits, so the close ends about 0.35 s inside the limit.
+    Whatever does not drain by then is counted as dropped. Review phase 1 measured the earlier 0.5 s reserve against a held
     lock: the stop ended at 5.96 s, because each batch waited out the full 2 s.
 - **Link drop counter.** `SerialLink` counts the frames its channel drops: `OnFrameDropped` adds 1 to
   `_droppedFrames` before its log-once check. `LinkStatus` gains `public long DroppedFrames { get; init; }`, a
@@ -554,9 +564,13 @@ New resx keys (en / ru):
 | `StoreWriteTitle` | Spectrum history write failed | Не удалось записать историю спектров |
 | `StoreWriteDetail` | Received frames could not be written to the history file; they count as dropped frames. | Принятые кадры не удалось записать в файл истории; они учтены как отброшенные. |
 | `StoreWriteRemedy` | Check the free space on the system drive, and close any program that opened the spectrum history file. The application keeps trying. | Проверьте свободное место на системном диске и закройте программы, открывшие файл истории спектров. Программа продолжает попытки записи. |
+| `StoreStoppedTitle` | Spectrum history stopped | Запись истории спектров остановлена |
+| `StoreStoppedDetail` | The application stopped writing the spectrum history after an unexpected error. The spectrum is still shown; new frames count as dropped. | Программа прекратила запись истории спектров после непредвиденной ошибки. Спектр отображается; новые кадры учитываются как отброшенные. |
+| `StoreStoppedRemedy` | Restart the application. If the error repeats, send the log file to the developer. | Перезапустите программу. Если ошибка повторится, передайте файл журнала разработчику. |
 
 Errors (`SpectrumVisualizer.UI/Store/StoreErrors.cs`): `StoreOpenError(string path)` mapped to Error severity,
-`StoreWriteError()` mapped to Warning; each carries the cause as an `ExceptionalError` reason. The view leaves the path
+`StoreWriteError()` (a failed batch; the writer keeps running) mapped to Warning, `StoreStoppedError()` (an exception
+after the open ended history) mapped to Error; each carries the cause as an `ExceptionalError` reason. The view leaves the path
 out, so repeats coalesce, as the link errors leave the port out (`ErrorMessageMapper.cs:10-11`).
 
 Data flow:
@@ -821,6 +835,10 @@ Data flow:
   test's cleanup can await it after a window close it did not wait for and only then delete its root
 - [x] ➕ review phase 1: the drain token now fires 1.5 s before the limit (a 3.5 s delay), and the store shortens its
   busy timeout to 1 s from the stop on; with 0.5 s and the 2 s timeout a held lock pushed the stop to 5.96 s
+- [x] ➕ review phase 1 re-check: no retention pass starts once the store stops, and the writer shortens the busy
+  timeout right before each statement, so a pass that woke before the stop cannot run a retention and a batch at
+  2 s each; a failure that ends history now reports `StoreStoppedError` (Error) with its own three resx keys, and
+  `StoreWriteError` stays for a failed batch, after which the writer keeps trying
 - [x] run `dotnet test SpectrumVisualizer.slnx` - must pass before next task (611 of 611)
 
 ### Task 11: Status bar pre-handover checklist (`dev:desktop-ui`)

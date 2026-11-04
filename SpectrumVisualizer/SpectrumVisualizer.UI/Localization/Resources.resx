@@ -126,6 +126,15 @@
   <data name="StoreWriteRemedy" xml:space="preserve">
     <value>Check the free space on the system drive, and close any program that opened the spectrum history file. The application keeps trying.</value>
   </data>
+  <data name="StoreStoppedTitle" xml:space="preserve">
+    <value>Spectrum history stopped</value>
+  </data>
+  <data name="StoreStoppedDetail" xml:space="preserve">
+    <value>The application stopped writing the spectrum history after an unexpected error. The spectrum is still shown; new frames count as dropped.</value>
+  </data>
+  <data name="StoreStoppedRemedy" xml:space="preserve">
+    <value>Restart the application. If the error repeats, send the log file to the developer.</value>
+  </data>
   <data name="LinkRestoredTitle" xml:space="preserve">
     <value>Receiving data</value>
   </data>
