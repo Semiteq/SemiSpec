@@ -9,17 +9,23 @@ public sealed class FrameSchedule(EmulatorOptions options, TimeProvider timeProv
 
 	private readonly long _start = timeProvider.GetTimestamp();
 
-	private readonly BoardState _state =
-		options.Device == Spectrometer.Atp2000 ? BoardState.Atp2000Connected : BoardState.Atp8000Connected;
+	private readonly BoardState _state = StateOf(options);
+
+	private readonly BoardState _ownFailedBit = FailedBitOf(options.Device);
 
 	private readonly SpectrumMeasurement _measurement =
 		SpectrumGenerator.Generate(options.Device, options.WavelengthNm, options.Delta);
 
+	private readonly SpectrumMeasurement _darkMeasurement =
+		SpectrumGenerator.Dark(options.Device, options.WavelengthNm, options.Delta);
+
 	private readonly TimeSpan? _spectrumPeriod = options.Rate > 0 ? TimeSpan.FromSeconds(1 / options.Rate) : null;
 	private readonly int _badCrcEvery = options.BadCrcEvery;
+	private readonly int _darkEvery = options.DarkEvery;
 	private TimeSpan _nextSpectrumAt;
 	private TimeSpan _lastSentAt;
 	private byte _seq;
+	private long _spectraSent;
 	private long _framesSent;
 
 	/// <summary>The bytes of the frame due now, or null when nothing is due.</summary>
@@ -30,7 +36,9 @@ public sealed class FrameSchedule(EmulatorOptions options, TimeProvider timeProv
 		if (_spectrumPeriod is { } period && now >= _nextSpectrumAt)
 		{
 			_seq++;
-			frame = new BoardFrame(_state, _seq, _measurement);
+			_spectraSent++;
+			var isDark = _darkEvery > 0 && _spectraSent % _darkEvery == 0;
+			frame = new BoardFrame(_state & ~_ownFailedBit, _seq, isDark ? _darkMeasurement : _measurement);
 			_nextSpectrumAt += period;
 			if (_nextSpectrumAt <= now)
 			{
@@ -55,5 +63,25 @@ public sealed class FrameSchedule(EmulatorOptions options, TimeProvider timeProv
 		}
 
 		return bytes;
+	}
+
+	private static BoardState StateOf(EmulatorOptions options)
+	{
+		var connected = options.BothConnected
+			? BoardState.Atp2000Connected | BoardState.Atp8000Connected
+			: ConnectedBitOf(options.Device);
+		return options.Failed is { } failed ? connected | FailedBitOf(failed) : connected;
+	}
+
+	private static BoardState ConnectedBitOf(Spectrometer device)
+	{
+		return device == Spectrometer.Atp2000 ? BoardState.Atp2000Connected : BoardState.Atp8000Connected;
+	}
+
+	private static BoardState FailedBitOf(Spectrometer device)
+	{
+		return device == Spectrometer.Atp2000
+			? BoardState.Atp2000MeasurementFailed
+			: BoardState.Atp8000MeasurementFailed;
 	}
 }

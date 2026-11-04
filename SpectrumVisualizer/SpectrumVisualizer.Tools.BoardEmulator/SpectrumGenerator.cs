@@ -30,4 +30,17 @@ public static class SpectrumGenerator
 			q: 0f,
 			pixels);
 	}
+
+	/// <summary>The board's dark measurement, sent as an ordinary spectrum: every pixel, amplitude and snr zero.</summary>
+	public static SpectrumMeasurement Dark(Spectrometer device, ushort wavelengthNm, byte delta)
+	{
+		return new SpectrumMeasurement(
+			device,
+			wavelengthNm,
+			delta,
+			amplitude: 0f,
+			snr: 0f,
+			q: 0f,
+			new ushort[device.PixelCount]);
+	}
 }

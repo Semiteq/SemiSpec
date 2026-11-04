@@ -28,7 +28,9 @@ public static class Program
 
 		Console.WriteLine(
 			$"{options.Port}: {options.Device}, {options.Rate} frames/s, {options.WavelengthNm} nm "
-			+ $"+/- {options.Delta} nm, bad CRC every {options.BadCrcEvery} (0 = never). Ctrl+C stops.");
+			+ $"+/- {options.Delta} nm, bad CRC every {options.BadCrcEvery}, dark every {options.DarkEvery} "
+			+ $"(0 = never), both connected {options.BothConnected}, failed {options.Failed?.ToString() ?? "none"}. "
+			+ "Ctrl+C stops.");
 
 		var schedule = new FrameSchedule(options, TimeProvider.System);
 		using var timer = new PeriodicTimer(_tickInterval);

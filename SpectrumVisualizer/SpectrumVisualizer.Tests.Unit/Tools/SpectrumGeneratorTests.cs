@@ -56,4 +56,19 @@ public sealed class SpectrumGeneratorTests
 		measurement.Delta.Should().Be(7);
 		measurement.Amplitude.Should().Be(30000);
 	}
+
+	[Theory]
+	[InlineData(Spectrometer.Atp2000, 2048)]
+	[InlineData(Spectrometer.Atp8000, 512)]
+	public void TheDarkSpectrumIsAllZeroWithZeroAmplitudeAndSnr(Spectrometer device, int pixelCount)
+	{
+		var measurement = SpectrumGenerator.Dark(device, 1310, 7);
+
+		measurement.Device.Should().Be(device);
+		measurement.Pixels.Should().HaveCount(pixelCount).And.OnlyContain(pixel => pixel == 0);
+		measurement.Amplitude.Should().Be(0);
+		measurement.Snr.Should().Be(0);
+		measurement.WavelengthNm.Should().Be(1310);
+		measurement.Delta.Should().Be(7);
+	}
 }

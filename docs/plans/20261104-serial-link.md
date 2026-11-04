@@ -632,18 +632,18 @@ the same run do not.
 - Modify: `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/Tools/FrameScheduleTests.cs`, `EmulatorCommandTests.cs`,
   `SpectrumGeneratorTests.cs`
 
-- [ ] add `DarkEvery`, `BothConnected` and `Failed` (a nullable `Spectrometer`) to `EmulatorOptions` (`:6-12`); add
+- [x] add `DarkEvery`, `BothConnected` and `Failed` (a nullable `Spectrometer`) to `EmulatorOptions` (`:6-12`); add
   `--dark-every`, `--both-connected` and `--failed` beside the options at `EmulatorCommand.cs:17-54`, list them in
   `Build` (`:58-66`) and `From` (`:68-78`), and add the cross-option rule of Solution Overview as a command validator
-- [ ] add `SpectrumGenerator.Dark(device, wavelengthNm, delta)`: all-zero pixels, amplitude 0, snr 0
-- [ ] derive the state in `FrameSchedule` (`:12-13`) from the options; send the dark spectrum as every nth spectrum;
+- [x] add `SpectrumGenerator.Dark(device, wavelengthNm, delta)`: all-zero pixels, amplitude 0, snr 0
+- [x] derive the state in `FrameSchedule` (`:12-13`) from the options; send the dark spectrum as every nth spectrum;
   clear the emulated spectrometer's failed bit in its spectrum frames; print the new options in the start line
   (`Program.cs`)
-- [ ] write tests: every third spectrum is dark with `--dark-every 3` and `seq` keeps counting; `--failed 8000` with
+- [x] write tests: every third spectrum is dark with `--dark-every 3` and `seq` keeps counting; `--failed 8000` with
   `--device 8000` sets bit 3 in heartbeats only; `--failed 2000 --both-connected` sets bit 2 in every frame;
   `--both-connected` sets bits 0 and 1; the rejected combination prints its error and exits 1; the defaults leave the
   frames unchanged
-- [ ] run `dotnet test SpectrumVisualizer.slnx` and the emulator `--help` - must pass before next task
+- [x] run `dotnet test SpectrumVisualizer.slnx` and the emulator `--help` - must pass before next task
 
 ### Task 13: Verify acceptance criteria
 - [ ] run every command of Acceptance Evidence and record each result with its count

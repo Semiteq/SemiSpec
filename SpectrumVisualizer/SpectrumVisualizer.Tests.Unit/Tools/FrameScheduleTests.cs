@@ -159,9 +159,86 @@ public sealed class FrameScheduleTests
 		frame.Measurement.WavelengthNm.Should().Be(650);
 	}
 
+	[Fact]
+	public void EveryThirdSpectrumIsDarkAndSeqKeepsCounting()
+	{
+		var schedule = new FrameSchedule(Options(rate: 1) with { DarkEvery = 3 }, _time);
+
+		var frames = SendEverySecond(schedule, 6);
+
+		frames.Select(frame => frame.Measurement!.Amplitude == 0).Should().Equal(false, false, true, false, false, true);
+		frames[2].Measurement!.Pixels.Should().OnlyContain(pixel => pixel == 0);
+		frames.Select(frame => frame.Seq).Should().Equal(1, 2, 3, 4, 5, 6);
+	}
+
+	[Fact]
+	public void TheEmulatedSpectrometersFailedBitShowsInHeartbeatsOnly()
+	{
+		var schedule = new FrameSchedule(Options(rate: 0.25) with { Failed = Spectrometer.Atp8000 }, _time);
+
+		var spectrum = Decode(schedule.Next());
+		_time.Advance(TimeSpan.FromSeconds(3));
+		var heartbeat = Decode(schedule.Next());
+
+		spectrum.State.Should().Be(BoardState.Atp8000Connected);
+		heartbeat.Measurement.Should().BeNull();
+		heartbeat.State.Should().Be(BoardState.Atp8000Connected | BoardState.Atp8000MeasurementFailed);
+	}
+
+	[Fact]
+	public void TheOtherSpectrometersFailedBitShowsInEveryFrame()
+	{
+		var options = Options(rate: 0.25) with { BothConnected = true, Failed = Spectrometer.Atp2000 };
+		var schedule = new FrameSchedule(options, _time);
+
+		var spectrum = Decode(schedule.Next());
+		_time.Advance(TimeSpan.FromSeconds(3));
+		var heartbeat = Decode(schedule.Next());
+
+		const BoardState Expected =
+			BoardState.Atp2000Connected | BoardState.Atp8000Connected | BoardState.Atp2000MeasurementFailed;
+		spectrum.State.Should().Be(Expected);
+		heartbeat.State.Should().Be(Expected);
+	}
+
+	[Fact]
+	public void BothConnectedSetsBothConnectedBits()
+	{
+		var schedule = new FrameSchedule(Options(rate: 1) with { BothConnected = true }, _time);
+
+		var frame = Decode(schedule.Next());
+
+		frame.State.Should().Be(BoardState.Atp2000Connected | BoardState.Atp8000Connected);
+		frame.Measurement!.Device.Should().Be(Spectrometer.Atp8000);
+	}
+
+	[Fact]
+	public void TheDefaultsSendTheSameSpectrumWithOnlyTheDeviceConnected()
+	{
+		var schedule = new FrameSchedule(Options(rate: 1), _time);
+		var expected = SpectrumGenerator.Generate(Spectrometer.Atp8000, 1550, 10);
+
+		var frames = SendEverySecond(schedule, 5);
+
+		frames.Should().OnlyContain(frame =>
+			frame.State == BoardState.Atp8000Connected && frame.Measurement!.Equals(expected));
+	}
+
 	private static EmulatorOptions Options(double rate, int badCrcEvery = 0)
 	{
-		return new EmulatorOptions("COM_TEST", Spectrometer.Atp8000, rate, 1550, 10, badCrcEvery);
+		return new EmulatorOptions("COM_TEST", Spectrometer.Atp8000, rate, 1550, 10, badCrcEvery, 0, false, null);
+	}
+
+	private List<BoardFrame> SendEverySecond(FrameSchedule schedule, int count)
+	{
+		var frames = new List<BoardFrame>();
+		for (var second = 0; second < count; second++)
+		{
+			frames.Add(Decode(schedule.Next()));
+			_time.Advance(TimeSpan.FromSeconds(1));
+		}
+
+		return frames;
 	}
 
 	private static BoardFrame Decode(byte[]? bytes)

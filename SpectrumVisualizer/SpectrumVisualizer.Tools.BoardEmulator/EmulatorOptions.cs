@@ -9,7 +9,10 @@ public sealed record EmulatorOptions(
 	double Rate,
 	ushort WavelengthNm,
 	byte Delta,
-	int BadCrcEvery)
+	int BadCrcEvery,
+	int DarkEvery,
+	bool BothConnected,
+	Spectrometer? Failed)
 {
 	public static ushort DefaultWavelength(Spectrometer device)
 	{
