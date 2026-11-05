@@ -3,12 +3,12 @@
 ; Run `dotnet publish SpectrumVisualizer/SpectrumVisualizer.UI/SpectrumVisualizer.UI.csproj -c Release` first.
 
 #ifndef AppVersion
-  #error AppVersion must be defined. Pass it as: iscc.exe /DAppVersion=3.0.0 SpectrumVisualizer.iss
+  #error AppVersion must be defined. Pass it as: iscc.exe /DAppVersion=3.0.0 Installer\SpectrumVisualizer.iss
 #endif
 
 #define AppName      "SpectrumVisualizer"
 #define AppPublisher "Semiteq, Inc."
-#define AppURL       "semiteq.ru"
+#define AppURL       "https://semiteq.ru"
 #define AppExeName   "SpectrumVisualizer.UI.exe"
 ; The AppId of the 2.x installer: setup upgrades that install in place
 #define AppId        "{{02EA7FE7-4B06-4B9C-93ED-2B49AE013EAA}"

@@ -17,7 +17,7 @@ using MainWindowView = SpectrumVisualizer.UI.MainWindow.MainWindow;
 namespace SpectrumVisualizer.Tests.Unit.UI.MainWindow;
 
 /// <summary>
-/// The old-firmware remedies take one line at the minimum width, so their entry stays within the panel's three-line cap.
+/// The old-firmware remedies take one line at the minimum width.
 /// </summary>
 [Trait("Component", "UI")]
 [Trait("Area", "MainWindow")]
@@ -33,6 +33,7 @@ public sealed class MainWindowTextFitMessageTests : MainWindowTextFitTestBase
 		var window = Realise();
 		window.Width = MainWindowView.MinimumWidth;
 		Dispatcher.UIThread.RunJobs();
+		window.Bounds.Width.Should().Be(MainWindowView.MinimumWidth);
 
 		foreach (var error in new IError[] { new BoardNotRespondingError(PortName), new UnrecognisedDataError(PortName) })
 		{
@@ -52,7 +53,6 @@ public sealed class MainWindowTextFitMessageTests : MainWindowTextFitTestBase
 			TestContext.Current.TestOutputHelper?.WriteLine(
 				$"{culture}: {error.GetType().Name} remedy {width:0.#} px in a {slot:0.#} px slot, "
 				+ $"window {window.Bounds.Width} px");
-			window.Bounds.Width.Should().Be(MainWindowView.MinimumWidth);
 			remedy.Text.Should().Be(ErrorMessageMapper.Map(error).Remedy);
 			width.Should().BeLessThanOrEqualTo(slot, "the remedy of {0} takes one line", error.GetType().Name);
 		}
