@@ -366,3 +366,4 @@ FodyWeavers.xsd
 
 # Avalonia solution build output
 SpectrumVisualizer/Artifacts/
+Installer/Output/
