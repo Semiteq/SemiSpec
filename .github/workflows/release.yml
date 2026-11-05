@@ -1,0 +1,92 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # The release body is the tag annotation; this job is the only publisher of the release.
+  build-and-release:
+    name: Build and release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: extract version and release notes from tag
+        id: version
+        shell: bash
+        run: |
+          git fetch --force --tags origin
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          PROPS_VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' SpectrumVisualizer/Directory.Build.props)
+          if [ "$VERSION" != "$PROPS_VERSION" ]; then
+            echo "tag $TAG does not match Version $PROPS_VERSION in SpectrumVisualizer/Directory.Build.props" >&2
+            exit 1
+          fi
+          if [ "$(git cat-file -t "$TAG")" != "tag" ]; then
+            echo "tag $TAG is not annotated; create it with git tag -a --cleanup=verbatim" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          {
+            echo "body<<RELEASE_NOTES_EOF"
+            git tag -l --format='%(contents)' "$TAG"
+            echo "RELEASE_NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: setup .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: restore
+        run: dotnet restore SpectrumVisualizer.slnx
+
+      - name: build
+        run: dotnet build SpectrumVisualizer.slnx -c Release --no-restore
+
+      - name: unit tests
+        run: dotnet test SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/SpectrumVisualizer.Tests.Unit.csproj -c Release --no-build
+
+      - name: publish
+        run: dotnet publish SpectrumVisualizer/SpectrumVisualizer.UI/SpectrumVisualizer.UI.csproj -c Release
+
+      - name: install Inno Setup
+        shell: powershell
+        run: |
+          winget install --id JRSoftware.InnoSetup.7 --version 7.1.1 --exact --scope machine --silent `
+            --accept-source-agreements --accept-package-agreements --disable-interactivity
+          $iscc = Get-ChildItem -Path $env:ProgramFiles, ${env:ProgramFiles(x86)} -Filter ISCC.exe -Recurse -Depth 1 -ErrorAction SilentlyContinue |
+            Where-Object { $_.DirectoryName -like '*Inno Setup 7' } | Select-Object -First 1
+          if (-not $iscc) { throw "ISCC.exe of Inno Setup 7 not found" }
+          $iscc.DirectoryName | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: build installer
+        shell: cmd
+        run: iscc.exe /DAppVersion=${{ steps.version.outputs.version }} Installer/SpectrumVisualizer.iss
+
+      - name: create GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: SpectrumVisualizer ${{ steps.version.outputs.version }}
+          body: ${{ steps.version.outputs.body }}
+          draft: false
+          prerelease: false
+          make_latest: true
+          files: |
+            Installer/Output/SpectrumVisualizerInstaller.exe
