@@ -5,10 +5,12 @@ on:
     branches: [master]
     paths:
       - ".github/workflows/ci.yml"
+      - ".github/workflows/release.yml"
       - ".editorconfig"
       - ".gitattributes"
       - ".config/dotnet-tools.json"
       - ".githooks/**"
+      - "Installer/**"
       - "SpectrumVisualizer/**"
       - "SpectrumVisualizer.slnx"
       - "global.json"
@@ -17,10 +19,12 @@ on:
   pull_request:
     paths:
       - ".github/workflows/ci.yml"
+      - ".github/workflows/release.yml"
       - ".editorconfig"
       - ".gitattributes"
       - ".config/dotnet-tools.json"
       - ".githooks/**"
+      - "Installer/**"
       - "SpectrumVisualizer/**"
       - "SpectrumVisualizer.slnx"
       - "global.json"

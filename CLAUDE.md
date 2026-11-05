@@ -4,9 +4,10 @@ SpectrumVisualizer is the operator's desktop viewer for the spectrometer board: 
 serial port and shows the spectrum. The application under `SpectrumVisualizer/` is a .NET 10 (C# 14) Windows desktop
 app on Avalonia 12, ReactiveUI and Semi.Avalonia.
 
-`SpectrumVisualizer.slnx` at the root lists every project. Their build gates (`SpectrumVisualizer/Directory.Build.props`,
-`SpectrumVisualizer/Directory.Packages.props`, `SpectrumVisualizer/.editorconfig` with `root = true`) sit inside
-`SpectrumVisualizer/`. All commands run from the repo root.
+`SpectrumVisualizer.slnx` at the root lists every project. Their build gates
+(`SpectrumVisualizer/Directory.Build.props`, `SpectrumVisualizer/Directory.Packages.props`,
+`SpectrumVisualizer/.editorconfig` with `root = true`) sit inside `SpectrumVisualizer/`. All commands run from the repo
+root.
 
 ## Build
 
@@ -46,10 +47,10 @@ dotnet tool restore
 dotnet terse <file.cs>
 ```
 
-`terse` (pinned in `.config/dotnet-tools.json`) is the comment gate. The pre-commit hook `.githooks/pre-commit` runs both
-gates over staged `SpectrumVisualizer/*.cs` files and refuses commits on `master` or `main`; install it once per clone with
-`cp .githooks/pre-commit .git/hooks/pre-commit`, which also works under a global `core.hooksPath` that chains
-`.git/hooks`. `.github/workflows/ci.yml` runs build, tests, format and terse.
+`terse` (pinned in `.config/dotnet-tools.json`) is the comment gate. The pre-commit hook `.githooks/pre-commit` runs
+both gates over staged `SpectrumVisualizer/*.cs` files and refuses commits on `master` or `main`; install it once per
+clone with `cp .githooks/pre-commit .git/hooks/pre-commit`, which also works under a global `core.hooksPath` that
+chains `.git/hooks`. `.github/workflows/ci.yml` runs build, tests, format and terse.
 
 ## Release
 
@@ -59,11 +60,8 @@ iscc.exe /DAppVersion=X.Y.Z Installer\SpectrumVisualizer.iss
 git tag -a vX.Y.Z --cleanup=verbatim -F notes.txt
 ```
 
-The `Version` element in `SpectrumVisualizer/Directory.Build.props` is the one version source; `/DAppVersion` repeats
-it. Pushing a `vX.Y.Z` tag runs `.github/workflows/release.yml`: it fails unless the tag is annotated and equals that
-version, then builds, tests, publishes, compiles the installer with Inno Setup 7 and attaches
-`SpectrumVisualizerInstaller.exe` to a GitHub release whose body is the tag annotation. The owner's steps are in
-`readme.md`, Release; `docs/architecture/overview.md`, Release, explains the installer script.
+The version is the `Version` element in `SpectrumVisualizer/Directory.Build.props`. The owner's steps are in
+`readme.md`, Release; `docs/architecture/overview.md`, Release, describes the installer script and `release.yml`.
 
 ## Layout
 

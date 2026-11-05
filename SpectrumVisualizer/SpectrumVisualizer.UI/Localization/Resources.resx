@@ -97,7 +97,7 @@
     <value>No data came from the board for 10 seconds.</value>
   </data>
   <data name="BoardNotRespondingRemedy" xml:space="preserve">
-    <value>Check the board's power and the cable. If the board still runs the old firmware, flash the board firmware delivered with this version of the program: the old firmware sends no data between measurements.</value>
+    <value>Check the board's power and the cable. If the board runs old firmware, flash the board firmware delivered with this version of the program.</value>
   </data>
   <data name="UnrecognisedDataTitle" xml:space="preserve">
     <value>Unrecognised data</value>
@@ -106,7 +106,7 @@
     <value>Data arrives on the port, but no valid frame came for 10 seconds.</value>
   </data>
   <data name="UnrecognisedDataRemedy" xml:space="preserve">
-    <value>Check that the spectrometer board is connected to this port and sends at 115200 baud. If it is, the board runs the old firmware: flash the board firmware delivered with this version of the program.</value>
+    <value>Check that the spectrometer board is on this port at 115200 baud. If it is, flash the board firmware delivered with this version of the program.</value>
   </data>
   <data name="StoreOpenTitle" xml:space="preserve">
     <value>Spectrum history is off</value>

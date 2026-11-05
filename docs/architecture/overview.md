@@ -940,7 +940,8 @@ a row: it raises that entry's repeat count and last-seen time, and the log line 
 is compared, so a lost port, a restored link and a second lost port are three rows. The panel row is visible while the
 list has entries: the first entry opens it, Clear empties the list and hides it. The list shows at most 64 px, one
 three-line entry, and scrolls past that, so the panel row stands at most 133 px. An entry with an empty remedy shows
-no remedy line.
+no remedy line. `BoardNotRespondingRemedy` and `UnrecognisedDataRemedy` fit one line at the minimum width in both
+languages, so their entries keep three lines.
 
 `UnhandledErrorObserver` is the handler `BuildAvaloniaApp` passes to `UseReactiveUI(... WithExceptionHandler ...)`.
 `App.Run` builds it once with the logger `Program` hands over, and it lives for the process, because ReactiveUI takes
@@ -957,9 +958,10 @@ log it a second time.
 
 ### Publish
 
-The `Version` element of `SpectrumVisualizer/Directory.Build.props` is the one version source: the exe's file version
-and the installer's version both come from it. In Release the props emit no symbols (`DebugType None`). During
-`dotnet publish` (`_IsPublishing`) they set `RuntimeIdentifier win-x64`, `SelfContained` and `PublishReadyToRun`, so
+The `Version` element of `SpectrumVisualizer/Directory.Build.props` is the one version source. The exe's file version
+comes from it. The installer's version is the tag's, passed as `/DAppVersion`, and the release workflow fails unless
+the tag equals `Version`. In Release the props emit no symbols (`DebugType None`). During `dotnet publish`
+(`_IsPublishing`) they set `RuntimeIdentifier win-x64`, `SelfContained` and `PublishReadyToRun`, so
 `dotnet publish SpectrumVisualizer/SpectrumVisualizer.UI/SpectrumVisualizer.UI.csproj -c Release` writes a folder
 that runs without an installed .NET to `SpectrumVisualizer/Artifacts/publish/SpectrumVisualizer.UI/release_win-x64/`.
 There is no single-file publish.
@@ -969,11 +971,14 @@ There is no single-file publish.
 `Installer/SpectrumVisualizer.iss` packs that folder. It refuses to compile without `/DAppVersion=X.Y.Z` and resolves
 its paths relative to `Installer/`; the compiled `SpectrumVisualizerInstaller.exe` goes to `Installer/Output/`.
 
-- `AppId` is the one of the 2.x installer, and `DefaultDirName` is `{autopf}\SpectrumVisualizer`, so setup upgrades
-  a 2.x install in place and Settings, Apps keeps one `SpectrumVisualizer` entry.
+- `AppId` is the one of the 2.x installer, so setup upgrades a 2.x install in place and Settings, Apps keeps one
+  entry, `SpectrumVisualizer X.Y.Z` (`AppVerName`).
+- `DisableDirPage=yes` hides the folder page. A fresh install goes to `DefaultDirName`, `{autopf}\SpectrumVisualizer`;
+  an upgrade reuses the folder the 2.x install recorded. The wizard gives the operator no way to pick another folder.
 - `[InstallDelete]` empties the program folder before the copy, so no 2.x file outlives the upgrade. This is safe
-  because the app keeps nothing in the program folder at run time: the spectra and the logs live under
-  `%LOCALAPPDATA%\SpectrumVisualizer`.
+  because the folder is the app's own and the app keeps nothing in it at run time: the spectra and the logs live
+  under `%LOCALAPPDATA%\SpectrumVisualizer`. A 2.x install that an operator once put into a shared folder loses the
+  other files there.
 - `[InstallDelete]` also deletes the 2.x Start menu and desktop shortcuts, which point at the removed exe. `[Icons]`
   creates the Start menu entry and, when the operator ticks the unchecked desktop task, a desktop shortcut.
 - `[Files]` copies the publish folder without `*.pdb` and the `SpectrumVisualizer.*.xml` doc files.
@@ -981,7 +986,8 @@ its paths relative to `Installer/`; the compiled `SpectrumVisualizerInstaller.ex
 - `PrivilegesRequired=admin`, because setup writes to Program Files. The post-install launch carries
   `runasoriginaluser`, so the app runs as the operator and writes the operator's `%LOCALAPPDATA%`, not the
   administrator's.
-- The wizard offers Russian and English.
+- The wizard offers Russian and English and preselects the Windows language. `UsePreviousLanguage=no` keeps it from
+  reusing the English that the 2.x installer recorded.
 - Uninstall removes the program folder and the shortcuts and leaves `%LOCALAPPDATA%\SpectrumVisualizer`.
 
 ### The release workflow

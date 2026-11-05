@@ -32,6 +32,8 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
 DefaultDirName={autopf}\{#AppName}
+; No folder page: a fresh install goes to DefaultDirName, an upgrade reuses the 2.x folder
+DisableDirPage=yes
 DisableProgramGroupPage=yes
 
 OutputDir=Output
@@ -39,7 +41,6 @@ OutputBaseFilename=SpectrumVisualizerInstaller
 
 Compression=lzma2/ultra64
 SolidCompression=yes
-LZMAUseSeparateProcess=yes
 
 WizardStyle=modern
 SetupIconFile={#AppIconFile}
@@ -47,6 +48,8 @@ UninstallDisplayIcon={app}\{#AppExeName}
 
 PrivilegesRequired=admin
 CloseApplications=yes
+; The 2.x installer recorded English; the language dialog preselects the Windows language instead
+UsePreviousLanguage=no
 
 [Languages]
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
@@ -56,8 +59,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [InstallDelete]
-; Empties the program folder before the copy, so no 2.x file outlives the upgrade;
-; data and logs live under %LOCALAPPDATA%, outside this folder
+; Empties the program folder before the copy, so no 2.x file outlives the upgrade. With no folder page the
+; folder is DefaultDirName or the 2.x one; data and logs live under %LOCALAPPDATA%, outside it
 Type: filesandordirs; Name: "{app}\*"
 ; The 2.x shortcuts point at the removed exe; [Icons] recreates the chosen ones
 Type: files; Name: "{autoprograms}\{#AppName}.lnk"

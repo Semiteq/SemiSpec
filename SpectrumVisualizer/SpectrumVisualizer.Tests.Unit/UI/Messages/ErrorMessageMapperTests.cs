@@ -101,6 +101,17 @@ public sealed class ErrorMessageMapperTests
 		view.Remedy.Should().NotContain(DistinctPort);
 	}
 
+	[Theory]
+	[InlineData("en", "firmware")]
+	[InlineData("ru", "\u043F\u0440\u043E\u0448\u0438\u0432\u043A")]
+	public void TheRemediesOfASilentAndAForeignBoardNameTheBoardFirmware(string culture, string firmware)
+	{
+		using var cultureScope = new CultureScope(culture);
+
+		ErrorMessageMapper.Map(new BoardNotRespondingError(DistinctPort)).Remedy.Should().Contain(firmware);
+		ErrorMessageMapper.Map(new UnrecognisedDataError(DistinctPort)).Remedy.Should().Contain(firmware);
+	}
+
 	[Fact]
 	public void MapGivesAFailedPortListingItsOwnTextAtWarning()
 	{
