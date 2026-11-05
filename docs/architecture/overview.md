@@ -952,3 +952,45 @@ outside ReactiveUI, for example in a code-behind event handler. With a panel it 
 `TryReportFailure` and sets `Handled`, so the app keeps running. Before `Configure` there is no panel: the exception
 stays unhandled, ends the dispatcher loop, and `Program` logs it as Fatal and exits with code 1; the handler does not
 log it a second time.
+
+## Release
+
+### Publish
+
+The `Version` element of `SpectrumVisualizer/Directory.Build.props` is the one version source: the exe's file version
+and the installer's version both come from it. In Release the props emit no symbols (`DebugType None`). During
+`dotnet publish` (`_IsPublishing`) they set `RuntimeIdentifier win-x64`, `SelfContained` and `PublishReadyToRun`, so
+`dotnet publish SpectrumVisualizer/SpectrumVisualizer.UI/SpectrumVisualizer.UI.csproj -c Release` writes a folder
+that runs without an installed .NET to `SpectrumVisualizer/Artifacts/publish/SpectrumVisualizer.UI/release_win-x64/`.
+There is no single-file publish.
+
+### The installer script
+
+`Installer/SpectrumVisualizer.iss` packs that folder. It refuses to compile without `/DAppVersion=X.Y.Z` and resolves
+its paths relative to `Installer/`; the compiled `SpectrumVisualizerInstaller.exe` goes to `Installer/Output/`.
+
+- `AppId` is the one of the 2.x installer, and `DefaultDirName` is `{autopf}\SpectrumVisualizer`, so setup upgrades
+  a 2.x install in place and Settings, Apps keeps one `SpectrumVisualizer` entry.
+- `[InstallDelete]` empties the program folder before the copy, so no 2.x file outlives the upgrade. This is safe
+  because the app keeps nothing in the program folder at run time: the spectra and the logs live under
+  `%LOCALAPPDATA%\SpectrumVisualizer`.
+- `[InstallDelete]` also deletes the 2.x Start menu and desktop shortcuts, which point at the removed exe. `[Icons]`
+  creates the Start menu entry and, when the operator ticks the unchecked desktop task, a desktop shortcut.
+- `[Files]` copies the publish folder without `*.pdb` and the `SpectrumVisualizer.*.xml` doc files.
+- `CloseApplications=yes` asks to close a running copy, the 2.x exe included, before the files change.
+- `PrivilegesRequired=admin`, because setup writes to Program Files. The post-install launch carries
+  `runasoriginaluser`, so the app runs as the operator and writes the operator's `%LOCALAPPDATA%`, not the
+  administrator's.
+- The wizard offers Russian and English.
+- Uninstall removes the program folder and the shortcuts and leaves `%LOCALAPPDATA%\SpectrumVisualizer`.
+
+### The release workflow
+
+`.github/workflows/release.yml` runs on a pushed tag that matches `vX.Y.Z`, on one Windows runner. Its first step is
+the gate: it fails unless the tag without `v` equals the props `Version`, read with `sed`, and unless `git cat-file
+-t` of the tag prints `tag`, because the release body is the tag annotation and a lightweight tag has none. The tag
+must be created with `git tag -a --cleanup=verbatim`, so the `#` of the Markdown headings survives in the
+annotation. The workflow then restores, builds, runs the unit tests, publishes, installs Inno Setup 7.1.1 with
+winget, compiles the script with the tag's version, and creates the release "SpectrumVisualizer X.Y.Z" with
+`softprops/action-gh-release`, marked latest, with `SpectrumVisualizerInstaller.exe` attached. A failed step stops
+the run before the release exists.
