@@ -11,7 +11,7 @@ fi
 
 cd "$(git rev-parse --show-toplevel)"
 
-# The old WinForms projects at the root follow their own style and are not gated.
+# The hook gates the C# files under SpectrumVisualizer/.
 mapfile -d '' staged < <(git diff --cached --name-only --diff-filter=ACMR -z -- 'SpectrumVisualizer/*.cs')
 if [[ "${#staged[@]}" -eq 0 ]]; then
   exit 0
