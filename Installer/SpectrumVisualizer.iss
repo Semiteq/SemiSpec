@@ -1,4 +1,3 @@
-; SpectrumVisualizer Inno Setup script
 ; Build with: iscc.exe /DAppVersion=3.0.0 Installer\SpectrumVisualizer.iss
 ; Run `dotnet publish SpectrumVisualizer/SpectrumVisualizer.UI/SpectrumVisualizer.UI.csproj -c Release` first.
 
@@ -32,7 +31,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
 DefaultDirName={autopf}\{#AppName}
-; No folder page: a fresh install goes to DefaultDirName, an upgrade reuses the 2.x folder
+; Keep yes: [InstallDelete] empties {app}, so the user must not choose the folder
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 
@@ -59,8 +58,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [InstallDelete]
-; Empties the program folder before the copy, so no 2.x file outlives the upgrade. With no folder page the
-; folder is DefaultDirName or the 2.x one; data and logs live under %LOCALAPPDATA%, outside it
+; No 2.x file outlives the upgrade. Data and logs live under %LOCALAPPDATA%, outside {app}
 Type: filesandordirs; Name: "{app}\*"
 ; The 2.x shortcuts point at the removed exe; [Icons] recreates the chosen ones
 Type: files; Name: "{autoprograms}\{#AppName}.lnk"

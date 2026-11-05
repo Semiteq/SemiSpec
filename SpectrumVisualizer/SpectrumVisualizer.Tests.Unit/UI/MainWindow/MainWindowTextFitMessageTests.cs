@@ -16,9 +16,6 @@ using MainWindowView = SpectrumVisualizer.UI.MainWindow.MainWindow;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.MainWindow;
 
-/// <summary>
-/// The old-firmware remedies take one line at the minimum width.
-/// </summary>
 [Trait("Component", "UI")]
 [Trait("Area", "MainWindow")]
 [Trait("Category", "Unit")]
