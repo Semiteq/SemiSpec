@@ -73,6 +73,41 @@ public sealed class EnvelopeColumnTests
 		columns.Should().BeEmpty();
 	}
 
+	[Fact]
+	public void ANearFlatRangeWidensToTwoOnItsCentre()
+	{
+		const double Noise = 1e-9;
+
+		var (bottom, top) = EnvelopeColumn.VerticalRange([Envelope(18776 - Noise, 18776), Envelope(18776, 18776 + Noise)])!.Value;
+
+		bottom.Should().BeApproximately(18775.0, 1e-6);
+		top.Should().BeApproximately(18777.0, 1e-6);
+		(top - bottom).Should().BeGreaterThanOrEqualTo(2.0);
+		bottom.Should().BeLessThan(18776 - Noise);
+		top.Should().BeGreaterThan(18776 + Noise);
+	}
+
+	[Fact]
+	public void AnExactlyFlatRangeIsPlusOrMinusOne()
+	{
+		var range = EnvelopeColumn.VerticalRange([Envelope(18776, 18776)]);
+
+		range.Should().Be((18775.0, 18777.0));
+	}
+
+	[Fact]
+	public void ARealSpanIsPaddedByFivePercent()
+	{
+		var range = EnvelopeColumn.VerticalRange([Envelope(100, 150), Envelope(120, 200)]);
+
+		range.Should().Be((95.0, 205.0));
+	}
+
+	private static EnvelopeColumn Envelope(double min, double max)
+	{
+		return new EnvelopeColumn(0, min, max, max);
+	}
+
 	private static IReadOnlyList<EnvelopeColumn> Map(params IntensityColumn[] columns)
 	{
 		var series = new IntensitySeries(_start, _start + (columns.Length * _width), _width, columns);

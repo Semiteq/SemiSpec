@@ -626,8 +626,9 @@ bottom of the data area in `AppSeverityErrorBrush` and at least 1 px wide, so on
 failed columns less than 5 s apart join into one span, so a steady failure draws one bar instead of dashes. The readout names the failure, so
 colour never carries it alone.
 
-The Y limits pad the drawn values by 5 % of their span, `v - 1 .. v + 1` when they are flat, and stay unchanged when
-nothing is drawn. The Y label names the key on two lines, "Intensity" over "650 nm ±10 nm", so no pane row repeats
+The Y limits pad the drawn values by 5 % of their span. A span under 2 counts as flat and takes `c - 1 .. c + 1` around
+its centre `c`, so float noise on a steady signal does not shrink the axis to fractions of a unit. The limits stay
+unchanged when nothing is drawn. The Y label names the key on two lines, "Intensity" over "650 nm ±10 nm", so no pane row repeats
 it: on one line the widest Russian key overruns the room the plot gives a label at the trend's floor. The X label
 reads "Time". While a moment is shown, the shown-moment line stands at it in `AppMarkerLineBrush`.
 
