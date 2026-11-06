@@ -2,8 +2,8 @@
 
 ## Purpose
 
-SpectrumVisualizer shows the operator the spectrum the spectrometer board sends over a serial port. The code under
-`SpectrumVisualizer/` starts, logs to a fixed folder and shows the main window. The operator picks a COM port in the
+SemiSpec shows the operator the spectrum the spectrometer board sends over a serial port. The code under
+`SemiSpec/` starts, logs to a fixed folder and shows the main window. The operator picks a COM port in the
 connection row and connects; the serial link reads the board's frames, reopens the port after an unplug, and the
 status bar shows the link state, both spectrometers' bits, the spectra lost since Connect and the frames dropped since
 the start. Link faults, reported failures, ReactiveUI's unhandled exceptions and exceptions that escape a dispatcher job
@@ -34,13 +34,13 @@ the trend's folds and re-reads.
   nothing; the trend feed logs the cache's key changes.
 - The console tools only: System.CommandLine 2.0.2.
 
-`SpectrumVisualizer/Directory.Packages.props` holds every version.
+`SemiSpec/Directory.Packages.props` holds every version.
 
 ## Components
 
 | Component | Project | Responsibility |
 | --- | --- | --- |
-| `AppDataPaths` | Core | Resolves the log folder `SpectrumVisualizer\Logs` and the store folder `SpectrumVisualizer\Spectra` under the local app data root; fails on a root that is not fully qualified |
+| `AppDataPaths` | Core | Resolves the log folder `SemiSpec\Logs` and the store folder `SemiSpec\Spectra` under the local app data root; fails on a root that is not fully qualified |
 | `Crc16Modbus` | Core | CRC-16/MODBUS of the frame, over a span |
 | `BoardFrame`, `SpectrumMeasurement` | Core | One decoded frame: state, `seq` and the measurement of a spectrum frame; the measurement rejects a pixel count that does not match its device |
 | `ReceivedFrame` | Core | A decoded frame with its receive time; the item of the link's channel and of the store queue (`Core/Protocol/`) |
@@ -71,7 +71,7 @@ the trend's folds and re-reads.
 | `EmulatorCommand` | Tools.BoardEmulator | Parses and range-checks the command line into an `EmulatorOptions` record; rejects `--failed` for the other spectrometer without `--both-connected` |
 | `Program` (emulator) | Tools.BoardEmulator | Opens the port, checks every 10 ms which frame is due and writes it, until Ctrl+C |
 | `BenchmarkCommand` | Tools.StoreBenchmark | Parses and range-checks the command line into a `BenchmarkOptions` record |
-| `ToolCommandLine` | both tools | The model numbers of `--device` and `--failed` and the whole-number option parser; one source file under `SpectrumVisualizer/Shared/` that each tool project compiles as its own internal copy, since the two tools share no project but Core |
+| `ToolCommandLine` | both tools | The model numbers of `--device` and `--failed` and the whole-number option parser; one source file under `SemiSpec/Shared/` that each tool project compiles as its own internal copy, since the two tools share no project but Core |
 | `BenchmarkRun`, `BenchmarkFile` | Tools.StoreBenchmark | Fills a store file through `SpectrumDatabase`, churns it, measures inserts, size, series reads, `SpectrumHistory`, retention, WAL growth, the trend cache's folds and the trend's re-reads, and prints one table |
 | `ISerialPortProvider`, `RjcpSerialPortProvider` | UI | Lists the COM ports and opens one for the link, mapping open failures to typed errors |
 | `SerialLink` | UI | The link's surface: Connect, Disconnect, the published status and the bounded frame channel |
@@ -105,7 +105,7 @@ the trend's folds and re-reads.
 | `TrendHistoryError`, `TrendMomentError` | UI | The stored points at a new key could not be read; the stored spectrum of a clicked moment could not be read (`UI/Trend/`) |
 | `SpectrumStore`, `StoreWriter`, `StoreRetention`, `StoreFile` | UI | The background writer: `SpectrumStore` enqueues every distributor frame, runs one `StoreWriter` task and counts the frames lost; `StoreWriter` writes the queue to the instance file in batches and runs `StoreRetention` once a minute, which deletes rows older than 24 h and sweeps other instances' files once an hour; `StoreFile` is the instance file's path (`UI/Store/`) |
 | `StoreOpenError`, `StoreWriteError`, `StoreStoppedError` | UI | The store file could not be prepared or opened; a batch could not be written; an unexpected failure after the open ended the writer (`UI/Store/`) |
-| `AppLogging` | UI | Creates the log folder and the Serilog logger: `spectrum-visualizer.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
+| `AppLogging` | UI | Creates the log folder and the Serilog logger: `semispec.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
 | `AddUi(LoggingSetup, AppDataPaths)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` of this process under the store folder, `SpectrumStore`, `SpectrumHistory` over the `StoreFile`, `IntensityCache`, `LiveSpectrumSource`, `SwitchingSpectrumSource` over it, the message panel, the connection row, the status bar, the spectrum view model, `TrendChartViewModel`, `OverviewViewModel`, `TrendFeed` built over `SpectrumHistory.IntensityPointsAsync` and `SpectrumAtAsync` with `DefaultScheduler.Instance` for its throttle, `TrendViewModel` and the main window view model, all singletons |
 | `Program` | UI | Entry point: paths, logging, container, `App.Run` with the logger for unhandled exceptions |
@@ -134,7 +134,7 @@ benchmark references Core only, so it times the same cache and plan the app runs
 
 1. `AppDataPaths.Under` resolves the log folder and the store folder from
    `Environment.SpecialFolder.LocalApplicationData`.
-2. `AppLogging.Create` creates `%LOCALAPPDATA%\SpectrumVisualizer\Logs` and the logger; `Program.Main` sets `Log.Logger` to it.
+2. `AppLogging.Create` creates `%LOCALAPPDATA%\SemiSpec\Logs` and the logger; `Program.Main` sets `Log.Logger` to it.
 3. `AddUi` builds the service provider with the paths; the store's instance file is named here, and nothing touches
    the store folder until the window opens.
 4. `App.Run` receives a logger from the container's `ILoggerFactory`, which writes to that logger, builds the
@@ -185,7 +185,7 @@ then calls `Log.CloseAndFlush()` while the session may still write its last line
 
 ## Main window
 
-`SpectrumVisualizer/SpectrumVisualizer.UI/MainWindow/MainWindow.axaml` has five rows, top to bottom:
+`SemiSpec/SemiSpec.UI/MainWindow/MainWindow.axaml` has five rows, top to bottom:
 
 | Row | Height | Content |
 | --- | --- | --- |
@@ -711,7 +711,7 @@ the close changes nothing.
 
 ### Files and sweep
 
-The store folder is `%LOCALAPPDATA%\SpectrumVisualizer\Spectra`, and the instance file is `spectra-<process id>.db`.
+The store folder is `%LOCALAPPDATA%\SemiSpec\Spectra`, and the instance file is `spectra-<process id>.db`.
 Two live processes never share a process id, so two running copies never share a file. Before the open,
 `StoreFiles.Prepare` creates the folder, deletes the own file and its `-wal` and `-shm` sidecars (left by a dead
 process with the same id), then tries to delete every other `spectra-<digits>.db`; a name with anything else between
@@ -884,7 +884,7 @@ the WAL far below its 64 MB limit, so the series is not sliced by time. The stor
 read again; run on the operator PC, it measures the read against that PC's disk and memory:
 
 ```powershell
-dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark
+dotnet run -c Release --project SemiSpec/SemiSpec.Tools.StoreBenchmark
 ```
 
 With the defaults it fills a day of ATP-2000 spectra at 2 per second, every row at 650 nm, churns the file through
@@ -963,37 +963,43 @@ log it a second time.
 
 ### Publish
 
-The `Version` element of `SpectrumVisualizer/Directory.Build.props` is the one version source. The exe's file version
+The `Version` element of `SemiSpec/Directory.Build.props` is the one version source. The exe's file version
 comes from it. The installer's version is the tag's, passed as `/DAppVersion`, and the release workflow fails unless
 the tag equals `Version`. In Release the props emit no symbols (`DebugType None`). During `dotnet publish`
 (`_IsPublishing`) they set `RuntimeIdentifier win-x64`, `SelfContained` and `PublishReadyToRun`, so
-`dotnet publish SpectrumVisualizer/SpectrumVisualizer.UI/SpectrumVisualizer.UI.csproj -c Release` writes a folder
-that runs without an installed .NET to `SpectrumVisualizer/Artifacts/publish/SpectrumVisualizer.UI/release_win-x64/`.
-There is no single-file publish.
+`dotnet publish SemiSpec/SemiSpec.UI/SemiSpec.UI.csproj -c Release` writes a folder that runs without an installed
+.NET to `SemiSpec/Artifacts/publish/SemiSpec.UI/release_win-x64/`. The UI project sets `AssemblyName` to `SemiSpec`,
+so the exe is `SemiSpec.exe`; its `RootNamespace` stays `SemiSpec.UI`. There is no single-file publish.
 
 ### The installer script
 
-`Installer/SpectrumVisualizer.iss` packs that folder. It refuses to compile without `/DAppVersion=X.Y.Z` and resolves
-its paths relative to `Installer/`; the compiled `SpectrumVisualizerInstaller.exe` goes to `Installer/Output/`.
+`Installer/SemiSpec.iss` packs that folder. It refuses to compile without `/DAppVersion=X.Y.Z` and resolves
+its paths relative to `Installer/`; the compiled `SemiSpecInstaller.exe` goes to `Installer/Output/`.
 
-- `AppId` is the one of the 2.x installer, so setup upgrades a 2.x install in place and Settings, Apps keeps one
-  entry, `SpectrumVisualizer X.Y.Z` (`AppVerName`).
-- `DisableDirPage=yes` hides the folder page. A fresh install goes to `DefaultDirName`, `{autopf}\SpectrumVisualizer`;
-  an upgrade reuses the folder the 2.x install recorded. The wizard gives the operator no way to pick another folder.
+- `AppId` is the one of the 2.x installer, which shipped as SpectrumVisualizer, so setup upgrades a 2.x or 3.0
+  install in place and Settings, Apps keeps one entry, `SemiSpec X.Y.Z` (`AppVerName`).
+- `DisableDirPage=yes` hides the folder page. A fresh install goes to `DefaultDirName`, `{autopf}\SemiSpec`;
+  an upgrade reuses the folder the previous install recorded (`UsePreviousAppDir`), so an upgraded machine keeps
+  `{autopf}\SpectrumVisualizer`. The wizard gives the operator no way to pick another folder.
 - `[InstallDelete]` empties the program folder before the copy, so no 2.x file outlives the upgrade. This is safe
   because the folder is the app's own and the app keeps nothing in it at run time: the spectra and the logs live
-  under `%LOCALAPPDATA%\SpectrumVisualizer`. A 2.x install that an operator once put into a shared folder loses the
+  under `%LOCALAPPDATA%\SemiSpec`. A 2.x install that an operator once put into a shared folder loses the
   other files there.
-- `[InstallDelete]` also deletes the 2.x Start menu and desktop shortcuts, which point at the removed exe. `[Icons]`
-  creates the Start menu entry and, when the operator ticks the unchecked desktop task, a desktop shortcut.
-- `[Files]` copies the publish folder without `*.pdb` and the `SpectrumVisualizer.*.xml` doc files.
-- `CloseApplications=yes` asks to close a running copy, the 2.x exe included, before the files change.
+- `[InstallDelete]` also deletes the Start menu and desktop shortcuts under both names, `SemiSpec.lnk` and
+  `SpectrumVisualizer.lnk` of the 2.x and 3.0 installers, which point at a removed exe. `[Icons]` creates the Start
+  menu entry and, when the operator ticks the unchecked desktop task, a desktop shortcut.
+- `[Files]` copies the publish folder without `*.pdb` and the `SemiSpec.xml` and `SemiSpec.*.xml` doc files.
+- `CloseApplications=yes` asks to close a running copy before the files change, the 3.0 `SpectrumVisualizer.UI.exe`
+  and the 2.x `SpectrumVisualizer.Uart.exe` included, since both sit under the `{app}\*` that the wipe covers.
 - `PrivilegesRequired=admin`, because setup writes to Program Files. The post-install launch carries
   `runasoriginaluser`, so the app runs as the operator and writes the operator's `%LOCALAPPDATA%`, not the
   administrator's.
 - The wizard offers Russian and English and preselects the Windows language. `UsePreviousLanguage=no` keeps it from
   reusing the English that the 2.x installer recorded.
-- Uninstall removes the program folder and the shortcuts and leaves `%LOCALAPPDATA%\SpectrumVisualizer`.
+- Uninstall removes the program folder and the shortcuts and leaves `%LOCALAPPDATA%\SemiSpec`.
+- Nothing migrates or deletes `%LOCALAPPDATA%\SpectrumVisualizer`, the data folder of the builds named
+  SpectrumVisualizer. The app starts every run with an empty store, so it reads nothing from that folder; the folder
+  stays on disk until the operator deletes it.
 
 ### The release workflow
 
@@ -1002,6 +1008,6 @@ the gate: it fails unless the tag without `v` equals the props `Version`, read w
 -t` of the tag prints `tag`, because the release body is the tag annotation and a lightweight tag has none. The tag
 must be created with `git tag -a --cleanup=verbatim`, so the `#` of the Markdown headings survives in the
 annotation. The workflow then restores, builds, runs the unit tests, publishes, installs Inno Setup 7.1.1 with
-winget, compiles the script with the tag's version, and creates the release "SpectrumVisualizer X.Y.Z" with
-`softprops/action-gh-release`, marked latest, with `SpectrumVisualizerInstaller.exe` attached. A failed step stops
+winget, compiles the script with the tag's version, and creates the release "SemiSpec X.Y.Z" with
+`softprops/action-gh-release`, marked latest, with `SemiSpecInstaller.exe` attached. A failed step stops
 the run before the release exists.

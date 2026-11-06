@@ -1,0 +1,7 @@
+<Solution>
+    <Project Path="SemiSpec/SemiSpec.Core/SemiSpec.Core.csproj"/>
+    <Project Path="SemiSpec/SemiSpec.UI/SemiSpec.UI.csproj"/>
+    <Project Path="SemiSpec/SemiSpec.Tools.BoardEmulator/SemiSpec.Tools.BoardEmulator.csproj"/>
+    <Project Path="SemiSpec/SemiSpec.Tools.StoreBenchmark/SemiSpec.Tools.StoreBenchmark.csproj"/>
+    <Project Path="SemiSpec/SemiSpec.Tests.Unit/SemiSpec.Tests.Unit.csproj"/>
+</Solution>

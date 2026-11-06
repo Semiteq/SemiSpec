@@ -1,10 +1,10 @@
 [
   {
-    "label": "Launch SpectrumVisualizer",
+    "label": "Launch SemiSpec",
     "adapter": "netcoredbg",
     "request": "launch",
-    "program": "${ZED_WORKTREE_ROOT}/SpectrumVisualizer/Artifacts/bin/SpectrumVisualizer.UI/debug/SpectrumVisualizer.UI.dll",
-    "cwd": "${ZED_WORKTREE_ROOT}/SpectrumVisualizer/Artifacts/bin/SpectrumVisualizer.UI/debug",
+    "program": "${ZED_WORKTREE_ROOT}/SemiSpec/Artifacts/bin/SemiSpec.UI/debug/SemiSpec.dll",
+    "cwd": "${ZED_WORKTREE_ROOT}/SemiSpec/Artifacts/bin/SemiSpec.UI/debug",
     "args": [],
     "stopAtEntry": false,
     "build": "Build"
@@ -13,7 +13,7 @@
     "label": "Launch board emulator",
     "adapter": "netcoredbg",
     "request": "launch",
-    "program": "${ZED_WORKTREE_ROOT}/SpectrumVisualizer/Artifacts/bin/SpectrumVisualizer.Tools.BoardEmulator/debug/SpectrumVisualizer.Tools.BoardEmulator.dll",
+    "program": "${ZED_WORKTREE_ROOT}/SemiSpec/Artifacts/bin/SemiSpec.Tools.BoardEmulator/debug/SemiSpec.Tools.BoardEmulator.dll",
     "cwd": "${ZED_WORKTREE_ROOT}",
     "args": ["--port", "COM4", "--device", "2000", "--rate", "2"],
     "stopAtEntry": false,

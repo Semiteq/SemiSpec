@@ -31,9 +31,9 @@ jobs:
           git fetch --force --tags origin
           TAG="${GITHUB_REF_NAME}"
           VERSION="${TAG#v}"
-          PROPS_VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' SpectrumVisualizer/Directory.Build.props)
+          PROPS_VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' SemiSpec/Directory.Build.props)
           if [ "$VERSION" != "$PROPS_VERSION" ]; then
-            echo "tag $TAG does not match Version $PROPS_VERSION in SpectrumVisualizer/Directory.Build.props" >&2
+            echo "tag $TAG does not match Version $PROPS_VERSION in SemiSpec/Directory.Build.props" >&2
             exit 1
           fi
           if [ "$(git cat-file -t "$TAG")" != "tag" ]; then
@@ -54,16 +54,16 @@ jobs:
           global-json-file: global.json
 
       - name: restore
-        run: dotnet restore SpectrumVisualizer.slnx
+        run: dotnet restore SemiSpec.slnx
 
       - name: build
-        run: dotnet build SpectrumVisualizer.slnx -c Release --no-restore
+        run: dotnet build SemiSpec.slnx -c Release --no-restore
 
       - name: unit tests
-        run: dotnet test SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/SpectrumVisualizer.Tests.Unit.csproj -c Release --no-build
+        run: dotnet test SemiSpec/SemiSpec.Tests.Unit/SemiSpec.Tests.Unit.csproj -c Release --no-build
 
       - name: publish
-        run: dotnet publish SpectrumVisualizer/SpectrumVisualizer.UI/SpectrumVisualizer.UI.csproj -c Release
+        run: dotnet publish SemiSpec/SemiSpec.UI/SemiSpec.UI.csproj -c Release
 
       - name: install Inno Setup
         shell: powershell
@@ -77,16 +77,16 @@ jobs:
 
       - name: build installer
         shell: cmd
-        run: iscc.exe /DAppVersion=${{ steps.version.outputs.version }} Installer/SpectrumVisualizer.iss
+        run: iscc.exe /DAppVersion=${{ steps.version.outputs.version }} Installer/SemiSpec.iss
 
       - name: create GitHub release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: SpectrumVisualizer ${{ steps.version.outputs.version }}
+          name: SemiSpec ${{ steps.version.outputs.version }}
           body: ${{ steps.version.outputs.body }}
           draft: false
           prerelease: false
           make_latest: true
           files: |
-            Installer/Output/SpectrumVisualizerInstaller.exe
+            Installer/Output/SemiSpecInstaller.exe

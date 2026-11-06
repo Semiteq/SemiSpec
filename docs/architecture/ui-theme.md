@@ -1,12 +1,12 @@
 # UI theme
 
 Every colour the app's own AXAML paints resolves to a key in
-`SpectrumVisualizer/SpectrumVisualizer.UI/Styles/Palette.axaml`. The palette is a subset of the one SemiPlot uses: the
+`SemiSpec/SemiSpec.UI/Styles/Palette.axaml`. The palette is a subset of the one SemiPlot uses: the
 JetBrains values, in a `Light` and a `Dark` variant with the same key set, cut to the `App*` keys the views read plus
 Semi's component overrides. `App.axaml` declares `RequestedThemeVariant="Light"` and nothing in the app changes it, so
 the app runs on `Light`. What the palette does not cover keeps Semi's own colour.
 
-`SpectrumVisualizer/SpectrumVisualizer.UI/App.axaml` is an include manifest and holds no style body:
+`SemiSpec/SemiSpec.UI/App.axaml` is an include manifest and holds no style body:
 
 1. `Application.Resources`: `ResourceInclude` of `Styles/Palette.axaml`.
 2. `Application.Styles`: `<semi:SemiTheme />`.
@@ -58,7 +58,7 @@ Semi owns the controls; the `App*` keys are ours, and each exists in both varian
 | `AppConnectionOkBrush` | The status bar dot in Receiving | `#208A3C` | `#5FAD65` |
 | `AppConnectionFaultBrush` | The status bar dot in PortUnavailable, NotResponding and OtherDevice | `#DB3B4B` | `#E55765` |
 
-`SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/AppResourcesTests.cs` resolves every key in this table under both
+`SemiSpec/SemiSpec.Tests.Unit/UI/AppResourcesTests.cs` resolves every key in this table under both
 variants.
 
 ## The plot
@@ -88,7 +88,7 @@ the scale 0, 4, 8, 12, 16, 24, 32. A text button carries no padding of its own: 
 32 px `MinHeight`. This command lists every off-scale inset and prints nothing on the current tree:
 
 ```powershell
-git grep -nP '(?:Margin|Padding|Spacing)(?:\x22\s+Value)?=\x22(?!(?:0|4|8|12|16|24|32)(?:[, ]+(?:0|4|8|12|16|24|32)){0,3}\x22)' -- 'SpectrumVisualizer/SpectrumVisualizer.UI/*.axaml'
+git grep -nP '(?:Margin|Padding|Spacing)(?:\x22\s+Value)?=\x22(?!(?:0|4|8|12|16|24|32)(?:[, ]+(?:0|4|8|12|16|24|32)){0,3}\x22)' -- 'SemiSpec/SemiSpec.UI/*.axaml'
 ```
 
 `\x22` is the double quote, so the command runs unchanged in PowerShell and bash; it needs Git built with PCRE. Sizes
@@ -101,7 +101,7 @@ The palette is the only place a colour is written. A literal on a control cannot
 every literal outside `Styles/` and prints nothing on the current tree:
 
 ```powershell
-git grep -nE '#[0-9A-Fa-f]{6,8}\b|"(Gray|Black|White)"' -- 'SpectrumVisualizer/SpectrumVisualizer.UI/*.axaml' ':!SpectrumVisualizer/SpectrumVisualizer.UI/Styles/*'
+git grep -nE '#[0-9A-Fa-f]{6,8}\b|"(Gray|Black|White)"' -- 'SemiSpec/SemiSpec.UI/*.axaml' ':!SemiSpec/SemiSpec.UI/Styles/*'
 ```
 
 No CI job runs it.

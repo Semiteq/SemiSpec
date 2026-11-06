@@ -1,6 +1,6 @@
 root = true
 
-# Text files outside SpectrumVisualizer/, which has its own root .editorconfig.
+# Text files outside SemiSpec/, which has its own root .editorconfig.
 # Line endings follow .gitattributes: native under text=auto, LF where it sets eol=lf.
 [*]
 charset = utf-8

@@ -11,8 +11,8 @@ fi
 
 cd "$(git rev-parse --show-toplevel)"
 
-# The hook gates the C# files under SpectrumVisualizer/.
-mapfile -d '' staged < <(git diff --cached --name-only --diff-filter=ACMR -z -- 'SpectrumVisualizer/*.cs')
+# The hook gates the C# files under SemiSpec/.
+mapfile -d '' staged < <(git diff --cached --name-only --diff-filter=ACMR -z -- 'SemiSpec/*.cs')
 if [[ "${#staged[@]}" -eq 0 ]]; then
   exit 0
 fi
@@ -28,9 +28,9 @@ if [[ "$status" -ne 0 ]]; then
   exit 1
 fi
 
-if dotnet format SpectrumVisualizer.slnx --verify-no-changes --no-restore --verbosity quiet \
+if dotnet format SemiSpec.slnx --verify-no-changes --no-restore --verbosity quiet \
   --include "${staged[@]}"; then
   exit 0
 fi
-echo "pre-commit: formatting differs; run 'dotnet format SpectrumVisualizer.slnx' and stage again" >&2
+echo "pre-commit: formatting differs; run 'dotnet format SemiSpec.slnx' and stage again" >&2
 exit 1

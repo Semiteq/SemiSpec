@@ -63,9 +63,9 @@
 #*.RTF   diff=astextplain
 
 ###############################################################################
-# The Avalonia tree and its build files use LF, matching SpectrumVisualizer/.editorconfig.
+# The Avalonia tree and its build files use LF, matching SemiSpec/.editorconfig.
 ###############################################################################
-SpectrumVisualizer/** text eol=lf
+SemiSpec/** text eol=lf
 *.slnx text eol=lf
 global.json text eol=lf
 nuget.config text eol=lf
