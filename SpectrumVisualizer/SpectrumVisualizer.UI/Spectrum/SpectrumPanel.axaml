@@ -20,9 +20,10 @@
     <!-- 120 px is the number width. -->
     <Grid ColumnSpacing="12"
           RowSpacing="8"
-          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto"
+                              SharedSizeGroup="SidePaneLabel" />
             <ColumnDefinition Width="Auto"
                               MinWidth="120" />
         </Grid.ColumnDefinitions>
@@ -125,6 +126,13 @@
                 HorizontalAlignment="Left"
                 Content="{x:Static text:Resources.ChartStickToZero}"
                 Command="{Binding StickToZeroCommand}" />
+
+        <Button Grid.Row="13"
+                Grid.Column="1"
+                Name="BackToLive"
+                HorizontalAlignment="Left"
+                Content="{x:Static text:Resources.ChartBackToLive}"
+                Command="{Binding BackToLiveCommand}" />
     </Grid>
 
 </UserControl>

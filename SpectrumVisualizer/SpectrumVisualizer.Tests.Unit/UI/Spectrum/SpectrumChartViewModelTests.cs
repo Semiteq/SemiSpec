@@ -28,6 +28,14 @@ public sealed class SpectrumChartViewModelTests : IDisposable
 {
 	private const double Tolerance = 1e-9;
 
+	private static readonly ChartColors _colors = new(
+		new Color(1, 2, 3),
+		new Color(4, 5, 6, 64),
+		new Color(7, 8, 9),
+		new Color(10, 11, 12),
+		new Color(13, 14, 15),
+		new Color(16, 17, 18));
+
 	private readonly SpectrumChartViewModel _chart = new();
 
 	public void Dispose()
@@ -161,7 +169,7 @@ public sealed class SpectrumChartViewModelTests : IDisposable
 	[AvaloniaFact]
 	public void ApplyPaletteColoursTheLinesTheBandAndTheCentreLine()
 	{
-		var colors = new ChartColors(new Color(1, 2, 3), new Color(4, 5, 6, 64), new Color(7, 8, 9));
+		var colors = _colors;
 
 		_chart.ApplyPalette(colors);
 
@@ -173,7 +181,7 @@ public sealed class SpectrumChartViewModelTests : IDisposable
 	[AvaloniaFact]
 	public async Task ApplyPaletteRunsUnderThePlotLock()
 	{
-		var colors = new ChartColors(new Color(1, 2, 3), new Color(4, 5, 6, 64), new Color(7, 8, 9));
+		var colors = _colors;
 		using var held = new ManualResetEventSlim();
 		using var release = new ManualResetEventSlim();
 		var holder = Task.Run(() =>

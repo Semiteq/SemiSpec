@@ -45,6 +45,27 @@ public sealed class MainWindowLayoutTests : MainWindowLayoutTestBase
 	}
 
 	[AvaloniaFact]
+	public void AWindowTallerThanTheScreenOpensInsideItsWorkArea()
+	{
+		// The headless screen's work area is 1920 x 1280 and its window has no frame.
+		const double WorkAreaHeight = 1280;
+		var window = new MainWindowView { Height = 2000 };
+
+		window.Show();
+		Dispatcher.UIThread.RunJobs();
+
+		try
+		{
+			window.Height.Should().Be(WorkAreaHeight);
+			window.Width.Should().Be(MainWindowView.OpeningWidth, "the opening width fits");
+		}
+		finally
+		{
+			window.Close();
+		}
+	}
+
+	[AvaloniaFact]
 	public void AtALargeWidthBothRowsStayLeftAlignedWithTheirGapsUnchanged()
 	{
 		var window = Realise();

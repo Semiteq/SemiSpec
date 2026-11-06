@@ -147,6 +147,22 @@ internal sealed class BenchmarkFile : IDisposable
 		return StoreConnection.OpenReader(Path);
 	}
 
+	/// <summary>The frames of the rows the file holds now, in receive order.</summary>
+	public IEnumerable<ReceivedFrame> WindowFrames()
+	{
+		for (var position = _windowStart; position < _windowStart + _options.Rows; position++)
+		{
+			yield return FrameAt(position % _options.Rows, TimeAt(position), _options.WavelengthNm);
+		}
+	}
+
+	/// <summary>A spectrum the file does not hold, index rows after its newest row, at the wavelength.</summary>
+	public ReceivedFrame FrameAfterWindow(int index, ushort wavelengthNm)
+	{
+		var position = _windowStart + _options.Rows + index;
+		return FrameAt(position % _options.Rows, TimeAt(position), wavelengthNm);
+	}
+
 	public void Dispose()
 	{
 		_database.CheckpointAndClose();
@@ -160,7 +176,7 @@ internal sealed class BenchmarkFile : IDisposable
 		{
 			do
 			{
-				ThrowIfFailed(_database.Write([FrameAt(0, at)]));
+				ThrowIfFailed(_database.Write([FrameAt(0, at, _options.WavelengthNm)]));
 				at += _rowInterval;
 			}
 			while (await timer.WaitForNextTickAsync(token));
@@ -181,7 +197,7 @@ internal sealed class BenchmarkFile : IDisposable
 			var batchEnd = Math.Min(position + BatchSize, end);
 			for (var p = position; p < batchEnd; p++)
 			{
-				batch.Add(FrameAt(p % _options.Rows, TimeAt(p)));
+				batch.Add(FrameAt(p % _options.Rows, TimeAt(p), _options.WavelengthNm));
 			}
 
 			var stopwatch = Stopwatch.StartNew();
@@ -192,11 +208,11 @@ internal sealed class BenchmarkFile : IDisposable
 		return elapsed;
 	}
 
-	private ReceivedFrame FrameAt(long row, DateTimeOffset receivedAt)
+	private ReceivedFrame FrameAt(long row, DateTimeOffset receivedAt, ushort wavelengthNm)
 	{
 		var measurement = new SpectrumMeasurement(
 			_options.Device,
-			_options.WavelengthNm,
+			wavelengthNm,
 			Delta,
 			1000f + (row % 100),
 			50f,

@@ -6,6 +6,7 @@
         xmlns:messages="clr-namespace:SpectrumVisualizer.UI.Messages"
         xmlns:spectrum="clr-namespace:SpectrumVisualizer.UI.Spectrum"
         xmlns:text="clr-namespace:SpectrumVisualizer.UI.Localization"
+        xmlns:trend="clr-namespace:SpectrumVisualizer.UI.Trend"
         mc:Ignorable="d"
         d:DesignWidth="1280"
         d:DesignHeight="800"
@@ -15,6 +16,7 @@
         Width="{x:Static local:MainWindow.OpeningWidth}"
         Height="800"
         MinWidth="{x:Static local:MainWindow.MinimumWidth}"
+        MinHeight="{x:Static local:MainWindow.MinimumHeight}"
         WindowStartupLocation="CenterScreen">
 
     <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
@@ -34,22 +36,57 @@
         <Grid Grid.Row="2"
               Name="ContentArea"
               ColumnDefinitions="*,Auto">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="3*"
+                               MinHeight="{x:Static local:MainWindow.SpectrumRowMinHeight}" />
+                <RowDefinition Height="2*"
+                               MinHeight="{x:Static local:MainWindow.TrendRowMinHeight}" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
             <!-- No padding: ScottPlot draws its own axis margins over the panel background. -->
-            <Border Grid.Column="0"
+            <Border Grid.Row="0"
+                    Grid.Column="0"
                     Name="SpectrumPane"
                     Background="{DynamicResource AppPanelBackgroundBrush}">
                 <spectrum:SpectrumChartView DataContext="{Binding Spectrum.Chart}" />
             </Border>
 
-            <Border Grid.Column="1"
+            <Border Grid.Row="1"
+                    Grid.Column="0"
+                    Name="TrendPane"
+                    Background="{DynamicResource AppPanelBackgroundBrush}"
+                    BorderThickness="0,1,0,0"
+                    BorderBrush="{DynamicResource AppBorderBrush}">
+                <trend:TrendChartView DataContext="{Binding Trend}" />
+            </Border>
+
+            <Border Grid.Row="2"
+                    Grid.Column="0"
+                    Name="OverviewPane"
+                    Background="{DynamicResource AppPanelBackgroundBrush}"
+                    BorderThickness="0,1,0,0"
+                    BorderBrush="{DynamicResource AppBorderBrush}">
+                <trend:OverviewView DataContext="{Binding Trend.Overview}" />
+            </Border>
+
+            <Border Grid.Row="0"
+                    Grid.RowSpan="3"
+                    Grid.Column="1"
                     Name="SignalPane"
                     Width="{x:Static spectrum:SpectrumPanel.PaneWidth}"
                     Background="{DynamicResource AppPanelBackgroundBrush}"
                     BorderThickness="1,0,0,0"
                     BorderBrush="{DynamicResource AppBorderBrush}"
                     Padding="16">
-                <spectrum:SpectrumPanel DataContext="{Binding Spectrum}" />
+                <ScrollViewer Name="SidePaneScroll"
+                              HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <StackPanel Grid.IsSharedSizeScope="True">
+                        <spectrum:SpectrumPanel DataContext="{Binding Spectrum}" />
+                        <trend:TrendPanel DataContext="{Binding Trend}" />
+                    </StackPanel>
+                </ScrollViewer>
             </Border>
 
         </Grid>

@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using ReactiveUI;
 
 using SpectrumVisualizer.Core.Spectrum;
+using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Messages;
 
 namespace SpectrumVisualizer.UI.Spectrum;
@@ -23,7 +24,7 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 	private readonly ILogger<SpectrumViewModel> _logger;
 
 	public SpectrumViewModel(
-		IDisplayedSpectrumSource source,
+		SwitchingSpectrumSource source,
 		MessagePanelViewModel messagePanel,
 		TimeProvider timeProvider,
 		IScheduler uiScheduler,
@@ -35,7 +36,7 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 		Chart = new SpectrumChartViewModel();
 		SignalInfo = new SignalInfoViewModel(timeProvider);
 
-		_disposables.Add(source.Changed
+		_disposables.Add(source.CurrentChanged
 			.ObserveOn(uiScheduler)
 			.StartWith(Unit.Default)
 			.Select(_ => ReadCurrent(source))
@@ -50,6 +51,11 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 				(inverted, logarithmic) => new SpectrumDisplay(inverted, logarithmic))
 			.Subscribe(Chart.SetDisplay, ReportPipelineFailure));
 
+		var shownMoment = source.WhenAnyValue(switching => switching.ShownMoment);
+		_disposables.Add(shownMoment
+			.Select(HistoricalTextOf)
+			.BindTo(Chart, chart => chart.HistoricalText));
+
 		var canStickToZero = Chart.WhenAnyValue(chart => chart.HasSpectrum);
 		var canResetScale = Chart.WhenAnyValue(
 			chart => chart.HasSpectrum,
@@ -58,6 +64,9 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 
 		_disposables.Add(ResetScaleCommand = ReactiveCommand.Create(Chart.ResetScale, canResetScale));
 		_disposables.Add(StickToZeroCommand = ReactiveCommand.Create(Chart.StickToZero, canStickToZero));
+		_disposables.Add(BackToLiveCommand = ReactiveCommand.Create(
+			source.ReturnToLive,
+			shownMoment.Select(moment => moment is not null)));
 		_disposables.Add(Chart);
 	}
 
@@ -81,9 +90,18 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 
 	public ReactiveCommand<Unit, Unit> StickToZeroCommand { get; }
 
+	public ReactiveCommand<Unit, Unit> BackToLiveCommand { get; }
+
 	public void Dispose()
 	{
 		_disposables.Dispose();
+	}
+
+	private static string HistoricalTextOf(DateTimeOffset? moment)
+	{
+		return moment is { } shown
+			? Resources.FormatSpectrumHistoricalFormat(ClockText.TimeOfDay(shown))
+			: string.Empty;
 	}
 
 	/// <summary>A failed read is reported and skipped, so the next signal reads again.</summary>

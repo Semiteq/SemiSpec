@@ -207,6 +207,9 @@
   <data name="SpectrumEmpty" xml:space="preserve">
     <value>Спектра пока нет. Подключитесь к плате в строке выше.</value>
   </data>
+  <data name="SpectrumHistoricalFormat" xml:space="preserve">
+    <value>Спектр от {0}</value>
+  </data>
   <data name="SignalTitle" xml:space="preserve">
     <value>Сигнал</value>
   </data>
@@ -251,5 +254,72 @@
   </data>
   <data name="ChartStickToZero" xml:space="preserve">
     <value>Прижать к нулю</value>
+  </data>
+  <data name="ChartBackToLive" xml:space="preserve">
+    <value>Вернуться к текущему</value>
+  </data>
+  <data name="TrendTitle" xml:space="preserve">
+    <value>Тренд</value>
+  </data>
+  <data name="TrendTimeWindow" xml:space="preserve">
+    <value>Интервал</value>
+  </data>
+  <data name="TrendFollowLive" xml:space="preserve">
+    <value>Следить за данными</value>
+  </data>
+  <data name="TrendPresetMinutesFormat" xml:space="preserve">
+    <value>{0} мин</value>
+  </data>
+  <data name="TrendPresetHoursFormat" xml:space="preserve">
+    <value>{0} ч</value>
+  </data>
+  <data name="TrendAxisTime" xml:space="preserve">
+    <value>Время</value>
+  </data>
+  <data name="TrendAxisIntensity" xml:space="preserve">
+    <value>Интенсивность</value>
+  </data>
+  <data name="TrendAxisIntensityFormat" xml:space="preserve">
+    <value>Интенсивность
+{0} нм ±{1} нм</value>
+  </data>
+  <data name="TrendEmpty" xml:space="preserve">
+    <value>Тренда пока нет. Он появится с первым спектром.</value>
+  </data>
+  <data name="TrendReadoutRangeFormat" xml:space="preserve">
+    <value>{0} – {1}</value>
+  </data>
+  <data name="TrendReadoutCountFormat" xml:space="preserve">
+    <value>Спектров: {0}</value>
+  </data>
+  <data name="TrendReadoutNoData" xml:space="preserve">
+    <value>Нет данных</value>
+  </data>
+  <data name="TrendReadoutLostFormat" xml:space="preserve">
+    <value>Потеряно спектров: {0}</value>
+  </data>
+  <data name="TrendReadoutNoSpectra" xml:space="preserve">
+    <value>Нет спектров</value>
+  </data>
+  <data name="TrendReadoutUncoveredFormat" xml:space="preserve">
+    <value>{0} нм вне диапазона спектрометра</value>
+  </data>
+  <data name="TrendReadoutFailedFormat" xml:space="preserve">
+    <value>Ошибка измерения: {0}</value>
+  </data>
+  <data name="TrendHistoryTitle" xml:space="preserve">
+    <value>Не удалось прочитать историю тренда</value>
+  </data>
+  <data name="TrendHistoryDetail" xml:space="preserve">
+    <value>Сохранённые спектры на новой длине волны или ширине окна не прочитаны; тренд показывает только данные после смены.</value>
+  </data>
+  <data name="TrendMomentTitle" xml:space="preserve">
+    <value>Не удалось прочитать спектр этого момента</value>
+  </data>
+  <data name="TrendMomentDetail" xml:space="preserve">
+    <value>Сохранённый спектр на выбранное время не прочитан.</value>
+  </data>
+  <data name="TrendMomentRemedy" xml:space="preserve">
+    <value>Выберите другой момент.</value>
   </data>
 </root>

@@ -16,7 +16,7 @@ public sealed class LiveSpectrumSource(FrameDistributor frameDistributor) : IDis
 			? new DisplayedSpectrum(measurement, latest.ReceivedAt)
 			: null;
 
-	public IObservable<Unit> Changed { get; } = frameDistributor.Frames
+	public IObservable<Unit> CurrentChanged { get; } = frameDistributor.Frames
 		.Where(received => received.Frame.Measurement is not null)
 		.Select(_ => Unit.Default);
 }

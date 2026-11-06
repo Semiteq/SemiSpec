@@ -24,6 +24,10 @@ public sealed class StoreBenchmarkRunTests : IDisposable
 		"Series 10 min to 1000 columns, SpectrumHistory (ms)",
 		"Series 0.28 h to 1000 columns, SpectrumHistory (ms)",
 		"SpectrumAt the end of the range, SpectrumHistory (ms)",
+		"Trend cache fold, 0.28 h (2000 points) to 2048 columns (ms)",
+		"Trend cache fold, 10 min to 2048 columns (ms)",
+		"Trend re-read at another wavelength: visible 10 min first, to its landing (ms)",
+		"Trend re-read at another wavelength: the whole day in its plan, to the last chunk (ms)",
 		"One retention pass, 120 rows (ms)",
 		"WAL after a 0.28 h substr series read beside a writer at 2 spectra/s (MB)",
 	];

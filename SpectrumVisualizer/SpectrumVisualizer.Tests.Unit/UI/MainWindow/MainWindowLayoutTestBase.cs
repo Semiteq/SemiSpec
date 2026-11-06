@@ -11,6 +11,7 @@ using ReactiveUI.Avalonia;
 using SpectrumVisualizer.Tests.Unit.UI.Link;
 using SpectrumVisualizer.Tests.Unit.UI.Spectrum;
 using SpectrumVisualizer.Tests.Unit.UI.Store;
+using SpectrumVisualizer.Tests.Unit.UI.Trend;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
@@ -46,7 +47,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 	protected static readonly string[] PaneHeaders = ["SignalHeader", "ChartHeader"];
 
 	protected static readonly string[] PaneControls =
-		["InvertSpectrum", "LogarithmicScale", "ResetScale", "StickToZero"];
+		["InvertSpectrum", "LogarithmicScale", "ResetScale", "StickToZero", "BackToLive"];
 
 	private ConnectionBarViewModel? _connectionBar;
 	private AppStatusBarViewModel? _statusBar;
@@ -58,6 +59,8 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 	{
 		SerialLink = new SerialLink(PortProvider, LinkScheduler, NullLogger<SerialLink>.Instance);
 		Store = new UnstartedStore(MessagePanel);
+		SwitchingSource = new SwitchingSpectrumSource(SpectrumSource);
+		Trend = new TrendStand(SwitchingSource, MessagePanel);
 	}
 
 	protected TestScheduler LinkScheduler { get; } = new();
@@ -70,9 +73,13 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 
 	private protected FakeDisplayedSpectrumSource SpectrumSource { get; } = new();
 
+	protected SwitchingSpectrumSource SwitchingSource { get; }
+
 	protected MessagePanelViewModel MessagePanel { get; } = new(TimeProvider.System);
 
 	private protected UnstartedStore Store { get; }
+
+	private protected TrendStand Trend { get; }
 
 	protected AppStatusBarViewModel StatusBar =>
 		_statusBar ?? throw new InvalidOperationException("Realise the window first.");
@@ -87,6 +94,8 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 		_connectionBar?.Dispose();
 		_statusBar?.Dispose();
 		_spectrum?.Dispose();
+		Trend.Dispose();
+		SwitchingSource.Dispose();
 		SpectrumSource.Dispose();
 		SerialLink.Dispose();
 		Store.Dispose();
@@ -123,7 +132,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 			AvaloniaScheduler.Instance,
 			NullLogger<AppStatusBarViewModel>.Instance);
 		_spectrum = new SpectrumViewModel(
-			SpectrumSource,
+			SwitchingSource,
 			MessagePanel,
 			TimeProvider.System,
 			AvaloniaScheduler.Instance,
@@ -133,6 +142,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 			_connectionBar,
 			_statusBar,
 			_spectrum,
+			Trend.Trend,
 			new LogLevelControl(),
 			NullLogger<MainWindowViewModel>.Instance);
 		_window = new MainWindowView { DataContext = _viewModel };

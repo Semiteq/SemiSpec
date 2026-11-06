@@ -3,6 +3,7 @@ using FluentResults;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Store;
+using SpectrumVisualizer.UI.Trend;
 
 namespace SpectrumVisualizer.UI.Messages;
 
@@ -62,6 +63,16 @@ public static class ErrorMessageMapper
 				Resources.StoreStoppedDetail,
 				Resources.StoreStoppedRemedy,
 				MessageSeverity.Error),
+			TrendHistoryError => new MessageView(
+				Resources.TrendHistoryTitle,
+				Resources.TrendHistoryDetail,
+				string.Empty,
+				MessageSeverity.Warning),
+			TrendMomentError => new MessageView(
+				Resources.TrendMomentTitle,
+				Resources.TrendMomentDetail,
+				Resources.TrendMomentRemedy,
+				MessageSeverity.Warning),
 			IExceptionalError thrown => MapThrown(thrown),
 			_ => MapUnknown(error)
 		};

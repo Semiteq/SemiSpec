@@ -1,0 +1,37 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:SpectrumVisualizer.UI.Trend"
+             mc:Ignorable="d"
+             d:DesignWidth="900"
+             d:DesignHeight="36"
+             x:Class="SpectrumVisualizer.UI.Trend.OverviewView"
+             x:DataType="local:OverviewViewModel">
+
+    <Canvas Name="StripCanvas"
+            Height="36"
+            Background="{DynamicResource AppContentBackgroundBrush}"
+            ClipToBounds="True"
+            Cursor="Hand">
+        <local:OverviewBand Name="BandLayer"
+                            Canvas.Left="0"
+                            Canvas.Top="0"
+                            IsHitTestVisible="False"
+                            BandColor="{DynamicResource AppAccentBrush}" />
+        <Border Name="WindowHighlight"
+                Canvas.Top="0"
+                IsVisible="False"
+                IsHitTestVisible="False"
+                Background="{DynamicResource AppAccentFillBrush}"
+                BorderThickness="2"
+                BorderBrush="{DynamicResource AppAccentBrush}" />
+        <Border Name="HoverLine"
+                Canvas.Top="0"
+                Width="1"
+                IsVisible="False"
+                IsHitTestVisible="False"
+                Background="{DynamicResource AppSecondaryForegroundBrush}" />
+    </Canvas>
+
+</UserControl>

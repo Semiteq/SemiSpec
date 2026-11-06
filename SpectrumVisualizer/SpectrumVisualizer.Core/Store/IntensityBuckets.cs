@@ -1,14 +1,22 @@
 using FluentResults;
 
+using SpectrumVisualizer.Core.Protocol;
+
 namespace SpectrumVisualizer.Core.Store;
 
-/// <summary>Folds window intensities into min/max columns on the time grid of the query.</summary>
+/// <summary>Folds window intensities, breaks and failure marks into columns on the time grid of the query.</summary>
 public sealed class IntensityBuckets(IntensityQuery query)
 {
 	private readonly double[] _min = new double[query.ColumnCount];
 	private readonly double[] _max = new double[query.ColumnCount];
 	private readonly int[] _count = new int[query.ColumnCount];
 	private readonly int[] _uncoveredCount = new int[query.ColumnCount];
+	private readonly double[] _last = new double[query.ColumnCount];
+	private readonly DateTimeOffset[] _lastAt = new DateTimeOffset[query.ColumnCount];
+	private readonly int[] _breakCount = new int[query.ColumnCount];
+	private readonly int[] _lostCount = new int[query.ColumnCount];
+	private readonly int[] _noSpectraCount = new int[query.ColumnCount];
+	private readonly BoardState[] _failed = new BoardState[query.ColumnCount];
 
 	public void Add(DateTimeOffset receivedAt, double value)
 	{
@@ -29,10 +37,32 @@ public sealed class IntensityBuckets(IntensityQuery query)
 			_max[column] = Math.Max(_max[column], value);
 		}
 
+		if (_count[column] == 0 || receivedAt >= _lastAt[column])
+		{
+			_last[column] = value;
+			_lastAt[column] = receivedAt;
+		}
+
 		_count[column]++;
 	}
 
-	/// <summary>Counts a spectrum the series cannot read: its device misses the wavelength, or the row is corrupt.</summary>
+	/// <summary>Adds the point's value, or counts the point as uncovered when its value is NaN.</summary>
+	public void Add(TrendPoint point)
+	{
+		var receivedAt = DateTimeOffset.FromUnixTimeMilliseconds(point.UnixMs);
+		if (double.IsNaN(point.Value))
+		{
+			AddUncovered(receivedAt);
+		}
+		else
+		{
+			Add(receivedAt, point.Value);
+		}
+	}
+
+	/// <summary>
+	/// Counts a spectrum the series cannot read: its device misses the wavelength, or the row is corrupt.
+	/// </summary>
 	public void AddUncovered(DateTimeOffset receivedAt)
 	{
 		var column = query.ColumnOf(receivedAt);
@@ -42,15 +72,52 @@ public sealed class IntensityBuckets(IntensityQuery query)
 		}
 	}
 
+	/// <summary>Counts a break of the line; a break with none lost ends a stretch without spectra.</summary>
+	public void AddBreak(DateTimeOffset moment, int lost)
+	{
+		var column = query.ColumnOf(moment);
+		if (column < 0)
+		{
+			return;
+		}
+
+		_breakCount[column]++;
+		_lostCount[column] += lost;
+		if (lost == 0)
+		{
+			_noSpectraCount[column]++;
+		}
+	}
+
+	/// <summary>
+	/// Merges a frame's measurement-failed bits into its column; the continuity rule passes only those bits.
+	/// </summary>
+	public void AddFailure(DateTimeOffset moment, BoardState state)
+	{
+		var column = query.ColumnOf(moment);
+		if (column >= 0)
+		{
+			_failed[column] |= state;
+		}
+	}
+
 	public IntensitySeries ToSeries()
 	{
 		var columns = new IntensityColumn[_count.Length];
 		for (var i = 0; i < columns.Length; i++)
 		{
-			var start = query.ColumnStart(i);
-			columns[i] = _count[i] == 0
-				? new IntensityColumn(start, double.NaN, double.NaN, 0, _uncoveredCount[i])
-				: new IntensityColumn(start, _min[i], _max[i], _count[i], _uncoveredCount[i]);
+			var empty = _count[i] == 0;
+			columns[i] = new IntensityColumn(
+				query.ColumnStart(i),
+				empty ? double.NaN : _min[i],
+				empty ? double.NaN : _max[i],
+				_count[i],
+				_uncoveredCount[i],
+				empty ? double.NaN : _last[i],
+				_breakCount[i],
+				_lostCount[i],
+				_noSpectraCount[i],
+				_failed[i]);
 		}
 
 		return new IntensitySeries(query.From, query.To, query.ColumnWidth, columns);
@@ -97,7 +164,9 @@ public sealed record IntensityQuery
 
 	public TimeSpan ColumnWidth => TimeSpan.FromMilliseconds(_widthMilliseconds);
 
-	/// <summary>The grid columns that intersect [From, To); the first and the last may stick out of the range.</summary>
+	/// <summary>
+	/// The grid columns that intersect [From, To); the first and the last may stick out of the range.
+	/// </summary>
 	public int ColumnCount { get; }
 
 	/// <summary>
@@ -175,8 +244,18 @@ public sealed record IntensitySeries(
 	DateTimeOffset From, DateTimeOffset To, TimeSpan ColumnWidth, IntensityColumn[] Columns);
 
 /// <summary>
-/// Min and max of the column's covered spectra, NaN when Count is 0; UncoveredCount counts the spectra of a device that
-/// does not cover the wavelength and the corrupt rows the series skipped.
+/// Min, max and latest value of the covered spectra, NaN when Count is 0; UncoveredCount counts uncovered spectra and
+/// skipped corrupt rows; the break counts (NoSpectraCount of them end a silence) and the failed bits come from the
+/// trend's continuity rule, and the store leaves them at zero.
 /// </summary>
 public readonly record struct IntensityColumn(
-	DateTimeOffset Start, double Min, double Max, int Count, int UncoveredCount);
+	DateTimeOffset Start,
+	double Min,
+	double Max,
+	int Count,
+	int UncoveredCount,
+	double Last,
+	int BreakCount,
+	int LostCount,
+	int NoSpectraCount,
+	BoardState Failed);

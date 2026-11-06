@@ -8,7 +8,6 @@ using ScottPlot;
 using ScottPlot.Plottables;
 using ScottPlot.TickGenerators;
 
-using SpectrumVisualizer.Core.Calibration;
 using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Core.Spectrum;
 using SpectrumVisualizer.UI.Chart;
@@ -36,14 +35,15 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		new double[Math.Max(Spectrometer.Atp2000.PixelCount, Spectrometer.Atp8000.PixelCount)];
 	private DisplayedSpectrum? _shown;
 	private SpectrumDisplay _display;
+	private Spectrometer? _frozenDevice;
 
 	public SpectrumChartViewModel()
 	{
 		_band = Plot.Add.HorizontalSpan(0.0, 0.0);
 		_band.IsVisible = false;
 		_band.LineStyle.Width = 0f;
-		_atp2000Line = AddLine(Spectrometer.Atp2000);
-		_atp8000Line = AddLine(Spectrometer.Atp8000);
+		_atp2000Line = DeviceLine.AddTo(Plot, Spectrometer.Atp2000);
+		_atp8000Line = DeviceLine.AddTo(Plot, Spectrometer.Atp8000);
 		_centreLine = Plot.Add.VerticalLine(0.0);
 		_centreLine.IsVisible = false;
 
@@ -63,18 +63,36 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		private set => this.RaiseAndSetIfChanged(ref field, value);
 	}
 
+	/// <summary>"Spectrum from HH:mm:ss" in local time while a past moment is shown; empty while live.</summary>
+	public string HistoricalText
+	{
+		get;
+		set => this.RaiseAndSetIfChanged(ref field, value);
+	} = string.Empty;
+
 	/// <summary>One signal per redraw request, raised at once on the caller's thread; completes on dispose.</summary>
 	public IObservable<Unit> RedrawRequested => _redrawRequests.AsObservable();
 
-	/// <summary>Draws the spectrum; the frame's pixel array is read, never written.</summary>
+	/// <summary>
+	/// Draws the spectrum; the frame's pixel array is read, never written. A switch into or out of a historical
+	/// spectrum keeps a frozen scale only on the device it was frozen on.
+	/// </summary>
 	public void Show(DisplayedSpectrum spectrum)
 	{
+		var wasFollowing = IsFollowing;
 		lock (Plot.Sync)
 		{
+			var crossesHistory = spectrum.IsHistorical || _shown is { IsHistorical: true };
+			if (crossesHistory && spectrum.Measurement.Device != _frozenDevice)
+			{
+				IsFollowing = true;
+			}
+
 			_shown = spectrum;
 			Project();
 		}
 
+		RaiseIfFollowingChanged(wasFollowing);
 		HasSpectrum = true;
 		RequestRedraw();
 	}
@@ -165,21 +183,6 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		Plot.Dispose();
 	}
 
-	private DeviceLine AddLine(Spectrometer device)
-	{
-		var calibration = SpectrometerCalibration.For(device);
-		var xs = new double[device.PixelCount];
-		for (var pixel = 0; pixel < xs.Length; pixel++)
-		{
-			xs[pixel] = calibration.WavelengthOf(pixel);
-		}
-
-		var ys = new double[xs.Length];
-		var line = Plot.Add.SignalXY(xs, ys);
-		line.IsVisible = false;
-		return new DeviceLine(line, xs, ys);
-	}
-
 	private DeviceLine LineFor(Spectrometer device)
 	{
 		return device == Spectrometer.Atp2000 ? _atp2000Line : _atp8000Line;
@@ -188,14 +191,14 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 	/// <summary>Fills the shown line, the band and, if following, the limits; caller holds Plot.Sync.</summary>
 	private void Project()
 	{
-		if (_shown is not { Measurement: var measurement })
+		if (_shown is not { Measurement: var measurement, IsHistorical: var isHistorical })
 		{
 			return;
 		}
 
 		var line = LineFor(measurement.Device);
 		var projection = SpectrumProjection.Fill(measurement.Pixels, _display, line.Ys);
-		if (!projection.IsDark)
+		if (!projection.IsDark && !isHistorical)
 		{
 			line.LastNonDark = measurement;
 		}
@@ -246,33 +249,28 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		_redrawRequests.OnNext(Unit.Default);
 	}
 
-	/// <summary>Runs the change under Plot.Sync, then raises IsFollowing outside the lock and redraws.</summary>
 	private void ChangeScale(Action change)
 	{
 		var wasFollowing = IsFollowing;
 		lock (Plot.Sync)
 		{
 			change();
+			if (!IsFollowing)
+			{
+				_frozenDevice = _shown?.Measurement.Device;
+			}
 		}
 
+		RaiseIfFollowingChanged(wasFollowing);
+		RequestRedraw();
+	}
+
+	private void RaiseIfFollowingChanged(bool wasFollowing)
+	{
 		if (wasFollowing != IsFollowing)
 		{
 			this.RaisePropertyChanged(nameof(IsFollowing));
 		}
-
-		RequestRedraw();
-	}
-
-	private sealed class DeviceLine(SignalXY plottable, double[] xs, double[] ys)
-	{
-		public SignalXY Plottable { get; } = plottable;
-
-		public double[] Xs { get; } = xs;
-
-		public double[] Ys { get; } = ys;
-
-		/// <summary>The device's last non-dark measurement, the Y reference while it shows a dark frame.</summary>
-		public SpectrumMeasurement? LastNonDark { get; set; }
 	}
 
 	private readonly ref struct ReferenceSpectrum(Span<double> ys, ProjectedSpectrum projection)

@@ -14,10 +14,12 @@ The app sets no culture. The generated accessor reads `ResourceManager.GetString
 left null, which falls through to `CultureInfo.CurrentUICulture`, the Windows UI language. A Russian Windows shows the
 Russian set; any other language shows English. Semi's own control strings follow the same culture (`ui-theme.md`).
 
-Numbers and times follow `CultureInfo.CurrentCulture`: the signal pane's amplitude, SNR and Q in `G6`, and the log
-axis's tick labels in `"0.###"`. Two outputs are the exception. `AppLogging` writes the log file with the invariant
-culture, so every machine produces the same log format. The signal pane's update time is the fixed `HH:mm:ss.fff`,
-formatted with the invariant culture.
+Numbers and times follow `CultureInfo.CurrentCulture`: the signal pane's amplitude, SNR and Q in `G6`, the log
+axis's tick labels in `"0.###"`, the trend readout's values in `G6` and its counts, and the numbers in the preset
+labels. These outputs are the exception. `AppLogging` writes the log file with the invariant culture, so every machine
+produces the same log format. The signal pane's update time is the fixed `HH:mm:ss.fff`, and the trend readout's time
+and the historical line's time are the fixed `HH:mm:ss` in local time, all formatted with the invariant culture.
+ScottPlot's `DateTimeAutomatic` labels the trend's time axis.
 
 ## The generated accessor
 
@@ -46,14 +48,19 @@ AXAML reads a key as `{x:Static text:Resources.Key}` with
 | Status bar | `StatusNotConnected`, `StatusConnecting`, `StatusPortUnavailable`, `StatusWaiting`, `StatusReceiving`, `StatusNotResponding`, `StatusOtherDevice`, `StatusSpectrometerFormat`, `StatusSpectrometerConnected`, `StatusSpectrometerNotConnected`, `StatusSpectrometerFailed`, `StatusSpectrometerNoData`, `StatusLostSpectraFormat`, `StatusDroppedFramesFormat`, `StatusNoValue`; the restored entry: `LinkRestoredTitle`, `LinkRestoredDetail` |
 | Message panel | `MessagePanelTitle`, `MessagePanelClear`, `MessagePanelRepeatFormat` |
 | Signal pane | `SignalTitle`, `SignalDevice`, `SignalWavelength`, `SignalWindow`, `SignalAmplitude`, `SignalSnr`, `SignalQ`, `SignalUpdated`, `SignalWavelengthFormat`, `SignalWindowFormat`; it also reads the status bar's `StatusNoValue` for a row with no value |
-| Chart controls | `ChartTitle`, `ChartInvert`, `ChartLogScale`, `ChartResetScale`, `ChartStickToZero` |
-| Spectrum chart | `SpectrumAxisWavelength`, `SpectrumAxisIntensity`, `SpectrumEmpty` |
-| `ErrorMessageMapper` | `FailureThrownTitle`, `FailureThrownDetail`, `FailureThrownRemedy`, `FailureUnknownTitle`, `FailureUnknownRemedy`; for each link error a `Title`, `Detail` and `Remedy` key: `PortBusy*`, `PortNotFound*`, `PortLost*`, `BoardNotResponding*`, `UnrecognisedData*`; for a failed port listing `PortListTitle`, `PortListDetail`, `PortListRemedy`; for the store errors `StoreOpenTitle`, `StoreOpenDetail`, `StoreOpenRemedy`, `StoreWriteTitle`, `StoreWriteDetail`, `StoreWriteRemedy`, `StoreStoppedTitle`, `StoreStoppedDetail`, `StoreStoppedRemedy` |
+| Chart controls | `ChartTitle`, `ChartInvert`, `ChartLogScale`, `ChartResetScale`, `ChartStickToZero`, `ChartBackToLive` |
+| Spectrum chart | `SpectrumAxisWavelength`, `SpectrumAxisIntensity`, `SpectrumEmpty`; the historical line: `SpectrumHistoricalFormat` |
+| Trend pane | `TrendTitle`, `TrendTimeWindow`, `TrendFollowLive`; the preset labels: `TrendPresetMinutesFormat`, `TrendPresetHoursFormat` |
+| Trend chart | `TrendAxisTime`, `TrendAxisIntensity` (before the first spectrum), `TrendAxisIntensityFormat` (the key, with a line break after the first word), `TrendEmpty` |
+| Trend readout | `TrendReadoutRangeFormat`, `TrendReadoutCountFormat`, `TrendReadoutNoData`, `TrendReadoutLostFormat`, `TrendReadoutNoSpectra`, `TrendReadoutUncoveredFormat`, `TrendReadoutFailedFormat` |
+| `ErrorMessageMapper` | `FailureThrownTitle`, `FailureThrownDetail`, `FailureThrownRemedy`, `FailureUnknownTitle`, `FailureUnknownRemedy`; for each link error a `Title`, `Detail` and `Remedy` key: `PortBusy*`, `PortNotFound*`, `PortLost*`, `BoardNotResponding*`, `UnrecognisedData*`; for a failed port listing `PortListTitle`, `PortListDetail`, `PortListRemedy`; for the store errors `StoreOpenTitle`, `StoreOpenDetail`, `StoreOpenRemedy`, `StoreWriteTitle`, `StoreWriteDetail`, `StoreWriteRemedy`, `StoreStoppedTitle`, `StoreStoppedDetail`, `StoreStoppedRemedy`; for the trend errors `TrendHistoryTitle`, `TrendHistoryDetail`, `TrendMomentTitle`, `TrendMomentDetail`, `TrendMomentRemedy` |
 
 The device names `ATP-2000` and `ATP-8000` stay literals in code: they read the same in both sets.
 
 A message has three parts: the title names what failed in one short line, the detail names what the app observed, and
-the remedy names the action that fixes it. The remedy is empty when no action is owed.
+the remedy names the action that fixes it. The remedy is empty when no action is owed; such a message has no remedy
+key, because every key needs a non-empty value in both sets, and the mapper passes an empty string
+(`TrendHistoryError`, the restored entry).
 
 ## What stays a literal
 

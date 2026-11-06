@@ -8,7 +8,8 @@ using Color = ScottPlot.Color;
 
 namespace SpectrumVisualizer.UI.Chart;
 
-public readonly record struct ChartColors(Color Line, Color BandFill, Color CentreLine);
+public readonly record struct ChartColors(
+	Color Line, Color BandFill, Color CentreLine, Color Envelope, Color MomentLine, Color FailureStrip);
 
 /// <summary>
 /// Paints the five ScottPlot surfaces the library draws from its own defaults, and resolves the plottable colours.
@@ -23,6 +24,7 @@ public static class ChartPalette
 	private const string LineKey = "AppAccentBrush";
 	private const string BandFillKey = "AppAccentFillBrush";
 	private const string CentreLineKey = "AppMarkerLineBrush";
+	private const string FailureStripKey = "AppSeverityErrorBrush";
 
 	public static void Apply(Plot plot, IResourceHost resources, ThemeVariant variant)
 	{
@@ -49,10 +51,15 @@ public static class ChartPalette
 
 	public static ChartColors Colors(IResourceHost resources, ThemeVariant variant)
 	{
+		var line = Resolve(resources, variant, LineKey);
+		var markerLine = Resolve(resources, variant, CentreLineKey);
 		return new ChartColors(
-			Resolve(resources, variant, LineKey),
+			line,
 			Resolve(resources, variant, BandFillKey),
-			Resolve(resources, variant, CentreLineKey));
+			markerLine,
+			line,
+			markerLine,
+			Resolve(resources, variant, FailureStripKey));
 	}
 
 	private static Color Resolve(IResourceHost resources, ThemeVariant variant, string key)

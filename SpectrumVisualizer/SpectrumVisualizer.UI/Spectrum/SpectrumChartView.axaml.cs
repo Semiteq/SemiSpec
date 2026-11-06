@@ -11,15 +11,19 @@ namespace SpectrumVisualizer.UI.Spectrum;
 
 public partial class SpectrumChartView : UserControl
 {
+	private readonly ChartFrames _frames;
 	private IDisposable? _redrawSubscription;
 	private SpectrumChartViewModel? _viewModel;
-	private int _frameSequence;
-	private int? _pendingFrame;
 	private Point? _pressPosition;
 
 	public SpectrumChartView()
 	{
 		InitializeComponent();
+		_frames = new ChartFrames(
+			PlotControl,
+			() => _viewModel is not null,
+			colors => _viewModel?.ApplyPalette(colors),
+			frameServed: () => { });
 		DataContextChanged += OnDataContextChanged;
 
 		// Only pan and zoom stay: autoscale and keyboard responses would move the limits behind the scale.
@@ -38,67 +42,25 @@ public partial class SpectrumChartView : UserControl
 	}
 
 	/// <summary>Animation-frame callbacks that served a redraw request since the view was built.</summary>
-	internal int ServedFrameCount { get; private set; }
+	internal int ServedFrameCount => _frames.ServedFrameCount;
 
 	protected override void OnLoaded(RoutedEventArgs e)
 	{
 		base.OnLoaded(e);
-
-		if (Application.Current is { } application)
-		{
-			application.ActualThemeVariantChanged += OnActualThemeVariantChanged;
-		}
-
-		RepaintChart();
+		_frames.Attach();
 	}
 
 	protected override void OnUnloaded(RoutedEventArgs e)
 	{
-		ClearPendingFrame();
-
-		if (Application.Current is { } application)
-		{
-			application.ActualThemeVariantChanged -= OnActualThemeVariantChanged;
-		}
-
+		_frames.Detach();
 		base.OnUnloaded(e);
-	}
-
-	private void OnActualThemeVariantChanged(object? sender, EventArgs eventArgs)
-	{
-		RepaintChart();
-	}
-
-	private void RepaintChart()
-	{
-		ApplyChartPalette();
-		RequestFrame();
-	}
-
-	private void ApplyChartPalette()
-	{
-		if (Application.Current is not { } application)
-		{
-			return;
-		}
-
-		var variant = application.ActualThemeVariant;
-		var plot = PlotControl.Plot;
-		var colors = ChartPalette.Colors(application, variant);
-
-		// One hold of the lock, so no render sees new surfaces with old series colours; ApplyPalette re-enters it.
-		lock (plot.Sync)
-		{
-			ChartPalette.Apply(plot, application, variant);
-			_viewModel?.ApplyPalette(colors);
-		}
 	}
 
 	private void OnDataContextChanged(object? sender, EventArgs eventArgs)
 	{
 		_redrawSubscription?.Dispose();
 		_redrawSubscription = null;
-		ClearPendingFrame();
+		_frames.ClearPending();
 		_viewModel = DataContext as SpectrumChartViewModel;
 
 		// A null DataContext leaves the plot in place: AvaPlot.Reset disposes the plot it replaces, and that plot is
@@ -113,43 +75,8 @@ public partial class SpectrumChartView : UserControl
 			PlotControl.Reset(_viewModel.Plot);
 		}
 
-		_redrawSubscription = _viewModel.RedrawRequested.Subscribe(_ => RequestFrame(), ClearPendingFrame);
-		RepaintChart();
-	}
-
-	private void RequestFrame()
-	{
-		if (_pendingFrame is not null || TopLevel.GetTopLevel(this) is not { } topLevel)
-		{
-			return;
-		}
-
-		var frame = ++_frameSequence;
-		topLevel.RequestAnimationFrame(_ => ServeFrame(frame));
-		_pendingFrame = frame;
-	}
-
-	private void ServeFrame(int frame)
-	{
-		if (_pendingFrame != frame)
-		{
-			return;
-		}
-
-		_pendingFrame = null;
-
-		if (_viewModel is null || TopLevel.GetTopLevel(this) is null)
-		{
-			return;
-		}
-
-		PlotControl.InvalidateVisual();
-		ServedFrameCount++;
-	}
-
-	private void ClearPendingFrame()
-	{
-		_pendingFrame = null;
+		_redrawSubscription = _viewModel.RedrawRequested.Subscribe(_ => _frames.Request(), _frames.ClearPending);
+		_frames.Repaint();
 	}
 
 	private void OnPlotPointerWheelChanged(object? sender, PointerWheelEventArgs eventArgs)

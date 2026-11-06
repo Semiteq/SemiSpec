@@ -67,6 +67,14 @@ sync   len    st  seq crc16
 CRC-16/MODBUS: reflected polynomial 0xA001, initial value 0xFFFF, no final XOR (`Crc16Modbus`). ASCII `123456789`
 gives `0x4B37`.
 
+`SpectrumVisualizer.Tests.Unit/Core/Protocol/FirmwareFrames.txt` holds frames written by the firmware's own frame code,
+`pc_link.c` in OptoskyProj, built on the PC: the heartbeat above, an ATP-2000 spectrum, an ATP-8000 spectrum and an
+ATP-8000 dark frame, one per line as a name and the frame bytes in hex. `FirmwareFrameTests` runs two checks on each
+line against the same frame built in C#: `FrameDecoder` decodes the line to a `BoardFrame` equal field by field to that
+frame, and the line's bytes equal `FrameEncoder.Encode` of that frame byte for byte. The decoder and
+the encoder follow OptoskyProj#20, not the C code, so a byte order error in the firmware fails these tests. The
+OptoskyProj README describes how to regenerate the file after a change to `pc_link.c`.
+
 ## Model
 
 `BoardFrame` holds `State`, `Seq` and a `SpectrumMeasurement` that is null for a heartbeat. `SpectrumMeasurement`'s
@@ -139,7 +147,9 @@ the last spectrum's `seq`, 0 before any spectrum. After 255 comes 0.
 The first frame is the baseline, so an app started mid-run reports no false loss, even when that frame carries 57. A
 heartbeat reports k, not k - 1: it repeats the last spectrum the board sent, so every spectrum up to and including
 that `seq` was lost. Every frame, heartbeats included, becomes the new baseline, so the spectrum after a heartbeat
-that reported a loss does not report it again. `Reset()` starts a new baseline, for a reconnect.
+that reported a loss does not report it again. `Reset()` starts a new baseline, for a reconnect. The trend keeps its
+own tracker over the distributor's frames and resets it after more than 10 s without any frame, so the `seq` step
+across a reconnect, an unplug or a stopped board is not counted as loss there (`overview.md`, Trend).
 
 A board restart looks like an ordinary gap. A loss of 256 or more spectra in a row miscounts; at 1.3 spectra per second
 that is over 3 minutes of silence. OptoskyProj#20 has the app report a silent board after 10 s without a valid frame,

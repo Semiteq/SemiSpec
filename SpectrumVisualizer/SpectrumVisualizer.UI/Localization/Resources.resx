@@ -207,6 +207,9 @@
   <data name="SpectrumEmpty" xml:space="preserve">
     <value>No spectrum yet. Connect to the board in the row above.</value>
   </data>
+  <data name="SpectrumHistoricalFormat" xml:space="preserve">
+    <value>Spectrum from {0}</value>
+  </data>
   <data name="SignalTitle" xml:space="preserve">
     <value>Signal</value>
   </data>
@@ -251,5 +254,72 @@
   </data>
   <data name="ChartStickToZero" xml:space="preserve">
     <value>Stick to zero</value>
+  </data>
+  <data name="ChartBackToLive" xml:space="preserve">
+    <value>Back to live</value>
+  </data>
+  <data name="TrendTitle" xml:space="preserve">
+    <value>Trend</value>
+  </data>
+  <data name="TrendTimeWindow" xml:space="preserve">
+    <value>Time window</value>
+  </data>
+  <data name="TrendFollowLive" xml:space="preserve">
+    <value>Follow live</value>
+  </data>
+  <data name="TrendPresetMinutesFormat" xml:space="preserve">
+    <value>{0} min</value>
+  </data>
+  <data name="TrendPresetHoursFormat" xml:space="preserve">
+    <value>{0} h</value>
+  </data>
+  <data name="TrendAxisTime" xml:space="preserve">
+    <value>Time</value>
+  </data>
+  <data name="TrendAxisIntensity" xml:space="preserve">
+    <value>Intensity</value>
+  </data>
+  <data name="TrendAxisIntensityFormat" xml:space="preserve">
+    <value>Intensity
+{0} nm ±{1} nm</value>
+  </data>
+  <data name="TrendEmpty" xml:space="preserve">
+    <value>No trend yet. It appears with the first spectrum.</value>
+  </data>
+  <data name="TrendReadoutRangeFormat" xml:space="preserve">
+    <value>{0} – {1}</value>
+  </data>
+  <data name="TrendReadoutCountFormat" xml:space="preserve">
+    <value>Spectra: {0}</value>
+  </data>
+  <data name="TrendReadoutNoData" xml:space="preserve">
+    <value>No data</value>
+  </data>
+  <data name="TrendReadoutLostFormat" xml:space="preserve">
+    <value>{0} spectra lost</value>
+  </data>
+  <data name="TrendReadoutNoSpectra" xml:space="preserve">
+    <value>No spectra</value>
+  </data>
+  <data name="TrendReadoutUncoveredFormat" xml:space="preserve">
+    <value>Spectrometer does not cover {0} nm</value>
+  </data>
+  <data name="TrendReadoutFailedFormat" xml:space="preserve">
+    <value>Measurement failed: {0}</value>
+  </data>
+  <data name="TrendHistoryTitle" xml:space="preserve">
+    <value>The trend history could not be read</value>
+  </data>
+  <data name="TrendHistoryDetail" xml:space="preserve">
+    <value>The stored spectra at the new wavelength or window could not be read; the trend shows only the data since the change.</value>
+  </data>
+  <data name="TrendMomentTitle" xml:space="preserve">
+    <value>The spectrum of that moment could not be read</value>
+  </data>
+  <data name="TrendMomentDetail" xml:space="preserve">
+    <value>The stored spectrum at the clicked time could not be read.</value>
+  </data>
+  <data name="TrendMomentRemedy" xml:space="preserve">
+    <value>Click another moment.</value>
   </data>
 </root>

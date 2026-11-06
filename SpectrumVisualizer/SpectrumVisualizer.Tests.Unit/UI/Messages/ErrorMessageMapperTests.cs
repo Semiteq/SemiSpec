@@ -6,6 +6,7 @@ using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Messages;
 using SpectrumVisualizer.UI.Store;
+using SpectrumVisualizer.UI.Trend;
 
 using Xunit;
 
@@ -151,6 +152,30 @@ public sealed class ErrorMessageMapperTests
 			Resources.StoreStoppedDetail,
 			Resources.StoreStoppedRemedy,
 			MessageSeverity.Error));
+	}
+
+	[Fact]
+	public void MapGivesAFailedTrendHistoryReadItsOwnTextAtWarningWithNoRemedy()
+	{
+		var view = ErrorMessageMapper.Map(new TrendHistoryError().CausedBy(new Error("the store file is locked")));
+
+		view.Should().Be(new MessageView(
+			Resources.TrendHistoryTitle,
+			Resources.TrendHistoryDetail,
+			string.Empty,
+			MessageSeverity.Warning));
+	}
+
+	[Fact]
+	public void MapGivesAFailedTrendMomentReadItsOwnTextAtWarning()
+	{
+		var view = ErrorMessageMapper.Map(new TrendMomentError().CausedBy(new Error("the store file is locked")));
+
+		view.Should().Be(new MessageView(
+			Resources.TrendMomentTitle,
+			Resources.TrendMomentDetail,
+			Resources.TrendMomentRemedy,
+			MessageSeverity.Warning));
 	}
 
 	[Fact]

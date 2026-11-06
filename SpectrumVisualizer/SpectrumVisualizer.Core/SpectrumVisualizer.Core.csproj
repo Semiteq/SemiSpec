@@ -3,6 +3,7 @@
   <ItemGroup>
     <PackageReference Include="FluentResults"/>
     <PackageReference Include="Microsoft.Data.Sqlite"/>
+    <PackageReference Include="System.Reactive"/>
   </ItemGroup>
 
 </Project>
