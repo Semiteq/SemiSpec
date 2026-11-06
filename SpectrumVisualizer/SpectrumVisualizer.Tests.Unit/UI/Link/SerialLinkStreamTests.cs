@@ -17,7 +17,8 @@ public sealed class SerialLinkStreamTests : SerialLinkTestBase
 	[Fact(Timeout = TestTimeoutMs)]
 	public async Task FramesInRandomChunksReachTheChannel()
 	{
-		BoardFrame[] frames = [Spectrum(Spectrometer.Atp2000, 1), Spectrum(Spectrometer.Atp8000, 2), Heartbeat(2)];
+		BoardFrame[] frames =
+			[SpectrumFrame(Spectrometer.Atp2000, 1), SpectrumFrame(Spectrometer.Atp8000, 2), Heartbeat(2)];
 		var bytes = Concat(frames.Select(FrameEncoder.Encode));
 		await ConnectAsync();
 
@@ -55,7 +56,7 @@ public sealed class SerialLinkStreamTests : SerialLinkTestBase
 	[Fact(Timeout = TestTimeoutMs)]
 	public async Task SilenceAfterAFrameNeverDrainsThePartialFrameInFlight()
 	{
-		var next = FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 2));
+		var next = FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 2));
 		await ConnectAsync();
 
 		await AtAsync(1, port => port.PushBytes(Concat(FrameEncoder.Encode(Heartbeat(1)), next[..500])));
@@ -64,7 +65,7 @@ public sealed class SerialLinkStreamTests : SerialLinkTestBase
 		await AtAsync(31, port => port.PushTimeout());
 		await AtAsync(32, port => port.PushBytes(next[500..]));
 
-		TakeFrames().Should().Equal(Heartbeat(1), Spectrum(Spectrometer.Atp8000, 2));
+		TakeFrames().Should().Equal(Heartbeat(1), SpectrumFrame(Spectrometer.Atp8000, 2));
 		Statuses().Where(status => status.Fault is not null).Should().ContainSingle()
 			.Which.Fault.Should().BeOfType<BoardNotRespondingError>();
 		Link.Status.State.Should().Be(LinkState.Receiving);
@@ -75,9 +76,9 @@ public sealed class SerialLinkStreamTests : SerialLinkTestBase
 	{
 		await ConnectAsync();
 
-		await AtAsync(1, port => port.PushBytes(Corrupted(Spectrum(Spectrometer.Atp2000, 1))));
-		await AtAsync(4, port => port.PushBytes(Corrupted(Spectrum(Spectrometer.Atp2000, 2))));
-		await AtAsync(7, port => port.PushBytes(Corrupted(Spectrum(Spectrometer.Atp2000, 3))));
+		await AtAsync(1, port => port.PushBytes(Corrupted(SpectrumFrame(Spectrometer.Atp2000, 1))));
+		await AtAsync(4, port => port.PushBytes(Corrupted(SpectrumFrame(Spectrometer.Atp2000, 2))));
+		await AtAsync(7, port => port.PushBytes(Corrupted(SpectrumFrame(Spectrometer.Atp2000, 3))));
 		Link.Status.State.Should().Be(LinkState.Waiting);
 		await AtAsync(10, port => port.PushTimeout());
 
@@ -141,7 +142,7 @@ public sealed class SerialLinkStreamTests : SerialLinkTestBase
 	[Fact(Timeout = TestTimeoutMs)]
 	public async Task ADrainDiscardsThePartialFrameInFlight()
 	{
-		var spectrum = FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 2));
+		var spectrum = FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 2));
 		var half = spectrum.Length / 2;
 		await ConnectAsync();
 
@@ -176,10 +177,10 @@ public sealed class SerialLinkStreamTests : SerialLinkTestBase
 	{
 		await ConnectAsync();
 
-		await AtAsync(0, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 1))));
-		await AtAsync(1, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 2))));
+		await AtAsync(0, port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 1))));
+		await AtAsync(1, port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 2))));
 		Link.Status.LostSpectra.Should().Be(0);
-		await AtAsync(2, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 5))));
+		await AtAsync(2, port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 5))));
 
 		Link.Status.LostSpectra.Should().Be(2);
 	}

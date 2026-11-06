@@ -9,6 +9,7 @@ using FluentResults;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Testing;
+using Microsoft.Reactive.Testing;
 
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Messages;
@@ -54,6 +55,31 @@ public sealed class ResultReportingTests : IDisposable
 		_panel.HasEntries.Should().BeTrue();
 		logger.Levels().Should().Equal(LogLevel.Error);
 		logger.Failures().Should().Equal(thrown);
+	}
+
+	[AvaloniaFact]
+	public void ReportFailureLogsTheExceptionOfAWrappedCause()
+	{
+		var logger = new FakeLogger();
+		var thrown = new IOException("the port list could not be read");
+
+		_panel.ReportFailure(new PortListError().CausedBy(new ExceptionalError(thrown.Message, thrown)), logger);
+
+		logger.Failures().Should().Equal(thrown);
+	}
+
+	[AvaloniaFact]
+	public void ReportFailureLogsTheDeepestExceptionOfTheReasonChain()
+	{
+		var logger = new FakeLogger();
+		var outer = new InvalidOperationException("the batch failed");
+		var inner = new IOException("the disk is full");
+		var error = new ExceptionalError(outer.Message, outer)
+			.CausedBy(new Error("the write failed").CausedBy(new ExceptionalError(inner.Message, inner)));
+
+		_panel.ReportFailure(error, logger);
+
+		logger.Failures().Should().Equal(inner);
 	}
 
 	[AvaloniaFact]
@@ -104,6 +130,33 @@ public sealed class ResultReportingTests : IDisposable
 
 		report.Should().NotThrow();
 		logger.Levels().Should().Equal(LogLevel.Error, LogLevel.Error);
+	}
+
+	[AvaloniaFact]
+	public void TryReportFailureLogsAtOnceWhenTheSchedulerNeverRunsTheJob()
+	{
+		var logger = new FakeLogger();
+		var thrown = new IOException("the disk is full");
+
+		_panel.TryReportFailure(new ExceptionalError(thrown.Message, thrown), logger, new TestScheduler());
+
+		logger.Levels().Should().Equal(LogLevel.Error);
+		logger.Failures().Should().Equal(thrown);
+		_panel.Entries.Should().BeEmpty();
+	}
+
+	[AvaloniaFact]
+	public void TryReportFailureJobAddsTheEntryWithoutASecondLogLine()
+	{
+		var logger = new FakeLogger();
+		var scheduler = new TestScheduler();
+		var error = new Error("the port is taken");
+
+		_panel.TryReportFailure(error, logger, scheduler);
+		scheduler.AdvanceBy(1);
+
+		_panel.Entries.Should().ContainSingle().Which.View.Should().Be(ErrorMessageMapper.Map(error));
+		logger.Levels().Should().Equal(LogLevel.Error);
 	}
 
 	[AvaloniaFact]

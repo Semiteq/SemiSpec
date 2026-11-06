@@ -9,29 +9,55 @@ using Microsoft.Reactive.Testing;
 using ReactiveUI.Avalonia;
 
 using SpectrumVisualizer.Tests.Unit.UI.Link;
+using SpectrumVisualizer.Tests.Unit.UI.Spectrum;
+using SpectrumVisualizer.Tests.Unit.UI.Store;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
+using SpectrumVisualizer.UI.Spectrum;
 
 using MainWindowView = SpectrumVisualizer.UI.MainWindow.MainWindow;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.MainWindow;
 
-/// <summary>A shown main window over a real link and the fake port, for the desktop UI checklist.</summary>
+/// <summary>A shown main window over a real link and the fake port, with the signal pane's parts and insets.</summary>
 public abstract class MainWindowLayoutTestBase : IDisposable
 {
 	protected const string PortName = "COM3";
 
-	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
+	/// <summary>A chart width at which the ATP-8000 wavelength axis still carries four labelled ticks.</summary>
+	protected const int ChartFloorWidth = 400;
+
+	protected const double LargeWidth = 2560;
+
+	protected const double PaneBorder = 1;
+	protected const double PanePadding = 16;
+	protected const double RowSpacing = 8;
+	protected const double LabelToField = 12;
+	protected const double SectionHeaderAbove = 16;
+
+	protected static readonly string[] PaneLabels =
+		["DeviceLabel", "WavelengthLabel", "WindowLabel", "AmplitudeLabel", "SnrLabel", "QLabel", "UpdatedLabel"];
+
+	protected static readonly string[] PaneValues =
+		["DeviceValue", "WavelengthValue", "WindowValue", "AmplitudeValue", "SnrValue", "QValue", "UpdatedValue"];
+
+	protected static readonly string[] PaneHeaders = ["SignalHeader", "ChartHeader"];
+
+	protected static readonly string[] PaneControls =
+		["InvertSpectrum", "LogarithmicScale", "ResetScale", "StickToZero"];
+
 	private ConnectionBarViewModel? _connectionBar;
 	private AppStatusBarViewModel? _statusBar;
+	private SpectrumViewModel? _spectrum;
 	private MainWindowViewModel? _viewModel;
 	private MainWindowView? _window;
 
 	protected MainWindowLayoutTestBase()
 	{
 		SerialLink = new SerialLink(PortProvider, LinkScheduler, NullLogger<SerialLink>.Instance);
+		Store = new UnstartedStore(MessagePanel);
 	}
 
 	protected TestScheduler LinkScheduler { get; } = new();
@@ -42,8 +68,17 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 
 	protected SerialLink SerialLink { get; }
 
+	private protected FakeDisplayedSpectrumSource SpectrumSource { get; } = new();
+
+	protected MessagePanelViewModel MessagePanel { get; } = new(TimeProvider.System);
+
+	private protected UnstartedStore Store { get; }
+
 	protected AppStatusBarViewModel StatusBar =>
 		_statusBar ?? throw new InvalidOperationException("Realise the window first.");
+
+	protected SpectrumViewModel Spectrum =>
+		_spectrum ?? throw new InvalidOperationException("Realise the window first.");
 
 	public void Dispose()
 	{
@@ -51,9 +86,12 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 		_viewModel?.Dispose();
 		_connectionBar?.Dispose();
 		_statusBar?.Dispose();
+		_spectrum?.Dispose();
+		SpectrumSource.Dispose();
 		SerialLink.Dispose();
+		Store.Dispose();
 		Port.Dispose();
-		_messagePanel.Dispose();
+		MessagePanel.Dispose();
 		GC.SuppressFinalize(this);
 	}
 
@@ -75,18 +113,26 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 		_connectionBar = new ConnectionBarViewModel(
 			PortProvider,
 			SerialLink,
-			_messagePanel,
+			MessagePanel,
 			AvaloniaScheduler.Instance,
 			NullLogger<ConnectionBarViewModel>.Instance);
 		_statusBar = new AppStatusBarViewModel(
 			SerialLink,
-			_messagePanel,
+			Store.Store,
+			MessagePanel,
 			AvaloniaScheduler.Instance,
 			NullLogger<AppStatusBarViewModel>.Instance);
+		_spectrum = new SpectrumViewModel(
+			SpectrumSource,
+			MessagePanel,
+			TimeProvider.System,
+			AvaloniaScheduler.Instance,
+			NullLogger<SpectrumViewModel>.Instance);
 		_viewModel = new MainWindowViewModel(
-			_messagePanel,
+			MessagePanel,
 			_connectionBar,
 			_statusBar,
+			_spectrum,
 			new LogLevelControl(),
 			NullLogger<MainWindowViewModel>.Instance);
 		_window = new MainWindowView { DataContext = _viewModel };

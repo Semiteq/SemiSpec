@@ -13,13 +13,15 @@ using ReactiveUI.Avalonia;
 using Serilog;
 using Serilog.Events;
 
+using SpectrumVisualizer.Core;
 using SpectrumVisualizer.Tests.Unit.UI.Logging;
-
 using SpectrumVisualizer.UI;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
+using SpectrumVisualizer.UI.Spectrum;
+using SpectrumVisualizer.UI.Store;
 
 using Xunit;
 
@@ -29,11 +31,17 @@ namespace SpectrumVisualizer.Tests.Unit.UI.Di;
 [Trait("Component", "UI")]
 [Trait("Area", "Di")]
 [Trait("Category", "Unit")]
-public sealed class CompositionRootTests : IDisposable
+public sealed class CompositionRootTests : IAsyncDisposable
 {
+	private static readonly TimeSpan _storeStopLimit = TimeSpan.FromSeconds(10);
+
 	private readonly LogLevelControl _logLevelControl = new();
 	private readonly CollectingSink _sink = new();
 	private readonly LoggingSetup _logging;
+	// Every test in the process gets the same instance file name, so each test owns its root.
+	private readonly TempFolder _root = new();
+	private readonly AppDataPaths _paths;
+	private readonly List<SpectrumStore> _stores = [];
 
 	public CompositionRootTests()
 	{
@@ -42,12 +50,13 @@ public sealed class CompositionRootTests : IDisposable
 			.WriteTo.Sink(_sink)
 			.CreateLogger();
 		_logging = new LoggingSetup(logger, _logLevelControl);
+		_paths = AppDataPaths.Under(_root.Root).Value;
 	}
 
 	[AvaloniaFact]
 	public void EveryRegisteredServiceResolves()
 	{
-		var services = new ServiceCollection().AddUi(_logging);
+		var services = new ServiceCollection().AddUi(_logging, _paths);
 		using var provider = services.BuildServiceProvider();
 
 		foreach (var descriptor in services.Where(descriptor => !descriptor.ServiceType.IsGenericTypeDefinition))
@@ -74,6 +83,28 @@ public sealed class CompositionRootTests : IDisposable
 	}
 
 	[AvaloniaFact]
+	public void TheDistributorAndTheLiveSpectrumSourceAreOneInstanceEach()
+	{
+		using var provider = BuildContainer();
+
+		provider.GetRequiredService<FrameDistributor>()
+			.Should().BeSameAs(provider.GetRequiredService<FrameDistributor>());
+		provider.GetRequiredService<IDisplayedSpectrumSource>()
+			.Should().BeOfType<LiveSpectrumSource>()
+			.And.BeSameAs(provider.GetRequiredService<IDisplayedSpectrumSource>());
+	}
+
+	[AvaloniaFact]
+	public void TheStoreIsOneInstanceOverTheInstanceFileUnderTheStoreFolder()
+	{
+		using var provider = BuildContainer();
+
+		provider.GetRequiredService<SpectrumStore>().Should().BeSameAs(provider.GetRequiredService<SpectrumStore>());
+		provider.GetRequiredService<StoreFile>().Path
+			.Should().Be(Path.Combine(_paths.StoreFolder, $"spectra-{Environment.ProcessId}.db"));
+	}
+
+	[AvaloniaFact]
 	public void TheMainWindowShowsTheContainersStatusBarSeededFromTheLink()
 	{
 		using var provider = BuildContainer();
@@ -82,6 +113,16 @@ public sealed class CompositionRootTests : IDisposable
 
 		statusBar.Should().BeSameAs(provider.GetRequiredService<AppStatusBarViewModel>());
 		statusBar.Status.Should().BeSameAs(provider.GetRequiredService<SerialLink>().Status);
+	}
+
+	[AvaloniaFact]
+	public void TheMainWindowShowsTheContainersSpectrumViewModel()
+	{
+		using var provider = BuildContainer();
+
+		var spectrum = provider.GetRequiredService<MainWindowViewModel>().Spectrum;
+
+		spectrum.Should().BeSameAs(provider.GetRequiredService<SpectrumViewModel>());
 	}
 
 	[AvaloniaFact]
@@ -140,11 +181,21 @@ public sealed class CompositionRootTests : IDisposable
 
 	private ServiceProvider BuildContainer()
 	{
-		return new ServiceCollection().AddUi(_logging).BuildServiceProvider();
+		var provider = new ServiceCollection().AddUi(_logging, _paths).BuildServiceProvider();
+		_stores.Add(provider.GetRequiredService<SpectrumStore>());
+
+		return provider;
 	}
 
-	public void Dispose()
+	public async ValueTask DisposeAsync()
 	{
+		// Showing the window starts the store; a writer still open would hold the instance file and fail the delete.
+		foreach (var store in _stores)
+		{
+			await store.StopAsync().WaitAsync(_storeStopLimit);
+		}
+
+		_root.Dispose();
 		_logging.Logger.Dispose();
 	}
 }

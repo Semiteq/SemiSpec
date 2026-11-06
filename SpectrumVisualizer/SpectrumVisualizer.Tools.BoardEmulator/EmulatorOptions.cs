@@ -12,10 +12,4 @@ public sealed record EmulatorOptions(
 	int BadCrcEvery,
 	int DarkEvery,
 	bool BothConnected,
-	Spectrometer? Failed)
-{
-	public static ushort DefaultWavelength(Spectrometer device)
-	{
-		return device == Spectrometer.Atp2000 ? (ushort)650 : (ushort)1550;
-	}
-}
+	Spectrometer? Failed);

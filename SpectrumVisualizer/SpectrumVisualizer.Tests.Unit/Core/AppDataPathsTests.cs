@@ -22,6 +22,14 @@ public sealed class AppDataPathsTests
 	}
 
 	[Fact]
+	public void TheStoreFolderSitsInsideTheAppFolder()
+	{
+		var paths = AppDataPaths.Under(_root).Value;
+
+		paths.StoreFolder.Should().Be(Path.Combine(_root, "SpectrumVisualizer", "Spectra"));
+	}
+
+	[Fact]
 	public void ATrailingSeparatorOnTheRootDoesNotChangeTheFolders()
 	{
 		var paths = AppDataPaths.Under(_root + Path.DirectorySeparatorChar).Value;

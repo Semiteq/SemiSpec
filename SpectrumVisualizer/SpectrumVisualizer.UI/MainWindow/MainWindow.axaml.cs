@@ -5,8 +5,13 @@ namespace SpectrumVisualizer.UI.MainWindow;
 
 public partial class MainWindow : Window
 {
-	/// <summary>The status bar with its longest texts in either language; MainWindowTextFitTests measures it.</summary>
-	public const double MinimumWidth = 1048;
+	/// <summary>
+	/// Holds the connection row, the status bar and the signal pane plus the chart floor; MainWindowTextFitTests
+	/// measures it.
+	/// </summary>
+	public const double MinimumWidth = 1256;
+
+	public const double OpeningWidth = 1280;
 
 	private IDisposable? _exitSubscription;
 

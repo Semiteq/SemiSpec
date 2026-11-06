@@ -2,12 +2,14 @@ using FluentResults;
 
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Localization;
+using SpectrumVisualizer.UI.Store;
 
 namespace SpectrumVisualizer.UI.Messages;
 
 /// <summary>
 /// Turns an <see cref="IError"/> into the state the operator reads: a title, a detail, a remedy and a severity.
-/// A link error's view leaves out the port name, so a repeat on another port coalesces into one panel row.
+/// A link error's view leaves out the port name and a store error's view the file path, so a repeat coalesces
+/// into one panel row.
 /// </summary>
 public static class ErrorMessageMapper
 {
@@ -45,6 +47,21 @@ public static class ErrorMessageMapper
 				Resources.UnrecognisedDataDetail,
 				Resources.UnrecognisedDataRemedy,
 				MessageSeverity.Warning),
+			StoreOpenError => new MessageView(
+				Resources.StoreOpenTitle,
+				Resources.StoreOpenDetail,
+				Resources.StoreOpenRemedy,
+				MessageSeverity.Error),
+			StoreWriteError => new MessageView(
+				Resources.StoreWriteTitle,
+				Resources.StoreWriteDetail,
+				Resources.StoreWriteRemedy,
+				MessageSeverity.Warning),
+			StoreStoppedError => new MessageView(
+				Resources.StoreStoppedTitle,
+				Resources.StoreStoppedDetail,
+				Resources.StoreStoppedRemedy,
+				MessageSeverity.Error),
 			IExceptionalError thrown => MapThrown(thrown),
 			_ => MapUnknown(error)
 		};

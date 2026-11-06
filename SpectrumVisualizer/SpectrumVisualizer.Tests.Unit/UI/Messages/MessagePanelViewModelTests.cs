@@ -4,23 +4,28 @@ using AwesomeAssertions;
 
 using FluentResults;
 
+using Microsoft.Extensions.Time.Testing;
+
 using SpectrumVisualizer.UI.Messages;
 
 using Xunit;
 
 namespace SpectrumVisualizer.Tests.Unit.UI.Messages;
 
-// The clock is stepped by hand because a tight loop of reports would otherwise share one timestamp and
+// The clock steps one second per read because a tight loop of reports would otherwise share one timestamp and
 // hide a last-seen stamp that never moves.
 [Trait("Component", "UI")]
 [Trait("Area", "Messages")]
 [Trait("Category", "Unit")]
 public sealed class MessagePanelViewModelTests
 {
+	private static readonly DateTimeOffset _origin = new(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
+	private static readonly TimeSpan _step = TimeSpan.FromSeconds(1);
+
 	[AvaloniaFact]
 	public void ReportCoalescesAnIdenticalFailureIntoOneEntry()
 	{
-		var clock = new SteppingClock();
+		var clock = SteppingClock();
 		using var panel = new MessagePanelViewModel(clock);
 
 		for (var repeat = 0; repeat < 20; repeat++)
@@ -31,13 +36,13 @@ public sealed class MessagePanelViewModelTests
 		panel.Entries.Should().HaveCount(1);
 		panel.Entries[0].RepeatCount.Should().Be(20);
 		panel.Entries[0].HasRepeated.Should().BeTrue();
-		panel.Entries[0].LastSeen.Should().Be(SteppingClock.Origin + (SteppingClock.Step * 19));
+		panel.Entries[0].LastSeen.Should().Be(_origin + (_step * 19));
 	}
 
 	[AvaloniaFact]
 	public void ReportKeepsTwoDifferentFailuresApart()
 	{
-		var clock = new SteppingClock();
+		var clock = SteppingClock();
 		using var panel = new MessagePanelViewModel(clock);
 
 		panel.Report(Failure("archive"));
@@ -51,7 +56,7 @@ public sealed class MessagePanelViewModelTests
 	[AvaloniaFact]
 	public void ReportStartsANewEntryWhenAnotherFailureCameBetween()
 	{
-		var clock = new SteppingClock();
+		var clock = SteppingClock();
 		using var panel = new MessagePanelViewModel(clock);
 
 		panel.Report(Failure("archive"));
@@ -65,7 +70,7 @@ public sealed class MessagePanelViewModelTests
 	[AvaloniaFact]
 	public void ReportDropsTheOldestEntryOnceTheCapIsReached()
 	{
-		var clock = new SteppingClock();
+		var clock = SteppingClock();
 		using var panel = new MessagePanelViewModel(clock);
 
 		for (var index = 0; index <= MessagePanelViewModel.MaximumEntries; index++)
@@ -81,7 +86,7 @@ public sealed class MessagePanelViewModelTests
 	[AvaloniaFact]
 	public void ReportOpensThePanelOnTheFirstEntry()
 	{
-		using var panel = new MessagePanelViewModel(new SteppingClock());
+		using var panel = new MessagePanelViewModel(SteppingClock());
 
 		panel.HasEntries.Should().BeFalse("a session that never fails is not given the row");
 
@@ -93,7 +98,7 @@ public sealed class MessagePanelViewModelTests
 	[AvaloniaFact]
 	public void ReportKeepsDifferentExceptionMessagesApartAndCoalescesIdenticalOnes()
 	{
-		using var panel = new MessagePanelViewModel(new SteppingClock());
+		using var panel = new MessagePanelViewModel(SteppingClock());
 
 		panel.Report(Thrown("the port is taken"));
 		panel.Report(Thrown("the port is taken"));
@@ -106,7 +111,7 @@ public sealed class MessagePanelViewModelTests
 	[AvaloniaFact]
 	public void HasEntriesNotifiesWhenTheFirstEntryArrives()
 	{
-		using var panel = new MessagePanelViewModel(new SteppingClock());
+		using var panel = new MessagePanelViewModel(SteppingClock());
 		var raised = new List<string?>();
 		panel.PropertyChanged += (_, arguments) => raised.Add(arguments.PropertyName);
 
@@ -118,7 +123,7 @@ public sealed class MessagePanelViewModelTests
 	[AvaloniaFact]
 	public void ReportAnswersWhetherItCoalescedAgainstTheNewestEntryOnly()
 	{
-		using var panel = new MessagePanelViewModel(new SteppingClock());
+		using var panel = new MessagePanelViewModel(SteppingClock());
 		var archive = Failure("archive");
 
 		panel.Report(archive).Should().BeFalse("the list is empty");
@@ -130,7 +135,7 @@ public sealed class MessagePanelViewModelTests
 	[AvaloniaFact]
 	public void ClearCommandEmptiesTheListAndTakesThePanelOffScreen()
 	{
-		using var panel = new MessagePanelViewModel(new SteppingClock());
+		using var panel = new MessagePanelViewModel(SteppingClock());
 		panel.Report(Failure("archive"));
 
 		panel.ClearCommand.Execute().Subscribe();
@@ -142,7 +147,7 @@ public sealed class MessagePanelViewModelTests
 	[AvaloniaFact]
 	public void ReportKeepsTwoViewsThatDifferOnlyInSeverityApart()
 	{
-		using var panel = new MessagePanelViewModel(new SteppingClock());
+		using var panel = new MessagePanelViewModel(SteppingClock());
 
 		panel.Report(Failure("archive", MessageSeverity.Warning)).Should().BeFalse();
 		panel.Report(Failure("archive", MessageSeverity.Error)).Should().BeFalse();
@@ -163,17 +168,8 @@ public sealed class MessagePanelViewModelTests
 		return ErrorMessageMapper.Map(new ExceptionalError(exception.Message, exception));
 	}
 
-	private sealed class SteppingClock : TimeProvider
+	private static FakeTimeProvider SteppingClock()
 	{
-		public static readonly DateTimeOffset Origin = new(2026, 9, 15, 10, 0, 0, TimeSpan.Zero);
-
-		public static readonly TimeSpan Step = TimeSpan.FromSeconds(1);
-
-		private int _reads;
-
-		public override DateTimeOffset GetUtcNow()
-		{
-			return Origin + (Step * _reads++);
-		}
+		return new FakeTimeProvider(_origin) { AutoAdvanceAmount = _step };
 	}
 }

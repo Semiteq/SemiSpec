@@ -2,6 +2,8 @@ using System.Buffers;
 
 using AwesomeAssertions;
 
+using Microsoft.Extensions.Time.Testing;
+
 using SpectrumVisualizer.Core.Protocol;
 using SpectrumVisualizer.Tools.BoardEmulator;
 
@@ -16,7 +18,7 @@ namespace SpectrumVisualizer.Tests.Unit.Tools;
 [Trait("Category", "Unit")]
 public sealed class FrameScheduleTests
 {
-	private readonly ManualTimeProvider _time = new();
+	private readonly FakeTimeProvider _time = new();
 
 	[Fact]
 	public void TheFirstSpectrumIsSentAtOnceWithSeqOne()
@@ -249,22 +251,5 @@ public sealed class FrameScheduleTests
 		var found = FrameDecoder.TryReadFrame(ref buffer, out var frame, out var discarded);
 		discarded.Should().Be(0);
 		return found ? frame! : throw new InvalidOperationException("The bytes hold no whole valid frame.");
-	}
-
-	private sealed class ManualTimeProvider : TimeProvider
-	{
-		private long _ticks;
-
-		public override long TimestampFrequency => TimeSpan.TicksPerSecond;
-
-		public override long GetTimestamp()
-		{
-			return _ticks;
-		}
-
-		public void Advance(TimeSpan by)
-		{
-			_ticks += by.Ticks;
-		}
 	}
 }

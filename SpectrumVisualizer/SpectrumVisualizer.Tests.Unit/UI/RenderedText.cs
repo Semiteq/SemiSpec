@@ -11,10 +11,10 @@ namespace SpectrumVisualizer.Tests.Unit.UI;
 /// </summary>
 internal static class RenderedText
 {
-	public static double Width(string text, FontFamily family, double fontSize)
+	public static double Width(string text, FontFamily family, double fontSize, FontWeight weight = FontWeight.Normal)
 	{
 		var widest = 0d;
-		foreach (var typeface in Candidates(family))
+		foreach (var typeface in Candidates(family, weight))
 		{
 			using (typeface)
 			using (var font = new SKFont(typeface, (float)fontSize) { LinearMetrics = true, Subpixel = true })
@@ -38,9 +38,11 @@ internal static class RenderedText
 		return [.. family.FamilyNames.Where(name => installed.Contains(name, StringComparer.OrdinalIgnoreCase))];
 	}
 
-	private static IEnumerable<SKTypeface> Candidates(FontFamily family)
+	private static IEnumerable<SKTypeface> Candidates(FontFamily family, FontWeight weight)
 	{
-		using (var stream = AssetLoader.Open(new Uri("avares://Avalonia.Fonts.Inter/Assets/Inter-Regular.ttf")))
+		var isBold = weight >= FontWeight.Bold;
+		var interFace = isBold ? "Inter-Bold.ttf" : "Inter-Regular.ttf";
+		using (var stream = AssetLoader.Open(new Uri($"avares://Avalonia.Fonts.Inter/Assets/{interFace}")))
 		using (var data = SKData.Create(stream))
 		{
 			yield return SKTypeface.FromData(data);
@@ -48,7 +50,7 @@ internal static class RenderedText
 
 		foreach (var name in InstalledFamilies(family))
 		{
-			yield return SKFontManager.Default.MatchFamily(name);
+			yield return SKFontManager.Default.MatchFamily(name, isBold ? SKFontStyle.Bold : SKFontStyle.Normal);
 		}
 	}
 }

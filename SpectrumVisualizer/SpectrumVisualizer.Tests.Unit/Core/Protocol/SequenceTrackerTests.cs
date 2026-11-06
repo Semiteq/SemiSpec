@@ -20,22 +20,22 @@ public sealed class SequenceTrackerTests
 	[InlineData(57)]
 	public void TheFirstSpectrumIsTheBaseline(byte seq)
 	{
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, seq)).Should().Be(0);
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, seq)).Should().Be(0);
 	}
 
 	[Fact]
 	public void TheFirstHeartbeatIsTheBaseline()
 	{
 		_tracker.Observe(Heartbeat(57)).Should().Be(0);
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, 58)).Should().Be(0);
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, 58)).Should().Be(0);
 	}
 
 	[Fact]
 	public void TheNextSpectrumLosesNothing()
 	{
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, 10));
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, 10));
 
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, 11)).Should().Be(0);
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, 11)).Should().Be(0);
 	}
 
 	[Theory]
@@ -45,55 +45,55 @@ public sealed class SequenceTrackerTests
 	[InlineData(10, 9, 254)]
 	public void ASpectrumThatSkipsKReportsKMinusOneLost(byte previous, byte next, int lost)
 	{
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, previous));
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, previous));
 
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, next)).Should().Be(lost);
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, next)).Should().Be(lost);
 	}
 
 	[Fact]
 	public void ASpectrumRepeatingThePreviousSeqReports256Lost()
 	{
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, 10));
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, 10));
 
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, 10)).Should().Be(256);
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, 10)).Should().Be(256);
 	}
 
 	[Fact]
 	public void TheSeqWrapsFrom255To0()
 	{
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, 255));
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, 255));
 
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, 0)).Should().Be(0);
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, 0)).Should().Be(0);
 	}
 
 	[Fact]
 	public void AHeartbeatRepeatingTheLastSpectrumSeqLosesNothing()
 	{
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, 10));
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, 10));
 
 		_tracker.Observe(Heartbeat(10)).Should().Be(0);
 		_tracker.Observe(Heartbeat(10)).Should().Be(0);
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, 11)).Should().Be(0);
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, 11)).Should().Be(0);
 	}
 
 	[Fact]
 	public void AHeartbeatWithADifferentSeqReportsTheLossOnce()
 	{
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, 10));
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, 10));
 
 		_tracker.Observe(Heartbeat(13)).Should().Be(3);
 		_tracker.Observe(Heartbeat(13)).Should().Be(0);
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, 14)).Should().Be(0);
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, 14)).Should().Be(0);
 	}
 
 	[Fact]
 	public void ResetStartsANewBaseline()
 	{
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, 10));
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, 10));
 
 		_tracker.Reset();
 
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, 200)).Should().Be(0);
-		_tracker.Observe(Spectrum(Spectrometer.Atp8000, 202)).Should().Be(1);
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, 200)).Should().Be(0);
+		_tracker.Observe(SpectrumFrame(Spectrometer.Atp8000, 202)).Should().Be(1);
 	}
 }

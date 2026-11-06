@@ -22,6 +22,7 @@
     <PackageReference Include="Avalonia.Skia"/>
     <PackageReference Include="ReactiveUI.Avalonia"/>
     <PackageReference Include="RJCP.SerialPortStream"/>
+    <PackageReference Include="ScottPlot.Avalonia"/>
     <PackageReference Include="Semi.Avalonia"/>
     <PackageReference Include="Microsoft.CodeAnalysis.ResxSourceGenerator" PrivateAssets="all"/>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>

@@ -5,6 +5,7 @@ using FluentResults;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Messages;
+using SpectrumVisualizer.UI.Store;
 
 using Xunit;
 
@@ -109,6 +110,47 @@ public sealed class ErrorMessageMapperTests
 			Resources.PortListDetail,
 			Resources.PortListRemedy,
 			MessageSeverity.Warning));
+	}
+
+	[Fact]
+	public void MapGivesAFailedStoreOpenItsOwnTextAtErrorWithoutThePath()
+	{
+		const string StorePath = @"C:\Store987\spectra-987.db";
+
+		var view = ErrorMessageMapper.Map(
+			new StoreOpenError(StorePath).CausedBy(new IOException("the folder is a file")));
+
+		view.Should().Be(new MessageView(
+			Resources.StoreOpenTitle,
+			Resources.StoreOpenDetail,
+			Resources.StoreOpenRemedy,
+			MessageSeverity.Error));
+		view.Detail.Should().NotContain("987");
+	}
+
+	[Fact]
+	public void MapGivesAFailedStoreWriteItsOwnTextAtWarning()
+	{
+		var view = ErrorMessageMapper.Map(new StoreWriteError().CausedBy(new IOException("the disk is full")));
+
+		view.Should().Be(new MessageView(
+			Resources.StoreWriteTitle,
+			Resources.StoreWriteDetail,
+			Resources.StoreWriteRemedy,
+			MessageSeverity.Warning));
+	}
+
+	[Fact]
+	public void MapGivesAStoppedStoreItsOwnTextAtError()
+	{
+		var view = ErrorMessageMapper.Map(
+			new StoreStoppedError().CausedBy(new InvalidOperationException("the clock failed")));
+
+		view.Should().Be(new MessageView(
+			Resources.StoreStoppedTitle,
+			Resources.StoreStoppedDetail,
+			Resources.StoreStoppedRemedy,
+			MessageSeverity.Error));
 	}
 
 	[Fact]

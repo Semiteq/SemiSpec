@@ -27,9 +27,6 @@
   <data name="MenuViewVerboseLogging" xml:space="preserve">
     <value>Verbose logging</value>
   </data>
-  <data name="ContentPlaceholder" xml:space="preserve">
-    <value>The spectrum appears here after a device connects</value>
-  </data>
   <data name="StatusNotConnected" xml:space="preserve">
     <value>Not connected</value>
   </data>
@@ -111,6 +108,33 @@
   <data name="UnrecognisedDataRemedy" xml:space="preserve">
     <value>Check that the spectrometer board is connected to this port and sends at 115200 baud.</value>
   </data>
+  <data name="StoreOpenTitle" xml:space="preserve">
+    <value>Spectrum history is off</value>
+  </data>
+  <data name="StoreOpenDetail" xml:space="preserve">
+    <value>The application could not create its spectrum history file. The spectrum view works; nothing is stored.</value>
+  </data>
+  <data name="StoreOpenRemedy" xml:space="preserve">
+    <value>Restart the application. If the failure repeats, send the log file to the developer.</value>
+  </data>
+  <data name="StoreWriteTitle" xml:space="preserve">
+    <value>Spectrum history write failed</value>
+  </data>
+  <data name="StoreWriteDetail" xml:space="preserve">
+    <value>Received frames could not be written to the history file; they count as dropped frames.</value>
+  </data>
+  <data name="StoreWriteRemedy" xml:space="preserve">
+    <value>Check the free space on the system drive, and close any program that opened the spectrum history file. The application keeps trying.</value>
+  </data>
+  <data name="StoreStoppedTitle" xml:space="preserve">
+    <value>Spectrum history stopped</value>
+  </data>
+  <data name="StoreStoppedDetail" xml:space="preserve">
+    <value>The application stopped writing the spectrum history after an unexpected error. The spectrum is still shown; new frames count as dropped.</value>
+  </data>
+  <data name="StoreStoppedRemedy" xml:space="preserve">
+    <value>Restart the application. If the error repeats, send the log file to the developer.</value>
+  </data>
   <data name="LinkRestoredTitle" xml:space="preserve">
     <value>Receiving data</value>
   </data>
@@ -168,7 +192,64 @@
   <data name="StatusLostSpectraFormat" xml:space="preserve">
     <value>Lost spectra: {0}</value>
   </data>
+  <data name="StatusDroppedFramesFormat" xml:space="preserve">
+    <value>Dropped frames: {0}</value>
+  </data>
   <data name="StatusNoValue" xml:space="preserve">
     <value>-</value>
+  </data>
+  <data name="SpectrumAxisWavelength" xml:space="preserve">
+    <value>Wavelength, nm</value>
+  </data>
+  <data name="SpectrumAxisIntensity" xml:space="preserve">
+    <value>Intensity</value>
+  </data>
+  <data name="SpectrumEmpty" xml:space="preserve">
+    <value>No spectrum yet. Connect to the board in the row above.</value>
+  </data>
+  <data name="SignalTitle" xml:space="preserve">
+    <value>Signal</value>
+  </data>
+  <data name="SignalDevice" xml:space="preserve">
+    <value>Spectrometer</value>
+  </data>
+  <data name="SignalWavelength" xml:space="preserve">
+    <value>Wavelength</value>
+  </data>
+  <data name="SignalWindow" xml:space="preserve">
+    <value>Window</value>
+  </data>
+  <data name="SignalAmplitude" xml:space="preserve">
+    <value>Amplitude</value>
+  </data>
+  <data name="SignalSnr" xml:space="preserve">
+    <value>SNR</value>
+  </data>
+  <data name="SignalQ" xml:space="preserve">
+    <value>Q factor</value>
+  </data>
+  <data name="SignalUpdated" xml:space="preserve">
+    <value>Updated</value>
+  </data>
+  <data name="SignalWavelengthFormat" xml:space="preserve">
+    <value>{0} nm</value>
+  </data>
+  <data name="SignalWindowFormat" xml:space="preserve">
+    <value>±{0} nm</value>
+  </data>
+  <data name="ChartTitle" xml:space="preserve">
+    <value>Chart</value>
+  </data>
+  <data name="ChartInvert" xml:space="preserve">
+    <value>Invert spectrum</value>
+  </data>
+  <data name="ChartLogScale" xml:space="preserve">
+    <value>Logarithmic scale</value>
+  </data>
+  <data name="ChartResetScale" xml:space="preserve">
+    <value>Reset scale</value>
+  </data>
+  <data name="ChartStickToZero" xml:space="preserve">
+    <value>Stick to zero</value>
   </data>
 </root>

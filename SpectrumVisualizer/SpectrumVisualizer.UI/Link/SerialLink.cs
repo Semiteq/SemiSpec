@@ -4,6 +4,8 @@ using System.Threading.Channels;
 
 using Microsoft.Extensions.Logging;
 
+using SpectrumVisualizer.Core.Protocol;
+
 namespace SpectrumVisualizer.UI.Link;
 
 /// <summary>
@@ -29,6 +31,9 @@ public sealed class SerialLink : IDisposable
 
 	// Reset by Connect while no session runs, then written by the session task only.
 	private bool _frameDropLogged;
+
+	// Counts for the process; written and read on the session task only, one session at a time.
+	private long _droppedFrames;
 
 	public SerialLink(ISerialPortProvider serialPortProvider, IScheduler scheduler, ILogger<SerialLink> logger)
 	{
@@ -118,6 +123,7 @@ public sealed class SerialLink : IDisposable
 	/// <summary>A fault rides a state change, so the comparison ignores it.</summary>
 	private void Publish(LinkStatus status)
 	{
+		status = status with { DroppedFrames = _droppedFrames };
 		if (status with { Fault = null } == _status with { Fault = null })
 		{
 			return;
@@ -132,6 +138,7 @@ public sealed class SerialLink : IDisposable
 	/// </summary>
 	private void OnFrameDropped(ReceivedFrame dropped)
 	{
+		_droppedFrames++;
 		if (_frameDropLogged)
 		{
 			return;

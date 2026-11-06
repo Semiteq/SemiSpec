@@ -20,6 +20,7 @@ All commands run from the repo root.
 dotnet build SpectrumVisualizer.slnx -c Release       # new app; warnings are errors
 dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI
 dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator -- --help
+dotnet run -c Release --project SpectrumVisualizer/SpectrumVisualizer.Tools.StoreBenchmark -- --help
 dotnet build SpectrumVisualizer.sln                   # old app
 ```
 
@@ -38,7 +39,8 @@ dotnet test SpectrumVisualizer.Tests                  # old app
 
 `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit` is the only test project of the new app: xUnit, AwesomeAssertions,
 Avalonia.Headless. Every test class carries three traits: `Component` (`Core|UI|Tools`), `Area`
-(`Calibration|Di|Emulator|Link|Logging|MainWindow|Messages|Paths|Protocol|Resources`) and `Category` (`Unit`).
+(`Calibration|Chart|Di|Emulator|Link|Logging|MainWindow|Messages|Paths|Protocol|Resources|Spectrum|Store`) and
+`Category` (`Unit`).
 `xunit.runner.json` sets `failSkips`, so a skipped test fails the run. A hung run leaves
 `SpectrumVisualizer.Tests.Unit.exe` locked, and the next build fails with MSB3027 until the process is killed.
 
@@ -65,11 +67,16 @@ then builds and tests the old app.
 .githooks/                       pre-commit hook
 .github/workflows/               CI
 SpectrumVisualizer/              new app: build props, .editorconfig, projects below
-  SpectrumVisualizer.Core/       UI-free code: paths, board protocol, wavelength calibration
-  SpectrumVisualizer.UI/         Avalonia WinExe: startup, logging, serial link, main window, messages, styles, resx text
+  SpectrumVisualizer.Core/       UI-free code: paths, board protocol, wavelength calibration,
+                                 spectrum projection and scale, log axis ticks, spectrum store (Store/)
+  SpectrumVisualizer.UI/         Avalonia WinExe: startup, logging, serial link, main window, spectrum chart,
+                                 store writer service (Store/), messages, styles, resx text
   SpectrumVisualizer.Tools.BoardEmulator/
                                  console tool: writes board frames to a COM port
+  SpectrumVisualizer.Tools.StoreBenchmark/
+                                 console tool: fills a store file and measures its writes, size and reads
   SpectrumVisualizer.Tests.Unit/ unit and headless UI tests
+  Shared/                        source linked into both tools (<Compile Include Link>): shared option parsing
 SpectrumVisualizer.Uart/         old WinForms app
 SpectrumVisualizer.Tests/        old app's MSTest tests
 docs/                            architecture docs and plans

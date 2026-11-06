@@ -143,7 +143,7 @@ public sealed class SerialLinkPortLossTests : SerialLinkTestBase
 	[Fact(Timeout = TestTimeoutMs)]
 	public async Task APortLostMidFrameDropsTheHalfFrameAndTheReopenedPortStartsClean()
 	{
-		var spectrum = FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 2));
+		var spectrum = FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 2));
 		var half = spectrum.Length / 2;
 		await using var reopened = new FakePortStream();
 		await ConnectAsync();
@@ -185,13 +185,16 @@ public sealed class SerialLinkPortLossTests : SerialLinkTestBase
 	{
 		await using var reopened = new FakePortStream();
 		await ConnectAsync();
-		await AtAsync(0, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 5))));
+		await AtAsync(0, port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 5))));
 		await LoseAsync(Port, 1);
 		await ReopenAsync(reopened, 2);
 
-		await AtAsync(reopened, 3, port => port.PushBytes(FrameEncoder.Encode(Spectrum(Spectrometer.Atp8000, 57))));
+		await AtAsync(
+			reopened,
+			3,
+			port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 57))));
 
-		TakeFrames().Should().Equal(Spectrum(Spectrometer.Atp8000, 5), Spectrum(Spectrometer.Atp8000, 57));
+		TakeFrames().Should().Equal(SpectrumFrame(Spectrometer.Atp8000, 5), SpectrumFrame(Spectrometer.Atp8000, 57));
 		Link.Status.State.Should().Be(LinkState.Receiving);
 		Link.Status.LostSpectra.Should().Be(0);
 	}

@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 
@@ -10,18 +9,19 @@ using Avalonia.VisualTree;
 
 using AwesomeAssertions;
 
-using FluentResults;
-
 using Microsoft.Extensions.Logging.Abstractions;
 
 using ReactiveUI.Avalonia;
 
 using SpectrumVisualizer.Tests.Unit.UI.Link;
+using SpectrumVisualizer.Tests.Unit.UI.Spectrum;
+using SpectrumVisualizer.Tests.Unit.UI.Store;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
+using SpectrumVisualizer.UI.Spectrum;
 
 using Xunit;
 
@@ -36,8 +36,11 @@ public sealed class MainWindowViewTests : IDisposable
 {
 	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
 	private readonly SerialLink _serialLink;
+	private readonly UnstartedStore _store;
 	private readonly ConnectionBarViewModel _connectionBar;
 	private readonly AppStatusBarViewModel _statusBar;
+	private readonly FakeDisplayedSpectrumSource _spectrumSource = new();
+	private readonly SpectrumViewModel _spectrum;
 	private readonly MainWindowViewModel _viewModel;
 	private readonly MainWindowView _window;
 
@@ -51,22 +54,31 @@ public sealed class MainWindowViewTests : IDisposable
 			_messagePanel,
 			AvaloniaScheduler.Instance,
 			NullLogger<ConnectionBarViewModel>.Instance);
+		_store = new UnstartedStore(_messagePanel);
 		_statusBar = new AppStatusBarViewModel(
 			_serialLink,
+			_store.Store,
 			_messagePanel,
 			AvaloniaScheduler.Instance,
 			NullLogger<AppStatusBarViewModel>.Instance);
+		_spectrum = new SpectrumViewModel(
+			_spectrumSource,
+			_messagePanel,
+			TimeProvider.System,
+			AvaloniaScheduler.Instance,
+			NullLogger<SpectrumViewModel>.Instance);
 		_viewModel = new MainWindowViewModel(
 			_messagePanel,
 			_connectionBar,
 			_statusBar,
+			_spectrum,
 			new LogLevelControl(),
 			NullLogger<MainWindowViewModel>.Instance);
 		_window = new MainWindowView { DataContext = _viewModel };
 	}
 
 	[AvaloniaFact]
-	public void TheRealisedWindowShowsTheMenuThePlaceholderAndTheStatusBarWithTheMessagePanelHidden()
+	public void TheRealisedWindowShowsTheMenuTheContentPanesAndTheStatusBarWithTheMessagePanelHidden()
 	{
 		Realise();
 
@@ -75,9 +87,18 @@ public sealed class MainWindowViewTests : IDisposable
 		Named<Menu>(menuBar, "MainMenu").Items.OfType<MenuItem>().Select(item => item.Name)
 			.Should().Equal("FileMenu", "ViewMenu");
 
-		var placeholder = Named<TextBlock>(_window, "ContentPlaceholder");
-		placeholder.IsEffectivelyVisible.Should().BeTrue();
-		placeholder.Text.Should().Be(Resources.ContentPlaceholder);
+		var content = Named<Grid>(_window, "ContentArea");
+		var spectrumPane = Named<Border>(_window, "SpectrumPane");
+		var signalPane = Named<Border>(_window, "SignalPane");
+		new Control[] { spectrumPane, signalPane }.Select(pane => pane.Parent).Should().AllBeEquivalentTo(content);
+		new Control[] { spectrumPane, signalPane }.Select(Grid.GetColumn).Should().Equal(0, 1);
+		spectrumPane.Child.Should().BeOfType<SpectrumChartView>()
+			.Which.DataContext.Should().BeSameAs(_spectrum.Chart);
+		signalPane.Child.Should().BeOfType<SpectrumPanel>()
+			.Which.DataContext.Should().BeSameAs(_spectrum);
+		signalPane.Bounds.Width.Should().Be(SpectrumPanel.PaneWidth);
+		_window.GetVisualDescendants().OfType<Control>()
+			.Should().NotContain(control => control.Name == "ContentPlaceholder");
 
 		Named<Border>(_window, "MessagePanel").IsVisible.Should().BeFalse("no message has arrived yet");
 
@@ -96,7 +117,10 @@ public sealed class MainWindowViewTests : IDisposable
 		dot.IsEffectivelyVisible.Should().BeTrue();
 		dot.Classes.Where(name => name.StartsWith("tone-", StringComparison.Ordinal)).Should().Equal("tone-neutral");
 
-		string[] segments = ["LinkText", "PortText", "Atp2000Text", "Atp8000Text", "LostSpectraText"];
+		string[] segments =
+		[
+			"LinkText", "PortText", "Atp2000Text", "Atp8000Text", "LostSpectraText", "DroppedFramesText",
+		];
 		segments.Select(name => Named<TextBlock>(bar, name))
 			.Should().OnlyContain(segment => segment.IsEffectivelyVisible && segment.Bounds.Width > 0);
 		segments.Select(name => Named<TextBlock>(bar, name).Text).Should().Equal(
@@ -104,7 +128,8 @@ public sealed class MainWindowViewTests : IDisposable
 			Resources.StatusNoValue,
 			Resources.FormatStatusSpectrometerFormat("ATP-2000", Resources.StatusSpectrometerNoData),
 			Resources.FormatStatusSpectrometerFormat("ATP-8000", Resources.StatusSpectrometerNoData),
-			Resources.FormatStatusLostSpectraFormat(Resources.StatusNoValue));
+			Resources.FormatStatusLostSpectraFormat(Resources.StatusNoValue),
+			Resources.FormatStatusDroppedFramesFormat(0));
 	}
 
 	[AvaloniaFact]
@@ -116,7 +141,7 @@ public sealed class MainWindowViewTests : IDisposable
 			{
 				Named<AppMenuBar>(_window, "MenuBar"),
 				Named<Border>(_window, "ConnectionRow"),
-				Named<Border>(_window, "ContentArea"),
+				Named<Grid>(_window, "ContentArea"),
 				Named<Border>(_window, "MessagePanel"),
 				Named<Border>(_window, "StatusBar"),
 			}
@@ -144,84 +169,6 @@ public sealed class MainWindowViewTests : IDisposable
 		Named<Button>(bar, "Disconnect").Content.Should().Be(Resources.ConnectionDisconnect);
 		Named<Button>(bar, "Connect").IsEffectivelyEnabled.Should().BeFalse("no port is selected");
 		Named<Button>(bar, "Disconnect").IsEffectivelyEnabled.Should().BeFalse("the link is idle");
-	}
-
-	[AvaloniaFact]
-	public void AReportedFailureOpensTheMessagePanelRow()
-	{
-		Realise();
-
-		_messagePanel.ReportFailure(new Error("port busy"), NullLogger.Instance);
-		Dispatcher.UIThread.RunJobs();
-
-		Named<Border>(_window, "MessagePanel").IsVisible.Should().BeTrue();
-	}
-
-	[AvaloniaFact]
-	public void ARepeatedFailureShowsOneEntryWithItsTimeTitleRepeatCountAndRemedy()
-	{
-		Realise();
-		var error = new Error("port busy");
-
-		_messagePanel.ReportFailure(error, NullLogger.Instance);
-		_messagePanel.ReportFailure(error, NullLogger.Instance);
-		var entry = RealisedEntry(0);
-
-		var view = ErrorMessageMapper.Map(error);
-		EntryText(entry, "EntryTitle").Text.Should().Be(view.Title);
-		EntryText(entry, "EntryDetail").Text.Should().Be(view.Detail);
-		EntryText(entry, "EntryRemedy").Text.Should().Be(view.Remedy);
-		EntryText(entry, "EntryRemedy").IsVisible.Should().BeTrue();
-		EntryText(entry, "EntryTime").Text.Should().Be(
-			string.Format(CultureInfo.CurrentCulture, "{0:HH:mm:ss}", _messagePanel.Entries[0].LastSeen));
-
-		var repeat = EntryText(entry, "EntryRepeat");
-		repeat.IsVisible.Should().BeTrue();
-		repeat.Text.Should().Be(string.Format(CultureInfo.CurrentCulture, Resources.MessagePanelRepeatFormat, 2));
-	}
-
-	[AvaloniaFact]
-	public void AFirstFailureHidesTheRepeatLineAndAnEmptyRemedyTakesNoLine()
-	{
-		Realise();
-
-		_messagePanel.Report(new MessageView("title", "detail", string.Empty, MessageSeverity.Error));
-		var entry = RealisedEntry(0);
-
-		EntryText(entry, "EntryRepeat").IsVisible.Should().BeFalse();
-		EntryText(entry, "EntryRemedy").IsVisible.Should().BeFalse();
-	}
-
-	[AvaloniaTheory]
-	[InlineData(MessageSeverity.Info, "severity-info")]
-	[InlineData(MessageSeverity.Warning, "severity-warning")]
-	[InlineData(MessageSeverity.Error, "severity-error")]
-	public void TheEntryDotCarriesTheClassOfItsSeverityOnly(MessageSeverity severity, string expected)
-	{
-		Realise();
-
-		_messagePanel.Report(new MessageView("title", "detail", "remedy", severity));
-		var dot = RealisedEntry(0)
-			.GetVisualDescendants()
-			.OfType<Ellipse>()
-			.Single(item => item.Name == "EntrySeverity");
-
-		dot.Classes.Where(name => name.StartsWith("severity-", StringComparison.Ordinal))
-			.Should().Equal(expected);
-	}
-
-	[AvaloniaFact]
-	public void ClearEmptiesTheListAndHidesTheMessagePanelRow()
-	{
-		Realise();
-		_messagePanel.ReportFailure(new Error("port busy"), NullLogger.Instance);
-		Dispatcher.UIThread.RunJobs();
-
-		Named<Button>(PanelView(), "ClearMessages").Command!.Execute(null);
-		Dispatcher.UIThread.RunJobs();
-
-		_messagePanel.Entries.Should().BeEmpty();
-		Named<Border>(_window, "MessagePanel").IsVisible.Should().BeFalse();
 	}
 
 	[AvaloniaFact]
@@ -254,9 +201,12 @@ public sealed class MainWindowViewTests : IDisposable
 	{
 		_window.Close();
 		_viewModel.Dispose();
+		_spectrum.Dispose();
+		_spectrumSource.Dispose();
 		_connectionBar.Dispose();
 		_statusBar.Dispose();
 		_serialLink.Dispose();
+		_store.Dispose();
 		_messagePanel.Dispose();
 	}
 
@@ -266,29 +216,9 @@ public sealed class MainWindowViewTests : IDisposable
 		return root.FindControl<T>(name) ?? throw new InvalidOperationException($"No control named {name}.");
 	}
 
-	private static TextBlock EntryText(Control entry, string name)
-	{
-		return entry.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Name == name);
-	}
-
-	private MessagePanelView PanelView()
-	{
-		return _window.GetVisualDescendants().OfType<MessagePanelView>().Single();
-	}
-
 	private void Realise()
 	{
 		_window.Show();
 		Dispatcher.UIThread.RunJobs();
-	}
-
-	/// <summary>The realised row of an entry; the virtualizing panel creates it only on a layout pass.</summary>
-	private Control RealisedEntry(int index)
-	{
-		Dispatcher.UIThread.RunJobs();
-		_window.UpdateLayout();
-
-		return Named<ItemsControl>(PanelView(), "MessageEntries").ContainerFromIndex(index)
-			?? throw new InvalidOperationException($"No realised entry at {index}.");
 	}
 }

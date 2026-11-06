@@ -17,6 +17,7 @@ using Semi.Avalonia;
 using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
+using SpectrumVisualizer.UI.Store;
 
 namespace SpectrumVisualizer.UI;
 
@@ -24,10 +25,13 @@ public class App : Application
 {
 	private const string RussianLanguage = "ru";
 
-	private static readonly TimeSpan _linkStopLimit = TimeSpan.FromSeconds(5);
+	private static readonly TimeSpan _backgroundStopLimit = TimeSpan.FromSeconds(5);
+
+	// The store's close budget behind this reserve: docs/architecture/overview.md, close section.
+	private static readonly TimeSpan _storeCloseReserve = TimeSpan.FromSeconds(1.5);
 
 	// Started by the first close of the main window; a later close passes once the stop completes.
-	private Task? _linkStop;
+	private Task? _backgroundStop;
 
 	// Written once on the UI thread in Configure; read by UnhandledErrorObserver on whichever thread
 	// ReactiveUI raises the exception, so the write is published with volatile.
@@ -67,52 +71,95 @@ public class App : Application
 		}
 
 		var window = new MainWindow.MainWindow { DataContext = services.MainWindow };
-		window.Opened += (_, _) => services.MainWindow.ConnectionBar.RefreshPorts();
+		window.Opened += (_, _) =>
+		{
+			services.MainWindow.ConnectionBar.RefreshPorts();
+			// The store subscribes before the distributor reads its first frame.
+			services.SpectrumStore.Start();
+			services.FrameDistributor.Start();
+		};
 		window.Closing += (sender, e) => OnMainWindowClosing(services, sender, e);
 
 		return window;
 	}
 
-	/// <summary>Holds an operator close until the link has stopped, at most for the stop limit.</summary>
+	/// <summary>
+	/// Holds an operator close until the link, the frame distributor and the spectrum store have stopped, at most for
+	/// the stop limit.
+	/// </summary>
 	private async void OnMainWindowClosing(ConfiguredServices services, object? sender, WindowClosingEventArgs e)
 	{
 		try
 		{
-			if (_linkStop is not null)
+			if (_backgroundStop is not null)
 			{
-				e.Cancel = !_linkStop.IsCompleted;
+				e.Cancel = !_backgroundStop.IsCompleted;
 				return;
 			}
 
-			_linkStop = StopLinkAsync(services);
+			_backgroundStop = StopBackgroundServicesAsync(services);
 
-			// An idle link stops at once; re-closing from inside Closing would re-enter Close.
-			if (_linkStop.IsCompleted || sender is not Window window)
+			// Services that never ran stop at once; re-closing from inside Closing would re-enter Close.
+			if (_backgroundStop.IsCompleted || sender is not Window window)
 			{
 				return;
 			}
 
 			e.Cancel = true;
-			await _linkStop;
+			await _backgroundStop;
 			window.Close();
 		}
 		catch (Exception exception)
 		{
-			services.Logger.LogError(exception, "Stopping the link on window close failed");
+			services.Logger.LogError(
+				exception,
+				"Stopping the link, the frame distributor and the spectrum store on window close failed");
 		}
 	}
 
-	private static async Task StopLinkAsync(ConfiguredServices services)
+	/// <summary>Never faults, so the close that follows the stop always passes.</summary>
+	private static async Task StopBackgroundServicesAsync(ConfiguredServices services)
 	{
 		try
 		{
-			await services.SerialLink.DisconnectAsync().WaitAsync(_linkStopLimit);
+			await StopLinkDistributorThenStoreAsync(services).WaitAsync(_backgroundStopLimit);
 		}
 		catch (TimeoutException)
 		{
 			services.Logger.LogWarning(
-				"The link did not stop within {Limit}; the window closes anyway",
-				_linkStopLimit);
+				"The link, the frame distributor and the spectrum store did not stop within {Limit}; "
+				+ "the window closes anyway",
+				_backgroundStopLimit);
+		}
+		catch (Exception exception)
+		{
+			services.Logger.LogError(
+				exception,
+				"Stopping the link, the frame distributor and the spectrum store failed; the window closes anyway");
+		}
+	}
+
+	/// <summary>
+	/// The link stops first, so no frame enters the channel after the distributor has stopped reading it, and the
+	/// distributor before the store, so no frame reaches the store after its queue has closed.
+	/// </summary>
+	private static async Task StopLinkDistributorThenStoreAsync(ConfiguredServices services)
+	{
+		using var storeDrain = new CancellationTokenSource(_backgroundStopLimit - _storeCloseReserve);
+		try
+		{
+			await services.SerialLink.DisconnectAsync();
+		}
+		finally
+		{
+			try
+			{
+				await services.FrameDistributor.StopAsync();
+			}
+			finally
+			{
+				await services.SpectrumStore.StopAsync(storeDrain.Token);
+			}
 		}
 	}
 
@@ -144,6 +191,8 @@ public class App : Application
 			services.GetRequiredService<MainWindowViewModel>(),
 			services.GetRequiredService<MessagePanelViewModel>(),
 			services.GetRequiredService<SerialLink>(),
+			services.GetRequiredService<FrameDistributor>(),
+			services.GetRequiredService<SpectrumStore>(),
 			services.GetRequiredService<ILogger<App>>());
 	}
 
@@ -169,5 +218,7 @@ public class App : Application
 		MainWindowViewModel MainWindow,
 		MessagePanelViewModel MessagePanel,
 		SerialLink SerialLink,
+		FrameDistributor FrameDistributor,
+		SpectrumStore SpectrumStore,
 		ILogger<App> Logger);
 }

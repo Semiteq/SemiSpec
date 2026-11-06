@@ -17,12 +17,12 @@ internal static class ProtocolSamples
 		return new BoardFrame(BoardState.Atp2000Connected | BoardState.Atp8000Connected, seq, null);
 	}
 
-	public static BoardFrame Spectrum(Spectrometer device, byte seq)
+	public static BoardFrame SpectrumFrame(Spectrometer device, byte seq)
 	{
-		return Spectrum(device, seq, Ramp(device));
+		return SpectrumFrame(device, seq, Ramp(device));
 	}
 
-	public static BoardFrame Spectrum(Spectrometer device, byte seq, ushort[] pixels)
+	public static BoardFrame SpectrumFrame(Spectrometer device, byte seq, ushort[] pixels)
 	{
 		var measurement = new SpectrumMeasurement(device, 1310, 5, 1234.5f, 42.25f, 0.75f, pixels);
 		return new BoardFrame(BoardState.Atp2000Connected | BoardState.Atp8000Connected, seq, measurement);

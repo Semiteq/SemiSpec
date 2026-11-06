@@ -32,6 +32,10 @@ public sealed class AppResourcesTests
 		"AppSeverityInfoBrush",
 		"AppConnectionOkBrush",
 		"AppConnectionFaultBrush",
+		"AppAccentBrush",
+		"AppAccentFillBrush",
+		"AppMarkerLineBrush",
+		"AppMinorGridLineBrush",
 	];
 
 	[Fact]

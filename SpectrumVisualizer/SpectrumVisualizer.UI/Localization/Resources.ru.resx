@@ -27,9 +27,6 @@
   <data name="MenuViewVerboseLogging" xml:space="preserve">
     <value>Подробный журнал</value>
   </data>
-  <data name="ContentPlaceholder" xml:space="preserve">
-    <value>Спектр появится здесь после подключения устройства</value>
-  </data>
   <data name="StatusNotConnected" xml:space="preserve">
     <value>Не подключено</value>
   </data>
@@ -111,6 +108,33 @@
   <data name="UnrecognisedDataRemedy" xml:space="preserve">
     <value>Проверьте, что к этому порту подключена плата спектрометра и она передаёт на скорости 115200 бод.</value>
   </data>
+  <data name="StoreOpenTitle" xml:space="preserve">
+    <value>История спектров отключена</value>
+  </data>
+  <data name="StoreOpenDetail" xml:space="preserve">
+    <value>Программа не смогла создать файл истории спектров. Спектр отображается, но не сохраняется.</value>
+  </data>
+  <data name="StoreOpenRemedy" xml:space="preserve">
+    <value>Перезапустите программу. Если ошибка повторится, передайте файл журнала разработчику.</value>
+  </data>
+  <data name="StoreWriteTitle" xml:space="preserve">
+    <value>Не удалось записать историю спектров</value>
+  </data>
+  <data name="StoreWriteDetail" xml:space="preserve">
+    <value>Принятые кадры не удалось записать в файл истории; они учтены как отброшенные.</value>
+  </data>
+  <data name="StoreWriteRemedy" xml:space="preserve">
+    <value>Проверьте свободное место на системном диске и закройте программы, открывшие файл истории спектров. Программа продолжает попытки записи.</value>
+  </data>
+  <data name="StoreStoppedTitle" xml:space="preserve">
+    <value>Запись истории спектров остановлена</value>
+  </data>
+  <data name="StoreStoppedDetail" xml:space="preserve">
+    <value>Программа прекратила запись истории спектров после непредвиденной ошибки. Спектр отображается; новые кадры учитываются как отброшенные.</value>
+  </data>
+  <data name="StoreStoppedRemedy" xml:space="preserve">
+    <value>Перезапустите программу. Если ошибка повторится, передайте файл журнала разработчику.</value>
+  </data>
   <data name="LinkRestoredTitle" xml:space="preserve">
     <value>Идёт приём данных</value>
   </data>
@@ -168,7 +192,64 @@
   <data name="StatusLostSpectraFormat" xml:space="preserve">
     <value>Потеряно спектров: {0}</value>
   </data>
+  <data name="StatusDroppedFramesFormat" xml:space="preserve">
+    <value>Отброшено кадров: {0}</value>
+  </data>
   <data name="StatusNoValue" xml:space="preserve">
     <value>-</value>
+  </data>
+  <data name="SpectrumAxisWavelength" xml:space="preserve">
+    <value>Длина волны, нм</value>
+  </data>
+  <data name="SpectrumAxisIntensity" xml:space="preserve">
+    <value>Интенсивность</value>
+  </data>
+  <data name="SpectrumEmpty" xml:space="preserve">
+    <value>Спектра пока нет. Подключитесь к плате в строке выше.</value>
+  </data>
+  <data name="SignalTitle" xml:space="preserve">
+    <value>Сигнал</value>
+  </data>
+  <data name="SignalDevice" xml:space="preserve">
+    <value>Спектрометр</value>
+  </data>
+  <data name="SignalWavelength" xml:space="preserve">
+    <value>Длина волны</value>
+  </data>
+  <data name="SignalWindow" xml:space="preserve">
+    <value>Окно измерения</value>
+  </data>
+  <data name="SignalAmplitude" xml:space="preserve">
+    <value>Амплитуда</value>
+  </data>
+  <data name="SignalSnr" xml:space="preserve">
+    <value>Сигнал/шум</value>
+  </data>
+  <data name="SignalQ" xml:space="preserve">
+    <value>Добротность</value>
+  </data>
+  <data name="SignalUpdated" xml:space="preserve">
+    <value>Обновлено</value>
+  </data>
+  <data name="SignalWavelengthFormat" xml:space="preserve">
+    <value>{0} нм</value>
+  </data>
+  <data name="SignalWindowFormat" xml:space="preserve">
+    <value>±{0} нм</value>
+  </data>
+  <data name="ChartTitle" xml:space="preserve">
+    <value>График</value>
+  </data>
+  <data name="ChartInvert" xml:space="preserve">
+    <value>Инвертировать спектр</value>
+  </data>
+  <data name="ChartLogScale" xml:space="preserve">
+    <value>Логарифмическая шкала</value>
+  </data>
+  <data name="ChartResetScale" xml:space="preserve">
+    <value>Сбросить масштаб</value>
+  </data>
+  <data name="ChartStickToZero" xml:space="preserve">
+    <value>Прижать к нулю</value>
   </data>
 </root>
