@@ -6,10 +6,10 @@ using SemiSpec.UI.Messages;
 namespace SemiSpec.UI.Store;
 
 /// <summary>
-/// The writer's retention pass: deletes the rows older than a day. A run of failures logs one Warning with the stack,
-/// Debug repeats and one Information line on recovery.
+/// The writer's retention pass: deletes the rows older than a day and marks the file on a damage failure. A run of
+/// failures logs one Warning with the stack, Debug repeats and one Information line on recovery.
 /// </summary>
-internal sealed class StoreRetention(TimeProvider timeProvider, ILogger logger)
+internal sealed class StoreRetention(StoreFile storeFile, TimeProvider timeProvider, ILogger logger)
 {
 	private static readonly TimeSpan _retentionAge = TimeSpan.FromHours(24);
 
@@ -23,6 +23,11 @@ internal sealed class StoreRetention(TimeProvider timeProvider, ILogger logger)
 		var deleted = database.DeleteBefore(cutoff);
 		if (deleted.IsFailed)
 		{
+			if (StoreDamage.IsDamage(deleted.Errors))
+			{
+				StoreFiles.MarkDamaged(storeFile.Path);
+			}
+
 			if (++_failedDeletes == 1)
 			{
 				logger.LogWarning(

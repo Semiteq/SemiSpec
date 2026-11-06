@@ -147,9 +147,9 @@ public sealed class StoreFilesTests : IDisposable
 	}
 
 	[Fact]
-	public void SetAsideDeletesTheSharedMemorySidecar()
+	public void SetAsideDeletesTheSharedMemorySidecarAndTheMarker()
 	{
-		Touch(HistoryFile, HistoryFile + "-shm");
+		Touch(HistoryFile, HistoryFile + "-shm", HistoryFile + ".damaged");
 
 		var result = StoreFiles.SetAside(HistoryFile, _localNow);
 
@@ -177,6 +177,35 @@ public sealed class StoreFilesTests : IDisposable
 
 		result.IsFailed.Should().BeTrue();
 		result.Errors[0].Message.Should().Contain($"'{HistoryFile}'");
+	}
+
+	[Fact]
+	public void MarkDamagedCreatesTheMarkerOnceAndNeverThrows()
+	{
+		var marker = _folder.FileIn("spectra.db.damaged");
+		var markedBefore = new DateTime(2026, 11, 1, 8, 0, 0, DateTimeKind.Utc);
+
+		StoreFiles.MarkDamaged(HistoryFile);
+		File.SetLastWriteTimeUtc(marker, markedBefore);
+		StoreFiles.MarkDamaged(HistoryFile);
+		var markInAMissingFolder = () => StoreFiles.MarkDamaged(
+			StoreFiles.HistoryFile(Path.Combine(_folder.Root, "missing")));
+
+		StoreFiles.IsMarkedDamaged(HistoryFile).Should().BeTrue();
+		new FileInfo(marker).Length.Should().Be(0);
+		File.GetLastWriteTimeUtc(marker).Should().Be(markedBefore, "the second call leaves the marker as it was");
+		markInAMissingFolder.Should().NotThrow();
+		Directory.GetFileSystemEntries(_folder.Root).Should().Equal(marker);
+	}
+
+	[Fact]
+	public void DeleteWithSidecarsDeletesTheMarker()
+	{
+		Touch(HistoryFile, HistoryFile + "-wal", HistoryFile + "-shm", HistoryFile + ".damaged");
+
+		StoreFiles.DeleteWithSidecars(HistoryFile);
+
+		Directory.GetFiles(_folder.Root).Should().BeEmpty();
 	}
 
 	private static void Touch(params string[] files)

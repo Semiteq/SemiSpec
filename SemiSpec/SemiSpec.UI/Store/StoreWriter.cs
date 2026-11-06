@@ -29,7 +29,7 @@ internal sealed class StoreWriter(
 	private static readonly TimeSpan _retentionInterval = TimeSpan.FromMinutes(1);
 
 	private readonly StoreOpening _opening = new(storeFile, messagePanel, uiScheduler, timeProvider, logger);
-	private readonly StoreRetention _retention = new(timeProvider, logger);
+	private readonly StoreRetention _retention = new(storeFile, timeProvider, logger);
 
 	// Set by Stop on the UI thread, read by the writer task.
 	private volatile bool _stopped;
@@ -212,6 +212,7 @@ internal sealed class StoreWriter(
 		}
 
 		countDropped(batch.Count);
+		MarkOnDamage(written.Errors);
 		_failedBatches++;
 		_failedFrames += batch.Count;
 		if (_failedBatches == 1)
@@ -268,9 +269,19 @@ internal sealed class StoreWriter(
 		_checkpoint = closed;
 		if (closed.IsFailed)
 		{
+			MarkOnDamage(closed.Errors);
 			logger.LogWarning(
 				ResultReporting.CauseOf(closed.Errors),
 				"The spectrum store WAL could not be checkpointed");
+		}
+	}
+
+	/// <summary>The running writer keeps the file; the marker makes the next open set it aside.</summary>
+	private void MarkOnDamage(IEnumerable<IError> errors)
+	{
+		if (StoreDamage.IsDamage(errors))
+		{
+			StoreFiles.MarkDamaged(storeFile.Path);
 		}
 	}
 }

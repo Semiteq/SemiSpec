@@ -476,13 +476,20 @@ file to the developer." / ru "Действий не требуется. Если
   `SpectrumHistorySpectrumTests.cs`
 - Modify: `SemiSpec/SemiSpec.Tests.Unit/UI/Store/SpectrumStoreFailureTests.cs`
 
-- [ ] `StoreDamage.IsDamage`; `StoreFiles.MarkDamaged` and `IsMarkedDamaged`; `SetAside` and
+- [x] `StoreDamage.IsDamage`; `StoreFiles.MarkDamaged` and `IsMarkedDamaged`; `SetAside` and
   `DeleteWithSidecars` delete the marker
-- [ ] mark after a damaged batch, retention pass, checkpoint and history read
-- [ ] `StoreOpening` sets a marked file aside before it opens it
-- [ ] write the marker tests of Acceptance Evidence item 1, including the held-lock batch that marks nothing; the
+- [x] mark after a damaged batch, retention pass, checkpoint and history read
+- [x] `StoreOpening` sets a marked file aside before it opens it
+- [x] write the marker tests of Acceptance Evidence item 1, including the held-lock batch that marks nothing; the
   damaged-table test pins the ASSUMPTION on damage past page 1
-- [ ] run `dotnet test SemiSpec.slnx` - must pass before next task
+- [x] run `dotnet test SemiSpec.slnx` - must pass before next task (1020 of 1020)
+- ➕ codes 11 and 26 live in `StoreDamage` only; `SpectrumDatabase.Open` filters through it. The page damage helper
+  `Tests.Unit/Core/Store/DamagedPages.cs` serves the database, history and store tests. Added beyond item 1:
+  `DeleteWithSidecarsDeletesTheMarker` and `ADamagedRetentionPassMarksTheFile`. The set-aside Warning line now
+  names the cause: "... was set aside as {SetAsidePath} and a new one started: {Damage}".
+- ⚠️ a marker whose `spectra.db` is gone (deleted by hand) makes `SetAside` fail at every start, so the store ends
+  in `StoreOpenError` until the marker is deleted. Plan-conformant (a failed rename ends in `StoreOpenError`), not
+  handled here.
 
 ### Task 6: Store ready signal
 **Files:**

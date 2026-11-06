@@ -3,6 +3,7 @@ using AwesomeAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
+using SemiSpec.Core.Store;
 using SemiSpec.Tests.Unit.Core.Store;
 using SemiSpec.Tests.Unit.UI.Messages;
 using SemiSpec.UI.Localization;
@@ -20,6 +21,8 @@ namespace SemiSpec.Tests.Unit.UI.Store;
 [Trait("Category", "Unit")]
 public sealed class SpectrumStoreFailureTests : SpectrumStoreTestBase
 {
+	private string Marker => StorePath + ".damaged";
+
 	[Fact(Timeout = TestTimeoutMs)]
 	public async Task AFailedBatchCountsItsFramesAndReportsOnce()
 	{
@@ -228,6 +231,83 @@ public sealed class SpectrumStoreFailureTests : SpectrumStoreTestBase
 		Logger.Levels().Should().NotContain(LogLevel.Error);
 		Logger.Failures().Should().ContainSingle().Which.Should().BeOfType<SqliteException>()
 			.Which.SqliteErrorCode.Should().Be(26);
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task ADamagedBatchMarksTheFile()
+	{
+		using (var database = SpectrumDatabase.Open(StorePath).Value)
+		{
+			database.Write([StoreSamples.Spectrum(StoreSamples.Start)]).IsSuccess.Should().BeTrue();
+		}
+
+		DamagedPages.Page(StorePath, (long)Scalar("SELECT rootpage FROM sqlite_master WHERE name = 'heartbeat'")!);
+		await StartOpenedAsync(new RetentionClock(StoreSamples.Start));
+		File.Exists(Marker).Should().BeFalse("the open and the retention at open leave the heartbeat table unread");
+
+		using (HoldWriteLock())
+		{
+			Feed(StoreSamples.Heartbeat(StoreSamples.Start));
+			await Waits.UntilAsync(() => Store.DroppedFrames == 1);
+		}
+
+		File.Exists(Marker).Should().BeFalse("a batch that failed on a held lock is no damage");
+		Feed(StoreSamples.Heartbeat(StoreSamples.Start));
+		await Waits.UntilAsync(() => Store.DroppedFrames == 2);
+		await StopAsync();
+
+		File.Exists(Marker).Should().BeTrue();
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task ADamagedRetentionPassMarksTheFile()
+	{
+		using (var database = SpectrumDatabase.Open(StorePath).Value)
+		{
+			database.Write([StoreSamples.Spectrum(StoreSamples.Start)]).IsSuccess.Should().BeTrue();
+		}
+
+		DamagedPages.TablePages(StorePath);
+
+		await StartOpenedAsync(new RetentionClock(StoreSamples.Start.AddHours(25)));
+		await StopAsync();
+
+		File.Exists(Marker).Should().BeTrue();
+		Panel.Entries.Should().BeEmpty("the marker waits for the next open");
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task AMarkedFileIsSetAsideAtTheNextOpen()
+	{
+		using (var database = SpectrumDatabase.Open(StorePath).Value)
+		{
+			database.Write([StoreSamples.Spectrum(StoreSamples.Start, seq: 7)]).IsSuccess.Should().BeTrue();
+		}
+
+		StoreFiles.MarkDamaged(StorePath);
+		var clock = new RetentionClock(StoreSamples.Start);
+		var setAside = Folder.FileIn($"spectra.broken-{clock.GetLocalNow():yyyyMMdd-HHmmss}.db");
+
+		await StartOpenedAsync(clock);
+		await StopAsync();
+
+		File.Exists(Marker).Should().BeFalse();
+		Count("spectrum").Should().Be(0, "the store starts on a fresh file");
+		using (var setAsideFile = new SqliteConnection($"Data Source={setAside};Pooling=False"))
+		{
+			setAsideFile.Open();
+			Scalar(setAsideFile, "SELECT group_concat(seq) FROM spectrum").Should().Be("7");
+		}
+
+		var entry = Panel.Entries.Should().ContainSingle().Subject;
+		entry.View.Title.Should().Be(Resources.StoreFileReplacedTitle);
+		entry.View.Severity.Should().Be(MessageSeverity.Warning);
+		Logger.Collector.GetSnapshot()
+			.Where(record => record.Level == LogLevel.Warning
+				&& record.Message.Contains(StorePath, StringComparison.Ordinal)
+				&& record.Message.Contains(setAside, StringComparison.Ordinal))
+			.Should().ContainSingle();
+		Logger.Levels().Should().NotContain(LogLevel.Error);
 	}
 
 	private void Execute(string sql)

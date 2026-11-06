@@ -5,8 +5,8 @@ using FluentResults;
 namespace SemiSpec.Core.Store;
 
 /// <summary>
-/// Names the history file in the store folder, deletes the per-process store files older builds left there and sets
-/// an unreadable history file aside.
+/// Names the history file in the store folder, deletes the per-process store files older builds left there, marks a
+/// history file damaged and sets an unreadable or marked one aside.
 /// </summary>
 public static class StoreFiles
 {
@@ -15,6 +15,7 @@ public static class StoreFiles
 	private const string DatabaseExtension = ".db";
 	private const string WalSuffix = "-wal";
 	private const string SharedMemorySuffix = "-shm";
+	private const string DamageMarkerSuffix = ".damaged";
 	private const string SetAsidePrefix = "spectra.broken-";
 	private const string SetAsideStampFormat = "yyyyMMdd-HHmmss";
 	private const int KeptSetAsideFiles = 2;
@@ -94,8 +95,28 @@ public static class StoreFiles
 	}
 
 	/// <summary>
+	/// Creates the empty marker spectra.db.damaged beside the history file, which the next open sets aside; never throws.
+	/// </summary>
+	public static void MarkDamaged(string historyFile)
+	{
+		try
+		{
+			new FileStream(historyFile + DamageMarkerSuffix, FileMode.CreateNew, FileAccess.Write).Dispose();
+		}
+		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+		{
+			// An existing marker already says it; a folder the marker cannot be written to leaves the file in use.
+		}
+	}
+
+	public static bool IsMarkedDamaged(string historyFile)
+	{
+		return File.Exists(historyFile + DamageMarkerSuffix);
+	}
+
+	/// <summary>
 	/// Renames the closed history file to spectra.broken-&lt;local stamp&gt;.db beside it with its WAL, deletes its
-	/// shared memory and the set-aside files beyond the newest two; the value is the new path.
+	/// shared memory, its damage marker and the set-aside files beyond the newest two; the value is the new path.
 	/// </summary>
 	public static Result<string> SetAside(string historyFile, DateTimeOffset localNow)
 	{
@@ -111,6 +132,7 @@ public static class StoreFiles
 			}
 
 			File.Delete(historyFile + SharedMemorySuffix);
+			File.Delete(historyFile + DamageMarkerSuffix);
 		}
 		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 		{
@@ -150,7 +172,9 @@ public static class StoreFiles
 		}
 	}
 
-	/// <summary>Deletes the store file and its WAL and shared-memory sidecars; a missing file is no error.</summary>
+	/// <summary>
+	/// Deletes the store file, its WAL and shared-memory sidecars and its damage marker; a missing file is no error.
+	/// </summary>
 	public static void DeleteWithSidecars(string database)
 	{
 		File.Delete(database);
@@ -158,6 +182,8 @@ public static class StoreFiles
 		{
 			File.Delete(database + suffix);
 		}
+
+		File.Delete(database + DamageMarkerSuffix);
 	}
 
 	/// <summary>False when the delete failed, which for a legacy store file means a running older build holds it.</summary>

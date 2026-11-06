@@ -70,9 +70,6 @@ public sealed class SpectrumDatabase : IDisposable
 	// Microsoft.Data.Sqlite counts the busy timeout in whole seconds and waits forever on 0, so 1 s is the shortest.
 	private const int ShortBusyTimeoutSeconds = 1;
 
-	private const int SqliteCorrupt = 11;
-	private const int SqliteNotADatabase = 26;
-
 	private readonly SqliteConnection _connection;
 	private readonly SqliteCommand _insertSpectrum;
 	private readonly SqliteCommand _insertHeartbeat;
@@ -118,7 +115,7 @@ public sealed class SpectrumDatabase : IDisposable
 
 			return new SpectrumDatabase(connection);
 		}
-		catch (SqliteException ex) when (ex.SqliteErrorCode is SqliteNotADatabase or SqliteCorrupt)
+		catch (SqliteException ex) when (StoreDamage.IsDamage(ex))
 		{
 			connection?.Dispose();
 			return Result.Fail(new StoreFileUnreadableError(ex));

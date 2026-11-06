@@ -11,7 +11,7 @@ namespace SemiSpec.UI.Store;
 
 /// <summary>
 /// The writer's open sequence: prepares the folder, opens the history file, replaces a file of another schema
-/// version with a fresh one and sets an unreadable file aside before it starts a fresh one.
+/// version with a fresh one and sets an unreadable or damage-marked file aside before it starts a fresh one.
 /// </summary>
 internal sealed class StoreOpening(
 	StoreFile storeFile,
@@ -29,6 +29,12 @@ internal sealed class StoreOpening(
 		}
 
 		LogLegacyFilesDeleted(prepared.Value);
+		if (StoreFiles.IsMarkedDamaged(storeFile.Path))
+		{
+			return ReplaceDamaged(
+				new Error("A failed read or write of an earlier run marked the spectrum store file as damaged"));
+		}
+
 		var opened = SpectrumDatabase.Open(storeFile.Path);
 		if (opened.HasError<StoreSchemaMismatchError>(out var mismatches))
 		{
@@ -36,7 +42,7 @@ internal sealed class StoreOpening(
 		}
 
 		return opened.HasError<StoreFileUnreadableError>(out var unreadable)
-			? ReplaceUnreadable(unreadable.First())
+			? ReplaceDamaged(unreadable.First())
 			: opened;
 	}
 
@@ -75,14 +81,15 @@ internal sealed class StoreOpening(
 	}
 
 	/// <summary>
-	/// Sets the unreadable file aside under the operator's local time, opens a fresh one and reports the replacement.
+	/// Sets the unreadable or marked file aside under the operator's local time, opens a fresh one and reports the
+	/// replacement.
 	/// </summary>
-	private Result<SpectrumDatabase> ReplaceUnreadable(StoreFileUnreadableError unreadable)
+	private Result<SpectrumDatabase> ReplaceDamaged(IError damage)
 	{
 		var setAside = StoreFiles.SetAside(storeFile.Path, timeProvider.GetLocalNow());
 		if (setAside.IsFailed)
 		{
-			return Result.Fail(unreadable).WithErrors(setAside.Errors);
+			return Result.Fail(damage).WithErrors(setAside.Errors);
 		}
 
 		var reopened = SpectrumDatabase.Open(storeFile.Path);
@@ -92,12 +99,12 @@ internal sealed class StoreOpening(
 		}
 
 		logger.LogWarning(
-			"The spectrum store file {Path} could not be read; it was set aside as {SetAsidePath} "
-				+ "and a new one started",
+			"The spectrum store file {Path} was set aside as {SetAsidePath} and a new one started: {Damage}",
 			storeFile.Path,
-			setAside.Value);
+			setAside.Value,
+			damage.Message);
 		messagePanel.TryReportFailure(
-			new StoreFileReplacedError(storeFile.Path, setAside.Value).CausedBy(unreadable),
+			new StoreFileReplacedError(storeFile.Path, setAside.Value).CausedBy(damage),
 			logger,
 			uiScheduler);
 		return reopened;

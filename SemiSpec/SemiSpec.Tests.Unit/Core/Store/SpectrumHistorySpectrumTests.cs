@@ -134,6 +134,40 @@ public sealed class SpectrumHistorySpectrumTests : SpectrumHistoryTestBase
 		File.Exists(StorePath).Should().BeFalse();
 	}
 
+	[Fact]
+	public async Task ADamagedTablePageFailsAReadWithCorrupt()
+	{
+		Store(StoreSamples.Spectrum(Start));
+		DamagedPages.TablePages(StorePath);
+
+		var result = await History.SpectrumAtAsync(Start, Token);
+
+		result.Errors.Should().ContainSingle().Which.Should().BeOfType<ExceptionalError>()
+			.Which.Exception.Should().BeOfType<SqliteException>()
+			.Which.SqliteErrorCode.Should().Be(11, "the reader opens on page 1 and meets the damage at the read");
+	}
+
+	[Fact]
+	public async Task ADamagedReadMarksTheFile()
+	{
+		Store(StoreSamples.Spectrum(Start));
+		DamagedPages.TablePages(StorePath);
+
+		var result = await History.IntensityPointsAsync(
+			StoreSamples.SampleNm, StoreSamples.SampleDelta, Start, Start.AddSeconds(1), Token);
+
+		result.IsFailed.Should().BeTrue();
+		File.Exists(StorePath + ".damaged").Should().BeTrue();
+	}
+
+	[Fact]
+	public async Task AReadOfAMissingFileDoesNotMarkIt()
+	{
+		(await History.StoredRangeAsync(Token)).IsFailed.Should().BeTrue();
+
+		Directory.GetFiles(Folder.Root).Should().BeEmpty();
+	}
+
 	[Fact(Timeout = TestTimeoutMs)]
 	public async Task TheHistoryReadsBesideAnOpenWriteTransaction()
 	{

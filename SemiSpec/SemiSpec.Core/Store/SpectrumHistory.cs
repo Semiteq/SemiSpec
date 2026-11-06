@@ -10,7 +10,7 @@ namespace SemiSpec.Core.Store;
 
 /// <summary>
 /// Reads a spectrum store file: a stored spectrum, the intensity series and points and the stored range; each call
-/// opens its own reader connection on the thread pool.
+/// opens its own reader connection on the thread pool, and a read SQLite fails as damaged marks the file.
 /// </summary>
 public sealed class SpectrumHistory(string path)
 {
@@ -177,6 +177,11 @@ public sealed class SpectrumHistory(string path)
 				}
 				catch (SqliteException ex)
 				{
+					if (StoreDamage.IsDamage(ex))
+					{
+						StoreFiles.MarkDamaged(path);
+					}
+
 					return Result.Fail<T>(new ExceptionalError(failure, ex));
 				}
 			},

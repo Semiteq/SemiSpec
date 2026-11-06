@@ -20,12 +20,6 @@ namespace SemiSpec.Tests.Unit.Core.Store;
 [Trait("Category", "Unit")]
 public sealed class SpectrumDatabaseTests : IDisposable
 {
-	private const int DatabaseHeaderBytes = 100;
-	private const int PageBytes = 4096;
-
-	// No SQLite header starts with it, and as a b-tree page type it is invalid.
-	private const byte DamageByte = 0xFF;
-
 	private readonly TempFolder _folder = new();
 	private readonly string _path;
 
@@ -119,7 +113,7 @@ public sealed class SpectrumDatabaseTests : IDisposable
 	[Fact]
 	public void OpenOfRandomBytesFailsAsUnreadable()
 	{
-		File.WriteAllBytes(_path, DamageBytes(2 * PageBytes));
+		File.WriteAllBytes(_path, DamagedPages.Bytes(2 * DamagedPages.PageBytes));
 
 		var result = SpectrumDatabase.Open(_path);
 
@@ -133,16 +127,27 @@ public sealed class SpectrumDatabaseTests : IDisposable
 	public void OpenOfADamagedSchemaPageFailsAsUnreadable()
 	{
 		OpenDatabase().Dispose();
-		using (var file = new FileStream(_path, FileMode.Open, FileAccess.Write))
-		{
-			file.Position = DatabaseHeaderBytes;
-			file.Write(DamageBytes(PageBytes - DatabaseHeaderBytes));
-		}
+		DamagedPages.SchemaPage(_path);
 
 		var result = SpectrumDatabase.Open(_path);
 
 		result.Errors.Should().ContainSingle().Which.Should().BeOfType<StoreFileUnreadableError>()
 			.Which.SqliteErrorCode.Should().Be(11, "SQLite reports a damaged schema page as SQLITE_CORRUPT");
+	}
+
+	[Fact]
+	public void AWriteToADamagedTablePageFailsWithTheDamageCode()
+	{
+		OpenDatabase().Dispose();
+		DamagedPages.TablePages(_path);
+		using var database = OpenDatabase();
+
+		var result = database.Write([StoreSamples.Spectrum(StoreSamples.Start)]);
+
+		result.Errors.Should().ContainSingle().Which.Should().BeOfType<ExceptionalError>()
+			.Which.Exception.Should().BeOfType<SqliteException>()
+			.Which.SqliteErrorCode.Should().Be(11, "the open reads page 1 only, the write meets the damage");
+		StoreDamage.IsDamage(result.Errors).Should().BeTrue();
 	}
 
 	[Fact]
@@ -393,11 +398,6 @@ public sealed class SpectrumDatabaseTests : IDisposable
 
 		var deleteTheFile = () => File.Delete(_path);
 		deleteTheFile.Should().NotThrow("the checkpoint closed the writer connection");
-	}
-
-	private static byte[] DamageBytes(int count)
-	{
-		return [.. Enumerable.Repeat(DamageByte, count)];
 	}
 
 	private SpectrumDatabase OpenDatabase()
