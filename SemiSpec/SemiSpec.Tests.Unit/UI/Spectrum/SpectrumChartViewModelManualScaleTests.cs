@@ -15,7 +15,7 @@ using static SemiSpec.Tests.Unit.UI.Spectrum.SpectrumSamples;
 
 namespace SemiSpec.Tests.Unit.UI.Spectrum;
 
-/// <summary>The follow and frozen scale: manual scale, Reset scale, Stick to zero, toggles.</summary>
+/// <summary>The follow and frozen scale: manual scale, Autoscale, From zero, flyout input, toggles.</summary>
 [Trait("Component", "UI")]
 [Trait("Area", "Spectrum")]
 [Trait("Category", "Unit")]
@@ -68,6 +68,20 @@ public sealed class SpectrumChartViewModelManualScaleTests : SpectrumChartViewMo
 		_chart.ShouldSpanTheDeviceRange(Spectrometer.Atp8000);
 	}
 
+	[AvaloniaFact]
+	public void FlyoutInputBeforeTheFirstSpectrumFreezesNothing()
+	{
+		_chart.ToggleAutoscale();
+		_chart.SetVerticalRange(new AxisRange(5.0, 6.0));
+		_chart.SetHorizontalRange(new AxisRange(500.0, 600.0));
+
+		_chart.IsFollowing.Should().BeTrue();
+		_chart.Show(Atp8000Peak);
+		_chart.ShouldSpanTheDeviceRange(Spectrometer.Atp8000);
+		var limits = _chart.Plot.Axes.GetLimits();
+		limits.Top.Should().BeGreaterThan(6.0, "the first spectrum sets the Y limits");
+	}
+
 	[AvaloniaTheory]
 	[InlineData(0.0, 0.0, true, true)]
 	[InlineData(4.9, 0.0, true, true)]
@@ -103,19 +117,21 @@ public sealed class SpectrumChartViewModelManualScaleTests : SpectrumChartViewMo
 	}
 
 	[AvaloniaTheory]
-	[InlineData(false, PeakTop * 1.2)]
-	[InlineData(true, LogStuckTop)]
-	public void StickToZeroSetsTheBottomToZeroAndFreezes(bool logarithmic, double expectedTop)
+	[InlineData(false)]
+	[InlineData(true)]
+	public void FromZeroFollowsFromZeroToTheMaximumPlusFivePercent(bool logarithmic)
 	{
 		_chart.SetDisplay(new SpectrumDisplay(IsInverted: false, logarithmic));
 		_chart.Show(Atp2000Peak);
+		_chart.TakeManualScale();
 
-		_chart.StickToZero();
+		_chart.SetFromZero(true);
 
-		_chart.IsFollowing.Should().BeFalse();
+		_chart.IsFollowing.Should().BeTrue();
 		var limits = _chart.Plot.Axes.GetLimits();
 		limits.Bottom.Should().Be(0);
-		limits.Top.Should().BeApproximately(expectedTop, Tolerance);
+		var top = logarithmic ? Math.Log10(PeakTop) : PeakTop;
+		limits.Top.Should().BeApproximately(top * 1.05, Tolerance);
 		_chart.ShouldSpanTheDeviceRange(Spectrometer.Atp2000);
 	}
 
@@ -125,7 +141,7 @@ public sealed class SpectrumChartViewModelManualScaleTests : SpectrumChartViewMo
 	public void TogglingLogOrInversionReturnsToFollowing(bool inverted, bool logarithmic)
 	{
 		_chart.Show(Atp2000Peak);
-		_chart.StickToZero();
+		_chart.TakeManualScale();
 
 		_chart.SetDisplay(new SpectrumDisplay(inverted, logarithmic));
 

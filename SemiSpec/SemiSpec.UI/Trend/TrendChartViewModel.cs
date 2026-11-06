@@ -12,6 +12,7 @@ using ReactiveUI;
 
 using ScottPlot;
 
+using SemiSpec.Core.Spectrum;
 using SemiSpec.Core.Store;
 using SemiSpec.Core.Trend;
 using SemiSpec.UI.Chart;
@@ -90,6 +91,26 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		private set => this.RaiseAndSetIfChanged(ref field, value);
 	} = true;
 
+	/// <summary>Y runs from zero to the drawn maximum plus 5 %; on by default.</summary>
+	public bool IsFromZero
+	{
+		get;
+		private set => this.RaiseAndSetIfChanged(ref field, value);
+	} = true;
+
+	/// <summary>The typed Y range; null while Y follows the data.</summary>
+	public AxisRange? ManualVerticalRange
+	{
+		get;
+		private set
+		{
+			this.RaiseAndSetIfChanged(ref field, value);
+			this.RaisePropertyChanged(nameof(IsVerticalAutoscaled));
+		}
+	}
+
+	public bool IsVerticalAutoscaled => ManualVerticalRange is null;
+
 	public bool HasPoints
 	{
 		get;
@@ -144,6 +165,45 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	public void SetWidth(TimeSpan width)
 	{
 		_navigation.SetWidth(width);
+		Refresh();
+	}
+
+	/// <summary>Switches From zero and returns Y to following the data.</summary>
+	public void SetFromZero(bool fromZero)
+	{
+		IsFromZero = fromZero;
+		ManualVerticalRange = null;
+		Refresh();
+	}
+
+	/// <summary>The drawn Y range.</summary>
+	public AxisRange VerticalRange()
+	{
+		lock (Plot.Sync)
+		{
+			var limits = Plot.Axes.GetLimits();
+			return new AxisRange(limits.Bottom, limits.Top);
+		}
+	}
+
+	/// <summary>Holds Y at the typed range until Autoscale.</summary>
+	public void SetVerticalRange(AxisRange range)
+	{
+		ManualVerticalRange = range;
+		Refresh();
+	}
+
+	/// <summary>A following Y holds where it stands; a held Y follows the data again.</summary>
+	public void ToggleVerticalAutoscale()
+	{
+		ManualVerticalRange = ManualVerticalRange is null ? VerticalRange() : null;
+		Refresh();
+	}
+
+	/// <summary>Shows exactly [from, to] and stops following.</summary>
+	public void SetWindow(DateTimeOffset from, DateTimeOffset to)
+	{
+		_navigation.SetWindow(from, to);
 		Refresh();
 	}
 
@@ -206,7 +266,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		try
 		{
 			_lastFold = _cache.FoldCurrent(FollowExtent);
-			_layers.Draw(_lastFold, _navigation.From, _navigation.To);
+			_layers.Draw(_lastFold, _navigation.From, _navigation.To, IsFromZero, ManualVerticalRange);
 
 			HasPoints = _lastFold is not null;
 			Width = _navigation.Width;

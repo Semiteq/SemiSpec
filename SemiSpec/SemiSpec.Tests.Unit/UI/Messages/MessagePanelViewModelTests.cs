@@ -6,6 +6,7 @@ using FluentResults;
 
 using Microsoft.Extensions.Time.Testing;
 
+using SemiSpec.UI.Localization;
 using SemiSpec.UI.Messages;
 
 using Xunit;
@@ -154,6 +155,41 @@ public sealed class MessagePanelViewModelTests
 
 		panel.Entries.Select(entry => entry.View.Severity)
 			.Should().Equal(MessageSeverity.Error, MessageSeverity.Warning);
+	}
+
+	[AvaloniaFact]
+	public void ANewEntryShowsTheHiddenPanelAndARepeatDoesNotReopenIt()
+	{
+		using var panel = new MessagePanelViewModel(SteppingClock());
+		panel.IsVisible.Should().BeFalse("the panel starts hidden");
+
+		panel.Report(Failure("archive"));
+		panel.IsVisible.Should().BeTrue();
+
+		panel.ToggleCommand.Execute().Subscribe();
+		panel.Report(Failure("archive"));
+		panel.IsVisible.Should().BeFalse("a repeat of the newest entry keeps a panel the operator closed closed");
+
+		panel.Report(Failure("catalogue"));
+		panel.IsVisible.Should().BeTrue();
+	}
+
+	[AvaloniaFact]
+	public void ClearKeepsThePanelShownAndTheNewestEntryAndCountFollowTheList()
+	{
+		using var panel = new MessagePanelViewModel(SteppingClock());
+		panel.Report(Failure("archive"));
+		panel.MoreText.Should().BeEmpty("one entry has nothing under it");
+
+		panel.Report(Failure("catalogue"));
+		panel.NewestEntry!.View.Title.Should().Be("catalogue");
+		panel.MoreText.Should().Be(Resources.FormatMessagePanelMoreFormat("1"));
+
+		panel.ClearCommand.Execute().Subscribe();
+
+		panel.NewestEntry.Should().BeNull();
+		panel.MoreText.Should().BeEmpty();
+		panel.IsVisible.Should().BeTrue();
 	}
 
 	private static MessageView Failure(string title, MessageSeverity severity = MessageSeverity.Error)

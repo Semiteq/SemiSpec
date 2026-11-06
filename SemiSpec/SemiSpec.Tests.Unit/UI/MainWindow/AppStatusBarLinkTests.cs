@@ -110,6 +110,19 @@ public sealed class AppStatusBarLinkTests : AppStatusBarTestBase
 	}
 
 	[AvaloniaFact]
+	public async Task TheBoardTextsReadNoDataOnceTheLinkStopsReceiving()
+	{
+		await ConnectAsync();
+		await AtAsync(1, port => port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, 1))));
+		ViewModel.Atp8000Text.Should().Be(SpectrumText(Resources.StatusSpectrometerConnected));
+
+		await AtAsync(11, port => port.PushTimeout());
+
+		ViewModel.Atp8000Text.Should().Be(SpectrumText(Resources.StatusSpectrometerNoData), "the link keeps the byte");
+		ViewModel.LostSpectraText.Should().Be(Resources.FormatStatusLostSpectraFormat(Resources.StatusNoValue));
+	}
+
+	[AvaloniaFact]
 	public async Task BothSpectrometersReadNoDataBeforeTheFirstFrame()
 	{
 		await ConnectAsync();
@@ -205,5 +218,10 @@ public sealed class AppStatusBarLinkTests : AppStatusBarTestBase
 		last.Level.Should().Be(LogLevel.Error);
 		last.Message.Should().Be("The failure could not reach the message panel");
 		last.Exception.Should().BeOfType<PoisonedPanelException>();
+	}
+
+	private static string SpectrumText(string state)
+	{
+		return SpectrometerText("ATP-8000", state);
 	}
 }

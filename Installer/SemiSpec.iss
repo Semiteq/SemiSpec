@@ -16,6 +16,9 @@
 #define SrcBinDir    "..\SemiSpec\Artifacts\publish\SemiSpec.UI\release_win-x64"
 #define AppIconFile  "..\SemiSpec\SemiSpec.UI\icon.ico"
 
+; The log folder of every Semi application on the site: docs/architecture/overview.md, Release
+#define LogRoot      "C:\DISTR\Logs\SemiSpec"
+
 [Setup]
 AppId={#AppId}
 AppName={#AppName}
@@ -48,6 +51,7 @@ WizardImageFile=wizard-large-164.bmp,wizard-large-205.bmp,wizard-large-246.bmp,w
 WizardSmallImageFile=wizard-small-55.bmp,wizard-small-69.bmp,wizard-small-83.bmp,wizard-small-110.bmp
 UninstallDisplayIcon={app}\{#AppExeName}
 
+; Program Files and C:\DISTR both need admin rights
 PrivilegesRequired=admin
 CloseApplications=yes
 ; The 2.x installer recorded English; the language dialog preselects the Windows language instead
@@ -61,7 +65,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [InstallDelete]
-; No 2.x file outlives the upgrade. Data and logs live under %LOCALAPPDATA%, outside {app}
+; No 2.x file outlives the upgrade. The spectra live under %LOCALAPPDATA% and the logs under {#LogRoot}, outside {app}
 Type: filesandordirs; Name: "{app}\*"
 ; The old shortcuts point at the removed exe; [Icons] recreates the chosen ones.
 ; SpectrumVisualizer.lnk is the name the 2.x and 3.0 installers gave them
@@ -69,6 +73,10 @@ Type: files; Name: "{autoprograms}\{#AppName}.lnk"
 Type: files; Name: "{autodesktop}\{#AppName}.lnk"
 Type: files; Name: "{autoprograms}\SpectrumVisualizer.lnk"
 Type: files; Name: "{autodesktop}\SpectrumVisualizer.lnk"
+
+[Dirs]
+; The operator, not the installing admin, writes the log; uninstall keeps it
+Name: "{#LogRoot}"; Permissions: users-modify; Flags: uninsneveruninstall
 
 [Files]
 Source: "{#SrcBinDir}\*"; Excludes: "*.pdb,SemiSpec.xml,SemiSpec.*.xml"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

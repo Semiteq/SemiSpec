@@ -5,7 +5,7 @@ English, present tense, the design as it is. Build and test commands live in the
 ## Documents
 
 - [overview.md](./overview.md): purpose, stack, components, startup, the main window, the spectrum screen, the
-  trend, the spectrum store, the error route and the release.
+  trend, the axis flyouts, the spectrum store, the error route and the release.
 - [board-protocol.md](./board-protocol.md): the board-to-PC frame, the decoder, the `seq` rules, the serial link,
   the wavelength calibration and the board emulator.
 - [testing-strategy.md](./testing-strategy.md): the test project, what each kind of test owns, the headless setup.
@@ -26,11 +26,12 @@ None.
 | Conventions | SemiPlot (`Semiteq/SemiPlot`) is the reference app: same package pins, build gates, folder shape and error route |
 | Layout | The projects under `SemiSpec/` with their own `Directory.Build.props`, `Directory.Packages.props` and `.editorconfig`; `SemiSpec.slnx` at the root lists them; the Inno Setup script sits in `Installer/` |
 | Startup | No launch keys and no config files: every site runs the same setup |
-| Logging | Serilog to `%LOCALAPPDATA%\SemiSpec\Logs`; the operator raises the level to Debug from the menu at run time; the level is not persisted |
+| Logging | Serilog to `C:\DISTR\Logs\SemiSpec`, the Semi site folder SemiPlot and SemiStep share, which the installer creates; `%LOCALAPPDATA%\SemiSpec\Logs` with a Warning when that folder cannot be written; the operator raises the level to Debug from the menu at run time; the level is not persisted |
 | Errors | FluentResults for failures; one route to the message panel, with an Info, Warning or Error severity per entry; ReactiveUI's unhandled exceptions and exceptions that escape a dispatcher job reach the same panel and the app keeps running; before the panel exists an escaped exception ends the app and is logged as Fatal |
 | Text | resx: English neutral set, Russian satellite; the UI culture follows Windows |
 | Instances | One window per process; a second running copy is allowed |
 | Tests | One `Tests.Unit` project: xUnit 3.2.2, AwesomeAssertions, Avalonia.Headless. No integration project until a test needs Docker or a real port |
+| Chart options | A left click on an axis opens that axis's flyout, as in SemiPlot; the readout pane beside the spectrum holds values only, and the trend spans the window (`overview.md`, Axis flyouts) |
 | Chart renderer | ScottPlot.Avalonia 5.1.59; the plot sits alone in a decorator with a `BitmapCache` and redraws at most once per display frame, as in SemiPlot |
 | Frame distribution | `FrameDistributor` is the one reader of the link's channel; it keeps the latest spectrum frame and forwards every frame to its subscribers (the live spectrum source, the spectrum store and the trend feed), which own their scheduling (`overview.md`) |
 | Serial library | The chosen library is `RJCP.SerialPortStream` 3.0.5 with one cancellable read loop; the app reads the board's port with it at 115200 baud, 8N1, a 1 s read timeout and `ThrowOnReadError`, and the board emulator writes a port with it. `System.IO.Ports` is rejected: its `ReadAsync` ignores the cancellation token on Windows and reopening after an unplug fails |

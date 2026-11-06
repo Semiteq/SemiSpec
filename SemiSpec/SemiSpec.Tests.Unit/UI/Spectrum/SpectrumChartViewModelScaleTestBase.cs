@@ -12,7 +12,6 @@ namespace SemiSpec.Tests.Unit.UI.Spectrum;
 public abstract class SpectrumChartViewModelScaleTestBase : IDisposable
 {
 	private protected const double Tolerance = 1e-9;
-	private protected const double LogStuckTop = 4.5705429398818973;
 
 	private protected readonly SpectrumChartViewModel _chart = new();
 

@@ -50,11 +50,13 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		Plot.Axes.Bottom.Label.Text = Resources.SpectrumAxisWavelength;
 		Plot.Axes.Left.Label.Text = Resources.SpectrumAxisIntensity;
 		Plot.Font.Automatic();
+		Plot.Axes.Top.MinimumSize = ChartStateLine.TopMargin;
+		SetEmptyLimits();
 	}
 
 	public Plot Plot { get; } = new();
 
-	/// <summary>True while every spectrum sets the limits; false after a zoom, a pan or Stick to zero.</summary>
+	/// <summary>True while every spectrum sets the limits; false after a zoom or a pan.</summary>
 	public bool IsFollowing { get; private set; } = true;
 
 	public bool HasSpectrum
@@ -63,12 +65,8 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		private set => this.RaiseAndSetIfChanged(ref field, value);
 	}
 
-	/// <summary>"Spectrum from HH:mm:ss" in local time while a past moment is shown; empty while live.</summary>
-	public string HistoricalText
-	{
-		get;
-		set => this.RaiseAndSetIfChanged(ref field, value);
-	} = string.Empty;
+	/// <summary>True while the following scale runs from zero; a manual zoom still freezes it.</summary>
+	public bool IsFromZero { get; private set; }
 
 	/// <summary>One signal per redraw request, raised at once on the caller's thread; completes on dispose.</summary>
 	public IObservable<Unit> RedrawRequested => _redrawRequests.AsObservable();
@@ -139,6 +137,84 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		}
 	}
 
+	/// <summary>The drawn wavelength range in nm.</summary>
+	public AxisRange HorizontalRange()
+	{
+		lock (Plot.Sync)
+		{
+			var limits = Plot.Axes.GetLimits();
+			return new AxisRange(limits.Left, limits.Right);
+		}
+	}
+
+	/// <summary>The drawn intensity range in counts; the log axis converts from decades.</summary>
+	public AxisRange VerticalRange()
+	{
+		lock (Plot.Sync)
+		{
+			var limits = Plot.Axes.GetLimits();
+			return _display.IsLogarithmic
+				? new AxisRange(Math.Pow(10.0, limits.Bottom), Math.Pow(10.0, limits.Top))
+				: new AxisRange(limits.Bottom, limits.Top);
+		}
+	}
+
+	/// <summary>Shows the typed wavelength range and freezes the scale; no-op before the first spectrum.</summary>
+	public void SetHorizontalRange(AxisRange range)
+	{
+		if (!HasSpectrum)
+		{
+			return;
+		}
+
+		ChangeScale(() =>
+		{
+			Plot.Axes.SetLimitsX(range.Min, range.Max);
+			IsFollowing = false;
+		});
+	}
+
+	/// <summary>Why the intensity axis cannot show the range, or an empty string when it can.</summary>
+	public string VerticalRangeProblem(AxisRange range)
+	{
+		return _display.IsLogarithmic && range.Min <= 0.0 ? Resources.AxisScaleLogMinimumPositive : string.Empty;
+	}
+
+	/// <summary>Shows the typed intensity range and freezes; no-op before the first spectrum or on a problem.</summary>
+	public void SetVerticalRange(AxisRange range)
+	{
+		if (!HasSpectrum || VerticalRangeProblem(range).Length > 0)
+		{
+			return;
+		}
+
+		ChangeScale(() =>
+		{
+			if (_display.IsLogarithmic)
+			{
+				Plot.Axes.SetLimitsY(Math.Log10(range.Min), Math.Log10(range.Max));
+			}
+			else
+			{
+				Plot.Axes.SetLimitsY(range.Min, range.Max);
+			}
+
+			IsFollowing = false;
+		});
+	}
+
+	/// <summary>A following scale freezes where it stands, as TakeManualScale does; a frozen one follows again.</summary>
+	public void ToggleAutoscale()
+	{
+		if (IsFollowing)
+		{
+			TakeManualScale();
+			return;
+		}
+
+		ResetScale();
+	}
+
 	public void ResetScale()
 	{
 		ChangeScale(() =>
@@ -148,18 +224,14 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		});
 	}
 
-	public void StickToZero()
+	/// <summary>Switches the following scale to or from zero and returns to following.</summary>
+	public void SetFromZero(bool fromZero)
 	{
-		if (_shown is not { Measurement: var measurement })
-		{
-			return;
-		}
-
 		ChangeScale(() =>
 		{
-			var rawMax = ProjectReference(measurement).Projection.RawMax;
-			SetLimits(SpectrumScale.StuckToZero(LineFor(measurement.Device).Xs, rawMax, _display));
-			IsFollowing = false;
+			IsFromZero = fromZero;
+			IsFollowing = true;
+			Project();
 		});
 	}
 
@@ -209,8 +281,8 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 
 		if (IsFollowing)
 		{
-			var ys = projection.IsDark ? ProjectReference(measurement).Ys : line.Ys;
-			SetLimits(SpectrumScale.Following(line.Xs, ys, _display));
+			var ys = projection.IsDark ? ProjectReference(measurement) : line.Ys;
+			SetLimits(IsFromZero ? SpectrumScale.FromZero(line.Xs, ys) : SpectrumScale.Following(line.Xs, ys, _display));
 		}
 	}
 
@@ -218,12 +290,12 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 	/// The shown device's last non-dark measurement, or the shown one, projected in the current mode; caller holds
 	/// Plot.Sync.
 	/// </summary>
-	private ReferenceSpectrum ProjectReference(SpectrumMeasurement shown)
+	private ReadOnlySpan<double> ProjectReference(SpectrumMeasurement shown)
 	{
 		var reference = LineFor(shown.Device).LastNonDark ?? shown;
 		var ys = _referenceYs.AsSpan(0, reference.Pixels.Length);
-		var projection = SpectrumProjection.Fill(reference.Pixels, _display, ys);
-		return new ReferenceSpectrum(ys, projection);
+		SpectrumProjection.Fill(reference.Pixels, _display, ys);
+		return ys;
 	}
 
 	private void PlaceWindow(SpectrumMeasurement measurement, double[] xs)
@@ -237,6 +309,14 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		_band.IsVisible = overlapsDevice && measurement.Delta > 0;
 		_centreLine.X = measurement.WavelengthNm;
 		_centreLine.IsVisible = overlapsDevice;
+	}
+
+	/// <summary>Before the first spectrum: X over both devices' wavelengths, Y 0..1.</summary>
+	private void SetEmptyLimits()
+	{
+		var left = Math.Min(_atp2000Line.Xs[0], _atp8000Line.Xs[0]);
+		var right = Math.Max(_atp2000Line.Xs[^1], _atp8000Line.Xs[^1]);
+		Plot.Axes.SetLimits(left, right, 0.0, 1.0);
 	}
 
 	private void SetLimits(SpectrumLimits limits)
@@ -271,12 +351,5 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		{
 			this.RaisePropertyChanged(nameof(IsFollowing));
 		}
-	}
-
-	private readonly ref struct ReferenceSpectrum(Span<double> ys, ProjectedSpectrum projection)
-	{
-		public ReadOnlySpan<double> Ys { get; } = ys;
-
-		public ProjectedSpectrum Projection { get; } = projection;
 	}
 }

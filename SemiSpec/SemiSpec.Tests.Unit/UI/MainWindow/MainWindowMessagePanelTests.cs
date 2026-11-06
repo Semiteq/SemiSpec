@@ -44,7 +44,7 @@ public sealed class MainWindowMessagePanelTests : MainWindowLayoutTestBase
 
 		MessagePanel.ReportFailure(error, NullLogger.Instance);
 		MessagePanel.ReportFailure(error, NullLogger.Instance);
-		var entry = RealisedEntry(window, 0);
+		var entry = NewestEntry(window);
 
 		var view = ErrorMessageMapper.Map(error);
 		EntryText(entry, "EntryTitle").Text.Should().Be(view.Title);
@@ -65,7 +65,7 @@ public sealed class MainWindowMessagePanelTests : MainWindowLayoutTestBase
 		var window = Realise();
 
 		MessagePanel.Report(new MessageView("title", "detail", string.Empty, MessageSeverity.Error));
-		var entry = RealisedEntry(window, 0);
+		var entry = NewestEntry(window);
 
 		EntryText(entry, "EntryRepeat").IsVisible.Should().BeFalse();
 		EntryText(entry, "EntryRemedy").IsVisible.Should().BeFalse();
@@ -80,7 +80,7 @@ public sealed class MainWindowMessagePanelTests : MainWindowLayoutTestBase
 		var window = Realise();
 
 		MessagePanel.Report(new MessageView("title", "detail", "remedy", severity));
-		var dot = RealisedEntry(window, 0)
+		var dot = NewestEntry(window)
 			.GetVisualDescendants()
 			.OfType<Ellipse>()
 			.Single(item => item.Name == "EntrySeverity");
@@ -90,7 +90,7 @@ public sealed class MainWindowMessagePanelTests : MainWindowLayoutTestBase
 	}
 
 	[AvaloniaFact]
-	public void ClearEmptiesTheListAndHidesTheMessagePanelRow()
+	public void ClearEmptiesTheListAndKeepsTheMessagePanelRow()
 	{
 		var window = Realise();
 		MessagePanel.ReportFailure(new Error("port busy"), NullLogger.Instance);
@@ -100,6 +100,7 @@ public sealed class MainWindowMessagePanelTests : MainWindowLayoutTestBase
 		Dispatcher.UIThread.RunJobs();
 
 		MessagePanel.Entries.Should().BeEmpty();
-		Named<Border>(window, "MessagePanel").IsVisible.Should().BeFalse();
+		Named<Border>(window, "MessagePanel").IsVisible.Should().BeTrue("only the View menu hides the row");
+		Named<TextBlock>(PanelView(window), "EmptyMessages").IsVisible.Should().BeTrue();
 	}
 }

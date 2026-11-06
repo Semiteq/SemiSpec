@@ -43,16 +43,16 @@ Semi owns the controls; the `App*` keys are ours, and each exists in both varian
 
 | Key | Consumers | Light | Dark |
 | --- | --- | --- | --- |
-| `AppPanelBackgroundBrush` | Connection row, message panel row, status bar row, spectrum pane, trend pane, overview pane, signal pane; the trend readout's box; each plot's figure background | `#F7F8FA` | `#2B2D30` |
+| `AppPanelBackgroundBrush` | Connection row, message panel row, status bar row, spectrum pane, trend pane, overview pane, readout pane; the trend readout's box; each plot's figure background | `#F7F8FA` | `#2B2D30` |
 | `AppContentBackgroundBrush` | Each plot's data area; the overview strip | `#FFFFFF` | `#1E1F22` |
-| `AppBorderBrush` | The bottom border of the connection row; the top border of the trend pane, the overview pane, the message panel row and the status bar row; the left border of the signal pane; the border of the trend readout's box | `#EBECF0` | `#393B40` |
-| `AppSecondaryForegroundBrush` | The empty-state line of each chart; the historical line over the spectrum chart; the trend's hover line and the overview's hover line; each plot's axis labels, tick labels, ticks and frame; an entry's remedy, repeat count and time; the status bar dot in a neutral link state | `#818594` | `#6F737A` |
+| `AppBorderBrush` | The bottom border of the connection row and the separator before Back to live; the top border of the trend pane, the overview pane, the message panel row and the status bar row; the left border of the readout pane; the border of the trend readout's box | `#EBECF0` | `#393B40` |
+| `AppSecondaryForegroundBrush` | The empty-state line and the state line of each chart; the note on each axis flyout; the trend's hover line and the overview's hover line; each plot's axis labels, tick labels, ticks and frame; an entry's remedy, repeat count and time, and the message panel's "No messages"; the status bar dot in a neutral link state | `#818594` | `#6F737A` |
 | `AppSubtleLineBrush` | The 1 px separators between status bar segments; each plot's major gridlines | `#EBECF0` | `#393B40` |
 | `AppMinorGridLineBrush` | The spectrum plot's minor gridlines, drawn on the log axis only | `#F4F5F7` | `#2B2D30` |
 | `AppAccentBrush` | The spectrum line; the trend's envelope line; the overview band at opacity 0.35; the border of the overview's window highlight | `#3574F0` | `#3574F0` |
 | `AppAccentFillBrush` | The ±`delta` window band and the overview's window highlight, `Opacity="0.25"` | `#3574F0` | `#3574F0` |
 | `AppMarkerLineBrush` | The centre line at the frame's wavelength; the line at the shown moment on the trend | `#6F737A` | `#A8ADBD` |
-| `AppSeverityErrorBrush` | The message panel's dot on an Error entry; the trend's failure strip | `#DB3B4B` | `#E55765` |
+| `AppSeverityErrorBrush` | The message panel's dot on an Error entry; the trend's failure strip; the message line of each axis flyout | `#DB3B4B` | `#E55765` |
 | `AppSeverityWarningBrush` | The message panel's dot on a Warning entry | `#E3AE4D` | `#F2C55C` |
 | `AppSeverityInfoBrush` | The message panel's dot on an Info entry | `#3574F0` | `#3574F0` |
 | `AppConnectionOkBrush` | The status bar dot in Receiving | `#208A3C` | `#5FAD65` |

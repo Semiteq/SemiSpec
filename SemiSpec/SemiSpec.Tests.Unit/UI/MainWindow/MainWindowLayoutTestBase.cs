@@ -34,20 +34,15 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 
 	protected const double PaneBorder = 1;
 	protected const double PanePadding = 16;
+	protected const double PanePaddingTop = 12;
 	protected const double RowSpacing = 8;
 	protected const double LabelToField = 12;
-	protected const double SectionHeaderAbove = 16;
 
 	protected static readonly string[] PaneLabels =
 		["DeviceLabel", "WavelengthLabel", "WindowLabel", "AmplitudeLabel", "SnrLabel", "QLabel", "UpdatedLabel"];
 
 	protected static readonly string[] PaneValues =
 		["DeviceValue", "WavelengthValue", "WindowValue", "AmplitudeValue", "SnrValue", "QValue", "UpdatedValue"];
-
-	protected static readonly string[] PaneHeaders = ["SignalHeader", "ChartHeader"];
-
-	protected static readonly string[] PaneControls =
-		["InvertSpectrum", "LogarithmicScale", "ResetScale", "StickToZero", "BackToLive"];
 
 	private ConnectionBarViewModel? _connectionBar;
 	private AppStatusBarViewModel? _statusBar;
@@ -122,14 +117,13 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 		return window.GetVisualDescendants().OfType<MessagePanelView>().Single();
 	}
 
-	/// <summary>The realised row of an entry; the virtualizing panel creates it only on a layout pass.</summary>
-	protected static Control RealisedEntry(Window window, int index)
+	/// <summary>The panel shows the newest entry only; the rest live in the flyout of "N more".</summary>
+	protected static Control NewestEntry(Window window)
 	{
 		Dispatcher.UIThread.RunJobs();
 		window.UpdateLayout();
 
-		return Named<ItemsControl>(PanelView(window), "MessageEntries").ContainerFromIndex(index)
-			?? throw new InvalidOperationException($"No realised entry at {index}.");
+		return PanelView(window);
 	}
 
 	protected static TextBlock EntryText(Control entry, string name)
@@ -153,6 +147,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 			NullLogger<AppStatusBarViewModel>.Instance);
 		_spectrum = new SpectrumViewModel(
 			SwitchingSource,
+			SerialLink,
 			MessagePanel,
 			TimeProvider.System,
 			AvaloniaScheduler.Instance,

@@ -14,11 +14,11 @@ public sealed class AppDataPathsTests
 	private static readonly string _root = Path.Combine(Path.GetTempPath(), "local-app-data");
 
 	[Fact]
-	public void TheLogFolderSitsInsideTheAppFolder()
+	public void TheFallbackLogFolderSitsInsideTheAppFolder()
 	{
 		var paths = AppDataPaths.Under(_root).Value;
 
-		paths.LogFolder.Should().Be(Path.Combine(_root, "SemiSpec", "Logs"));
+		paths.FallbackLogFolder.Should().Be(Path.Combine(_root, "SemiSpec", "Logs"));
 	}
 
 	[Fact]

@@ -23,6 +23,7 @@ public sealed class TrendChartViewModelRenderTests : TrendChartTestBase
 	[AvaloniaFact]
 	public void ARangeWithGapsRendersWithFiniteLimits()
 	{
+		Chart.SetFromZero(false);
 		AddFlat(0, 100);
 		AddFlat(1, 200, Spectrometer.Atp2000);
 		AddFlat(2, 300);

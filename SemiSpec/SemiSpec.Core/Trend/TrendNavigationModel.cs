@@ -56,6 +56,13 @@ public sealed class TrendNavigationModel(DateTimeOffset from, DateTimeOffset to,
 		PlaceFrom(To - clampedWidth, clampedWidth);
 	}
 
+	/// <summary>Shows exactly [from, to], width clamped, held at the pan floor, and stops following.</summary>
+	public void SetWindow(DateTimeOffset from, DateTimeOffset to)
+	{
+		PlaceFrom(from, ClampWidthSpan(to - from));
+		IsSticky = false;
+	}
+
 	public void JumpToNow(DateTimeOffset now)
 	{
 		var width = Width;

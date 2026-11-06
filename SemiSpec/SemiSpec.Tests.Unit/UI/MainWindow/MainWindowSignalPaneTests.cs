@@ -1,3 +1,5 @@
+using System.Reactive.Linq;
+
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -12,7 +14,6 @@ using FluentResults;
 using Microsoft.Extensions.Logging.Abstractions;
 
 using SemiSpec.Core.Protocol;
-using SemiSpec.UI.Chart;
 using SemiSpec.UI.Localization;
 using SemiSpec.UI.Messages;
 using SemiSpec.UI.Spectrum;
@@ -32,18 +33,16 @@ namespace SemiSpec.Tests.Unit.UI.MainWindow;
 public sealed class MainWindowSignalPaneTests : MainWindowLayoutTestBase
 {
 	private static readonly string[] _paneParts =
-		["SignalHeader", .. PaneLabels, .. PaneValues, "ChartHeader", .. PaneControls];
+		[.. PaneLabels, .. PaneValues];
 
 	[AvaloniaFact]
 	public void TheSignalPaneRealisesEveryRowAndControl()
 	{
 		var panel = SignalPanel(Realise());
 
-		PaneLabels.Concat(PaneValues).Concat(PaneHeaders).Select(name => Named<TextBlock>(panel, name))
+		PaneLabels.Concat(PaneValues).Select(name => Named<TextBlock>(panel, name))
 			.Should().OnlyContain(text => text.IsEffectivelyVisible && text.Bounds.Width > 0);
 
-		PaneHeaders.Select(name => Named<TextBlock>(panel, name).Text)
-			.Should().Equal(Resources.SignalTitle, Resources.ChartTitle);
 		PaneLabels.Select(name => Named<TextBlock>(panel, name).Text).Should().Equal(
 			Resources.SignalDevice,
 			Resources.SignalWavelength,
@@ -54,60 +53,6 @@ public sealed class MainWindowSignalPaneTests : MainWindowLayoutTestBase
 			Resources.SignalUpdated);
 		PaneValues.Select(name => Named<TextBlock>(panel, name).Text)
 			.Should().OnlyContain(text => text == Resources.StatusNoValue, "no spectrum has arrived yet");
-
-		var invert = Named<CheckBox>(panel, "InvertSpectrum");
-		var logarithmic = Named<CheckBox>(panel, "LogarithmicScale");
-		invert.Content.Should().BeOfType<TextBlock>().Which.Text.Should().Be(Resources.ChartInvert);
-		logarithmic.Content.Should().BeOfType<TextBlock>().Which.Text.Should().Be(Resources.ChartLogScale);
-		new[] { invert, logarithmic }.Should().OnlyContain(box => box.IsEffectivelyVisible && box.IsChecked == false);
-
-		var resetScale = Named<Button>(panel, "ResetScale");
-		var stickToZero = Named<Button>(panel, "StickToZero");
-		var backToLive = Named<Button>(panel, "BackToLive");
-		resetScale.Content.Should().Be(Resources.ChartResetScale);
-		stickToZero.Content.Should().Be(Resources.ChartStickToZero);
-		backToLive.Content.Should().Be(Resources.ChartBackToLive);
-		new[] { resetScale, stickToZero, backToLive }
-			.Should().OnlyContain(button => button.IsEffectivelyVisible && !button.IsEffectivelyEnabled);
-	}
-
-	[AvaloniaFact]
-	public void ACheckboxReachesTheChart()
-	{
-		var window = Realise();
-		SpectrumSource.Current = Atp8000Peak;
-		SpectrumSource.Signal();
-		Dispatcher.UIThread.RunJobs();
-		var panel = SignalPanel(window);
-
-		Named<CheckBox>(panel, "LogarithmicScale").IsChecked = true;
-		Dispatcher.UIThread.RunJobs();
-
-		Spectrum.IsLogarithmic.Should().BeTrue();
-		Spectrum.Chart.Plot.Axes.Left.TickGenerator.Should().BeOfType<LogTickGenerator>();
-		Named<TextBlock>(panel, "DeviceValue").Text.Should().Be(Atp8000Peak.Measurement.Device.DisplayName);
-		Named<Button>(panel, "StickToZero").IsEffectivelyEnabled.Should().BeTrue("a spectrum is shown");
-	}
-
-	[AvaloniaFact]
-	public void BackToLiveIsEnabledOnlyWhileAMomentIsShown()
-	{
-		var window = Realise();
-		SpectrumSource.Current = Atp2000Peak;
-		SpectrumSource.Signal();
-		Dispatcher.UIThread.RunJobs();
-		var backToLive = Named<Button>(SignalPanel(window), "BackToLive");
-		backToLive.IsEffectivelyEnabled.Should().BeFalse("the live spectrum is shown");
-
-		SwitchingSource.ShowMoment(Atp8000Peak.Measurement, ReceivedAt);
-		Dispatcher.UIThread.RunJobs();
-		backToLive.IsEffectivelyEnabled.Should().BeTrue();
-
-		backToLive.Command!.Execute(null);
-		Dispatcher.UIThread.RunJobs();
-
-		backToLive.IsEffectivelyEnabled.Should().BeFalse();
-		SwitchingSource.ShownMoment.Should().BeNull();
 	}
 
 	[AvaloniaFact]
@@ -136,18 +81,15 @@ public sealed class MainWindowSignalPaneTests : MainWindowLayoutTestBase
 		}
 
 		formOrigin.Should().Be(
-			new Point(PaneBorder + PanePadding, PanePadding),
+			new Point(PaneBorder + PanePadding, PanePaddingTop),
 			"the left border and the pane padding");
-		Cell("SignalHeader").Top.Should().Be(0, "the first section header has 0 above");
-		string[] signalRows = ["SignalHeader", .. PaneLabels];
-		string[] chartRows = ["ChartHeader", .. PaneControls];
-		signalRows.Zip(signalRows.Skip(1), Gap).Concat(chartRows.Zip(chartRows.Skip(1), Gap))
-			.Should().AllSatisfy(gap => gap.Should().Be(RowSpacing, "8 between rows and below a section header"));
-		Gap(PaneLabels[^1], "ChartHeader").Should().Be(SectionHeaderAbove, "16 above a later section header");
+		Cell(PaneLabels[0]).Top.Should().Be(0, "the first row has 0 above");
+		PaneLabels.Zip(PaneLabels.Skip(1), Gap)
+			.Should().AllSatisfy(gap => gap.Should().Be(RowSpacing, "8 between rows"));
 
 		var fieldLeft = formOrigin.X + Cell(PaneLabels[0]).Right + LabelToField;
 		PaneLabels.Select(Left).Should().AllSatisfy(left => left.Should().Be(formOrigin.X, "one label edge"));
-		PaneValues.Concat(PaneControls).Select(Left)
+		PaneValues.Select(Left)
 			.Should().AllSatisfy(left => left.Should().Be(fieldLeft, "one field edge, 12 after the label column"));
 	}
 
@@ -218,9 +160,9 @@ public sealed class MainWindowSignalPaneTests : MainWindowLayoutTestBase
 		Record("ATP-8000");
 		Show(Dark(Spectrometer.Atp8000));
 		Record("dark");
-		Spectrum.IsLogarithmic = true;
+		Spectrum.ToggleLogarithmicCommand.Execute().Subscribe();
 		Record("log on");
-		Spectrum.IsInverted = true;
+		Spectrum.ToggleInvertCommand.Execute().Subscribe();
 		Record("inverted");
 		Spectrum.Chart.TakeManualScale();
 		Record("frozen scale");
@@ -237,9 +179,7 @@ public sealed class MainWindowSignalPaneTests : MainWindowLayoutTestBase
 		messageHeight.Should().BePositive();
 		var shown = PaneShapeOf(window);
 		shown.Window.Should().Be(opening.Window, "the message panel row never changes the window size");
-		shown.Pane.Should().Be(
-			opening.Pane.WithHeight(opening.Pane.Height - messageHeight),
-			"the message panel row takes its height from the content row");
+		shown.Pane.Height.Should().Be(shown.Chart.Height, "the readout pane spans the spectrum row only");
 		shown.Chart.Width.Should().Be(opening.Chart.Width);
 		shown.Chart.Height.Should().BeInRange(
 			MainWindowView.SpectrumRowMinHeight,

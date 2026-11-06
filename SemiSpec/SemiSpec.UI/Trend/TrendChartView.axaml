@@ -11,6 +11,188 @@
              x:Class="SemiSpec.UI.Trend.TrendChartView"
              x:DataType="local:TrendViewModel">
 
+    <UserControl.Resources>
+        <!-- A click on the intensity axis: its bounds, From zero and Autoscale; ported from SemiPlot's axis panel. -->
+        <Flyout x:Key="IntensityAxisFlyout" Placement="Pointer">
+            <Grid Width="300"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
+                  ColumnDefinitions="Auto,*"
+                  ColumnSpacing="12"
+                  RowSpacing="8">
+                <Grid.KeyBindings>
+                    <KeyBinding Gesture="Escape"
+                                Command="{Binding VerticalForm.CancelCommand}" />
+                </Grid.KeyBindings>
+
+                <TextBlock Grid.Row="0"
+                           Grid.ColumnSpan="2"
+                           Name="TrendAxisNote"
+                           Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                           Text="{x:Static text:Resources.AxisFlyoutSnapshotNote}" />
+
+                <TextBlock Grid.Row="1"
+                           VerticalAlignment="Center"
+                           Text="{x:Static text:Resources.AxisScaleMaximumLabel}" />
+                <TextBox Grid.Row="1"
+                         Grid.Column="1"
+                         Name="TrendMaximum"
+                         Width="140"
+                         HorizontalAlignment="Left"
+                         Text="{Binding VerticalForm.MaximumText}">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter"
+                                    Command="{Binding VerticalForm.CommitCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+
+                <TextBlock Grid.Row="2"
+                           VerticalAlignment="Center"
+                           Text="{x:Static text:Resources.AxisScaleMinimumLabel}" />
+                <TextBox Grid.Row="2"
+                         Grid.Column="1"
+                         Name="TrendMinimum"
+                         Width="140"
+                         HorizontalAlignment="Left"
+                         Text="{Binding VerticalForm.MinimumText}">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter"
+                                    Command="{Binding VerticalForm.CommitCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+
+                <CheckBox Grid.Row="3"
+                          Grid.Column="1"
+                          Name="TrendFromZero"
+                          Content="{x:Static text:Resources.ChartFromZero}"
+                          IsChecked="{Binding Chart.IsFromZero, Mode=OneWay}"
+                          Command="{Binding ToggleFromZeroCommand}" />
+
+                <ToggleButton Grid.Row="4"
+                              Grid.ColumnSpan="2"
+                              Name="TrendAutoscale"
+                              HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Center"
+                              Content="{x:Static text:Resources.AxisScaleAutoscale}"
+                              IsChecked="{Binding Chart.IsVerticalAutoscaled, Mode=OneWay}"
+                              Command="{Binding VerticalAutoscaleCommand}" />
+
+                <TextBlock Grid.Row="5"
+                           Grid.ColumnSpan="2"
+                           Name="TrendAxisMessage"
+                           Foreground="{DynamicResource AppSeverityErrorBrush}"
+                           TextWrapping="Wrap"
+                           Height="40"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding VerticalForm.ValidationMessage}" />
+            </Grid>
+        </Flyout>
+
+        <!-- A click on the time axis without a drag: SemiPlot's time window panel without its archive calendar. -->
+        <Flyout x:Key="TimeWindowFlyout" Placement="Pointer">
+            <Grid Width="380"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                  ColumnDefinitions="Auto,Auto,*"
+                  ColumnSpacing="12"
+                  RowSpacing="8">
+                <Grid.KeyBindings>
+                    <KeyBinding Gesture="Escape"
+                                Command="{Binding TimeWindow.CancelCommand}" />
+                </Grid.KeyBindings>
+
+                <TextBlock Grid.Row="0"
+                           Grid.ColumnSpan="3"
+                           Name="TimeWindowNote"
+                           Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                           Text="{x:Static text:Resources.AxisFlyoutSnapshotNote}" />
+
+                <TextBlock Grid.Row="1"
+                           VerticalAlignment="Center"
+                           Text="{x:Static text:Resources.TimeWindowStartLabel}" />
+                <TextBox Grid.Row="1"
+                         Grid.Column="1"
+                         Name="TimeWindowStartTime"
+                         Width="110"
+                         Text="{Binding TimeWindow.StartTimeText}">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter"
+                                    Command="{Binding TimeWindow.CommitCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+                <CalendarDatePicker Grid.Row="1"
+                                    Grid.Column="2"
+                                    Name="TimeWindowStartDate"
+                                    HorizontalAlignment="Stretch"
+                                    SelectedDateFormat="Custom"
+                                    CustomDateFormatString="{x:Static text:Resources.TimeWindowDateFormat}"
+                                    SelectedDate="{Binding TimeWindow.StartDate}" />
+
+                <TextBlock Grid.Row="2"
+                           VerticalAlignment="Center"
+                           Text="{x:Static text:Resources.TimeWindowEndLabel}" />
+                <TextBox Grid.Row="2"
+                         Grid.Column="1"
+                         Name="TimeWindowEndTime"
+                         Width="110"
+                         Text="{Binding TimeWindow.EndTimeText}">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter"
+                                    Command="{Binding TimeWindow.CommitCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+                <CalendarDatePicker Grid.Row="2"
+                                    Grid.Column="2"
+                                    Name="TimeWindowEndDate"
+                                    HorizontalAlignment="Stretch"
+                                    SelectedDateFormat="Custom"
+                                    CustomDateFormatString="{x:Static text:Resources.TimeWindowDateFormat}"
+                                    SelectedDate="{Binding TimeWindow.EndDate}" />
+
+                <TextBlock Grid.Row="3"
+                           VerticalAlignment="Center"
+                           Text="{x:Static text:Resources.TimeWindowWidthLabel}" />
+                <TextBox Grid.Row="3"
+                         Grid.Column="1"
+                         Name="TimeWindowWidth"
+                         Width="110"
+                         Text="{Binding TimeWindow.WidthText}">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter"
+                                    Command="{Binding TimeWindow.CommitCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+                <DropDownButton Grid.Row="3"
+                                Grid.Column="2"
+                                Name="TimeWindowPresets"
+                                HorizontalAlignment="Stretch"
+                                Content="{x:Static text:Resources.TimeWindowPresets}">
+                    <DropDownButton.Flyout>
+                        <MenuFlyout ItemsSource="{Binding TimeWindow.Presets}">
+                            <MenuFlyout.ItemContainerTheme>
+                                <ControlTheme TargetType="MenuItem"
+                                              BasedOn="{StaticResource {x:Type MenuItem}}"
+                                              x:DataType="local:TrendPreset">
+                                    <Setter Property="Header" Value="{Binding Label}" />
+                                    <Setter Property="Command"
+                                            Value="{Binding $parent[local:TrendChartView].((local:TrendViewModel)DataContext).TimeWindow.SetWidthCommand}" />
+                                    <Setter Property="CommandParameter" Value="{Binding}" />
+                                </ControlTheme>
+                            </MenuFlyout.ItemContainerTheme>
+                        </MenuFlyout>
+                    </DropDownButton.Flyout>
+                </DropDownButton>
+
+                <TextBlock Grid.Row="4"
+                           Grid.ColumnSpan="3"
+                           Name="TimeWindowMessage"
+                           Foreground="{DynamicResource AppSeverityErrorBrush}"
+                           TextWrapping="Wrap"
+                           Height="40"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding TimeWindow.Message}" />
+            </Grid>
+        </Flyout>
+    </UserControl.Resources>
+
     <Panel>
         <Decorator Name="PlotLayer">
             <Decorator.CacheMode>
@@ -27,6 +209,20 @@
                    MaxWidth="480"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center" />
+        <!-- The view sizes the band to the margin above the data area after each served frame. -->
+        <Panel Name="StateLineBand"
+               IsHitTestVisible="False"
+               HorizontalAlignment="Left"
+               VerticalAlignment="Top">
+            <TextBlock Name="StateLine"
+                       Text="{Binding StateText}"
+                       IsVisible="{Binding StateText, Converter={x:Static StringConverters.IsNotNullOrEmpty}, FallbackValue=False}"
+                       IsHitTestVisible="False"
+                       Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                       TextWrapping="NoWrap"
+                       TextTrimming="CharacterEllipsis"
+                       VerticalAlignment="Bottom" />
+        </Panel>
         <Canvas Name="CursorOverlay" IsHitTestVisible="False">
             <Line Name="CrosshairLine"
                   IsVisible="False"

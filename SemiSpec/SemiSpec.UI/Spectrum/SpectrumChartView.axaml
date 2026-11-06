@@ -9,7 +9,167 @@
              d:DesignWidth="900"
              d:DesignHeight="600"
              x:Class="SemiSpec.UI.Spectrum.SpectrumChartView"
-             x:DataType="local:SpectrumChartViewModel">
+             x:DataType="local:SpectrumViewModel">
+
+    <UserControl.Resources>
+        <!-- A click on the intensity axis: its bounds, its modes and Autoscale; ported from SemiPlot's axis panel. -->
+        <Flyout x:Key="IntensityAxisFlyout" Placement="Pointer">
+            <Grid Width="300"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                  ColumnDefinitions="Auto,*"
+                  ColumnSpacing="12"
+                  RowSpacing="8">
+                <Grid.KeyBindings>
+                    <KeyBinding Gesture="Escape"
+                                Command="{Binding VerticalForm.CancelCommand}" />
+                </Grid.KeyBindings>
+
+                <TextBlock Grid.Row="0"
+                           Grid.ColumnSpan="2"
+                           Name="IntensityNote"
+                           Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                           Text="{x:Static text:Resources.AxisFlyoutSnapshotNote}" />
+
+                <TextBlock Grid.Row="1"
+                           VerticalAlignment="Center"
+                           Text="{x:Static text:Resources.AxisScaleMaximumLabel}" />
+                <TextBox Grid.Row="1"
+                         Grid.Column="1"
+                         Name="IntensityMaximum"
+                         Width="140"
+                         HorizontalAlignment="Left"
+                         Text="{Binding VerticalForm.MaximumText}">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter"
+                                    Command="{Binding VerticalForm.CommitCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+
+                <TextBlock Grid.Row="2"
+                           VerticalAlignment="Center"
+                           Text="{x:Static text:Resources.AxisScaleMinimumLabel}" />
+                <TextBox Grid.Row="2"
+                         Grid.Column="1"
+                         Name="IntensityMinimum"
+                         Width="140"
+                         HorizontalAlignment="Left"
+                         Text="{Binding VerticalForm.MinimumText}">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter"
+                                    Command="{Binding VerticalForm.CommitCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+
+                <TextBlock Grid.Row="3"
+                           VerticalAlignment="Center"
+                           Text="{x:Static text:Resources.AxisScaleTypeLabel}" />
+                <CheckBox Grid.Row="3"
+                          Grid.Column="1"
+                          Name="IntensityLogarithmic"
+                          Content="{x:Static text:Resources.AxisScaleLogarithmic}"
+                          IsChecked="{Binding IsLogarithmic, Mode=OneWay}"
+                          Command="{Binding ToggleLogarithmicCommand}" />
+                <CheckBox Grid.Row="4"
+                          Grid.Column="1"
+                          Name="IntensityFromZero"
+                          Content="{x:Static text:Resources.ChartFromZero}"
+                          IsChecked="{Binding IsFromZero, Mode=OneWay}"
+                          Command="{Binding ToggleFromZeroCommand}" />
+                <CheckBox Grid.Row="5"
+                          Grid.Column="1"
+                          Name="IntensityInvert"
+                          Content="{x:Static text:Resources.ChartInvert}"
+                          IsChecked="{Binding IsInverted, Mode=OneWay}"
+                          Command="{Binding ToggleInvertCommand}" />
+
+                <ToggleButton Grid.Row="6"
+                              Grid.ColumnSpan="2"
+                              Name="IntensityAutoscale"
+                              HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Center"
+                              Content="{x:Static text:Resources.AxisScaleAutoscale}"
+                              IsChecked="{Binding Chart.IsFollowing, Mode=OneWay}"
+                              Command="{Binding AutoscaleCommand}" />
+
+                <TextBlock Grid.Row="7"
+                           Grid.ColumnSpan="2"
+                           Name="IntensityMessage"
+                           Foreground="{DynamicResource AppSeverityErrorBrush}"
+                           TextWrapping="Wrap"
+                           Height="40"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding VerticalForm.ValidationMessage}" />
+            </Grid>
+        </Flyout>
+
+        <!-- A click on the wavelength axis: its start and end in nm and Autoscale. -->
+        <Flyout x:Key="WavelengthAxisFlyout" Placement="Pointer">
+            <Grid Width="300"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                  ColumnDefinitions="Auto,*"
+                  ColumnSpacing="12"
+                  RowSpacing="8">
+                <Grid.KeyBindings>
+                    <KeyBinding Gesture="Escape"
+                                Command="{Binding HorizontalForm.CancelCommand}" />
+                </Grid.KeyBindings>
+
+                <TextBlock Grid.Row="0"
+                           Grid.ColumnSpan="2"
+                           Name="WavelengthNote"
+                           Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                           Text="{x:Static text:Resources.AxisFlyoutSnapshotNote}" />
+
+                <TextBlock Grid.Row="1"
+                           VerticalAlignment="Center"
+                           Text="{x:Static text:Resources.AxisScaleStartNmLabel}" />
+                <TextBox Grid.Row="1"
+                         Grid.Column="1"
+                         Name="WavelengthStart"
+                         Width="140"
+                         HorizontalAlignment="Left"
+                         Text="{Binding HorizontalForm.MinimumText}">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter"
+                                    Command="{Binding HorizontalForm.CommitCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+
+                <TextBlock Grid.Row="2"
+                           VerticalAlignment="Center"
+                           Text="{x:Static text:Resources.AxisScaleEndNmLabel}" />
+                <TextBox Grid.Row="2"
+                         Grid.Column="1"
+                         Name="WavelengthEnd"
+                         Width="140"
+                         HorizontalAlignment="Left"
+                         Text="{Binding HorizontalForm.MaximumText}">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter"
+                                    Command="{Binding HorizontalForm.CommitCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+
+                <ToggleButton Grid.Row="3"
+                              Grid.ColumnSpan="2"
+                              Name="WavelengthAutoscale"
+                              HorizontalAlignment="Stretch"
+                              HorizontalContentAlignment="Center"
+                              Content="{x:Static text:Resources.AxisScaleAutoscale}"
+                              IsChecked="{Binding Chart.IsFollowing, Mode=OneWay}"
+                              Command="{Binding AutoscaleCommand}" />
+
+                <TextBlock Grid.Row="4"
+                           Grid.ColumnSpan="2"
+                           Name="WavelengthMessage"
+                           Foreground="{DynamicResource AppSeverityErrorBrush}"
+                           TextWrapping="Wrap"
+                           Height="40"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding HorizontalForm.ValidationMessage}" />
+            </Grid>
+        </Flyout>
+    </UserControl.Resources>
 
     <Panel>
         <Decorator Name="PlotLayer">
@@ -20,22 +180,27 @@
         </Decorator>
         <TextBlock Name="EmptyStateMessage"
                    Text="{x:Static text:Resources.SpectrumEmpty}"
-                   IsVisible="{Binding !HasSpectrum, FallbackValue=False}"
+                   IsVisible="{Binding !Chart.HasSpectrum, FallbackValue=False}"
                    IsHitTestVisible="False"
                    Foreground="{DynamicResource AppSecondaryForegroundBrush}"
                    TextWrapping="Wrap"
                    MaxWidth="480"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center" />
-        <TextBlock Name="HistoricalLine"
-                   Text="{Binding HistoricalText}"
-                   IsVisible="{Binding HistoricalText, Converter={x:Static StringConverters.IsNotNullOrEmpty}, FallbackValue=False}"
-                   IsHitTestVisible="False"
-                   Foreground="{DynamicResource AppSecondaryForegroundBrush}"
-                   TextWrapping="NoWrap"
-                   Margin="0,8,0,0"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Top" />
+        <!-- The view sizes the band to the margin above the data area after each served frame. -->
+        <Panel Name="StateLineBand"
+               IsHitTestVisible="False"
+               HorizontalAlignment="Left"
+               VerticalAlignment="Top">
+            <TextBlock Name="StateLine"
+                       Text="{Binding StateText}"
+                       IsVisible="{Binding StateText, Converter={x:Static StringConverters.IsNotNullOrEmpty}, FallbackValue=False}"
+                       IsHitTestVisible="False"
+                       Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                       TextWrapping="NoWrap"
+                       TextTrimming="CharacterEllipsis"
+                       VerticalAlignment="Bottom" />
+        </Panel>
     </Panel>
 
 </UserControl>

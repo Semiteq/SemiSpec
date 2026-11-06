@@ -38,6 +38,9 @@ public sealed class MainWindowTextFitRowTests : MainWindowTextFitTestBase
 
 		var connectionTexts = Texts(connectionRow).Where(text => text.Name != "PlaceholderTextBlock").ToList();
 		var statusTexts = Texts(statusRow).ToList();
+		connectionTexts.Select(text => text.Text).Should().Contain(
+			[Resources.ChartBackToLive, Resources.TrendFollowLive],
+			"the live-navigation buttons sit in the connection row and count in its width");
 		connectionTexts.Concat(statusTexts).Should().OnlyContain(
 			text => text.TextWrapping == TextWrapping.NoWrap,
 			"a label, a button or a status text never takes a second line");

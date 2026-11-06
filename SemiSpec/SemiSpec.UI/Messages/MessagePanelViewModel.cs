@@ -4,6 +4,8 @@ using System.Reactive;
 
 using ReactiveUI;
 
+using SemiSpec.UI.Localization;
+
 namespace SemiSpec.UI.Messages;
 
 /// <summary>
@@ -24,14 +26,33 @@ public sealed class MessagePanelViewModel : ReactiveObject, IDisposable
 		_entries.CollectionChanged += OnEntriesChanged;
 
 		ClearCommand = ReactiveCommand.Create(_entries.Clear);
+		ToggleCommand = ReactiveCommand.Create(() => { IsVisible = !IsVisible; });
 	}
 
 	public ReadOnlyObservableCollection<MessageEntry> Entries { get; }
 
-	/// <summary>Whether the panel row is on screen: from the first entry until Clear empties the list.</summary>
 	public bool HasEntries => _entries.Count > 0;
 
+	/// <summary>
+	/// Whether the panel row is on screen, an empty list included. This view model is its only writer, and the View
+	/// menu reads back this same flag.
+	/// </summary>
+	public bool IsVisible
+	{
+		get;
+		private set => this.RaiseAndSetIfChanged(ref field, value);
+	}
+
+	public MessageEntry? NewestEntry => _entries.Count > 0 ? _entries[0] : null;
+
+	/// <summary>"N more" for the entries under the newest; empty while there are none.</summary>
+	public string MoreText => _entries.Count > 1
+		? Resources.FormatMessagePanelMoreFormat((_entries.Count - 1).ToString(Resources.Culture))
+		: string.Empty;
+
 	public ReactiveCommand<Unit, Unit> ClearCommand { get; }
+
+	public ReactiveCommand<Unit, Unit> ToggleCommand { get; }
 
 	/// <summary>
 	/// Adds the failure, or counts it against the newest entry when that entry carries the same view, and
@@ -48,6 +69,10 @@ public sealed class MessagePanelViewModel : ReactiveObject, IDisposable
 			return true;
 		}
 
+		// A new entry opens the row, so nothing new lands off screen; a repeat of the entry on top does not, so a
+		// panel closed during an outage stays closed.
+		IsVisible = true;
+
 		_entries.Insert(0, new MessageEntry(view, seenAt));
 
 		while (_entries.Count > MaximumEntries)
@@ -61,6 +86,7 @@ public sealed class MessagePanelViewModel : ReactiveObject, IDisposable
 	public void Dispose()
 	{
 		ClearCommand.Dispose();
+		ToggleCommand.Dispose();
 	}
 
 	private bool Coalesces(MessageView view)
@@ -71,5 +97,7 @@ public sealed class MessagePanelViewModel : ReactiveObject, IDisposable
 	private void OnEntriesChanged(object? sender, NotifyCollectionChangedEventArgs arguments)
 	{
 		this.RaisePropertyChanged(nameof(HasEntries));
+		this.RaisePropertyChanged(nameof(NewestEntry));
+		this.RaisePropertyChanged(nameof(MoreText));
 	}
 }

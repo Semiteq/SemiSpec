@@ -51,6 +51,18 @@ public sealed class SpectrumChartViewModelTests : IDisposable
 	}
 
 	[AvaloniaFact]
+	public void BeforeTheFirstSpectrumTheAxesSpanBothDevicesOverZeroToOne()
+	{
+		var limits = _chart.Plot.Axes.GetLimits();
+
+		limits.Left.Should().Be(SpectrometerCalibration.For(Spectrometer.Atp2000).WavelengthOf(0));
+		limits.Right.Should().Be(
+			SpectrometerCalibration.For(Spectrometer.Atp8000).WavelengthOf(Spectrometer.Atp8000.PixelCount - 1));
+		(limits.Bottom, limits.Top).Should().Be((0.0, 1.0));
+		TestContext.Current.TestOutputHelper?.WriteLine($"empty axis {limits.Left:0.#} .. {limits.Right:0.#} nm");
+	}
+
+	[AvaloniaFact]
 	public void TheFirstSpectrumSetsTheXLimitsToTheDeviceRange()
 	{
 		_chart.HasSpectrum.Should().BeFalse();

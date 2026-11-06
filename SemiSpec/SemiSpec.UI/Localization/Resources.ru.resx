@@ -30,9 +30,6 @@
   <data name="StatusNotConnected" xml:space="preserve">
     <value>Не подключено</value>
   </data>
-  <data name="MessagePanelTitle" xml:space="preserve">
-    <value>Сообщения</value>
-  </data>
   <data name="MessagePanelClear" xml:space="preserve">
     <value>Очистить</value>
   </data>
@@ -210,9 +207,6 @@
   <data name="SpectrumHistoricalFormat" xml:space="preserve">
     <value>Спектр от {0}</value>
   </data>
-  <data name="SignalTitle" xml:space="preserve">
-    <value>Сигнал</value>
-  </data>
   <data name="SignalDevice" xml:space="preserve">
     <value>Спектрометр</value>
   </data>
@@ -240,29 +234,11 @@
   <data name="SignalWindowFormat" xml:space="preserve">
     <value>±{0} нм</value>
   </data>
-  <data name="ChartTitle" xml:space="preserve">
-    <value>График</value>
-  </data>
   <data name="ChartInvert" xml:space="preserve">
     <value>Инвертировать спектр</value>
   </data>
-  <data name="ChartLogScale" xml:space="preserve">
-    <value>Логарифмическая шкала</value>
-  </data>
-  <data name="ChartResetScale" xml:space="preserve">
-    <value>Сбросить масштаб</value>
-  </data>
-  <data name="ChartStickToZero" xml:space="preserve">
-    <value>Прижать к нулю</value>
-  </data>
   <data name="ChartBackToLive" xml:space="preserve">
     <value>Вернуться к текущему</value>
-  </data>
-  <data name="TrendTitle" xml:space="preserve">
-    <value>Тренд</value>
-  </data>
-  <data name="TrendTimeWindow" xml:space="preserve">
-    <value>Интервал</value>
   </data>
   <data name="TrendFollowLive" xml:space="preserve">
     <value>Следить за данными</value>
@@ -321,5 +297,110 @@
   </data>
   <data name="TrendMomentRemedy" xml:space="preserve">
     <value>Выберите другой момент.</value>
+  </data>
+  <data name="MenuViewMessagePanel" xml:space="preserve">
+    <value>Панель сообщений</value>
+  </data>
+  <data name="MessagePanelMoreFormat" xml:space="preserve">
+    <value>Ещё {0}</value>
+  </data>
+  <data name="MessagePanelEmpty" xml:space="preserve">
+    <value>Нет сообщений</value>
+  </data>
+  <data name="ChartFromZero" xml:space="preserve">
+    <value>От нуля</value>
+  </data>
+  <data name="SpectrumStaleFormat" xml:space="preserve">
+    <value>Нет новых данных с {0}</value>
+  </data>
+  <data name="SpectrumStateLog" xml:space="preserve">
+    <value>Лог</value>
+  </data>
+  <data name="SpectrumStateInverted" xml:space="preserve">
+    <value>Инверсия</value>
+  </data>
+  <data name="SpectrumStateFromZero" xml:space="preserve">
+    <value>От нуля</value>
+  </data>
+  <data name="SpectrumStateFrozen" xml:space="preserve">
+    <value>Масштаб зафиксирован</value>
+  </data>
+  <data name="TrendStateNotFollowing" xml:space="preserve">
+    <value>Не следит за данными</value>
+  </data>
+  <data name="TrendWidthSecondsFormat" xml:space="preserve">
+    <value>{0} с</value>
+  </data>
+  <data name="TrendAxisTimeFormat" xml:space="preserve">
+    <value>Время, {0}</value>
+  </data>
+  <data name="TrendAxisTimeRangeFormat" xml:space="preserve">
+    <value>Время, {0} – {1}</value>
+  </data>
+  <data name="AxisScaleMaximumLabel" xml:space="preserve">
+    <value>Максимум</value>
+  </data>
+  <data name="AxisScaleMinimumLabel" xml:space="preserve">
+    <value>Минимум</value>
+  </data>
+  <data name="AxisScaleTypeLabel" xml:space="preserve">
+    <value>Тип шкалы</value>
+  </data>
+  <data name="AxisScaleLogarithmic" xml:space="preserve">
+    <value>Логарифмическая</value>
+  </data>
+  <data name="AxisScaleAutoscale" xml:space="preserve">
+    <value>Автомасштаб</value>
+  </data>
+  <data name="AxisScaleStartNmLabel" xml:space="preserve">
+    <value>Начало, нм</value>
+  </data>
+  <data name="AxisScaleEndNmLabel" xml:space="preserve">
+    <value>Конец, нм</value>
+  </data>
+  <data name="AxisScaleBoundInvalid" xml:space="preserve">
+    <value>Введите в каждом поле число</value>
+  </data>
+  <data name="AxisScaleMinimumBelowMaximum" xml:space="preserve">
+    <value>Минимум должен быть меньше максимума</value>
+  </data>
+  <data name="AxisScaleLogMinimumPositive" xml:space="preserve">
+    <value>Минимум: на логарифмической шкале должен быть больше 0</value>
+  </data>
+  <data name="AxisFlyoutSnapshotNote" xml:space="preserve">
+    <value>Значения на момент открытия</value>
+  </data>
+  <data name="TimeWindowStartLabel" xml:space="preserve">
+    <value>Начало</value>
+  </data>
+  <data name="TimeWindowEndLabel" xml:space="preserve">
+    <value>Конец</value>
+  </data>
+  <data name="TimeWindowWidthLabel" xml:space="preserve">
+    <value>Ширина</value>
+  </data>
+  <data name="TimeWindowPresets" xml:space="preserve">
+    <value>Быстрый выбор</value>
+  </data>
+  <data name="TimeWindowDateFormat" xml:space="preserve">
+    <value>dd.MM.yyyy</value>
+  </data>
+  <data name="TimeWindowClockPattern" xml:space="preserve">
+    <value>чч:мм:сс</value>
+  </data>
+  <data name="TimeWindowStartUnreadableFormat" xml:space="preserve">
+    <value>Время начала: запишите как {0}.</value>
+  </data>
+  <data name="TimeWindowEndUnreadableFormat" xml:space="preserve">
+    <value>Время конца: запишите как {0}.</value>
+  </data>
+  <data name="TimeWindowWidthUnreadableFormat" xml:space="preserve">
+    <value>Ширина: запишите как {0}.</value>
+  </data>
+  <data name="TimeWindowEndNotAfterStart" xml:space="preserve">
+    <value>Конец должен быть позже начала.</value>
+  </data>
+  <data name="ChartStateSeparator" xml:space="preserve">
+    <value> · </value>
   </data>
 </root>

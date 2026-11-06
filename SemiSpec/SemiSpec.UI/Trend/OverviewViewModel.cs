@@ -34,6 +34,7 @@ public sealed class OverviewViewModel : ReactiveObject, IDisposable
 	private readonly IScheduler _uiScheduler;
 	private readonly ILogger<OverviewViewModel> _logger;
 	private readonly SerialDisposable _nextRefold = new();
+	private readonly ObservableAsPropertyHelper<bool> _isFromZero;
 	private readonly CompositeDisposable _disposables = [];
 
 	public OverviewViewModel(
@@ -55,6 +56,9 @@ public sealed class OverviewViewModel : ReactiveObject, IDisposable
 			.ObserveOn(uiScheduler)
 			.StartWith(Unit.Default)
 			.Subscribe(_ => Reporting(Refold), ReportFailure));
+		_disposables.Add(chart
+			.WhenAnyValue(trend => trend.IsFromZero)
+			.ToProperty(this, overview => overview.IsFromZero, out _isFromZero));
 		// The chart requests a redraw after every refresh, which is where its window moves.
 		_disposables.Add(chart.RedrawRequested
 			.Subscribe(_ => Reporting(FollowRedraw), ReportFailure));
@@ -66,6 +70,9 @@ public sealed class OverviewViewModel : ReactiveObject, IDisposable
 		get;
 		private set => this.RaiseAndSetIfChanged(ref field, value);
 	}
+
+	/// <summary>The trend's From zero mode, which the band follows with the same headroom.</summary>
+	public bool IsFromZero => _isFromZero.Value;
 
 	public bool HasExtent
 	{

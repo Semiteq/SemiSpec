@@ -52,7 +52,7 @@ public sealed class CompositionRootTests : IAsyncDisposable
 			.MinimumLevel.ControlledBy(_logLevelControl.Switch)
 			.WriteTo.Sink(_sink)
 			.CreateLogger();
-		_logging = new LoggingSetup(logger, _logLevelControl);
+		_logging = new LoggingSetup(logger, _logLevelControl, _root.Root);
 		_paths = AppDataPaths.Under(_root.Root).Value;
 	}
 

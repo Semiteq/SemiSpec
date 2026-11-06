@@ -4,8 +4,10 @@ using AwesomeAssertions;
 
 using ScottPlot;
 using ScottPlot.Plottables;
+using ScottPlot.TickGenerators;
 
 using SemiSpec.Core.Protocol;
+using SemiSpec.Core.Spectrum;
 using SemiSpec.Tests.Unit.Core.Store;
 using SemiSpec.UI.Chart;
 using SemiSpec.UI.Localization;
@@ -39,17 +41,85 @@ public sealed class TrendChartViewModelDisplayTests : TrendChartTestBase
 	public void TheYAxisLabelNamesTheKey()
 	{
 		Chart.Plot.Axes.Left.Label.Text.Should().Be(Resources.TrendAxisIntensity);
-		Chart.Plot.Axes.Bottom.Label.Text.Should().Be(Resources.TrendAxisTime);
 
 		AddSpectra(0, 1);
 		Sample();
 
 		Chart.Plot.Axes.Left.Label.Text.Should().Be(Resources.FormatTrendAxisIntensityFormat(SampleNm, SampleDelta));
+		Chart.Plot.Axes.Bottom.Label.Text.Should().StartWith(
+			Resources.FormatTrendAxisTimeFormat(string.Empty),
+			"the date moves from the ticks into the title");
+	}
+
+	[AvaloniaFact]
+	public void FromZeroRunsYFromZeroToTheMaximumPlusFivePercent()
+	{
+		AddFlat(0, 100);
+		AddFlat(1, 200);
+		Sample();
+
+		var limits = Chart.Plot.Axes.GetLimits();
+		limits.Bottom.Should().Be(0.0, "From zero is the trend's default");
+		limits.Top.Should().BeApproximately(210.0, Tolerance);
+	}
+
+	[AvaloniaFact]
+	public void ATypedRangeHoldsYUntilAutoscale()
+	{
+		AddFlat(0, 100);
+		AddFlat(1, 200);
+		Sample();
+
+		Chart.SetVerticalRange(new AxisRange(50.0, 60.0));
+		AddFlat(2, 400);
+		Sample();
+
+		Chart.IsVerticalAutoscaled.Should().BeFalse();
+		Chart.VerticalRange().Should().Be(new AxisRange(50.0, 60.0));
+
+		Chart.ToggleVerticalAutoscale();
+
+		Chart.IsVerticalAutoscaled.Should().BeTrue();
+		Chart.VerticalRange().Max.Should().BeApproximately(420.0, Tolerance);
+	}
+
+	[AvaloniaFact]
+	public void AutoscaleWhileFollowingHoldsTheDrawnRangeAndFromZeroReleasesIt()
+	{
+		AddFlat(0, 100);
+		Sample();
+		var drawn = Chart.VerticalRange();
+
+		Chart.ToggleVerticalAutoscale();
+		AddFlat(1, 400);
+		Sample();
+
+		Chart.VerticalRange().Should().Be(drawn);
+
+		Chart.SetFromZero(false);
+
+		Chart.IsVerticalAutoscaled.Should().BeTrue("a From zero toggle returns Y to following the data");
+	}
+
+	[AvaloniaFact]
+	public void TheTimeTicksShowSecondsUpToTwentyMinutesAndMinutesAbove()
+	{
+		AddSpectra(0, 60);
+		Sample();
+		var ticks = (DateTimeAutomatic)Chart.Plot.Axes.Bottom.TickGenerator;
+		var moment = new DateTime(2026, 11, 6, 13, 45, 30, DateTimeKind.Unspecified);
+
+		ticks.LabelFormatter!(moment).Should().Be("13:45:30");
+
+		Chart.SetWidth(TimeSpan.FromHours(1));
+
+		ticks.LabelFormatter!(moment).Should().Be("13:45");
 	}
 
 	[AvaloniaFact]
 	public void TheYLimitsPadTheVisibleEnvelope()
 	{
+		Chart.SetFromZero(false);
 		AddFlat(0, 100);
 		AddFlat(1, 200);
 		Sample();
@@ -62,6 +132,7 @@ public sealed class TrendChartViewModelDisplayTests : TrendChartTestBase
 	[AvaloniaFact]
 	public void AFlatVisibleRangeTakesPlusMinusOne()
 	{
+		Chart.SetFromZero(false);
 		AddFlat(0, 100);
 		AddFlat(1, 100);
 		Sample();

@@ -3,15 +3,16 @@
 ## Purpose
 
 SemiSpec shows the operator the spectrum the spectrometer board sends over a serial port. The code under
-`SemiSpec/` starts, logs to a fixed folder and shows the main window. The operator picks a COM port in the
+`SemiSpec/` starts, logs to `C:\DISTR\Logs\SemiSpec` and shows the main window. The operator picks a COM port in the
 connection row and connects; the serial link reads the board's frames, reopens the port after an unplug, and the
 status bar shows the link state, both spectrometers' bits, the spectra lost since Connect and the frames dropped since
 the start. Link faults, reported failures, ReactiveUI's unhandled exceptions and exceptions that escape a dispatcher job
 reach the message panel. The frame distributor reads the decoded frames, and the content row shows the latest spectrum
-over wavelength on a ScottPlot chart, with the board's signal values and the chart controls in a pane on its right.
-Under the spectrum chart the trend shows the intensity at the board's wavelength over time, from an in-memory cache
-of the last 24 h, with an overview strip of that whole history under it; a click on the trend shows the spectrum of
-that moment on the spectrum chart until the operator returns to live. The spectrum store writes every received frame
+over wavelength on a ScottPlot chart, with the board's signal values in a readout pane on its right. A left click on
+an axis of either chart opens that axis's flyout with its bounds and modes. Under the spectrum chart the trend shows
+the intensity at the board's wavelength over time across the full window width, from an in-memory cache of the last
+24 h, with an overview strip of that whole history under it; a click on the trend shows the spectrum of that moment
+on the spectrum chart until the operator returns to live. The spectrum store writes every received frame
 to a SQLite file of the running instance and keeps the last 24 h; its query service reads a stored spectrum, the
 intensity series and the intensity points at a wavelength. Two console tools support manual runs: the board emulator
 writes protocol frames to a serial port, and the store benchmark measures the store file's writes, size and reads and
@@ -40,7 +41,7 @@ the trend's folds and re-reads.
 
 | Component | Project | Responsibility |
 | --- | --- | --- |
-| `AppDataPaths` | Core | Resolves the log folder `SemiSpec\Logs` and the store folder `SemiSpec\Spectra` under the local app data root; fails on a root that is not fully qualified |
+| `AppDataPaths` | Core | Resolves the store folder `SemiSpec\Spectra` and the fallback log folder `SemiSpec\Logs` under the local app data root; fails on a root that is not fully qualified |
 | `Crc16Modbus` | Core | CRC-16/MODBUS of the frame, over a span |
 | `BoardFrame`, `SpectrumMeasurement` | Core | One decoded frame: state, `seq` and the measurement of a spectrum frame; the measurement rejects a pixel count that does not match its device |
 | `ReceivedFrame` | Core | A decoded frame with its receive time; the item of the link's channel and of the store queue (`Core/Protocol/`) |
@@ -52,7 +53,8 @@ the trend's folds and re-reads.
 | `SpectrometerCalibration` | Core | Per device: the wavelength of each pixel, the pixel for a wavelength, the pixel window for a wavelength and `delta` |
 | `SpectrumDisplay` | Core | How the spectrum is drawn: inverted or not, linear or log axis (`Core/Spectrum/`) |
 | `SpectrumProjection` | Core | Writes the displayed value of each pixel into a line's buffer: inverted over the frame's maximum, then `log10` floored at 1 on the log axis; reports the raw maximum and whether the frame is dark (`Core/Spectrum/`) |
-| `SpectrumScale` | Core | The axis limits of the shown spectrum while following and after Stick to zero, as pure functions (`Core/Spectrum/`) |
+| `SpectrumScale` | Core | The axis limits of the shown spectrum while following, with and without From zero, as pure functions (`Core/Spectrum/`) |
+| `FromZeroRange` | Core | The From zero range shared by the spectrum, the trend and the overview band: `0 .. max + 5 %`, `0 .. 1` when the maximum is not above 0 (`Core/Chart/`) |
 | `LogAxis` | Core | The ticks of an axis that runs in decades: major and minor positions for the limits and the axis length (`Core/Chart/`) |
 | `StoreFiles` | Core | Names the instance file `spectra-<process id>.db` and prepares the store folder: wipes the own file, deletes the files of dead instances and orphan sidecars (`Core/Store/`) |
 | `StoreConnection` | Core | Opens the writer's connection to a store file, creating it, with the store's connection string and pragmas; `OpenReader` opens an existing file only, with `query_only` (`Core/Store/`) |
@@ -64,9 +66,9 @@ the trend's folds and re-reads.
 | `IntensityCache` | Core | One intensity point per spectrum at the key of the latest spectrum frame, with the run's breaks and failure marks, for the last 24 h; the recent spectra, the key change and its re-read request, the landing of stored chunks, the completion of a re-read, the fold of the current extent under one lock hold and the moment lookup; `TrendTimeline` holds the key's points, breaks and failure marks in time order and folds them. `TrendKey`, `TrendExtent`, `TrendFold` and `ReReadRequest` are its results (`Core/Trend/`) |
 | `TrendHistoryPlan` | Core | The store ranges a re-read runs, in order: the visible window, then the rest of the day in hour chunks, newest first (`Core/Trend/`) |
 | `IntensityChunk`, `TrendPoint` | Core | The result of the store's points read: its start and one `(UnixMs, Value)` point per spectrum; `IntensityBuckets.Add(TrendPoint)` folds a NaN point as uncovered (`Core/Store/`) |
-| `TrendNavigationModel` | Core | The trend's visible window in UTC: width 10 s to 24 h, follow, pan, zoom around an anchor, set width, the pan floor at the first point, and the rule that a pan or a zoom leaving now outside the window stops following (`Core/Trend/`) |
+| `TrendNavigationModel` | Core | The trend's visible window in UTC: width 10 s to 24 h, follow, pan, zoom around an anchor, set width, set an exact window, the pan floor at the first point, and the rule that a pan or a zoom leaving now outside the window stops following (`Core/Trend/`) |
 | `TrendColumns` | Core | The column width for a data area, the fold query that includes its end, the gap rule and the joined failure ranges (`Core/Trend/`) |
-| `OverviewGeometry` | Core | Places the trend window, the pointer and the band along the overview strip, and applies the trend's gap rule to the band (`Core/Trend/`) |
+| `OverviewGeometry` | Core | Places the trend window, the pointer and the band along the overview strip, applies the trend's gap rule to the band, and scales the band from zero when the trend runs From zero (`Core/Trend/`) |
 | `FrameSchedule`, `SpectrumGenerator` | Tools.BoardEmulator | Which frame the emulated board sends at a tick and its `state`, and the synthetic and dark spectra |
 | `EmulatorCommand` | Tools.BoardEmulator | Parses and range-checks the command line into an `EmulatorOptions` record; rejects `--failed` for the other spectrometer without `--both-connected` |
 | `Program` (emulator) | Tools.BoardEmulator | Opens the port, checks every 10 ms which frame is due and writes it, until Ctrl+C |
@@ -84,9 +86,14 @@ the trend's folds and re-reads.
 | `DisplayedSpectrum`, `IDisplayedSpectrumSource` | UI | The spectrum the chart shows, its receive time and whether it is historical; the source's `Current` and the `CurrentChanged` signal. `LiveSpectrumSource` and `SwitchingSpectrumSource` implement it |
 | `LiveSpectrumSource` | UI | The live `IDisplayedSpectrumSource`: `Current` wraps the distributor's latest spectrum frame in a new record on each read, around the frame's own measurement; `CurrentChanged` signals each spectrum frame and skips heartbeats |
 | `SwitchingSpectrumSource` | UI | The `IDisplayedSpectrumSource` the app reads: the live source's spectrum, or the spectrum of a past moment until the operator returns to live; `ShownMoment` is that moment's receive time (`UI/Spectrum/`) |
-| `SpectrumChartViewModel` | UI | Owns the ScottPlot `Plot`: one line per spectrometer (`DeviceLine`), the window band, the centre line, the axis type and the follow or frozen scale; holds the historical line's text; asks the view for a redraw |
-| `SignalInfoViewModel` | UI | The seven signal pane texts of the shown spectrum |
-| `SpectrumViewModel` | UI | The spectrum screen: applies the source's latest spectrum to the chart and the signal pane, the Invert and Logarithmic checkboxes, Reset scale, Stick to zero and Back to live; writes the chart's historical line from `ShownMoment` |
+| `SpectrumChartViewModel` | UI | Owns the ScottPlot `Plot`: one line per spectrometer (`DeviceLine`), the window band, the centre line, the axis type, From zero and the follow or frozen scale; reads and sets the drawn axis ranges for the flyouts and names a range the intensity axis cannot show; asks the view for a redraw |
+| `SignalInfoViewModel` | UI | The seven readout pane texts of the shown spectrum |
+| `SpectrumViewModel` | UI | The spectrum screen: applies the source's latest spectrum to the chart and the readout pane; the Invert, Logarithmic, From zero and Autoscale commands, the two axis forms and Back to live; composes the chart's state line from `ShownMoment`, the staleness and the modes |
+| `SpectrumStaleness` | UI | Whether the shown live spectrum is stale: the link is not Receiving, or the last live spectrum is more than 10 s old (`UI/Spectrum/`) |
+| `IAxisFlyoutForm`, `AxisFlyout` | UI | The form behind an axis flyout (seed on open, commit on close, Escape cancels) and the view helper that opens the flyout at the pointer, closes the drop-downs inside it first on hide, and hides it when the window starts to close (`UI/Chart/`) |
+| `AxisRangeForm` | UI | The two number fields of an axis flyout, seeded from the drawn range, validated, and written back when a valid pair differs from the seed; takes the axis's own rule (`UI/Chart/`) |
+| `ChartAxisRegion` | UI | The band of the left or bottom axis panel of the last render, for a press on the axis (`UI/Chart/`) |
+| `ChartStateLine` | UI | Places a chart's one-line state text in the 24 px top margin over the data area (`UI/Chart/`) |
 | `ChartFrames` | UI | A chart view's redraws: joins redraw requests into one animation frame and repaints the plot and the series on a theme change; both chart views own one (`UI/Chart/`) |
 | `ChartPalette` | UI | Paints ScottPlot's figure, data area, grid and axes from the palette, and resolves the colours of the spectrum line, the band, the centre line, the trend's envelope, the shown-moment line and the failure strip |
 | `LogTickGenerator` | UI | ScottPlot's tick generator over `LogAxis`: the labels under the current culture, and a cache of the last two results keyed on the limits, the length and the culture |
@@ -96,16 +103,17 @@ the trend's folds and re-reads.
 | `TrendPlotLayers` | UI | The trend's layers on its plot: the envelope, the failure strip, the shown-moment line and the axes, written under `Plot.Sync` (`UI/Trend/`) |
 | `TrendCursorOverlay` | UI | Places the trend's hover line and readout box over the data area (`UI/Trend/`) |
 | `LocalTimeAxis` | UI | Converts a `DateTimeOffset` to the trend's X value, local-time OADate, and back (`UI/Trend/`) |
-| `TrendChartViewModel` | UI | Owns the trend's `Plot`: folds the cache over the navigation window at one column per data-area pixel, the Y limits, the Y label, the failure strip, the shown-moment line, navigation and the hover text (`UI/Trend/`) |
+| `TrendChartViewModel` | UI | Owns the trend's `Plot`: folds the cache over the navigation window at one column per data-area pixel, the Y limits with From zero and a typed range, the Y label, the failure strip, the shown-moment line, navigation and the hover text (`UI/Trend/`) |
 | `TrendReadout` | UI | The hover text of one folded column: local time, value or gap reason, failures (`UI/Trend/`) |
 | `TrendPresets` | UI | The time window presets 1 min, 10 min, 1 h, 6 h and 24 h, 10 min by default (`UI/Trend/`) |
 | `TrendFeed` | UI | Fills the cache from the distributor, logs each key change, runs the re-read after a key change and the read of a clicked moment, each as a pipeline where a newer request cancels the read in flight, and cancels the moment read on Back to live (`UI/Trend/`) |
-| `TrendViewModel` | UI | The trend section: the chart, the overview, the presets with the one that matches the chart's width selected, Follow live and the click to a moment (`UI/Trend/`) |
+| `TrendViewModel` | UI | The trend: the chart, the overview, the time window form, the intensity form, From zero, Autoscale, Follow live, the state line and the click to a moment (`UI/Trend/`) |
+| `TimeWindowPanelViewModel` | UI | The time axis flyout: the window's local start and end (time and date), its width and the presets, ported from SemiPlot's time window panel without its archive calendar (`UI/Trend/`) |
 | `OverviewViewModel`, `OverviewBand` | UI | The overview strip: the whole cache folded to 250 columns, the window's place along it, and the press that moves the trend there; the band control draws it (`UI/Trend/`) |
 | `TrendHistoryError`, `TrendMomentError` | UI | The stored points at a new key could not be read; the stored spectrum of a clicked moment could not be read (`UI/Trend/`) |
 | `SpectrumStore`, `StoreWriter`, `StoreRetention`, `StoreFile` | UI | The background writer: `SpectrumStore` enqueues every distributor frame, runs one `StoreWriter` task and counts the frames lost; `StoreWriter` writes the queue to the instance file in batches and runs `StoreRetention` once a minute, which deletes rows older than 24 h and sweeps other instances' files once an hour; `StoreFile` is the instance file's path (`UI/Store/`) |
 | `StoreOpenError`, `StoreWriteError`, `StoreStoppedError` | UI | The store file could not be prepared or opened; a batch could not be written; an unexpected failure after the open ended the writer (`UI/Store/`) |
-| `AppLogging` | UI | Creates the log folder and the Serilog logger: `semispec.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
+| `AppLogging` | UI | Picks the log folder (`C:\DISTR\Logs\SemiSpec`, or the fallback when the write check or the logger's open there fails), creates it and the Serilog logger: `semispec.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
 | `AddUi(LoggingSetup, AppDataPaths)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` of this process under the store folder, `SpectrumStore`, `SpectrumHistory` over the `StoreFile`, `IntensityCache`, `LiveSpectrumSource`, `SwitchingSpectrumSource` over it, the message panel, the connection row, the status bar, the spectrum view model, `TrendChartViewModel`, `OverviewViewModel`, `TrendFeed` built over `SpectrumHistory.IntensityPointsAsync` and `SpectrumAtAsync` with `DefaultScheduler.Instance` for its throttle, `TrendViewModel` and the main window view model, all singletons |
 | `Program` | UI | Entry point: paths, logging, container, `App.Run` with the logger for unhandled exceptions |
@@ -113,7 +121,7 @@ the trend's folds and re-reads.
 | `MainWindowViewModel` | UI | Exit request, the verbose-logging command, and the panel, connection row, status bar, spectrum and trend view models; it disposes none of them, the container owns them |
 | `ConnectionBarViewModel` | UI | The port list, the selection and the Refresh, Connect and Disconnect commands; reports a failed listing to the panel |
 | `AppStatusBarViewModel` | UI | The status bar texts and dot tone from `SerialLink.Status`, and the dropped-frames text from the link's and the store's counts; reports each fault and the restored entry to the panel |
-| `MessagePanelViewModel` | UI | The bounded, newest-first list of messages the operator reads |
+| `MessagePanelViewModel` | UI | The bounded, newest-first list of messages the operator reads, the newest entry and the count of the rest, and whether the panel row is shown |
 | `MessageSeverity` | UI | Info, Warning or Error on a message; the panel picks the dot class with `ObjectConverters.Equal` against each value |
 | `ResultReporting`, `ErrorMessageMapper` | UI | The route from a failed `Result` to the panel and the log |
 | `UnhandledErrorObserver` | UI | ReactiveUI's last-resort exception handler and the dispatcher's unhandled-exception handler |
@@ -132,9 +140,10 @@ benchmark references Core only, so it times the same cache and plan the app runs
 
 `Program.Main` runs these steps in order:
 
-1. `AppDataPaths.Under` resolves the log folder and the store folder from
+1. `AppDataPaths.Under` resolves the store folder and the fallback log folder from
    `Environment.SpecialFolder.LocalApplicationData`.
-2. `AppLogging.Create` creates `%LOCALAPPDATA%\SemiSpec\Logs` and the logger; `Program.Main` sets `Log.Logger` to it.
+2. `AppLogging.Create` picks the log folder and creates the logger there; `Program.Main` sets `Log.Logger` to it and
+   names the folder in its first Information line (Log folder, below).
 3. `AddUi` builds the service provider with the paths; the store's instance file is named here, and nothing touches
    the store folder until the window opens.
 4. `App.Run` receives a logger from the container's `ILoggerFactory`, which writes to that logger, builds the
@@ -146,6 +155,20 @@ benchmark references Core only, so it times the same cache and plan the app runs
 
 A failure in step 1 or 2 ends with exit code 1 and shows nothing, because there is no log to write to. A failure after
 the logger exists is logged as Fatal and ends with exit code 1.
+
+### Log folder
+
+The log folder is `AppLogging.SiteLogFolder`, `C:\DISTR\Logs\SemiSpec`, the folder where SemiPlot and SemiStep also
+log on an operator PC. The installer creates it with modify rights for users (Release). Before the logger exists,
+`AppLogging.CanWrite` creates the folder and opens `semispec.log` for append with `FileShare.ReadWrite |
+FileShare.Delete`, which the shared file sink of a running copy allows, so a second copy passes the check. When the
+check fails with an `IOException` or `UnauthorizedAccessException` (a dev run without the installer, a folder without
+rights), or when the logger cannot open the site folder after the check passed, the log goes to
+`%LOCALAPPDATA%\SemiSpec\Logs`, and the first log line is a Warning that names both folders. The app shows no notice
+on screen for the fallback.
+The check is a `Func<string, bool>` parameter of `AppLogging.Create`, so the tests choose its answer and never touch
+`C:\DISTR`. A user who may create folders under `C:\` gets the site folder even without the installer. The spectrum
+store stays under `%LOCALAPPDATA%` (Spectrum store).
 
 No ReactiveUI object is constructed before `AppBuilder.Setup()`. ReactiveUI takes its exception handler once, on first
 use, so a command or property helper built earlier would make the handler that `BuildAvaloniaApp` installs a silent
@@ -189,10 +212,10 @@ then calls `Log.CloseAndFlush()` while the session may still write its last line
 
 | Row | Height | Content |
 | --- | --- | --- |
-| Menu | `Auto` | `AppMenuBar`: File, Exit; View, Verbose logging |
-| Connection row | `Auto` | `ConnectionBar`: label "Port", a 240 px port list, Refresh, Connect, Disconnect |
-| Content | `*` | `ContentArea`, columns `*,Auto` and rows `3*,2*,Auto`: `SpectrumPane` with `SpectrumChartView`, `TrendPane` with `TrendChartView` and `OverviewPane` with `OverviewView` in the left column, and the 392 px `SignalPane` with `SpectrumPanel` and `TrendPanel` across all three rows |
-| Message panel | `Auto` | `MessagePanelView`; the row is hidden while the list is empty, and its list scrolls past 64 px |
+| Menu | `Auto` | `AppMenuBar`: File, Exit; View, Message panel, Verbose logging |
+| Connection row | `Auto` | `ConnectionBar`: label "Port", a 240 px port list, Refresh, Connect, Disconnect; then a 1 px separator, Back to live and Follow live |
+| Content | `*` | `ContentArea`, columns `*,Auto` and rows `3*,2*,Auto`: `SpectrumPane` with `SpectrumChartView` and the 312 px `SignalPane` with `SpectrumPanel` in the first row; `TrendPane` with `TrendChartView` and `OverviewPane` with `OverviewView` across both columns in the second and third rows |
+| Message panel | `Auto` | `MessagePanelView`, `MainWindow.MessagePanelHeight` 93 px high, shown while `MessagePanelViewModel.IsVisible` is true |
 | Status bar | `Auto` | `AppStatusBar`: dot and link text, port, ATP-2000, ATP-8000, lost spectra, dropped frames |
 
 The window opens centred at `MainWindow.OpeningWidth` 1280 by 800. On a screen whose work area is smaller,
@@ -202,10 +225,11 @@ Exit is view work: the view model emits on
 
 `MainWindow.MinimumWidth` is 1256 px, the window's `MinWidth`. It is the widest of the rows with their longest texts and
 the content row's floor, rounded up to the 8 px grid: the Russian status bar with `COM256`, six-digit lost and dropped
-counts and "Порт недоступен, переподключение" measures 1252.2 px (English 1085.2 px), the connection row 654.9 px
-in Russian (English 595.4 px), and the signal pane plus a 400 px chart floor 792 px. At 400 px an ATP-8000 spectrum
-keeps at least four labelled wavelength ticks; the measured axis shows eight, 1000 to 2400 nm. The charts never get
-less than 864 px (1256 minus the 392 px pane), where 10 min of trend keep at least four labelled time ticks. The
+counts and "Порт недоступен, переподключение" measures 1252.2 px (English 1085.2 px), the connection row with Back to
+live and Follow live 1049.3 px in Russian (English 835.4 px), and the readout pane plus a 400 px chart floor 712 px. At
+400 px an ATP-8000 spectrum keeps at least four labelled wavelength ticks; the measured axis shows eight, 1000 to
+2400 nm. At the minimum width the spectrum chart gets 944 px (1256 minus the 312 px pane) and the trend the full
+1256 px, where 10 min of trend keep at least four labelled time ticks. The
 headless text stub gives no real widths, so the `MainWindowTextFit*Tests` add the realised row chrome to each text
 measured through SkiaSharp at 14 px in the widest of Inter and every installed family of Semi's font chain; on Windows the app
 resolves that chain to Microsoft YaHei. The same test holds `MinimumWidth` at or under `OpeningWidth` and checks that
@@ -214,50 +238,50 @@ any width above the minimum, and no link state changes the set of rows or a row'
 
 `MainWindow.MinimumHeight` is 688 px, the window's `MinHeight`: a maximised window on a 1366 x 768 screen gives a
 client height of 689 px, and every row fits there with the message panel shown. The row floors are
-`SpectrumRowMinHeight` 192 px and `TrendRowMinHeight` 208 px, each a 120 px data area under the plot's axis margins;
-the data floor is 120 px because two 200 px floors would need 703 px of client height before the message panel. Above
-their floors the spectrum and trend rows split the content row 3 : 2; the spectrum takes the larger share because it
-is the primary live view. The measured row heights are in the table of `docs/plans/20261104-intensity-trend.md`,
-Solution Overview, Layout; `MainWindowChartHeightTests` measures them at 1280 x 800, 1366 x 768 and 1280 x 1024, with and
-without the message panel, and at the minimum.
+`SpectrumRowMinHeight` 192 px and `TrendRowMinHeight` 208 px, each a 120 px data area under the plot's axis margins,
+the 24 px top margin of the state line included; the data floor is 120 px because two 200 px floors would need 703 px
+of client height before the message panel. Above their floors the spectrum and trend rows split the content row
+3 : 2; the spectrum takes the larger share because it is the primary live view. `MainWindowChartHeightTests` measures
+the rows and prints them:
+
+| Client size | Message panel | Spectrum row (data) | Trend row (data) |
+| --- | --- | --- | --- |
+| 1280 x 800 | hidden | 389 (313.8) | 260 (183.8) |
+| 1280 x 800 | shown | 334 (258.8) | 222 (145.8) |
+| 1366 x 689 | hidden | 323 (247.8) | 215 (138.8) |
+| 1366 x 689 | shown | 237 (161.8) | 208 (131.8) |
+| 1280 x 1024 | hidden | 524 (448.8) | 349 (272.8) |
+| 1280 x 1024 | shown | 468 (392.8) | 312 (235.8) |
+| 1280 x 688 (minimum) | shown | 236 (160.8) | 208 (131.8) |
 
 The Verbose logging item reads `IsVerboseLogging` one-way and writes only through `ToggleVerboseLoggingCommand`, so the
 command is the level's single writer. `LogLevelControl` raises no notification; the command raises
 `IsVerboseLogging` after it flips the switch. The level resets to Information at every start. Each toggle writes
 an Information line with the new minimum level and a Debug line; the Debug line reaches the log file only when the
-toggle turned verbose logging on, so the operator sees the switch take effect in the file.
+toggle turned verbose logging on, so the operator sees the switch take effect in the file. The Message panel item is
+a check item over `MessagePanelViewModel.IsVisible` and writes only through its `ToggleCommand` (Error route).
 
 ### Content row
 
 The charts are the elements that stretch. `SpectrumPane` and `TrendPane` hold their charts edge to edge with no
 padding, because ScottPlot draws its own axis margins over the panel background. `TrendPane` and `OverviewPane` each
-carry a 1 px top border in `AppBorderBrush`; the overview is a 36 px strip, so its row is 37 px.
+carry a 1 px top border in `AppBorderBrush`; the overview is a 36 px strip, so its row is 37 px. The trend and the
+overview span both columns, so a wide window gives its extra width to the spectrum chart, the trend and the overview,
+and the readout pane keeps its width.
 
-`SignalPane` is a `Border` with a 1 px left border and `Padding="16"`, `SpectrumPanel.PaneWidth` wide, across the three
-rows. Inside it a `ScrollViewer` (`SidePaneScroll`) scrolls vertically only, so the pane scrolls instead of clipping
-when the shown message panel takes its height, and no row ever disappears; at default fonts a short window alone
-leaves the pane room. Its scrollbar overlays the pane's 24 px slack. The `ScrollViewer` holds `SpectrumPanel` and
-`TrendPanel` in one `StackPanel` with `Grid.IsSharedSizeScope`.
-Each panel is one form grid: a label column in the shared size group `SidePaneLabel`, so both forms keep one field
-edge, a 12 px gap and a field column of at least 120 px, the number width, with 8 px between rows.
+`SignalPane` is a `Border` with a 1 px left border and `Padding="16,12"`, `SpectrumPanel.PaneWidth` wide, beside the
+spectrum chart only. Inside it a `ScrollViewer` (`SidePaneScroll`) scrolls vertically only, so the pane scrolls
+instead of clipping when the spectrum row is at its floor. `SpectrumPanel` is one form grid: a label column, a 12 px
+gap and a field column of at least 120 px, the number width, with 8 px between rows. It holds the seven label and value
+rows of the readout (The readout pane) and no header and no control: the chart's options sit in the axis flyouts (The
+axis flyouts).
 
-- The "Signal" header comes first, then seven label and value rows.
-- The "Chart" header sits 16 px below them, then the "Invert spectrum" and "Logarithmic scale" checkboxes and the
-  Reset scale, Stick to zero and Back to live buttons, one per row in the field column with an empty label cell. Back
-  to live is enabled only while a moment is shown.
-- The "Trend" header sits 16 px below them, then the "Time window" label with the preset `ComboBox`, 120 px wide, and
-  the Follow live button in the field column.
-
-The buttons carry `HorizontalAlignment="Left"`, because Semi's button otherwise centres in the column.
-
-Every text in the pane stays on one line. A pane-scoped style sets `NoWrap` on every `TextBlock`, and each checkbox
-holds a `TextBlock` instead of a string, because Semi's `CheckBox` template wraps string content at template priority,
-where no style reaches. `PaneWidth` is 392 px: the 1 px border, 16 padding, the label column, 12, the field column, 16
-padding and 24 px slack, rounded up to the 8 px grid. Russian sets it: labels 117.5 px for "Окно измерения", field
-column 198.9 px for "Логарифмическая шкала", 385.4 px in all (English 91.0 and 140.6 px, 300.6 px). The longest values
-("-1,23457E-38", "65535 nm", "±255 nm", "23:59:59.999") measure at most 92.1 px and fit the 120 px floor.
-the `MainWindowTextFit*Tests` measure them the same way as the status bar, in the labels' face, which every label and value
-shares, together with the Trend section's label, Back to live, Follow live and the widest preset label in its box.
+Every text in the pane stays on one line: a pane-scoped style sets `NoWrap` on every `TextBlock`. `PaneWidth` is
+312 px: the 1 px border, 16 padding, the label column, 12, the field column, 16 padding and 24 px slack, rounded up to
+the 8 px grid. Russian sets it: labels 117.5 px for "Окно измерения", values 92.1 px, the field column at its 120 px
+floor, 306.5 px in all (English 91.0 and 92.0 px, 280 px). The longest values ("-1,23457E-38", "65535 nm", "±255 nm",
+"23:59:59.999") fit the 120 px floor. The `MainWindowTextFit*Tests` measure them the same way as the status bar, in the
+labels' face, which every label and value shares.
 
 The message panel row takes its height from the content row: the charts and the pane lose that height and keep their
 width, and the window keeps its size. No spectrum or trend state changes the window size or a pane's bounds.
@@ -271,6 +295,11 @@ scheduler, so it is right from construction. Refresh reads the port list again a
 still listed; a listing that fails shows an empty list and reports a `PortListError` to the message panel. With no ports the list shows the placeholder "No ports found"; the placeholder is empty while ports are
 listed. Connect and Refresh are synchronous commands; Disconnect awaits `DisconnectAsync`.
 
+Back to live and Follow live follow the connection row after a 1 px separator, the place SemiPlot gives its live
+navigation in the top bar. Back to live is `SpectrumViewModel.BackToLiveCommand`, enabled only while a past moment is
+shown (A past moment); Follow live is `TrendViewModel.FollowLiveCommand`, enabled only while the trend is not
+following (Navigation). Both stay in the row in every state, so the row never changes width.
+
 ### Status bar
 
 `AppStatusBarViewModel` follows `SerialLink.StatusUpdates(uiScheduler)` the same way as the connection row and holds the
@@ -280,9 +309,12 @@ latest `LinkStatus`; every text derives from it, and the dropped count adds the 
 | --- | --- |
 | Link | One text per `LinkState`: "Not connected", "Connecting", "Port unavailable, retrying", "Waiting for data", "Receiving data", "Board not responding", "Other device" |
 | Port | The port name; "-" while disconnected |
-| ATP-2000, ATP-8000 | "connected", "not connected", "measurement failed" (connected and failed bits set), or "no data" before the first frame |
-| Lost spectra | The total since Connect; "-" while disconnected |
+| ATP-2000, ATP-8000 | While Receiving: "connected", "not connected" or "measurement failed" (connected and failed bits set) from the latest frame's `state`; "no data" in every other state |
+| Lost spectra | The total since Connect while Receiving; "-" in every other state |
 | Dropped frames | "Dropped frames: {0}", the frames the link's channel dropped plus the frames the store lost, since the start; a number in every state, also while disconnected |
+
+The link keeps the last `state` byte and the lost count after it leaves Receiving, so the spectrometer and lost
+segments read them only while Receiving; outside it they would show a board that no longer answers as connected.
 
 Lost spectra are board spectra that never arrived, counted from `seq`. Dropped frames arrived but are missing from the
 stored history, so the count covers the run, not the connection. `DroppedFramesText` is an
@@ -349,11 +381,10 @@ carries a new `SpectrumMeasurement` around the same immutable pixel array, and `
 shows every click, also a second click on the same moment. While a moment is shown, live signals read the same
 historical record and `DistinctUntilChanged` drops them. `ReturnToLive` while live does nothing.
 
-`SpectrumViewModel` maps `ShownMoment` to "Spectrum from HH:mm:ss" in local time, or an empty string while live, and
-binds it to `SpectrumChartViewModel.HistoricalText`, which has no other writer; the line sits over the spectrum chart
-in `AppSecondaryForegroundBrush` while it is not empty. `BackToLiveCommand` calls `ReturnToLive` and is enabled only
-while `ShownMoment` is set. The Updated row of the signal pane shows the shown spectrum's receive time, so it shows
-the moment's time too. The trend reads the same `ShownMoment` and draws a line at it (Trend).
+While a moment is shown, the chart's state line starts with "Spectrum from HH:mm:ss" in local time (The view).
+`BackToLiveCommand` calls `ReturnToLive` and is enabled only while `ShownMoment` is set; its button sits in the
+connection row. The Updated row of the readout pane shows the shown spectrum's receive time, so it shows the moment's
+time too. The trend reads the same `ShownMoment` and draws a line at it (Trend).
 
 ### The chart
 
@@ -361,7 +392,7 @@ the moment's time too. The trend reads the same `ShownMoment` and draws a line a
 `SpectrometerCalibration.WavelengthOf` as `xs` and its own `ys` buffer; only the shown device's line is visible. The
 window is a `HorizontalSpan` from `WavelengthNm - Delta` to `WavelengthNm + Delta`, and a `VerticalLine` marks
 `WavelengthNm`. When that window does not overlap the device's wavelength range, both are hidden, and with `Delta` 0
-only the centre line is drawn; the signal pane still shows the wavelength and the window. The axis labels come from
+only the centre line is drawn; the readout pane still shows the wavelength and the window. The axis labels come from
 resx, and `Plot.Font.Automatic()` picks a font that holds Cyrillic. Every write to the plot (buffers, visibility,
 limits, the tick generator, the minor grid width, colours) happens inside `lock (Plot.Sync)`, which ScottPlot's
 render takes too, so a render never sees half an update. The frame's pixel array is read, never written.
@@ -380,57 +411,67 @@ sets them, so a flat range has a defined answer and no limit is NaN.
 
 | Case | X | Y, linear | Y, log (decades) |
 | --- | --- | --- | --- |
+| Before the first spectrum | 185.9 .. 2464.3 nm, the first ATP-2000 pixel to the last ATP-8000 pixel | `0 .. 1` | `0 .. 1` |
 | Following | `xs[0] .. xs[P - 1]` of the shown device | `min - 5 % .. max + 5 %` of the reference's span | the same, in decades |
 | Following, flat reference (`min == max`) | same | `v - 1 .. v + 1` | `v - 0.5 .. v + 0.5` |
-| Stick to zero | same | `0 .. rawMax x 1.2`; `0 .. 1` when `rawMax` is 0 | `0 .. log10(rawMax x 1.2)`; `0 .. 1` when `rawMax <= 1` |
+| Following, From zero | same | `0 .. max x 1.05`; `0 .. 1` when `max <= 0` | `0 .. max x 1.05` in decades; `0 .. 1` when `max <= 0` |
 | Frozen | unchanged | unchanged | unchanged |
+
+`max` is the largest displayed value of the reference, after inversion and the log step. `FromZeroRange` (Core/Chart)
+holds the From zero rule, and the trend and the overview share it. From zero is a mode of the following scale, off by
+default: every spectrum sets the limits again while it is on, and a zoom or a pan still freezes the scale.
 
 The reference is the spectrum the Y limits come from: the shown spectrum, or, while a dark frame is shown, the last
 non-dark measurement, projected again in the current inversion and axis mode. A dark frame is one whose raw pixels are
 all zero. The chart keeps the last non-dark measurement of each device, and a dark frame takes its own device's. With
 no earlier non-dark frame of that device the dark frame is its own reference and takes the flat range: the other
-device's intensities say nothing about this one. So a dark frame
-while following keeps the Y limits of the spectrum before it, Stick to zero on a dark frame takes that spectrum's
-`rawMax`, and a log or inversion toggle during a dark frame shows that spectrum's limits in the new mode; X follows the
-dark frame's device in every case. On the log axis the dark line lies at 0 decades, below a range kept from a spectrum
-whose minimum is above 1, so the data area is empty for that frame. `rawMax` is the reference's largest displayed value
-before the log step, after inversion.
+device's intensities say nothing about this one. So a dark frame while following keeps the Y limits of the spectrum
+before it, From zero on a dark frame takes that spectrum's maximum, and a log or inversion toggle during a dark frame
+shows that spectrum's limits in the new mode; X follows the dark frame's device in every case. On the log axis the
+dark line lies at 0 decades, below a range kept from a spectrum whose minimum is above 1, so the data area is empty for
+that frame.
 
-Only a live spectrum writes the last non-dark measurement, also when a toggle or Reset scale projects a historical one
+Only a live spectrum writes the last non-dark measurement, also when a toggle or Autoscale projects a historical one
 again, so a moment from the past never becomes the dark-frame reference; a historical dark spectrum takes the live
 reference of its device, or the flat range without one. Each change that ends with the scale frozen records the shown
 spectrum's device as the frozen device. A historical spectrum, and the first live spectrum after it, keep the frozen
 limits when their device is the frozen device and return the scale to following otherwise, so a moment of the other
 device never leaves the plot blank, and the operator compares moments of one device at one zoom.
 
-The scale follows from the start, after Reset scale and after a log or inversion toggle. Once a spectrum is shown it
-freezes on a wheel step over the plot, on a pointer move with a button held 5 px or more from the press, and after
-Stick to zero. Before the first spectrum neither input freezes it, so the first spectrum sets the limits. Tunnel
-handlers for `PointerWheelChanged`, `PointerPressed`, `PointerMoved` and `PointerReleased` on `AvaPlot` record the
-press and forward to the chart: a wheel step calls `TakeManualScale()`, and a move calls `OnHeldMove(press, current,
-isButtonHeld)`, which decides the freeze from the held button and the larger of the X and Y distances. The handlers run
-before ScottPlot's class handler, which marks the wheel event handled. The 5 px is ScottPlot 5.1.59's own floor:
-`MouseDragPan` and `MouseDragZoomRectangle` ignore a held move shorter than that, so a shorter move would freeze limits
-ScottPlot never moved. ScottPlot still applies that short pan on release, and `MouseDragZoom` (right button) has no
-floor, so a right drag under 5 px zooms a little; while following, the next spectrum sets the limits back in both
-cases. ScottPlot's `MouseDragPan` also restores
-the press-time limits on release before it applies the drag, so a press held across a frame ends on limits panned from
-the press-time view, not from the last frame. A bare click and a key press keep the scale following. While frozen, a
-live frame from the other device keeps the frozen limits, and its line can lie outside them until Reset scale. Reset
-scale is enabled only while a spectrum is shown and the scale is frozen, so the button also shows the frozen state;
-Stick to zero is enabled once a spectrum is shown. `IsFollowing` raises its change after `Plot.Sync` is released, so no
-subscriber runs under the plot lock.
+The scale follows from the start, after Autoscale returns it to following and after a log, inversion or From zero
+toggle. Once a spectrum is shown it freezes on a wheel step over the plot, on a pointer move with a button held 5 px or
+more from the press, on Autoscale while following, and on typed bounds in an axis flyout. Before the first spectrum
+none of these inputs freezes it, and typed bounds change nothing (`HasSpectrum` guards `TakeManualScale`,
+`ToggleAutoscale`, `SetVerticalRange` and `SetHorizontalRange`), so the first spectrum sets the limits. Tunnel handlers for `PointerWheelChanged`,
+`PointerPressed`, `PointerMoved` and `PointerReleased` on `AvaPlot` record the press and forward to the chart: a wheel
+step calls `TakeManualScale()`, and a move calls `OnHeldMove(press, current, isButtonHeld)`, which decides the freeze
+from the held button and the larger of the X and Y distances. The handlers run before ScottPlot's class handler, which
+marks the wheel event handled. The 5 px is ScottPlot 5.1.59's own floor: `MouseDragPan` and `MouseDragZoomRectangle`
+ignore a held move shorter than that, so a shorter move would freeze limits ScottPlot never moved. ScottPlot still
+applies that short pan on release, and `MouseDragZoom` (right button) has no floor, so a right drag under 5 px zooms a
+little; while following, the next spectrum sets the limits back in both cases. ScottPlot's `MouseDragPan` also
+restores the press-time limits on release before it applies the drag, so a press held across a frame ends on limits
+panned from the press-time view, not from the last frame. A bare click on the data area and a key press keep the scale
+following. While frozen, a live frame from the other device keeps the frozen limits, and its line can lie outside them
+until Autoscale. `IsFollowing` raises its change after `Plot.Sync` is released, so no subscriber runs under the plot
+lock.
+
+`AutoscaleCommand` toggles: while following it freezes the limits where they stand, and while frozen it returns to
+following in the current mode. Its toggle button in both spectrum flyouts is checked while the scale follows, so the
+button shows the state.
 
 ScottPlot's input processor stays on with five responses: `MouseInteractWithPlottables`, `MouseDragZoomRectangle`,
 `MouseDragPan`, `MouseDragZoom` and `MouseWheelZoom`. The view removes `DoubleClickBenchmark`, `SingleClickAutoscale`,
 `SingleClickContextMenu`, `KeyboardAutoscale` and `KeyboardPanAndZoom`: the app is a read-only viewer, ScottPlot's
-autoscaler never sets the limits, and keyboard input never moves them.
+autoscaler never sets the limits, and keyboard input never moves them. A left press on an axis band opens that axis's
+flyout and is marked handled, so it never reaches ScottPlot's pan or zoom (Axis flyouts).
 
 ### The view
 
 `SpectrumChartView` holds `AvaPlot` alone inside the `PlotLayer` decorator, whose `CacheMode` is a `BitmapCache`. The
-cache never goes on `AvaPlot` itself: there Avalonia 12 freezes the plot on its first frame. The view binds the chart
-with `PlotControl.Reset(chart.Plot)` when its `DataContext` changes and subscribes `RedrawRequested`; disposing the
+cache never goes on `AvaPlot` itself: there Avalonia 12 freezes the plot on its first frame. The view's
+`DataContext` is the `SpectrumViewModel`; the view binds its chart with `PlotControl.Reset(chart.Plot)` when the
+`DataContext` changes, subscribes `RedrawRequested` and attaches the two axis forms to their flyouts; disposing the
 chart completes that stream and clears a pending frame. `AvaPlot.Reset` disposes the plot it replaces, so the view
 skips it when the control already holds the chart's plot and leaves the control alone on a null `DataContext`: the same
 chart coming back keeps its plottables. A switch to another chart still disposes the previous chart's plot, because
@@ -443,10 +484,33 @@ while the operator drags or zooms. The view repaints the plot from the palette o
 the surfaces and the series colours, so no render sees one without the other.
 
 Until the first spectrum a line over the plot reads "No spectrum yet. Connect to the board in the row above." After a
-Disconnect the last spectrum stays and its update time tells its age; a new Connect does not clear it. While a moment
-is shown, the historical line sits at the top of the plot.
+Disconnect the last spectrum stays; the state line and its update time tell its age, and a new Connect does not clear
+it.
 
-### The signal pane
+### The state line
+
+Both charts reserve a 24 px top margin (`ChartStateLine.TopMargin`, the top axis's minimum size) for one line of state
+text over the data area. `ChartStateLine.Place` sizes the line's band to the data area's width and the margin's height
+after each served frame, and the spectrum view also after a size change, so the line starts at the data area's left
+edge. The line is one `TextBlock` in `AppSecondaryForegroundBrush`, `NoWrap` with an ellipsis, hidden while its text is
+empty, so no state changes the chart's layout.
+At the minimum width the longest spectrum line, a data-age text with all four modes, measures 561.9 px in Russian
+(English 462.8 px) over 878.2 px of data area, and the longest trend line 429.7 px (335.7 px) over 1190.2 px
+(`MainWindowTextFitChartTests`), so neither line trims.
+
+`SpectrumViewModel.StateText` joins its parts with " · " (`ChartStateSeparator`):
+
+1. "Spectrum from HH:mm:ss" while a moment is shown, or else "No new data since HH:mm:ss" while the live spectrum is
+   stale, with the receive time of the last live spectrum.
+2. "Log", "Inverted" and "From zero" for each mode that is on.
+3. "Scale frozen" while a spectrum is shown and the scale does not follow.
+
+`SpectrumStaleness.IsStale` holds the stale rule: a live spectrum is stale while the link is not Receiving, or when it
+is more than `LinkTiming.SilenceLimit`, 10 s, old. Before the first live spectrum nothing is stale, so the empty chart
+carries no state. The text is an `ObservableAsPropertyHelper` over the modes, the scale state, `ShownMoment`, the link
+status on the UI scheduler and a 1 s tick, so a spectrum turns stale on screen within a second of the 10 s.
+
+### The readout pane
 
 `SignalInfoViewModel` holds the shown `DisplayedSpectrum` and raises its seven texts from that one setter, which
 compares by reference: spectrometer, wavelength (`{0} nm`), window (`±{0} nm`), amplitude, SNR, Q factor and the update
@@ -626,13 +690,23 @@ bottom of the data area in `AppSeverityErrorBrush` and at least 1 px wide, so on
 failed columns less than 5 s apart join into one span, so a steady failure draws one bar instead of dashes. The readout names the failure, so
 colour never carries it alone.
 
-The Y limits pad the drawn values by 5 % of their span. A span under 2 counts as flat and takes `c - 1 .. c + 1` around
-its centre `c`, so float noise on a steady signal does not shrink the axis to fractions of a unit. The limits stay
-unchanged when nothing is drawn. The Y tick labels print the fraction digits each tick needs in the current culture
+The Y limits follow the drawn values in one of two modes. From zero, on by default, runs Y from 0 to the drawn
+maximum plus 5 % (`FromZeroRange`), so the trend shows the signal's level against zero. With From zero off, the limits
+pad the drawn values by 5 % of their span; a span under 2 counts as flat and takes `c - 1 .. c + 1` around its centre
+`c`, so float noise on a steady signal does not shrink the axis to fractions of a unit. The limits stay unchanged when
+nothing is drawn. A range typed in the intensity flyout (`ManualVerticalRange`) holds Y there in either mode until
+Autoscale or a From zero toggle clears it; `IsVerticalAutoscaled` is true while no range is held. Autoscale while Y
+follows holds the range drawn now. The Y tick labels print the fraction digits each tick needs in the current culture
 (`18 775,5` in Russian); ScottPlot's default rounds values above 1000 to whole numbers, which repeats labels on ticks
 less than 1 apart. The Y label names the key on two lines, "Intensity" over "650 nm ±10 nm", so no pane row repeats
-it: on one line the widest Russian key overruns the room the plot gives a label at the trend's floor. The X label
-reads "Time". While a moment is shown, the shown-moment line stands at it in `AppMarkerLineBrush`.
+it: on one line the widest Russian key overruns the room the plot gives a label at the trend's floor. The time ticks
+carry the time only, `HH:mm:ss` for a window of up to 20 min and `HH:mm` above, and the X label carries the date in
+the culture's short date format: "Time, {date}" (`TrendAxisTimeFormat`), or "Time, {first} – {last}"
+(`TrendAxisTimeRangeFormat`) for a window across midnight, in local time.
+
+`TrendViewModel.StateText` is the trend's state line (The state line): the window width, a preset's label or hours,
+minutes and seconds, then "Not following the data" while not following and "Scale frozen" while a Y range is held,
+joined by " · ". While a moment is shown, the shown-moment line stands at it in `AppMarkerLineBrush`.
 
 ### Navigation
 
@@ -645,23 +719,31 @@ The window's width runs from 10 s to 24 h, the history the cache keeps, and open
   following, so a zoom-in keeps the time under the cursor instead of snapping back. `TrendNavigationModel` owns this
   rule. While following, the drawn window ends up to 1 s before now, so `TrendChartViewModel` first moves it onto now,
   and the zoom anchor with it; a zoom-in at the right edge or a short drag toward now keeps following.
-- Zoom widths snap to the ladder `10 s x 1.25^n`. The preset box shows the preset of the current width, and is empty
-  after a zoom off every preset; picking a preset, also from the empty box, sets its width exactly, keeps the right
-  edge (while not following, the first-point clamp can move it) and keeps following as it was.
-- Follow live jumps to now and follows again; it is enabled only while not following.
+- Zoom widths snap to the ladder `10 s x 1.25^n`. A preset in the time flyout sets its width exactly, keeps the right
+  edge (while not following, the first-point clamp can move it) and keeps following as it was; a typed width does the
+  same.
+- Typed start and end in the time flyout show exactly that window, its width clamped to 10 s .. 24 h and held at the
+  pan floor, and stop following (`TrendNavigationModel.SetWindow`).
+- Follow live jumps to now and follows again; it is enabled only while not following, and its button sits in the
+  connection row.
 
 `TrendChartView` turns ScottPlot's input off (`UserInputProcessor.Disable()`, `HandleMouseWheelEvent = false`) and
 handles the pointer itself. A wheel notch zooms around the cursor time by 0.8 (wheel up) or 1.25 (wheel down);
-Shift + wheel pans by 10 % of the width, wheel down toward newer data. A left press captures the pointer; a move past
-4 px from the press starts a drag that pans by the time under the pointer; a release within 4 px is a click, which
-passes the press time to `TrendViewModel.ShowMoment`. A lost capture ends the drag. The view serves redraw requests
+Shift + wheel pans by 10 % of the width, wheel down toward newer data. A left press on the intensity axis band opens
+the intensity flyout at once. Any other left press captures the pointer; a move past 4 px from the press starts a drag
+that pans by the time under the pointer; a release within 4 px is a click. A click that pressed on the time axis band
+opens the time flyout, and any other click passes the press time to `TrendViewModel.ShowMoment`. A lost capture ends the drag. The view serves redraw requests
 once per display frame with the same `BitmapCache` layout and palette repaint as the spectrum chart view.
 
 The pointer maths runs in device-independent pixels at any Windows scale. ScottPlot.Avalonia 5.1.59 (decompiled)
 hands ScottPlot `PointerEventArgs.GetPosition`, which is in DIPs, renders into a rect of the control's DIP bounds on
 the Skia canvas Avalonia has already scaled, and keeps `DisplayScale` at 1; the app leaves `Plot.ScaleFactor` at 1. So
 `Plot.GetCoordinates` of a DIP position is the hover time, the zoom anchor and the click moment, and the overlay's
-division by `ScaleFactor` is a division by 1.
+division by `ScaleFactor` is a division by 1. With a `ScaleFactor` s, ScottPlot's layout (`LastRender.DataRect`, the
+axis panels) runs in DIPs divided by s, while `GetCoordinates` and `GetPixel` take and return DIPs; `ChartAxisRegion`
+divides a DIP position by s before it compares it with the layout, and `ChartStateLine` multiplies the layout by s,
+which `ChartAxisRegionTests` checks at s = 1 and s = 2. `TrendCursorOverlay` compares `GetPixel`'s DIPs with the
+layout directly, which holds only at s = 1.
 
 Until the first point a line over the plot reads "No trend yet. It appears with the first spectrum."
 
@@ -684,7 +766,9 @@ readout.
 
 ### The overview
 
-`OverviewView` is a 36 px strip in `AppContentBackgroundBrush`. `OverviewBand` draws the band in `AppAccentBrush` at
+`OverviewView` is a 36 px strip in `AppContentBackgroundBrush`. `OverviewViewModel.IsFromZero` mirrors the trend's
+From zero, and the band then runs from zero to its maximum plus 5 %, as the trend does
+(`OverviewGeometry.BandFigures`). `OverviewBand` draws the band in `AppAccentBrush` at
 opacity 0.35, with its centre line at full opacity; a column between two breaks draws at least a 3 px square; the window highlight is `AppAccentFillBrush` with an `AppAccentBrush` border and at least 6 px wide; a
 hover line in `AppSecondaryForegroundBrush` follows the pointer. A left press, and a move with the button held, centre
 the trend window on the time under the pointer, clamped at the first point, and stop following.
@@ -706,6 +790,49 @@ subscriptions exist before the first frame; the close chain stops the feed after
 (Startup). The chart and overview subscriptions to the cache live for the process. After its dispose the cache ignores
 frames and chunks, and the chart ignores a refresh and a posted data area width, so a read or a width that outlives
 the close changes nothing.
+
+## Axis flyouts
+
+A left press on an axis band opens that axis's flyout at the pointer, the interaction SemiPlot uses; the forms are
+ported from SemiPlot's axis scale panel and time window panel. `ChartAxisRegion` takes the left and bottom axis bands
+from the last render's layout (`PanelSizes`, `PanelOffsets`); before the first render, or on a hidden axis, there is
+no band. Each flyout lives in its chart view's resources:
+
+| Flyout | Width | Rows, top to bottom |
+| --- | --- | --- |
+| Spectrum intensity | 300 px | the note; Maximum; Minimum; Scale type: Logarithmic; From zero; Invert spectrum; Autoscale; the message line |
+| Spectrum wavelength | 300 px | the note; Start, nm; End, nm; Autoscale; the message line |
+| Trend intensity | 300 px | the note; Maximum; Minimum; From zero; Autoscale; the message line |
+| Trend time | 380 px | the note; Start time and date; End time and date; Width and the Presets drop-down (1 min, 10 min, 1 h, 6 h, 24 h); the message line |
+
+The number fields are 140 px wide, the time fields 110 px. The checkboxes and Autoscale run their commands at once
+(The scale; Trend, The chart).
+
+- Opening seeds the fields from the axis as it is drawn at that moment, and the note on the first row, "Values as of
+  opening", says so. The fields do not follow the live limits while the flyout is open: the spectrum redraws 2 to 3
+  times a second and a following trend once a second, and a refresh would overwrite the field the operator types in.
+  A mode toggle and every commit seed the fields again.
+- Enter commits and keeps the flyout open; a close by a click outside commits too; Escape closes it without a commit.
+  A field equal to its seed at the shown precision counts as unchanged, so an untouched flyout writes nothing, and
+  an edited bound is written with the other bound as it stood at the opening.
+- `AxisRangeForm` shows numbers as `0.###` in the current culture and reads them in the current culture first,
+  then with a point or a comma as the decimal separator, so "1.5" and "1,5" both read as 1.5 under Russian. A pair is written only when both fields read as
+  finite numbers, the minimum is below the maximum and the axis's own rule accepts it: on the log scale the spectrum
+  intensity axis needs a minimum above 0, which `SpectrumChartViewModel.VerticalRangeProblem` names and
+  `SetVerticalRange` checks again. The first rule broken shows on the message line, and the typed text stays.
+- `TimeWindowPanelViewModel` reads times as `hh:mm:ss` in local time, dates from a `CalendarDatePicker` in
+  `yyyy-MM-dd` and the width as `hh:mm:ss`. Changed edges take precedence over a changed width; an end not after the
+  start, or a field that does not read, shows its message and changes nothing.
+- The message line is a reserved 40 px row that wraps and ends in an ellipsis, so validation never resizes a flyout.
+  The longest message takes two lines of 18.6 px in Russian at the theme font; the note takes 214.5 px of the 300 px
+  row in Russian (`MainWindowTextFitFlyoutTests`).
+
+`AxisFlyout` binds the form of the current `DataContext` and hides its flyout on the form's close request. A chart view
+hides its flyouts on unload, on a `DataContext` change (before it detaches the old form, so pending fields commit as
+on unload) and on the window's `Closing`, which it subscribes in
+`OnLoaded` through `AxisFlyout.HideOnClosing` and leaves in `OnUnloaded`. `Hide` closes the calendars and the preset
+list inside the flyout before the flyout: a window that closes with a calendar drop-down open inside a flyout makes
+Avalonia 12 throw `ArgumentOutOfRangeException` from the logical-tree detach, and the app would crash on exit.
 
 ## Spectrum store
 
@@ -942,11 +1069,21 @@ severity class.
 
 The panel holds at most 200 entries, newest first. A message equal to the newest entry, severity included, does not add
 a row: it raises that entry's repeat count and last-seen time, and the log line drops to Debug. Only the newest entry
-is compared, so a lost port, a restored link and a second lost port are three rows. The panel row is visible while the
-list has entries: the first entry opens it, Clear empties the list and hides it. The list shows at most 64 px, one
-three-line entry, and scrolls past that, so the panel row stands at most 133 px. An entry with an empty remedy shows
-no remedy line. `BoardNotRespondingRemedy` and `UnrecognisedDataRemedy` fit one line at the minimum width in both
-languages, so their entries keep three lines.
+is compared, so a lost port, a restored link and a second lost port are three rows.
+
+The panel row is compact and shows the newest entry only. Its first line holds the severity dot, the last-seen time
+`HH:mm:ss`, the bold title, the repeat count and the detail, which ends in an ellipsis and carries the full text as a
+tooltip; on the right, "{n} more" opens a 640 px flyout with every entry, scrolling past 360 px, and Clear empties the
+list. The remedy takes the second line, wraps to at most two lines and ends in an ellipsis past them; an entry with an
+empty remedy shows no remedy line. With no entries the row reads "No messages". The row is
+`MainWindow.MessagePanelHeight` 93 px high in every state: a two-line remedy, the 1 px top border and the 8 px
+vertical padding. At the minimum width `BoardNotRespondingRemedy` fits one line in both languages and `UnrecognisedDataRemedy`
+two.
+
+`MessagePanelViewModel.IsVisible` decides whether the row shows, and the view model is its one writer. It starts false;
+each new entry sets it, so nothing new lands off screen, while a repeat that coalesces into the newest entry does not,
+so a panel the operator closed during an outage stays closed. View, Message panel toggles it through `ToggleCommand`,
+and Clear keeps the row shown.
 
 `UnhandledErrorObserver` is the handler `BuildAvaloniaApp` passes to `UseReactiveUI(... WithExceptionHandler ...)`.
 `App.Run` builds it once with the logger `Program` hands over, and it lives for the process, because ReactiveUI takes
@@ -982,21 +1119,27 @@ its paths relative to `Installer/`; the compiled `SemiSpecInstaller.exe` goes to
   an upgrade reuses the folder the previous install recorded (`UsePreviousAppDir`), so an upgraded machine keeps
   `{autopf}\SpectrumVisualizer`. The wizard gives the operator no way to pick another folder.
 - `[InstallDelete]` empties the program folder before the copy, so no 2.x file outlives the upgrade. This is safe
-  because the folder is the app's own and the app keeps nothing in it at run time: the spectra and the logs live
-  under `%LOCALAPPDATA%\SemiSpec`. A 2.x install that an operator once put into a shared folder loses the
+  because the folder is the app's own and the app keeps nothing in it at run time: the spectra live under
+  `%LOCALAPPDATA%\SemiSpec` and the logs under `C:\DISTR\Logs\SemiSpec`. A 2.x install that an operator once put into a shared folder loses the
   other files there.
 - `[InstallDelete]` also deletes the Start menu and desktop shortcuts under both names, `SemiSpec.lnk` and
   `SpectrumVisualizer.lnk` of the 2.x and 3.0 installers, which point at a removed exe. `[Icons]` creates the Start
   menu entry and, when the operator ticks the unchecked desktop task, a desktop shortcut.
+- `[Dirs]` creates `C:\DISTR\Logs\SemiSpec` (`LogRoot`) with `Permissions: users-modify`, so the operator, not the
+  installing administrator, can write the log, and `Flags: uninsneveruninstall`, so uninstall keeps the logs. The
+  entry is SemiPlot's. After an upgrade over a folder that already existed, check the rights by hand on the target
+  PC: `icacls C:\DISTR\Logs\SemiSpec` lists `BUILTIN\Users` with modify rights (`(M)`); without them the app logs to
+  the fallback folder.
 - `[Files]` copies the publish folder without `*.pdb` and the `SemiSpec.xml` and `SemiSpec.*.xml` doc files.
 - `CloseApplications=yes` asks to close a running copy before the files change, the 3.0 `SpectrumVisualizer.UI.exe`
   and the 2.x `SpectrumVisualizer.Uart.exe` included, since both sit under the `{app}\*` that the wipe covers.
-- `PrivilegesRequired=admin`, because setup writes to Program Files. The post-install launch carries
+- `PrivilegesRequired=admin`, because setup writes to Program Files and `C:\DISTR`. The post-install launch carries
   `runasoriginaluser`, so the app runs as the operator and writes the operator's `%LOCALAPPDATA%`, not the
   administrator's.
 - The wizard offers Russian and English and preselects the Windows language. `UsePreviousLanguage=no` keeps it from
   reusing the English that the 2.x installer recorded.
-- Uninstall removes the program folder and the shortcuts and leaves `%LOCALAPPDATA%\SemiSpec`.
+- Uninstall removes the program folder and the shortcuts and leaves `%LOCALAPPDATA%\SemiSpec` and
+  `C:\DISTR\Logs\SemiSpec`.
 - Nothing migrates or deletes `%LOCALAPPDATA%\SpectrumVisualizer`, the data folder of the builds named
   SpectrumVisualizer. The app starts every run with an empty store, so it reads nothing from that folder; the folder
   stays on disk until the operator deletes it.

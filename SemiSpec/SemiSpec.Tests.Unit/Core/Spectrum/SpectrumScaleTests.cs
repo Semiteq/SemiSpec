@@ -26,13 +26,12 @@ public sealed class SpectrumScaleTests
 		{ [0, 0, 0], true, -0.5, 0.5 },
 	};
 
-	public static TheoryData<double, bool, double> StuckRows => new()
+	public static TheoryData<double[], double> FromZeroRows => new()
 	{
-		{ 31000, false, 37200 },
-		{ 31000, true, Math.Log10(37200) },
-		{ 0, false, 1 },
-		{ 1, true, 1 },
-		{ 0, true, 1 },
+		{ [1000, 31000, 3000], 32550 },
+		{ [3, 4, 4.5], 4.725 },
+		{ [0, 0, 0], 1 },
+		{ [-5, -1, -2], 1 },
 	};
 
 	[Theory]
@@ -51,13 +50,10 @@ public sealed class SpectrumScaleTests
 	}
 
 	[Theory]
-	[MemberData(nameof(StuckRows))]
-	public void StuckToZeroRunsFromZeroToTheHeadroomOverTheRawMaximum(
-		double rawMax,
-		bool logarithmic,
-		double expectedTop)
+	[MemberData(nameof(FromZeroRows))]
+	public void FromZeroRunsFromZeroToTheMaximumPlusFivePercent(double[] ys, double expectedTop)
 	{
-		var limits = SpectrumScale.StuckToZero(_xs, rawMax, Display(logarithmic));
+		var limits = SpectrumScale.FromZero(_xs, ys);
 
 		limits.X.Should().Be(new AxisRange(400.0, 600.0));
 		limits.Y.Min.Should().Be(0.0);
@@ -74,12 +70,12 @@ public sealed class SpectrumScaleTests
 		var xs = Wavelengths(Spectrometer.Atp2000);
 		var ys = new double[xs.Length];
 		var display = new SpectrumDisplay(inverted, logarithmic);
-		var projected = SpectrumProjection.Fill(new ushort[xs.Length], display, ys);
+		SpectrumProjection.Fill(new ushort[xs.Length], display, ys);
 
 		SpectrumLimits[] all =
 		[
 			SpectrumScale.Following(xs, ys, display),
-			SpectrumScale.StuckToZero(xs, projected.RawMax, display),
+			SpectrumScale.FromZero(xs, ys),
 		];
 
 		foreach (var limits in all)

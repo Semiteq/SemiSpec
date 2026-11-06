@@ -32,15 +32,15 @@ public sealed class TrendViewModelTests : TrendFeedTestBase
 	}
 
 	[AvaloniaFact]
-	public void ThePresetsAreFiveWidthsWithTenMinutesSelected()
+	public void ThePresetsAreFiveWidthsAndTheChartOpensAtTenMinutes()
 	{
-		_trend.Presets.Select(preset => preset.Width).Should().Equal(
+		_trend.TimeWindow.Presets.Select(preset => preset.Width).Should().Equal(
 			TimeSpan.FromMinutes(1),
 			TimeSpan.FromMinutes(10),
 			TimeSpan.FromHours(1),
 			TimeSpan.FromHours(6),
 			TimeSpan.FromHours(24));
-		_trend.SelectedPreset!.Width.Should().Be(TimeSpan.FromMinutes(10));
+		Chart.Width.Should().Be(TimeSpan.FromMinutes(10));
 	}
 
 	[AvaloniaFact]
@@ -49,24 +49,11 @@ public sealed class TrendViewModelTests : TrendFeedTestBase
 		AddSpectra(0, 60);
 		Sample();
 
-		_trend.SelectedPreset = _trend.Presets[2];
+		PickPreset(2);
 
 		Chart.Width.Should().Be(TimeSpan.FromHours(1));
 		Chart.To.Should().Be(At(59));
 		Chart.IsFollowing.Should().BeTrue();
-	}
-
-	[AvaloniaFact]
-	public void TheSelectedPresetFollowsTheChartWidth()
-	{
-		AddSpectra(0, 1800);
-		Sample();
-
-		Chart.ZoomAt(0.8, Chart.To);
-		_trend.SelectedPreset.Should().BeNull("a zoomed width matches no preset");
-
-		Chart.SetWidth(TimeSpan.FromHours(1));
-		_trend.SelectedPreset.Should().Be(_trend.Presets[2]);
 	}
 
 	[AvaloniaFact]
@@ -76,10 +63,9 @@ public sealed class TrendViewModelTests : TrendFeedTestBase
 		Sample();
 		Chart.ZoomAt(0.8, Chart.To);
 
-		_trend.SelectedPreset = _trend.Presets[1];
+		PickPreset(1);
 
 		Chart.Width.Should().Be(TimeSpan.FromMinutes(10));
-		_trend.SelectedPreset.Should().Be(_trend.Presets[1]);
 	}
 
 	[AvaloniaFact]
@@ -186,5 +172,10 @@ public sealed class TrendViewModelTests : TrendFeedTestBase
 	private static bool CanExecute(ICommand command)
 	{
 		return command.CanExecute(null);
+	}
+
+	private void PickPreset(int index)
+	{
+		_trend.TimeWindow.SetWidthCommand.Execute(_trend.TimeWindow.Presets[index]).Subscribe();
 	}
 }
