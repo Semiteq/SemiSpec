@@ -99,6 +99,42 @@ public sealed class AppLoggingTests : IDisposable
 	}
 
 	[Fact]
+	public void ASiteFolderThatPassesTheCheckButCannotBeCreatedFallsBack()
+	{
+		Directory.CreateDirectory(_root);
+		var fileInTheWay = Path.Combine(_root, "occupied");
+		File.WriteAllText(fileInTheWay, string.Empty);
+		var fallback = Path.Combine(_root, "fallback");
+
+		var setup = AppLogging.Create(fileInTheWay, fallback, _ => true);
+
+		setup.IsSuccess.Should().BeTrue();
+		setup.Value.Logger.Dispose();
+		setup.Value.Folder.Should().Be(fallback);
+		File.ReadAllText(Path.Combine(fallback, AppLogging.LogFileName)).Should().Contain("[WRN]");
+	}
+
+	[Fact]
+	public void TheWriteCheckFailsOnAReadOnlyLogFile()
+	{
+		var folder = Path.Combine(_root, "denied");
+		Directory.CreateDirectory(folder);
+		var logFile = Path.Combine(folder, AppLogging.LogFileName);
+		File.WriteAllText(logFile, string.Empty);
+		File.SetAttributes(logFile, FileAttributes.ReadOnly);
+
+		try
+		{
+			// Windows answers a write open of a read-only file with UnauthorizedAccessException.
+			AppLogging.CanWrite(folder).Should().BeFalse();
+		}
+		finally
+		{
+			File.SetAttributes(logFile, FileAttributes.Normal);
+		}
+	}
+
+	[Fact]
 	public void TheWriteCheckFailsWhereAFileBlocksTheFolder()
 	{
 		Directory.CreateDirectory(_root);

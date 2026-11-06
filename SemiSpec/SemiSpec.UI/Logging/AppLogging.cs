@@ -25,14 +25,14 @@ public static class AppLogging
 	private const int RetainedFileCount = 5;
 
 	/// <summary>
-	/// Logs to the site folder when the check can write there, else to the fallback folder with a Warning that names
-	/// both.
+	/// Logs to the site folder when the check can write there and the logger opens, else to the fallback folder with
+	/// a Warning that names both.
 	/// </summary>
 	public static Result<LoggingSetup> Create(string siteFolder, string fallbackFolder, Func<string, bool> canWrite)
 	{
-		if (canWrite(siteFolder))
+		if (canWrite(siteFolder) && Create(siteFolder) is { IsSuccess: true } site)
 		{
-			return Create(siteFolder);
+			return site;
 		}
 
 		var setup = Create(fallbackFolder);
