@@ -75,9 +75,10 @@ public partial class SpectrumChartView : UserControl
 
 	private void OnDataContextChanged(object? sender, EventArgs eventArgs)
 	{
-		_subscriptions.Clear();
+		// Hidden while the old form is attached, so its pending fields commit as on unload.
 		_intensityAxis.Hide();
 		_wavelengthAxis.Hide();
+		_subscriptions.Clear();
 		_frames.ClearPending();
 		_viewModel = DataContext as SpectrumViewModel;
 

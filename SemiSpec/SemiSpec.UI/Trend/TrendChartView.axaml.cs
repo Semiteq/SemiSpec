@@ -89,9 +89,10 @@ public partial class TrendChartView : UserControl
 
 	private void OnDataContextChanged(object? sender, EventArgs eventArgs)
 	{
-		_subscriptions.Clear();
+		// Hidden while the old form is attached, so its pending fields commit as on unload.
 		_intensityAxis.Hide();
 		_timeAxis.Hide();
+		_subscriptions.Clear();
 		_frames.ClearPending();
 		_hoverTime = null;
 		_overlay.Hide();

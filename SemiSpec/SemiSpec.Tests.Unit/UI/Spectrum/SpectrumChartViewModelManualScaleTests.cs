@@ -15,7 +15,7 @@ using static SemiSpec.Tests.Unit.UI.Spectrum.SpectrumSamples;
 
 namespace SemiSpec.Tests.Unit.UI.Spectrum;
 
-/// <summary>The follow and frozen scale: manual scale, Reset scale, Stick to zero, toggles.</summary>
+/// <summary>The follow and frozen scale: manual scale, Autoscale, From zero, flyout input, toggles.</summary>
 [Trait("Component", "UI")]
 [Trait("Area", "Spectrum")]
 [Trait("Category", "Unit")]
@@ -66,6 +66,20 @@ public sealed class SpectrumChartViewModelManualScaleTests : SpectrumChartViewMo
 		_chart.IsFollowing.Should().BeTrue();
 		_chart.Show(Atp8000Peak);
 		_chart.ShouldSpanTheDeviceRange(Spectrometer.Atp8000);
+	}
+
+	[AvaloniaFact]
+	public void FlyoutInputBeforeTheFirstSpectrumFreezesNothing()
+	{
+		_chart.ToggleAutoscale();
+		_chart.SetVerticalRange(new AxisRange(5.0, 6.0));
+		_chart.SetHorizontalRange(new AxisRange(500.0, 600.0));
+
+		_chart.IsFollowing.Should().BeTrue();
+		_chart.Show(Atp8000Peak);
+		_chart.ShouldSpanTheDeviceRange(Spectrometer.Atp8000);
+		var limits = _chart.Plot.Axes.GetLimits();
+		limits.Top.Should().BeGreaterThan(6.0, "the first spectrum sets the Y limits");
 	}
 
 	[AvaloniaTheory]

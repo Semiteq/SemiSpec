@@ -114,9 +114,12 @@ public sealed class AxisRangeForm : ReactiveObject, IAxisFlyoutForm, IDisposable
 		return minimum < maximum ? _axisRule(typed) : Resources.AxisScaleMinimumBelowMaximum;
 	}
 
+	/// <summary>The current culture first, then a point or a comma as the decimal separator.</summary>
 	private static bool TryRead(string text, out double value)
 	{
-		return double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value) && double.IsFinite(value);
+		var isRead = double.TryParse(text, NumberStyles.Float, CultureInfo.CurrentCulture, out value)
+			|| double.TryParse(text.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+		return isRead && double.IsFinite(value);
 	}
 
 	/// <summary>The seed as its fields show it, so an untouched field never counts as a change.</summary>

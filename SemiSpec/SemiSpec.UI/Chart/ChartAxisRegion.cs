@@ -46,11 +46,14 @@ public sealed class ChartAxisRegion
 		return new ChartAxisRegion(dataRect.Left, dataRect.Right, top, top + size, plot.ScaleFactor);
 	}
 
-	/// <summary>Whether the band holds a position in the control's device-independent pixels.</summary>
+	/// <summary>
+	/// Whether the band holds a position in the control's device-independent pixels; the layout runs in those pixels
+	/// divided by the plot's scale factor, while GetCoordinates takes them as they are.
+	/// </summary>
 	public bool Contains(Point position)
 	{
-		var x = (float)(position.X * _scale);
-		var y = (float)(position.Y * _scale);
+		var x = (float)(position.X / _scale);
+		var y = (float)(position.Y / _scale);
 		return x >= _left && x <= _right && y >= _top && y <= _bottom;
 	}
 

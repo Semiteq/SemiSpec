@@ -159,9 +159,14 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		}
 	}
 
-	/// <summary>Shows the typed wavelength range and freezes the scale, like a zoom.</summary>
+	/// <summary>Shows the typed wavelength range and freezes the scale; no-op before the first spectrum.</summary>
 	public void SetHorizontalRange(AxisRange range)
 	{
+		if (!HasSpectrum)
+		{
+			return;
+		}
+
 		ChangeScale(() =>
 		{
 			Plot.Axes.SetLimitsX(range.Min, range.Max);
@@ -175,10 +180,10 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		return _display.IsLogarithmic && range.Min <= 0.0 ? Resources.AxisScaleLogMinimumPositive : string.Empty;
 	}
 
-	/// <summary>Shows the typed intensity range and freezes the scale; a range with a problem changes nothing.</summary>
+	/// <summary>Shows the typed intensity range and freezes; no-op before the first spectrum or on a problem.</summary>
 	public void SetVerticalRange(AxisRange range)
 	{
-		if (VerticalRangeProblem(range).Length > 0)
+		if (!HasSpectrum || VerticalRangeProblem(range).Length > 0)
 		{
 			return;
 		}
@@ -198,12 +203,12 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		});
 	}
 
-	/// <summary>Following returns to the frozen scale where it stands; a frozen scale returns to following.</summary>
+	/// <summary>A following scale freezes where it stands, as TakeManualScale does; a frozen one follows again.</summary>
 	public void ToggleAutoscale()
 	{
 		if (IsFollowing)
 		{
-			ChangeScale(() => IsFollowing = false);
+			TakeManualScale();
 			return;
 		}
 

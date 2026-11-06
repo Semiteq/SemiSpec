@@ -26,8 +26,8 @@ internal static class ChartStateLine
 			return;
 		}
 
-		band.Width = dataRect.Width / scale;
-		band.Height = Math.Max(0.0, (dataRect.Top / scale) - GapAboveData);
-		band.Margin = new Thickness(dataRect.Left / scale, 0.0, 0.0, 0.0);
+		band.Width = dataRect.Width * scale;
+		band.Height = Math.Max(0.0, (dataRect.Top * scale) - GapAboveData);
+		band.Margin = new Thickness(dataRect.Left * scale, 0.0, 0.0, 0.0);
 	}
 }

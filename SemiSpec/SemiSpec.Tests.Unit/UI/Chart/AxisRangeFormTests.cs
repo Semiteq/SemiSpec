@@ -118,6 +118,20 @@ public sealed class AxisRangeFormTests : IDisposable
 		_written.Should().BeEmpty();
 	}
 
+	[AvaloniaTheory]
+	[InlineData("1.5")]
+	[InlineData("1,5")]
+	public void APointOrACommaReadsAsTheDecimalSeparatorInRussian(string typed)
+	{
+		using var cultureScope = new CultureScope("ru-RU");
+		_form.Seed();
+
+		_form.MinimumText = typed;
+		_form.Commit();
+
+		_written.Should().Equal(new AxisRange(1.5, 20.0));
+	}
+
 	private static string Text(double value)
 	{
 		return value.ToString("0.###", CultureInfo.CurrentCulture);
