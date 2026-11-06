@@ -60,8 +60,9 @@ iscc.exe /DAppVersion=X.Y.Z Installer\SpectrumVisualizer.iss
 git tag -a vX.Y.Z --cleanup=verbatim -F notes.txt
 ```
 
-The version is the `Version` element in `SpectrumVisualizer/Directory.Build.props`. The owner's steps are in
-`readme.md`, Release; `docs/architecture/overview.md`, Release, describes the installer script and `release.yml`.
+The version is the `Version` element in `SpectrumVisualizer/Directory.Build.props`. To release, bump it, merge to
+`master`, then push the annotated tag; `docs/architecture/overview.md`, Release, describes the installer script and
+`release.yml`.
 
 ## Layout
 
@@ -88,5 +89,6 @@ docs/                            architecture docs and plans
 
 ## Docs
 
+- `readme.md`: the operators' guide, in Russian; the operators read Russian, so it is the one document not in English.
 - `docs/architecture/`: how the app is built and the locked decisions; enter at `docs/architecture/README.md`.
 - `docs/plans/`: dated implementation plans; finished ones move to its `completed/` subfolder.
