@@ -43,6 +43,21 @@ public sealed class OverviewGeometryBandTests : OverviewGeometryTestBase
 	}
 
 	[Fact]
+	public void FromZeroScalesTheBandFromZeroToItsMaximumPlusFivePercent()
+	{
+		var band = Band(
+			(0.0, 10.0, 20.0, 15.0),
+			(1.0, 10.0, 20.0, 15.0));
+
+		var figures = OverviewGeometry.BandFigures(band, First, First.AddDays(1), BandWidth, BandHeight, fromZero: true);
+
+		// The range is [0, 21] over 30 px, so a value v sits at 30 * (21 - v) / 21.
+		figures.Should().ContainSingle();
+		figures[0].CenterLine.Select(point => point.Y).Should().AllSatisfy(
+			y => y.Should().BeApproximately(30.0 * (21.0 - 15.0) / 21.0, 1e-9));
+	}
+
+	[Fact]
 	public void ALoneColumnBetweenBreaksDrawsAFigureThreePixelsWide()
 	{
 		var band = Band(
