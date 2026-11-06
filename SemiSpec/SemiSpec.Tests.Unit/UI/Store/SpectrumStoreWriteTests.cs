@@ -179,6 +179,32 @@ public sealed class SpectrumStoreWriteTests : SpectrumStoreTestBase
 		LogTimes("The spectrum store deleted 1 store files of older builds").Should().ContainSingle();
 	}
 
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task TheHistorySurvivesAStoreRestart()
+	{
+		var clock = new RetentionClock(StoreSamples.Start.AddSeconds(20));
+		await StartOpenedAsync(clock);
+		await FeedAsync([.. SpectraWithSeq(1, 10)]);
+		await DisposeStoreAsync();
+		Count("spectrum").Should().Be(10);
+
+		LinkFrames = LinkChannel();
+		CreateStore(clock);
+		StartStore();
+		await Waits.UntilAsync(() => LogTimes("Spectrum store file").Count == 2);
+		await FeedAsync([.. SpectraWithSeq(11, 5)]);
+		await StopAsync();
+
+		Scalar("SELECT group_concat(seq) FROM (SELECT seq FROM spectrum ORDER BY id)")
+			.Should().Be(string.Join(',', Enumerable.Range(1, 15)));
+	}
+
+	private static IEnumerable<ReceivedFrame> SpectraWithSeq(int first, int count)
+	{
+		return Enumerable.Range(first, count)
+			.Select(seq => StoreSamples.Spectrum(StoreSamples.Start.AddSeconds(seq), seq: (byte)seq));
+	}
+
 	private void WriteBeforeTheStart(params ReceivedFrame[] frames)
 	{
 		var database = SpectrumDatabase.Open(StorePath).Value;

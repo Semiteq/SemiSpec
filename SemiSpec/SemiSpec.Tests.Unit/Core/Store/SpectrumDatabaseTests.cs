@@ -49,6 +49,68 @@ public sealed class SpectrumDatabaseTests : IDisposable
 	}
 
 	[Fact]
+	public void OpenOfANewFileCreatesTheSchemaAndSetsVersionOne()
+	{
+		OpenDatabase().Dispose();
+
+		using var plain = OpenPlain();
+		Scalar(plain, "PRAGMA user_version").Should().Be(1L);
+		Scalar(plain, "SELECT group_concat(name) FROM (SELECT name FROM sqlite_master ORDER BY name)")
+			.Should().Be("heartbeat,heartbeat_time,spectrum,spectrum_time");
+	}
+
+	[Fact]
+	public void ReopenKeepsTheRows()
+	{
+		using (var first = OpenDatabase())
+		{
+			first.Write([StoreSamples.Spectrum(StoreSamples.Start, seq: 1)]).IsSuccess.Should().BeTrue();
+		}
+
+		using (var second = OpenDatabase())
+		{
+			second.Write([StoreSamples.Spectrum(StoreSamples.Start, seq: 2)]).IsSuccess.Should().BeTrue();
+		}
+
+		using var plain = OpenPlain();
+		Scalar(plain, "SELECT group_concat(seq) FROM (SELECT seq FROM spectrum ORDER BY id)").Should().Be("1,2");
+	}
+
+	[Fact]
+	public void OpenOfAnotherVersionFailsWithASchemaMismatch()
+	{
+		using (var plain = OpenPlain())
+		{
+			Execute(plain, "PRAGMA user_version = 2");
+		}
+
+		var result = SpectrumDatabase.Open(_path);
+
+		result.IsFailed.Should().BeTrue();
+		result.Errors.Should().ContainSingle().Which.Should().BeOfType<StoreSchemaMismatchError>()
+			.Which.Found.Should().Be(2);
+		using var check = OpenPlain();
+		Scalar(check, "PRAGMA user_version").Should().Be(2L);
+		Scalar(check, "SELECT count(*) FROM sqlite_master").Should().Be(0L, "a mismatched file stays unchanged");
+	}
+
+	[Fact]
+	public void OpenOfAVersionZeroFileWithTablesFailsWithASchemaMismatch()
+	{
+		using (var plain = OpenPlain())
+		{
+			Execute(plain, "CREATE TABLE other (x INTEGER)");
+		}
+
+		var result = SpectrumDatabase.Open(_path);
+
+		result.Errors.Should().ContainSingle().Which.Should().BeOfType<StoreSchemaMismatchError>()
+			.Which.Found.Should().Be(0);
+		var deleteTheFile = () => File.Delete(_path);
+		deleteTheFile.Should().NotThrow("the failed open closed its connection");
+	}
+
+	[Fact]
 	public void ASpectrumRoundTripsEveryField()
 	{
 		var receivedAt = StoreSamples.Start.AddTicks(1234567);

@@ -28,6 +28,7 @@ internal sealed class StoreWriter(
 
 	private static readonly TimeSpan _retentionInterval = TimeSpan.FromMinutes(1);
 
+	private readonly StoreOpening _opening = new(storeFile, logger);
 	private readonly StoreRetention _retention = new(timeProvider, logger);
 
 	// Set by Stop on the UI thread, read by the writer task.
@@ -79,8 +80,7 @@ internal sealed class StoreWriter(
 		SpectrumDatabase? database = null;
 		try
 		{
-			var prepared = StoreFiles.Prepare(storeFile.Path);
-			var opened = prepared.Bind(_ => SpectrumDatabase.Open(storeFile.Path));
+			var opened = _opening.Open();
 			if (opened.IsFailed)
 			{
 				ReportOpenFailure(opened.Errors);
@@ -89,7 +89,6 @@ internal sealed class StoreWriter(
 
 			database = opened.Value;
 			RunRetentionUnlessStopped(database);
-			LogLegacyFilesDeleted(prepared.Value);
 			logger.LogInformation("Spectrum store file {Path}", storeFile.Path);
 			await WriteQueuedAsync(database, cancellationToken, drainToken).ConfigureAwait(false);
 			CheckpointAndClose(database);
@@ -123,14 +122,6 @@ internal sealed class StoreWriter(
 			countDropped(DiscardQueued());
 		}
 		while (await queue.WaitToReadAsync(cancellationToken).ConfigureAwait(false));
-	}
-
-	private void LogLegacyFilesDeleted(int legacyFiles)
-	{
-		if (legacyFiles > 0)
-		{
-			logger.LogInformation("The spectrum store deleted {Count} store files of older builds", legacyFiles);
-		}
 	}
 
 	private void RunRetentionUnlessStopped(SpectrumDatabase database)

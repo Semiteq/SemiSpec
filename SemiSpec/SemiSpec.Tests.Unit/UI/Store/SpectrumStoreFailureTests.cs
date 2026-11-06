@@ -183,6 +183,25 @@ public sealed class SpectrumStoreFailureTests : SpectrumStoreTestBase
 		Panel.Entries.Should().BeEmpty("a failed retention pass loses no data");
 	}
 
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task ASchemaMismatchStartsAFreshFileAndLogsOneWarning()
+	{
+		Execute("CREATE TABLE spectrum (seq INTEGER); INSERT INTO spectrum VALUES (7); PRAGMA user_version = 2");
+
+		await StartOpenedAsync();
+		await FeedAsync(StoreSamples.Spectrum(StoreSamples.Start, seq: 1));
+		await Waits.UntilAsync(() => Count("spectrum") == 1);
+		await StopAsync();
+
+		Scalar("PRAGMA user_version").Should().Be(1L);
+		Scalar("SELECT group_concat(seq) FROM spectrum").Should().Be("1", "the rows of the old version are gone");
+		Panel.Entries.Should().BeEmpty("an app update causes a mismatch and the operator can do nothing about it");
+		Logger.Collector.GetSnapshot().Where(record => record.Level >= LogLevel.Warning)
+			.Should().ContainSingle().Which.Message.Should().Be(
+				$"The spectrum store file {StorePath} had schema version 2, this build uses 1; "
+				+ "the file was deleted and a new one started");
+	}
+
 	private void Execute(string sql)
 	{
 		using var connection = OpenPlain();

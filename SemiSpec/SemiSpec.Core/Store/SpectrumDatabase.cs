@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 
 using FluentResults;
@@ -13,8 +14,15 @@ namespace SemiSpec.Core.Store;
 /// </summary>
 public sealed class SpectrumDatabase : IDisposable
 {
+	/// <summary>The schema version this build creates and uses, kept in the file's PRAGMA user_version.</summary>
+	public const int SchemaVersion = 1;
+
+	private const string SchemaState = """
+		SELECT (SELECT user_version FROM pragma_user_version), (SELECT count(*) FROM sqlite_master WHERE type = 'table')
+		""";
+
 	private const string Schema = """
-		CREATE TABLE IF NOT EXISTS spectrum (
+		CREATE TABLE spectrum (
 			id INTEGER PRIMARY KEY,
 			received_at INTEGER NOT NULL,
 			device INTEGER NOT NULL,
@@ -26,13 +34,13 @@ public sealed class SpectrumDatabase : IDisposable
 			seq INTEGER NOT NULL,
 			state INTEGER NOT NULL,
 			pixels BLOB NOT NULL);
-		CREATE INDEX IF NOT EXISTS spectrum_time ON spectrum (received_at);
-		CREATE TABLE IF NOT EXISTS heartbeat (
+		CREATE INDEX spectrum_time ON spectrum (received_at);
+		CREATE TABLE heartbeat (
 			id INTEGER PRIMARY KEY,
 			received_at INTEGER NOT NULL,
 			seq INTEGER NOT NULL,
 			state INTEGER NOT NULL);
-		CREATE INDEX IF NOT EXISTS heartbeat_time ON heartbeat (received_at);
+		CREATE INDEX heartbeat_time ON heartbeat (received_at);
 		""";
 
 	private const string InsertSpectrum = """
@@ -88,16 +96,23 @@ public sealed class SpectrumDatabase : IDisposable
 			("$state", SqliteType.Integer));
 	}
 
-	/// <summary>Opens the store file, or creates it, and creates the schema where it is missing.</summary>
+	/// <summary>
+	/// Opens the store file, or creates it; a file without tables gets the schema and SchemaVersion, a file of another
+	/// version, or of version 0 with tables, fails with StoreSchemaMismatchError and is left closed and unchanged.
+	/// </summary>
 	public static Result<SpectrumDatabase> Open(string path)
 	{
 		SqliteConnection? connection = null;
 		try
 		{
 			connection = StoreConnection.Open(path);
-			using var command = connection.CreateCommand();
-			command.CommandText = Schema;
-			command.ExecuteNonQuery();
+			var schema = UseOrCreateSchema(connection);
+			if (schema.IsFailed)
+			{
+				connection.Dispose();
+				return schema;
+			}
+
 			return new SpectrumDatabase(connection);
 		}
 		catch (Exception ex) when (ex is SqliteException or IOException)
@@ -105,6 +120,35 @@ public sealed class SpectrumDatabase : IDisposable
 			connection?.Dispose();
 			return Result.Fail(new ExceptionalError("SQLite refused the file or the schema", ex));
 		}
+	}
+
+	private static Result UseOrCreateSchema(SqliteConnection connection)
+	{
+		using var transaction = connection.BeginTransaction(deferred: false);
+		using var command = connection.CreateCommand();
+		command.Transaction = transaction;
+		command.CommandText = SchemaState;
+		var (version, tables) = ReadSchemaState(command);
+		if (version == 0 && tables == 0)
+		{
+			command.CommandText = Schema
+				+ string.Create(CultureInfo.InvariantCulture, $"PRAGMA user_version = {SchemaVersion};");
+			command.ExecuteNonQuery();
+		}
+		else if (version != SchemaVersion)
+		{
+			return Result.Fail(new StoreSchemaMismatchError(version));
+		}
+
+		transaction.Commit();
+		return Result.Ok();
+	}
+
+	private static (int Version, long Tables) ReadSchemaState(SqliteCommand schemaState)
+	{
+		using var reader = schemaState.ExecuteReader();
+		reader.Read();
+		return (reader.GetInt32(0), reader.GetInt64(1));
 	}
 
 	/// <summary>Writes the frames in one transaction: all of them or, on failure, none.</summary>

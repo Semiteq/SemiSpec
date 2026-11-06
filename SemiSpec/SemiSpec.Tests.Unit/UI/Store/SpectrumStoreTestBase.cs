@@ -74,21 +74,28 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 
 	public async ValueTask DisposeAsync()
 	{
+		await DisposeStoreAsync();
+		Panel.Dispose();
+		Folder.Dispose();
+		GC.SuppressFinalize(this);
+	}
+
+	/// <summary>Stops and disposes the distributor and the store, so a test can create the next store.</summary>
+	protected async Task DisposeStoreAsync()
+	{
 		if (_distributor is not null)
 		{
 			await _distributor.StopAsync().WaitAsync(Waits.Limit);
 			_distributor.Dispose();
+			_distributor = null;
 		}
 
 		if (_store is not null)
 		{
 			await _store.StopAsync().WaitAsync(StopLimit);
 			_store.Dispose();
+			_store = null;
 		}
-
-		Panel.Dispose();
-		Folder.Dispose();
-		GC.SuppressFinalize(this);
 	}
 
 	protected static Channel<ReceivedFrame> LinkChannel()

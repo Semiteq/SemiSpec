@@ -433,14 +433,17 @@ file to the developer." / ru "Действий не требуется. Если
 - Modify: `SemiSpec/SemiSpec.Tests.Unit/Core/Store/SpectrumDatabaseTests.cs`
 - Modify: `SemiSpec/SemiSpec.Tests.Unit/UI/Store/SpectrumStoreFailureTests.cs`, `SpectrumStoreWriteTests.cs`
 
-- [ ] `SpectrumDatabase.Open`: read `user_version` and the table count, apply the table of Solution Overview, create
+- [x] `SpectrumDatabase.Open`: read `user_version` and the table count, apply the table of Solution Overview, create
   the schema and set the version in one transaction
-- [ ] create `StoreOpening` from `StoreWriter.OpenDatabase`: prepare, open, on a mismatch delete with sidecars,
+- [x] create `StoreOpening` from `StoreWriter.OpenDatabase`: prepare, open, on a mismatch delete with sidecars,
   log one Warning and open again
-- [ ] write the version tests of Acceptance Evidence item 1 (`OpenOfANewFile...`, `ReopenKeepsTheRows`, the two
+- [x] write the version tests of Acceptance Evidence item 1 (`OpenOfANewFile...`, `ReopenKeepsTheRows`, the two
   mismatch tests) and `ASchemaMismatchStartsAFreshFileAndLogsOneWarning`
-- [ ] write `TheHistorySurvivesAStoreRestart`, the first test that reopens a file
-- [ ] run `dotnet test SemiSpec.slnx` - must pass before next task
+- [x] write `TheHistorySurvivesAStoreRestart`, the first test that reopens a file
+- [x] run `dotnet test SemiSpec.slnx` - must pass before next task (1002 of 1002)
+- ➕ `Schema` is back to plain `CREATE TABLE` and `CREATE INDEX`: the gate creates the schema only in a file
+  without tables, so the Task 1 `IF NOT EXISTS` stopgap is gone. `StoreFileUnreadableError` moves to Task 4,
+  its first producer.
 
 ### Task 4: Damaged file set aside at open
 **Files:**
