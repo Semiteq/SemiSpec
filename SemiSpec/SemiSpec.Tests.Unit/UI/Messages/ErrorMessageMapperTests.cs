@@ -141,6 +141,20 @@ public sealed class ErrorMessageMapperTests
 	}
 
 	[Fact]
+	public void AStoreFileReplacedErrorMapsToAWarning()
+	{
+		var view = ErrorMessageMapper.Map(
+			new StoreFileReplacedError(@"C:\Store987\spectra.db", @"C:\Store987\spectra.broken-20261106-101500.db"));
+
+		view.Should().Be(new MessageView(
+			Resources.StoreFileReplacedTitle,
+			Resources.StoreFileReplacedDetail,
+			Resources.StoreFileReplacedRemedy,
+			MessageSeverity.Warning));
+		view.Detail.Should().NotContain("987");
+	}
+
+	[Fact]
 	public void MapGivesAFailedStoreWriteItsOwnTextAtWarning()
 	{
 		var view = ErrorMessageMapper.Map(new StoreWriteError().CausedBy(new IOException("the disk is full")));

@@ -114,6 +114,15 @@
   <data name="StoreOpenRemedy" xml:space="preserve">
     <value>Перезапустите программу. Если ошибка повторится, передайте файл журнала разработчику.</value>
   </data>
+  <data name="StoreFileReplacedTitle" xml:space="preserve">
+    <value>Файл истории спектров был повреждён</value>
+  </data>
+  <data name="StoreFileReplacedDetail" xml:space="preserve">
+    <value>Повреждённый файл отложен, начат новый пустой файл. История до этого запуска не отображается.</value>
+  </data>
+  <data name="StoreFileReplacedRemedy" xml:space="preserve">
+    <value>Действий не требуется. Если это повторится, передайте файл журнала разработчику.</value>
+  </data>
   <data name="StoreWriteTitle" xml:space="preserve">
     <value>Не удалось записать историю спектров</value>
   </data>

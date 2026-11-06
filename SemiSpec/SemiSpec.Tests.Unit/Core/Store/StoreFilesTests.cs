@@ -13,6 +13,8 @@ namespace SemiSpec.Tests.Unit.Core.Store;
 [Trait("Category", "Unit")]
 public sealed class StoreFilesTests : IDisposable
 {
+	private static readonly DateTimeOffset _localNow = new(2026, 11, 6, 10, 15, 0, TimeSpan.FromHours(3));
+
 	private readonly TempFolder _folder = new();
 
 	private string HistoryFile => StoreFiles.HistoryFile(_folder.Root);
@@ -124,6 +126,57 @@ public sealed class StoreFilesTests : IDisposable
 
 		result.IsFailed.Should().BeTrue();
 		result.Errors[0].Message.Should().Contain($"'{own}'");
+	}
+
+	[Fact]
+	public void SetAsideRenamesTheFileWithTheLocalStampAndMovesItsWal()
+	{
+		byte[] content = [1, 2, 3];
+		byte[] wal = [4, 5];
+		File.WriteAllBytes(HistoryFile, content);
+		File.WriteAllBytes(HistoryFile + "-wal", wal);
+
+		var result = StoreFiles.SetAside(HistoryFile, _localNow);
+
+		var setAside = _folder.FileIn("spectra.broken-20261106-101500.db");
+		result.Value.Should().Be(setAside);
+		File.ReadAllBytes(setAside).Should().Equal(content);
+		File.ReadAllBytes(setAside + "-wal").Should().Equal(wal);
+		File.Exists(HistoryFile).Should().BeFalse();
+		File.Exists(HistoryFile + "-wal").Should().BeFalse();
+	}
+
+	[Fact]
+	public void SetAsideDeletesTheSharedMemorySidecar()
+	{
+		Touch(HistoryFile, HistoryFile + "-shm");
+
+		var result = StoreFiles.SetAside(HistoryFile, _localNow);
+
+		Directory.GetFiles(_folder.Root).Should().Equal(result.Value);
+	}
+
+	[Fact]
+	public void SetAsideKeepsTheTwoNewestSetAsideFiles()
+	{
+		var oldest = _folder.FileIn("spectra.broken-20261101-080000.db");
+		var older = _folder.FileIn("spectra.broken-20261102-080000.db");
+		var newestOlder = _folder.FileIn("spectra.broken-20261103-080000.db");
+		Touch(oldest, oldest + "-wal", older, older + "-wal", older + "-shm", newestOlder, newestOlder + "-wal");
+		Touch(HistoryFile);
+
+		var result = StoreFiles.SetAside(HistoryFile, _localNow);
+
+		Directory.GetFiles(_folder.Root).Should().BeEquivalentTo([result.Value, newestOlder, newestOlder + "-wal"]);
+	}
+
+	[Fact]
+	public void SetAsideOfAMissingFileFailsAndNamesIt()
+	{
+		var result = StoreFiles.SetAside(HistoryFile, _localNow);
+
+		result.IsFailed.Should().BeTrue();
+		result.Errors[0].Message.Should().Contain($"'{HistoryFile}'");
 	}
 
 	private static void Touch(params string[] files)

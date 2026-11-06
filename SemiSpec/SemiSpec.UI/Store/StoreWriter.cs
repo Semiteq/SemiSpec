@@ -28,7 +28,7 @@ internal sealed class StoreWriter(
 
 	private static readonly TimeSpan _retentionInterval = TimeSpan.FromMinutes(1);
 
-	private readonly StoreOpening _opening = new(storeFile, logger);
+	private readonly StoreOpening _opening = new(storeFile, messagePanel, uiScheduler, timeProvider, logger);
 	private readonly StoreRetention _retention = new(timeProvider, logger);
 
 	// Set by Stop on the UI thread, read by the writer task.

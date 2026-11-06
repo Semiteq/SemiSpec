@@ -1,16 +1,24 @@
+using System.Reactive.Concurrency;
+
 using FluentResults;
 
 using Microsoft.Extensions.Logging;
 
 using SemiSpec.Core.Store;
+using SemiSpec.UI.Messages;
 
 namespace SemiSpec.UI.Store;
 
 /// <summary>
-/// The writer's open sequence: prepares the folder, opens the history file, and replaces a file of another schema
-/// version with a fresh one.
+/// The writer's open sequence: prepares the folder, opens the history file, replaces a file of another schema
+/// version with a fresh one and sets an unreadable file aside before it starts a fresh one.
 /// </summary>
-internal sealed class StoreOpening(StoreFile storeFile, ILogger logger)
+internal sealed class StoreOpening(
+	StoreFile storeFile,
+	MessagePanelViewModel messagePanel,
+	IScheduler uiScheduler,
+	TimeProvider timeProvider,
+	ILogger logger)
 {
 	public Result<SpectrumDatabase> Open()
 	{
@@ -22,8 +30,13 @@ internal sealed class StoreOpening(StoreFile storeFile, ILogger logger)
 
 		LogLegacyFilesDeleted(prepared.Value);
 		var opened = SpectrumDatabase.Open(storeFile.Path);
-		return opened.HasError<StoreSchemaMismatchError>(out var mismatches)
-			? ReplaceMismatched(mismatches.First())
+		if (opened.HasError<StoreSchemaMismatchError>(out var mismatches))
+		{
+			return ReplaceMismatched(mismatches.First());
+		}
+
+		return opened.HasError<StoreFileUnreadableError>(out var unreadable)
+			? ReplaceUnreadable(unreadable.First())
 			: opened;
 	}
 
@@ -59,5 +72,34 @@ internal sealed class StoreOpening(StoreFile storeFile, ILogger logger)
 			mismatch.Found,
 			SpectrumDatabase.SchemaVersion);
 		return SpectrumDatabase.Open(storeFile.Path);
+	}
+
+	/// <summary>
+	/// Sets the unreadable file aside under the operator's local time, opens a fresh one and reports the replacement.
+	/// </summary>
+	private Result<SpectrumDatabase> ReplaceUnreadable(StoreFileUnreadableError unreadable)
+	{
+		var setAside = StoreFiles.SetAside(storeFile.Path, timeProvider.GetLocalNow());
+		if (setAside.IsFailed)
+		{
+			return Result.Fail(unreadable).WithErrors(setAside.Errors);
+		}
+
+		var reopened = SpectrumDatabase.Open(storeFile.Path);
+		if (reopened.IsFailed)
+		{
+			return reopened;
+		}
+
+		logger.LogWarning(
+			"The spectrum store file {Path} could not be read; it was set aside as {SetAsidePath} "
+				+ "and a new one started",
+			storeFile.Path,
+			setAside.Value);
+		messagePanel.TryReportFailure(
+			new StoreFileReplacedError(storeFile.Path, setAside.Value).CausedBy(unreadable),
+			logger,
+			uiScheduler);
+		return reopened;
 	}
 }

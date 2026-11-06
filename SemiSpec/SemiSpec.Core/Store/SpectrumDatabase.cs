@@ -70,6 +70,9 @@ public sealed class SpectrumDatabase : IDisposable
 	// Microsoft.Data.Sqlite counts the busy timeout in whole seconds and waits forever on 0, so 1 s is the shortest.
 	private const int ShortBusyTimeoutSeconds = 1;
 
+	private const int SqliteCorrupt = 11;
+	private const int SqliteNotADatabase = 26;
+
 	private readonly SqliteConnection _connection;
 	private readonly SqliteCommand _insertSpectrum;
 	private readonly SqliteCommand _insertHeartbeat;
@@ -97,8 +100,8 @@ public sealed class SpectrumDatabase : IDisposable
 	}
 
 	/// <summary>
-	/// Opens the store file, or creates it; a file without tables gets the schema and SchemaVersion, a file of another
-	/// version, or of version 0 with tables, fails with StoreSchemaMismatchError and is left closed and unchanged.
+	/// Opens or creates the store file; a file of another version fails with StoreSchemaMismatchError, its version and
+	/// tables untouched, and one SQLite calls not a database or corrupt with StoreFileUnreadableError; both close it.
 	/// </summary>
 	public static Result<SpectrumDatabase> Open(string path)
 	{
@@ -114,6 +117,11 @@ public sealed class SpectrumDatabase : IDisposable
 			}
 
 			return new SpectrumDatabase(connection);
+		}
+		catch (SqliteException ex) when (ex.SqliteErrorCode is SqliteNotADatabase or SqliteCorrupt)
+		{
+			connection?.Dispose();
+			return Result.Fail(new StoreFileUnreadableError(ex));
 		}
 		catch (Exception ex) when (ex is SqliteException or IOException)
 		{

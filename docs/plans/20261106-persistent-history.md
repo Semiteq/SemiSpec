@@ -455,14 +455,17 @@ file to the developer." / ru "Действий не требуется. Если
 - Modify: `SemiSpec/SemiSpec.Tests.Unit/UI/Store/SpectrumStoreFailureTests.cs`
 - Modify: `SemiSpec/SemiSpec.Tests.Unit/UI/Messages/ErrorMessageMapperTests.cs`
 
-- [ ] `Open` turns codes 26 and 11 into `StoreFileUnreadableError`; other failures stay plain
-- [ ] `StoreFiles.SetAside`: rename with the local stamp, move the `-wal`, delete the `-shm`, keep the 2 newest
-- [ ] `StoreOpening`: on unreadable, set aside, reopen, report `StoreFileReplacedError` (Warning) with both paths in
+- [x] `Open` turns codes 26 and 11 into `StoreFileUnreadableError`; other failures stay plain
+- [x] `StoreFiles.SetAside`: rename with the local stamp, move the `-wal`, delete the `-shm`, keep the 2 newest
+- [x] `StoreOpening`: on unreadable, set aside, reopen, report `StoreFileReplacedError` (Warning) with both paths in
   the log line; a failed rename or reopen ends in `StoreOpenError`
-- [ ] add `StoreFileReplacedError`, its mapper arm and the three resx keys in both sets
-- [ ] write the unreadable and set-aside tests of Acceptance Evidence item 1 and the mapper test; the two damage
+- [x] add `StoreFileReplacedError`, its mapper arm and the three resx keys in both sets
+- [x] write the unreadable and set-aside tests of Acceptance Evidence item 1 and the mapper test; the two damage
   tests pin the ASSUMPTION on codes 26 and 11
-- [ ] run `dotnet test SemiSpec.slnx` - must pass before next task
+- [x] run `dotnet test SemiSpec.slnx` - must pass before next task (1011 of 1011)
+- ➕ the report writes two Warning lines: `StoreOpening` logs the one naming both paths, and `TryReportFailure`
+  logs the panel text with the SQLite stack. `StoreWriter` passes the panel, scheduler and clock to `StoreOpening`.
+  The marker half of `SetAsideDeletesTheSharedMemorySidecarAndTheMarker` waits for Task 5.
 
 ### Task 5: Damage marker
 **Files:**

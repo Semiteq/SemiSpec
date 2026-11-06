@@ -202,6 +202,34 @@ public sealed class SpectrumStoreFailureTests : SpectrumStoreTestBase
 				+ "the file was deleted and a new one started");
 	}
 
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task AnUnreadableFileIsSetAsideAndReportedOnce()
+	{
+		byte[] damaged = [.. Enumerable.Repeat((byte)0xFF, 8192)];
+		await File.WriteAllBytesAsync(StorePath, damaged, TestContext.Current.CancellationToken);
+		var clock = new RetentionClock(StoreSamples.Start);
+		var setAside = Folder.FileIn($"spectra.broken-{clock.GetLocalNow():yyyyMMdd-HHmmss}.db");
+
+		await StartOpenedAsync(clock);
+		await FeedAsync(StoreSamples.Spectrum(StoreSamples.Start, seq: 1));
+		await Waits.UntilAsync(() => Count("spectrum") == 1);
+		await StopAsync();
+
+		(await File.ReadAllBytesAsync(setAside, TestContext.Current.CancellationToken)).Should().Equal(damaged);
+		Scalar("PRAGMA user_version").Should().Be(1L);
+		var entry = Panel.Entries.Should().ContainSingle().Subject;
+		entry.View.Title.Should().Be(Resources.StoreFileReplacedTitle);
+		entry.View.Severity.Should().Be(MessageSeverity.Warning);
+		Logger.Collector.GetSnapshot()
+			.Where(record => record.Level == LogLevel.Warning
+				&& record.Message.Contains(StorePath, StringComparison.Ordinal)
+				&& record.Message.Contains(setAside, StringComparison.Ordinal))
+			.Should().ContainSingle();
+		Logger.Levels().Should().NotContain(LogLevel.Error);
+		Logger.Failures().Should().ContainSingle().Which.Should().BeOfType<SqliteException>()
+			.Which.SqliteErrorCode.Should().Be(26);
+	}
+
 	private void Execute(string sql)
 	{
 		using var connection = OpenPlain();

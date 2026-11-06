@@ -20,6 +20,12 @@ namespace SemiSpec.Tests.Unit.Core.Store;
 [Trait("Category", "Unit")]
 public sealed class SpectrumDatabaseTests : IDisposable
 {
+	private const int DatabaseHeaderBytes = 100;
+	private const int PageBytes = 4096;
+
+	// No SQLite header starts with it, and as a b-tree page type it is invalid.
+	private const byte DamageByte = 0xFF;
+
 	private readonly TempFolder _folder = new();
 	private readonly string _path;
 
@@ -108,6 +114,46 @@ public sealed class SpectrumDatabaseTests : IDisposable
 			.Which.Found.Should().Be(0);
 		var deleteTheFile = () => File.Delete(_path);
 		deleteTheFile.Should().NotThrow("the failed open closed its connection");
+	}
+
+	[Fact]
+	public void OpenOfRandomBytesFailsAsUnreadable()
+	{
+		File.WriteAllBytes(_path, DamageBytes(2 * PageBytes));
+
+		var result = SpectrumDatabase.Open(_path);
+
+		result.Errors.Should().ContainSingle().Which.Should().BeOfType<StoreFileUnreadableError>()
+			.Which.SqliteErrorCode.Should().Be(26, "SQLite reports a file without its header as SQLITE_NOTADB");
+		var deleteTheFile = () => File.Delete(_path);
+		deleteTheFile.Should().NotThrow("the failed open closed its connection");
+	}
+
+	[Fact]
+	public void OpenOfADamagedSchemaPageFailsAsUnreadable()
+	{
+		OpenDatabase().Dispose();
+		using (var file = new FileStream(_path, FileMode.Open, FileAccess.Write))
+		{
+			file.Position = DatabaseHeaderBytes;
+			file.Write(DamageBytes(PageBytes - DatabaseHeaderBytes));
+		}
+
+		var result = SpectrumDatabase.Open(_path);
+
+		result.Errors.Should().ContainSingle().Which.Should().BeOfType<StoreFileUnreadableError>()
+			.Which.SqliteErrorCode.Should().Be(11, "SQLite reports a damaged schema page as SQLITE_CORRUPT");
+	}
+
+	[Fact]
+	public void OpenOfADirectoryIsNotUnreadable()
+	{
+		Directory.CreateDirectory(_path);
+
+		var result = SpectrumDatabase.Open(_path);
+
+		result.Errors.Should().ContainSingle().Which.Should().BeOfType<ExceptionalError>(
+			"a file SQLite cannot open may be intact, so it is no damage");
 	}
 
 	[Fact]
@@ -347,6 +393,11 @@ public sealed class SpectrumDatabaseTests : IDisposable
 
 		var deleteTheFile = () => File.Delete(_path);
 		deleteTheFile.Should().NotThrow("the checkpoint closed the writer connection");
+	}
+
+	private static byte[] DamageBytes(int count)
+	{
+		return [.. Enumerable.Repeat(DamageByte, count)];
 	}
 
 	private SpectrumDatabase OpenDatabase()
