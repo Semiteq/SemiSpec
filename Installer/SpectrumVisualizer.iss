@@ -43,6 +43,8 @@ SolidCompression=yes
 
 WizardStyle=modern
 SetupIconFile={#AppIconFile}
+WizardImageFile=wizard-large-164.bmp,wizard-large-205.bmp,wizard-large-246.bmp,wizard-large-328.bmp
+WizardSmallImageFile=wizard-small-55.bmp,wizard-small-69.bmp,wizard-small-83.bmp,wizard-small-110.bmp
 UninstallDisplayIcon={app}\{#AppExeName}
 
 PrivilegesRequired=admin
