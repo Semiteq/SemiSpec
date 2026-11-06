@@ -4,7 +4,6 @@ using System.Threading.Channels;
 using AwesomeAssertions;
 
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Time.Testing;
 
@@ -34,7 +33,7 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 
 	protected SpectrumStoreTestBase()
 	{
-		StorePath = Folder.FileIn("spectra-1.db");
+		StorePath = Folder.FileIn("spectra.db");
 	}
 
 	/// <summary>
@@ -129,10 +128,10 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 		await OpenedAsync();
 	}
 
+	/// <summary>Waits for the line the writer logs once the open, the legacy cleanup and the first retention ran.</summary>
 	protected Task OpenedAsync()
 	{
-		return Waits.UntilAsync(
-			() => Logger.Collector.GetSnapshot().Any(record => record.Level == LogLevel.Information));
+		return Waits.UntilAsync(() => LogTimes("Spectrum store file").Count > 0);
 	}
 
 	protected Task StopAsync()

@@ -29,7 +29,7 @@ public abstract class AppLifecycleTestBase : IAsyncDisposable
 
 	private readonly CollectingSink _sink = new();
 	private readonly LoggingSetup _logging;
-	// Every test in the process gets the same instance file name, so each test owns its root.
+	// Every test gets the same history file name, so each test owns its root.
 	private readonly TempFolder _root = new();
 	private readonly AppDataPaths _paths;
 	private readonly List<SpectrumStore> _stores = [];
@@ -52,7 +52,7 @@ public abstract class AppLifecycleTestBase : IAsyncDisposable
 
 	public async ValueTask DisposeAsync()
 	{
-		// A writer still open would hold the instance file and fail the root's delete.
+		// A writer still open would hold the history file and fail the root's delete.
 		foreach (var store in _stores)
 		{
 			await store.StopAsync().WaitAsync(_storeStopLimit);

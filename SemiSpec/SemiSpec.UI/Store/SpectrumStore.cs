@@ -11,7 +11,7 @@ using SemiSpec.UI.Messages;
 
 namespace SemiSpec.UI.Store;
 
-/// <summary>The spectrum store file of this running instance.</summary>
+/// <summary>The spectrum store file the history is kept in across runs.</summary>
 public sealed record StoreFile(string Path);
 
 /// <summary>

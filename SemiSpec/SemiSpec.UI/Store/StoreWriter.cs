@@ -13,7 +13,7 @@ namespace SemiSpec.UI.Store;
 
 /// <summary>
 /// The writer task of the spectrum store: drains the queue into the store file in batches, runs the retention pass
-/// once a minute and closes the file with a checkpoint; every frame it loses goes to countDropped.
+/// at the open and once a minute and closes the file with a checkpoint; every frame it loses goes to countDropped.
 /// </summary>
 internal sealed class StoreWriter(
 	StoreFile storeFile,
@@ -28,7 +28,7 @@ internal sealed class StoreWriter(
 
 	private static readonly TimeSpan _retentionInterval = TimeSpan.FromMinutes(1);
 
-	private readonly StoreRetention _retention = new(storeFile, timeProvider, logger);
+	private readonly StoreRetention _retention = new(timeProvider, logger);
 
 	// Set by Stop on the UI thread, read by the writer task.
 	private volatile bool _stopped;
@@ -79,7 +79,8 @@ internal sealed class StoreWriter(
 		SpectrumDatabase? database = null;
 		try
 		{
-			var opened = OpenDatabase();
+			var prepared = StoreFiles.Prepare(storeFile.Path);
+			var opened = prepared.Bind(_ => SpectrumDatabase.Open(storeFile.Path));
 			if (opened.IsFailed)
 			{
 				ReportOpenFailure(opened.Errors);
@@ -87,6 +88,8 @@ internal sealed class StoreWriter(
 			}
 
 			database = opened.Value;
+			RunRetentionUnlessStopped(database);
+			LogLegacyFilesDeleted(prepared.Value);
 			logger.LogInformation("Spectrum store file {Path}", storeFile.Path);
 			await WriteQueuedAsync(database, cancellationToken, drainToken).ConfigureAwait(false);
 			CheckpointAndClose(database);
@@ -122,14 +125,20 @@ internal sealed class StoreWriter(
 		while (await queue.WaitToReadAsync(cancellationToken).ConfigureAwait(false));
 	}
 
-	private Result<SpectrumDatabase> OpenDatabase()
+	private void LogLegacyFilesDeleted(int legacyFiles)
 	{
-		var path = storeFile.Path;
-		return StoreFiles.Prepare(path).Bind(sweep =>
+		if (legacyFiles > 0)
 		{
-			_retention.LogSweep(sweep);
-			return SpectrumDatabase.Open(path);
-		});
+			logger.LogInformation("The spectrum store deleted {Count} store files of older builds", legacyFiles);
+		}
+	}
+
+	private void RunRetentionUnlessStopped(SpectrumDatabase database)
+	{
+		if (!_stopped)
+		{
+			_retention.Run(database);
+		}
 	}
 
 	private void ReportOpenFailure(IEnumerable<IError> causes)
@@ -154,11 +163,7 @@ internal sealed class StoreWriter(
 				if (retentionDue.IsCompleted)
 				{
 					await retentionDue.ConfigureAwait(false);
-					if (!_stopped)
-					{
-						_retention.Run(database);
-					}
-
+					RunRetentionUnlessStopped(database);
 					retentionDue = Task.Delay(_retentionInterval, timeProvider, retentionCancellation.Token);
 				}
 

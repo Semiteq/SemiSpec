@@ -5,68 +5,43 @@ using FluentResults;
 namespace SemiSpec.Core.Store;
 
 /// <summary>
-/// Names the spectrum store file of this process and clears the files earlier runs left in the store folder.
+/// Names the history file in the store folder and deletes the per-process store files older builds left there.
 /// </summary>
 public static class StoreFiles
 {
-	private const string FilePrefix = "spectra-";
+	private const string HistoryFileName = "spectra.db";
+	private const string LegacyFilePrefix = "spectra-";
 	private const string DatabaseExtension = ".db";
 	private static readonly string[] _sidecarSuffixes = ["-wal", "-shm"];
 
-	public static string InstanceFile(string folder, int processId)
+	public static string HistoryFile(string folder)
 	{
-		return Path.Combine(folder, $"{FilePrefix}{processId}{DatabaseExtension}");
+		return Path.Combine(folder, HistoryFileName);
 	}
 
 	/// <summary>
-	/// Creates the folder and wipes the own file, or fails; then deletes every other store file no live instance holds
-	/// open. A sweep that cannot list the folder deletes nothing and carries its failure in the result.
+	/// Creates the folder of the history file, then deletes every legacy store file no live process holds open and the
+	/// legacy sidecars whose store file is gone; the value is the count of legacy store files deleted.
 	/// </summary>
-	public static Result<StoreSweep> Prepare(string instanceFile)
+	public static Result<int> Prepare(string historyFile)
 	{
-		var folder = Path.GetDirectoryName(instanceFile)!;
+		var folder = Path.GetDirectoryName(historyFile)!;
+		string[] names;
 		try
 		{
 			Directory.CreateDirectory(folder);
-			DeleteWithSidecars(instanceFile);
+			names = Directory.GetFiles(folder, LegacyFilePrefix + "*");
 		}
 		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
 		{
 			return Result.Fail(
-				new ExceptionalError($"The spectrum store file '{instanceFile}' could not be prepared", ex));
-		}
-
-		return Sweep(instanceFile);
-	}
-
-	/// <summary>
-	/// Deletes every store file in the folder of the own file that no live instance holds open, and the sidecars whose
-	/// store file is gone; the own file stays.
-	/// </summary>
-	public static StoreSweep Sweep(string instanceFile)
-	{
-		var folder = Path.GetDirectoryName(instanceFile)!;
-		string[] names;
-		try
-		{
-			names = Directory.GetFiles(folder, FilePrefix + "*");
-		}
-		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-		{
-			var failure = new ExceptionalError($"The store folder '{folder}' could not be listed", ex);
-			return new StoreSweep(DeletedFiles: 0, KeptFiles: 0, failure);
+				new ExceptionalError($"The spectrum store file '{historyFile}' could not be prepared", ex));
 		}
 
 		var deleted = 0;
-		var kept = 0;
 		foreach (var name in names)
 		{
-			if (DatabaseOf(name) != name || string.Equals(name, instanceFile, StringComparison.OrdinalIgnoreCase))
-			{
-				continue;
-			}
-
-			if (TryDelete(name))
+			if (LegacyDatabaseOf(name) == name && TryDelete(name))
 			{
 				deleted++;
 				foreach (var suffix in _sidecarSuffixes)
@@ -74,27 +49,23 @@ public static class StoreFiles
 					TryDelete(name + suffix);
 				}
 			}
-			else
-			{
-				kept++;
-			}
 		}
 
 		foreach (var name in names)
 		{
-			if (DatabaseOf(name) is { } database && database != name && !File.Exists(database))
+			if (LegacyDatabaseOf(name) is { } database && database != name && !File.Exists(database))
 			{
 				TryDelete(name);
 			}
 		}
 
-		return new StoreSweep(deleted, kept);
+		return deleted;
 	}
 
 	/// <summary>
-	/// The store file a file belongs to, itself or the file of its sidecar; null outside spectra-&lt;digits&gt;.db.
+	/// The legacy store file a file belongs to, itself or the file of its sidecar; null outside spectra-&lt;digits&gt;.db.
 	/// </summary>
-	private static string? DatabaseOf(string file)
+	private static string? LegacyDatabaseOf(string file)
 	{
 		var database = file;
 		foreach (var suffix in _sidecarSuffixes)
@@ -106,13 +77,13 @@ public static class StoreFiles
 		}
 
 		var name = Path.GetFileName(database);
-		if (!name.StartsWith(FilePrefix, StringComparison.OrdinalIgnoreCase)
+		if (!name.StartsWith(LegacyFilePrefix, StringComparison.OrdinalIgnoreCase)
 			|| !name.EndsWith(DatabaseExtension, StringComparison.OrdinalIgnoreCase))
 		{
 			return null;
 		}
 
-		var processId = name[FilePrefix.Length..^DatabaseExtension.Length];
+		var processId = name[LegacyFilePrefix.Length..^DatabaseExtension.Length];
 		return int.TryParse(processId, NumberStyles.None, CultureInfo.InvariantCulture, out _) ? database : null;
 	}
 
@@ -126,6 +97,7 @@ public static class StoreFiles
 		}
 	}
 
+	/// <summary>False when the delete failed, which for a legacy store file means a running older build holds it.</summary>
 	private static bool TryDelete(string file)
 	{
 		try
@@ -139,9 +111,3 @@ public static class StoreFiles
 		}
 	}
 }
-
-/// <summary>
-/// Counts of the other instances' store files the sweep deleted and the ones a live instance kept open; Failure is what
-/// stopped the sweep from listing the folder, null when it ran.
-/// </summary>
-public sealed record StoreSweep(int DeletedFiles, int KeptFiles, ExceptionalError? Failure = null);

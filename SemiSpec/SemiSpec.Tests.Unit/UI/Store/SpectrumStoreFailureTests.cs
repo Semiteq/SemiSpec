@@ -88,7 +88,7 @@ public sealed class SpectrumStoreFailureTests : SpectrumStoreTestBase
 		var blocker = Folder.FileIn("blocker");
 		await File.WriteAllTextAsync(
 			blocker, "a file where the store folder belongs", TestContext.Current.CancellationToken);
-		var path = Path.Combine(blocker, "spectra-1.db");
+		var path = Path.Combine(blocker, "spectra.db");
 		CreateStore(path: path);
 		StartStore();
 

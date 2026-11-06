@@ -92,7 +92,7 @@ public abstract class AppStatusBarTestBase : IAsyncDisposable
 	/// <summary>Each distinct link text and tone the bar showed, in order.</summary>
 	protected IReadOnlyList<(string Text, LinkTone Tone)> ShownStates => _shownStates;
 
-	private string StorePath => _storeFolder.FileIn("spectra-1.db");
+	private string StorePath => _storeFolder.FileIn("spectra.db");
 
 	public async ValueTask DisposeAsync()
 	{

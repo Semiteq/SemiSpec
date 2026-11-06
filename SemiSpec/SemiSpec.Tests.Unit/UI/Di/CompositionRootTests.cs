@@ -99,13 +99,12 @@ public sealed class CompositionRootTests : IAsyncDisposable
 	}
 
 	[AvaloniaFact]
-	public void TheStoreIsOneInstanceOverTheInstanceFileUnderTheStoreFolder()
+	public void TheStoreIsOneInstanceOverTheHistoryFileUnderTheStoreFolder()
 	{
 		using var provider = BuildContainer();
 
 		provider.GetRequiredService<SpectrumStore>().Should().BeSameAs(provider.GetRequiredService<SpectrumStore>());
-		provider.GetRequiredService<StoreFile>().Path
-			.Should().Be(Path.Combine(_paths.StoreFolder, $"spectra-{Environment.ProcessId}.db"));
+		provider.GetRequiredService<StoreFile>().Path.Should().Be(Path.Combine(_paths.StoreFolder, "spectra.db"));
 	}
 
 	[AvaloniaFact]

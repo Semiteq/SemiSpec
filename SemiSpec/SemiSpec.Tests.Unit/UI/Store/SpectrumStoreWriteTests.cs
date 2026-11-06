@@ -5,6 +5,7 @@ using System.Threading.Channels;
 using AwesomeAssertions;
 
 using SemiSpec.Core.Protocol;
+using SemiSpec.Core.Store;
 using SemiSpec.Tests.Unit.Core.Store;
 
 using Xunit;
@@ -86,6 +87,7 @@ public sealed class SpectrumStoreWriteTests : SpectrumStoreTestBase
 		var firstPass = now.AddSeconds(61);
 		var clock = new RetentionClock(now);
 		await StartOpenedAsync(clock);
+		clock.Reads.Should().Be(1, "the open runs one pass, the next is a minute later");
 		Feed(
 			StoreSamples.Spectrum(StoreSamples.Start, seq: 1),
 			StoreSamples.Heartbeat(StoreSamples.Start, seq: 2),
@@ -134,21 +136,38 @@ public sealed class SpectrumStoreWriteTests : SpectrumStoreTestBase
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
-	public async Task TheRetentionPathSweepsTheFilesOfOtherInstancesOnceAnHour()
+	public async Task RetentionAtOpenDeletesRowsOlderThanADay()
 	{
-		var clock = new RetentionClock(StoreSamples.Start);
-		await StartOpenedAsync(clock);
-		var leftover = Folder.FileIn("spectra-2.db");
-		await File.WriteAllBytesAsync(leftover, [], TestContext.Current.CancellationToken);
+		var now = StoreSamples.Start.AddHours(25);
+		WriteBeforeTheStart(
+			StoreSamples.Spectrum(now - TimeSpan.FromHours(25), seq: 1),
+			StoreSamples.Spectrum(now - TimeSpan.FromHours(23), seq: 2));
 
-		await RetentionPassAsync(clock, TimeSpan.FromSeconds(61), expectedSpectra: 1);
-		await RetentionPassAsync(clock, TimeSpan.FromMinutes(59), expectedSpectra: 2);
-		var keptBeforeTheHour = File.Exists(leftover);
-		await RetentionPassAsync(clock, TimeSpan.FromMinutes(1), expectedSpectra: 3);
+		await StartOpenedAsync(new RetentionClock(now));
 
-		keptBeforeTheHour.Should().BeTrue("59 min passed since the first pass");
-		File.Exists(leftover).Should().BeFalse("an hour passed since the first pass");
-		File.Exists(StorePath).Should().BeTrue("the sweep keeps the own file");
-		LogTimes("The spectrum store sweep deleted").Should().HaveCount(2, "the open sweeps once, then the hour");
+		Scalar("SELECT group_concat(seq) FROM (SELECT seq FROM spectrum ORDER BY id)").Should().Be("2",
+			"the pass at the open deletes the 25 h row before the clock moves");
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task LegacyFilesAreDeletedAtOpen()
+	{
+		var legacy = Folder.FileIn("spectra-1234.db");
+		await File.WriteAllBytesAsync(legacy, [], TestContext.Current.CancellationToken);
+		await File.WriteAllBytesAsync(legacy + "-wal", [], TestContext.Current.CancellationToken);
+
+		await StartOpenedAsync();
+
+		File.Exists(legacy).Should().BeFalse();
+		File.Exists(legacy + "-wal").Should().BeFalse();
+		File.Exists(StorePath).Should().BeTrue();
+		LogTimes("The spectrum store deleted 1 store files of older builds").Should().ContainSingle();
+	}
+
+	private void WriteBeforeTheStart(params ReceivedFrame[] frames)
+	{
+		var database = SpectrumDatabase.Open(StorePath).Value;
+		database.Write(frames).IsSuccess.Should().BeTrue();
+		database.CheckpointAndClose().IsSuccess.Should().BeTrue();
 	}
 }

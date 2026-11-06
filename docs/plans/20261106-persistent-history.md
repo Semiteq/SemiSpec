@@ -16,6 +16,8 @@
 
 ## Context (from discovery)
 - Verified 2026-11-06 at `261335e` (master): `dotnet test SemiSpec.slnx` passes 944 of 944.
+- Baseline at the `ui-redesign` merge `4a158fb` (run at `bb89a7f`, which adds this plan only): `dotnet test
+  SemiSpec.slnx` passes 992 of 992, none skipped.
 - This plan executes on master after the branch `ui-redesign` (tip `84b9e06`) merges. Expected conflict points, from
   `git diff --stat master...ui-redesign`:
   - `docs/architecture/overview.md` gains about 370 changed lines; this plan cites its sections by name only.
@@ -393,16 +395,18 @@ file to the developer." / ru "Действий не требуется. Если
 - Modify: `SemiSpec/SemiSpec.Tests.Unit/UI/Di/CompositionRootTests.cs`, `AppLifecycleTestBase.cs` (the instance
   file comment)
 
-- [ ] record the test count of `dotnet test SemiSpec.slnx` at the `ui-redesign` merge commit in Context
-- [ ] replace `InstanceFile` with `HistoryFile`; `Prepare` creates the folder and deletes legacy files and orphan
+- [x] record the test count of `dotnet test SemiSpec.slnx` at the `ui-redesign` merge commit in Context
+- [x] replace `InstanceFile` with `HistoryFile`; `Prepare` creates the folder and deletes legacy files and orphan
   legacy sidecars, returning the count; remove `Sweep` and `StoreSweep`
-- [ ] `StoreRetention`: remove the sweep and `LogSweep`; `StoreWriter`: log the legacy count, run one retention pass
+- [x] `StoreRetention`: remove the sweep and `LogSweep`; `StoreWriter`: log the legacy count, run one retention pass
   right after the open
-- [ ] `AddUi` registers `StoreFile(StoreFiles.HistoryFile(paths.StoreFolder))`
-- [ ] rewrite the `Prepare` and name tests of `StoreFilesTests` per Acceptance Evidence item 1
-- [ ] write `RetentionAtOpenDeletesRowsOlderThanADay` and `LegacyFilesAreDeletedAtOpen`; adjust
+- [x] `AddUi` registers `StoreFile(StoreFiles.HistoryFile(paths.StoreFolder))`
+- [x] rewrite the `Prepare` and name tests of `StoreFilesTests` per Acceptance Evidence item 1
+- [x] write `RetentionAtOpenDeletesRowsOlderThanADay` and `LegacyFilesAreDeletedAtOpen`; adjust
   `RetentionRunsOnceAMinuteAlsoWithoutFrames`; rename the composition-root test
-- [ ] run `dotnet test SemiSpec.slnx` - must pass before next task
+- [x] run `dotnet test SemiSpec.slnx` - must pass before next task
+- ➕ `SpectrumDatabase.Schema` uses `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS`: without the
+  start-up wipe, a plain `CREATE TABLE` fails the second start. Task 3 replaces it with the version gate.
 
 ### Task 2: Retention fast path
 **Files:**

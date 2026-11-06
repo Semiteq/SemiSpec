@@ -39,7 +39,7 @@ public static class UiServiceCollectionExtensions
 			provider.GetRequiredService<MessagePanelViewModel>(),
 			provider.GetRequiredService<IScheduler>(),
 			provider.GetRequiredService<ILogger<FrameDistributor>>()));
-		services.AddSingleton(new StoreFile(StoreFiles.InstanceFile(paths.StoreFolder, Environment.ProcessId)));
+		services.AddSingleton(new StoreFile(StoreFiles.HistoryFile(paths.StoreFolder)));
 		services.AddSingleton<SpectrumStore>();
 		services.AddSingleton(provider => new SpectrumHistory(provider.GetRequiredService<StoreFile>().Path));
 		services.AddSingleton<IntensityCache>();

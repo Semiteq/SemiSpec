@@ -81,7 +81,8 @@ public sealed class SpectrumStoreStopTests : SpectrumStoreTestBase
 			// The due timer resumes the writer inline on the advancing thread, so the pass runs off the test thread.
 			var retentionPass = Task.Run(
 				() => clock.Advance(TimeSpan.FromSeconds(61)), TestContext.Current.CancellationToken);
-			await Waits.UntilAsync(() => clock.Reads == 1);
+			// The pass at the open made the first read.
+			await Waits.UntilAsync(() => clock.Reads == 2);
 			await FeedAsync([.. Enumerable.Repeat(StoreSamples.Spectrum(StoreSamples.Start), Fed)]);
 			await Distributor.StopAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
 			using var drain = new CancellationTokenSource(CloseLimit - CloseReserve);

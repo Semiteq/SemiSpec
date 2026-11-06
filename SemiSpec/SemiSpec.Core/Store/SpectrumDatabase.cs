@@ -14,7 +14,7 @@ namespace SemiSpec.Core.Store;
 public sealed class SpectrumDatabase : IDisposable
 {
 	private const string Schema = """
-		CREATE TABLE spectrum (
+		CREATE TABLE IF NOT EXISTS spectrum (
 			id INTEGER PRIMARY KEY,
 			received_at INTEGER NOT NULL,
 			device INTEGER NOT NULL,
@@ -26,13 +26,13 @@ public sealed class SpectrumDatabase : IDisposable
 			seq INTEGER NOT NULL,
 			state INTEGER NOT NULL,
 			pixels BLOB NOT NULL);
-		CREATE INDEX spectrum_time ON spectrum (received_at);
-		CREATE TABLE heartbeat (
+		CREATE INDEX IF NOT EXISTS spectrum_time ON spectrum (received_at);
+		CREATE TABLE IF NOT EXISTS heartbeat (
 			id INTEGER PRIMARY KEY,
 			received_at INTEGER NOT NULL,
 			seq INTEGER NOT NULL,
 			state INTEGER NOT NULL);
-		CREATE INDEX heartbeat_time ON heartbeat (received_at);
+		CREATE INDEX IF NOT EXISTS heartbeat_time ON heartbeat (received_at);
 		""";
 
 	private const string InsertSpectrum = """
@@ -78,7 +78,7 @@ public sealed class SpectrumDatabase : IDisposable
 			("$state", SqliteType.Integer));
 	}
 
-	/// <summary>Opens a fresh store file and creates the schema in it.</summary>
+	/// <summary>Opens the store file, or creates it, and creates the schema where it is missing.</summary>
 	public static Result<SpectrumDatabase> Open(string path)
 	{
 		SqliteConnection? connection = null;
