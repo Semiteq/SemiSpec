@@ -104,7 +104,8 @@ public sealed class StoreFilesTests : IDisposable
 			_folder.FileIn("spectra-1234 - Copy.db"),
 			_folder.FileIn("spectra-1234 - Copy.db-wal"),
 			_folder.FileIn("spectra.broken-20261106-101500.db"),
-			_folder.FileIn("spectra.db.damaged"),
+			HistoryFile,
+			HistoryFile + ".damaged",
 			_folder.FileIn("notes.db"),
 		];
 		Touch(kept);
@@ -113,6 +114,17 @@ public sealed class StoreFilesTests : IDisposable
 
 		result.Value.Should().Be(0);
 		Directory.GetFiles(_folder.Root).Should().BeEquivalentTo(kept);
+	}
+
+	[Fact]
+	public void PrepareDeletesADamageMarkerWhoseHistoryFileIsGone()
+	{
+		Touch(HistoryFile + ".damaged");
+
+		var result = StoreFiles.Prepare(HistoryFile);
+
+		result.Value.Should().Be(0);
+		Directory.GetFiles(_folder.Root).Should().BeEmpty();
 	}
 
 	[Fact]

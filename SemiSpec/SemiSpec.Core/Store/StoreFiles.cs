@@ -28,7 +28,8 @@ public static class StoreFiles
 
 	/// <summary>
 	/// Creates the folder of the history file, then deletes every legacy store file no live process holds open and the
-	/// legacy sidecars whose store file is gone; the value is the count of legacy store files deleted.
+	/// legacy sidecars whose store file is gone, and a damage marker whose history file is gone; the value is the count
+	/// of legacy store files deleted.
 	/// </summary>
 	public static Result<int> Prepare(string historyFile)
 	{
@@ -64,6 +65,11 @@ public static class StoreFiles
 			{
 				TryDelete(name);
 			}
+		}
+
+		if (!File.Exists(historyFile))
+		{
+			TryDelete(historyFile + DamageMarkerSuffix);
 		}
 
 		return deleted;

@@ -487,9 +487,10 @@ file to the developer." / ru "Действий не требуется. Если
   `Tests.Unit/Core/Store/DamagedPages.cs` serves the database, history and store tests. Added beyond item 1:
   `DeleteWithSidecarsDeletesTheMarker` and `ADamagedRetentionPassMarksTheFile`. The set-aside Warning line now
   names the cause: "... was set aside as {SetAsidePath} and a new one started: {Damage}".
-- ⚠️ a marker whose `spectra.db` is gone (deleted by hand) makes `SetAside` fail at every start, so the store ends
-  in `StoreOpenError` until the marker is deleted. Plan-conformant (a failed rename ends in `StoreOpenError`), not
-  handled here.
+- ➕ `Prepare` deletes a damage marker whose `spectra.db` is gone (deleted by hand), so the open no longer tries to
+  set aside a missing file and end in `StoreOpenError` at every start. `PrepareKeepsNamesOutsideTheLegacyPattern`
+  keeps the marker beside an existing `spectra.db`; `PrepareDeletesADamageMarkerWhoseHistoryFileIsGone` pins the
+  orphan case.
 
 ### Task 6: Store ready signal
 **Files:**
