@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:SemiSpec.UI.Trend"
+             xmlns:text="clr-namespace:SemiSpec.UI.Localization"
+             mc:Ignorable="d"
+             d:DesignWidth="320"
+             d:DesignHeight="120"
+             x:Class="SemiSpec.UI.Trend.TrendPanel"
+             x:DataType="local:TrendViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="TextBlock">
+            <Setter Property="TextWrapping" Value="NoWrap" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+    </UserControl.Styles>
+
+    <!-- The label column is shared with the signal pane's form, so both sections keep one field edge. -->
+    <Grid ColumnSpacing="12"
+          RowSpacing="8"
+          RowDefinitions="Auto,Auto,Auto">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"
+                              SharedSizeGroup="SidePaneLabel" />
+            <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <!-- The previous section ends this grid's row spacing, so the full 16 px above the header is margin. -->
+        <TextBlock Grid.Row="0"
+                   Grid.ColumnSpan="2"
+                   Name="TrendHeader"
+                   Text="{x:Static text:Resources.TrendTitle}"
+                   FontWeight="Bold"
+                   Margin="0,16,0,0" />
+
+        <TextBlock Grid.Row="1"
+                   Name="TimeWindowLabel"
+                   Text="{x:Static text:Resources.TrendTimeWindow}" />
+        <ComboBox Grid.Row="1"
+                  Grid.Column="1"
+                  Name="TimeWindowPreset"
+                  Width="120"
+                  ItemsSource="{Binding Presets}"
+                  SelectedItem="{Binding SelectedPreset}"
+                  DisplayMemberBinding="{Binding Label, DataType=local:TrendPreset}" />
+
+        <Button Grid.Row="2"
+                Grid.Column="1"
+                Name="FollowLive"
+                HorizontalAlignment="Left"
+                Content="{x:Static text:Resources.TrendFollowLive}"
+                Command="{Binding FollowLiveCommand}" />
+    </Grid>
+
+</UserControl>

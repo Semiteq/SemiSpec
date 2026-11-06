@@ -2,13 +2,13 @@
 
 ## One test project
 
-`SpectrumVisualizer/SpectrumVisualizer.Tests.Unit` holds every test of the app. A test's category is decided by the
+`SemiSpec/SemiSpec.Tests.Unit` holds every test of the app. A test's category is decided by the
 boundary it crosses: a unit test opens no socket, starts no container and touches no real port. The serial link runs
 over a fake port in every test, so no test crosses a machine boundary and there is no integration project. One is
 added when a test needs Docker or a real serial port.
 
-The project references `SpectrumVisualizer.Core`, `SpectrumVisualizer.UI`, `SpectrumVisualizer.Tools.BoardEmulator` and
-`SpectrumVisualizer.Tools.StoreBenchmark`;
+The project references `SemiSpec.Core`, `SemiSpec.UI`, `SemiSpec.Tools.BoardEmulator` and
+`SemiSpec.Tools.StoreBenchmark`;
 the UI project names it in `InternalsVisibleTo`. It is an executable (`OutputType Exe`, as xUnit 3 requires), and
 `xunit.runner.json` sets `failSkips: true`, so no test may be skipped.
 Two exceptions break "no visibility widened for a test". `RjcpSerialPortProvider.SortPortNames` and `MapOpenFailure`
@@ -29,7 +29,7 @@ frame pacing, so the frame-joining tests read them.
 - Test folders mirror the production project: `Core/` and its subfolders for Core, `UI/<folder>/` for each UI folder,
   `Tools/` for both console tools.
 - Board frames for any test come from `Core/Protocol/ProtocolSamples.cs`; its spectrum builder is `SpectrumFrame`,
-  because a member named `Spectrum` would collide with the `SpectrumVisualizer.Tests.Unit.UI.Spectrum` namespace in
+  because a member named `Spectrum` would collide with the `SemiSpec.Tests.Unit.UI.Spectrum` namespace in
   every test under `UI/`.
 - A class that writes process-global state joins `[Collection(ProcessGlobalStateCollection.Name)]`
   (`ProcessGlobalStateCollection.cs`), which runs with parallelization off. Its members are
@@ -38,7 +38,7 @@ frame pacing, so the frame-joining tests read them.
 
 ## Headless app
 
-`SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/TestAppBuilder.cs` registers the test application with
+`SemiSpec/SemiSpec.Tests.Unit/TestAppBuilder.cs` registers the test application with
 `[assembly: AvaloniaTestApplication]`. It configures the real `App` with `UseHeadless` and `UseReactiveUI(_ => { })`, so
 `App.axaml` loads the same palette and Semi theme as the running app. It installs no exception handler of its own.
 
@@ -89,8 +89,8 @@ No end-to-end framework exists. Headless realised-view tests take that role insi
 
 ## Gates
 
-`dotnet build SpectrumVisualizer.slnx` fails on any analyzer or style warning (`TreatWarningsAsErrors`,
+`dotnet build SemiSpec.slnx` fails on any analyzer or style warning (`TreatWarningsAsErrors`,
 `EnforceCodeStyleInBuild`, `AnalysisMode=Recommended`). `dotnet format --verify-no-changes` and `dotnet terse` run in
-the pre-commit hook over the staged `.cs` files under `SpectrumVisualizer/`. In CI, `dotnet format` checks the projects
-of `SpectrumVisualizer.slnx` and `dotnet terse` checks every tracked `.cs` file under `SpectrumVisualizer/`; the old
+the pre-commit hook over the staged `.cs` files under `SemiSpec/`. In CI, `dotnet format` checks the projects
+of `SemiSpec.slnx` and `dotnet terse` checks every tracked `.cs` file under `SemiSpec/`; the old
 app's sources are not gated.

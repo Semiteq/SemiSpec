@@ -2,7 +2,7 @@
   {
     "label": "Build",
     "command": "dotnet",
-    "args": ["build", "SpectrumVisualizer.slnx"],
+    "args": ["build", "SemiSpec.slnx"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "reveal": "always",
     "use_new_terminal": false,
@@ -11,7 +11,7 @@
   {
     "label": "Run app",
     "command": "dotnet",
-    "args": ["run", "--project", "SpectrumVisualizer/SpectrumVisualizer.UI"],
+    "args": ["run", "--project", "SemiSpec/SemiSpec.UI"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "reveal": "always",
     "use_new_terminal": true
@@ -22,7 +22,7 @@
     "args": [
       "run",
       "--project",
-      "SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator",
+      "SemiSpec/SemiSpec.Tools.BoardEmulator",
       "--",
       "--port",
       "COM4",
@@ -41,7 +41,7 @@
     "args": [
       "-NoProfile",
       "-Command",
-      "dotnet build SpectrumVisualizer.slnx; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; $bin = 'SpectrumVisualizer/Artifacts/bin'; Start-Process \"$bin/SpectrumVisualizer.UI/debug/SpectrumVisualizer.UI.exe\"; & \"$bin/SpectrumVisualizer.Tools.BoardEmulator/debug/SpectrumVisualizer.Tools.BoardEmulator.exe\" --port COM4 --device 2000 --rate 2"
+      "dotnet build SemiSpec.slnx; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; $bin = 'SemiSpec/Artifacts/bin'; Start-Process \"$bin/SemiSpec.UI/debug/SemiSpec.exe\"; & \"$bin/SemiSpec.Tools.BoardEmulator/debug/SemiSpec.Tools.BoardEmulator.exe\" --port COM4 --device 2000 --rate 2"
     ],
     "cwd": "$ZED_WORKTREE_ROOT",
     "reveal": "always",
@@ -51,7 +51,7 @@
   {
     "label": "Test All",
     "command": "dotnet",
-    "args": ["test", "SpectrumVisualizer.slnx"],
+    "args": ["test", "SemiSpec.slnx"],
     "cwd": "$ZED_WORKTREE_ROOT"
   },
   {
@@ -59,7 +59,7 @@
     "command": "dotnet",
     "args": [
       "test",
-      "SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/SpectrumVisualizer.Tests.Unit.csproj",
+      "SemiSpec/SemiSpec.Tests.Unit/SemiSpec.Tests.Unit.csproj",
       "--filter",
       "FullyQualifiedName~$ZED_STEM"
     ],
@@ -68,7 +68,7 @@
   {
     "label": "format",
     "command": "dotnet",
-    "args": ["format", "SpectrumVisualizer.slnx"],
+    "args": ["format", "SemiSpec.slnx"],
     "cwd": "$ZED_WORKTREE_ROOT"
   }
 ]

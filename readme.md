@@ -1,29 +1,52 @@
-# Spectrum Visualizer Solution
+# SemiSpec
 
-This solution contains two implementations of a Spectrum Visualizer application and one test project:
+[![CI](https://github.com/Semiteq/SemiSpec/actions/workflows/ci.yml/badge.svg)](https://github.com/Semiteq/SemiSpec/actions/workflows/ci.yml)
+![C#](https://img.shields.io/badge/C%23-.NET-blue)
+![.NET](https://img.shields.io/badge/.NET-10-512BD4)
+![Platform](https://img.shields.io/badge/platform-Windows-informational)
 
-1. **SpectrumVisualizer (Old Project)**
-   - Uses a vendor-specific library for device communication.
-   
-2. **SpectrumVisualizer.Uart (New Project)**
-   - Replaces the vendor-specific library with a custom UART implementation using `System.IO.Ports`.
+<div align="center">
+    <img src=./logo.png width=300 />
+</div>
 
-3. **SpectrumVisualizer.Tests**
-   - Contains MSTest-based unit tests for both implementations (where applicable).
-   - Focuses primarily on testing the new UART-based logic in `SpectrumVisualizer.Uart`.
+SemiSpec показывает спектр с платы спектрометров ATP-2000 и ATP-8000 и тренд интенсивности на длине волны,
+которую задаёт SCADA. Программа читает плату через COM-порт и хранит спектры за последние 24 часа.
 
-## Getting Started
+[Документация](./docs/architecture/README.md)
 
-1. **Clone and Open the Solution**  
-   - Clone this repository and open it in Visual Studio or another .NET-compatible IDE.
+<div align="center">
+    <img src="./docs/img/axis-flyout.png" width="800" />
+    <p><em>Главное окно: спектр, значения платы, тренд, обзор истории и панель интервала времени</em></p>
+</div>
 
-2. **Build and Run**  
-   - Each project can be built independently.  
-   - `SpectrumVisualizer` (old) relies on the vendor library (if still present).  
-   - `SpectrumVisualizer.Uart` (new) uses `System.IO.Ports` for UART communication.
-   - For single file package use `dotnet publish -r win-x64 -c Release --self-contained true /p:PublishSingleFile=true`
+## Возможности
 
-3. **Testing**  
-   - Open the Test Explorer in Visual Studio.
-   - Build and run the tests from the `SpectrumVisualizer.Tests` project.
-   - Tests cover parsing, data acquisition, and inversion logic for the new UART implementation.
+- Спектр с окном измерения ±`delta` и значения платы: амплитуда, сигнал/шум, добротность.
+- Тренд интенсивности за 24 часа с разрывами на потерянных спектрах и полосой ошибок измерения. Полоса обзора под
+  трендом показывает всю историю.
+- Щелчок по тренду открывает спектр этого момента.
+- Щелчок по оси открывает панель шкалы: границы, логарифмическая шкала, отсчёт от нуля, интервал времени.
+- Строка состояния и панель сообщений называют неполадку связи и что сделать.
+
+<div align="center">
+    <img src="./docs/img/past-moment.png" width="800" />
+    <p><em>Спектр прошлого момента</em></p>
+</div>
+
+<div align="center">
+    <img src="./docs/img/board-not-responding.png" width="800" />
+    <p><em>Плата не отвечает</em></p>
+</div>
+
+## Требования
+
+| Компонент            | Требование                              |
+| -------------------- | --------------------------------------- |
+| Операционная система | Windows 10 или Windows 11, 64-разрядная |
+
+## Установка
+
+Установщик `SemiSpecInstaller.exe` находится на странице
+[Releases](https://github.com/Semiteq/SemiSpec/releases/latest).
+
+Журнал программы лежит в папке `%LOCALAPPDATA%\SemiSpec\Logs`.

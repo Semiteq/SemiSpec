@@ -1,12 +1,12 @@
 # UI text
 
-Every string the operator reads lives in `SpectrumVisualizer/SpectrumVisualizer.UI/Localization/Resources.resx`
+Every string the operator reads lives in `SemiSpec/SemiSpec.UI/Localization/Resources.resx`
 (English) and `Resources.ru.resx` (Russian). C# source stays ASCII: the `terse` gate in the pre-commit hook and in CI
 rejects any other character, so Cyrillic and typographic glyphs live only in the resx.
 
 ## Two sets, one selector
 
-`SpectrumVisualizer.UI.csproj` sets `<NeutralLanguage>en</NeutralLanguage>`, so the English set is the neutral one and
+`SemiSpec.UI.csproj` sets `<NeutralLanguage>en</NeutralLanguage>`, so the English set is the neutral one and
 lives in the main assembly. `Resources.ru.resx` carries the same keys and compiles to a `ru` satellite assembly; the SDK
 takes the culture from the file name.
 
@@ -23,7 +23,7 @@ ScottPlot's `DateTimeAutomatic` labels the trend's time axis.
 
 ## The generated accessor
 
-`Microsoft.CodeAnalysis.ResxSourceGenerator`, pinned in `SpectrumVisualizer/Directory.Packages.props` and referenced with
+`Microsoft.CodeAnalysis.ResxSourceGenerator`, pinned in `SemiSpec/Directory.Packages.props` and referenced with
 `PrivateAssets="all"`, generates the `Resources` class from one item:
 
 ```xml
@@ -35,7 +35,7 @@ key with placeholders also gets a format method (`Resources.FormatFailureThrownD
 is a build error, in C# and in AXAML alike.
 
 AXAML reads a key as `{x:Static text:Resources.Key}` with
-`xmlns:text="clr-namespace:SpectrumVisualizer.UI.Localization"`. A format string with a placeholder is used as a
+`xmlns:text="clr-namespace:SemiSpec.UI.Localization"`. A format string with a placeholder is used as a
 `StringFormat`: `MessagePanelRepeatFormat` in the message panel.
 
 ## The keys
@@ -74,5 +74,5 @@ plain error's own message as its detail.
 2. Add the same key to `Resources.ru.resx` with the Russian text.
 3. Read it through `Resources.Key` in C# or `{x:Static text:Resources.Key}` in AXAML.
 
-`SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/AppResourcesTests.cs` fails when a neutral key is missing from the
+`SemiSpec/SemiSpec.Tests.Unit/UI/AppResourcesTests.cs` fails when a neutral key is missing from the
 Russian set or has an empty value there.

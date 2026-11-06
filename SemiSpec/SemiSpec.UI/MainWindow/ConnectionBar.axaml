@@ -1,0 +1,43 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:SemiSpec.UI.MainWindow"
+             xmlns:text="clr-namespace:SemiSpec.UI.Localization"
+             mc:Ignorable="d"
+             d:DesignWidth="1280"
+             d:DesignHeight="32"
+             x:Class="SemiSpec.UI.MainWindow.ConnectionBar"
+             x:DataType="local:ConnectionBarViewModel">
+
+    <StackPanel Orientation="Horizontal"
+                Spacing="8">
+
+        <!-- The 4 px margin on top of the 8 px spacing gives the 12 px label-to-field gap. -->
+        <TextBlock Name="PortLabel"
+                   Text="{x:Static text:Resources.ConnectionPortLabel}"
+                   Margin="0,0,4,0"
+                   VerticalAlignment="Center" />
+
+        <ComboBox Name="PortList"
+                  Width="240"
+                  ItemsSource="{Binding Ports}"
+                  SelectedItem="{Binding SelectedPort}"
+                  PlaceholderText="{Binding PortPlaceholder}"
+                  IsEnabled="{Binding IsIdle}" />
+
+        <Button Name="RefreshPorts"
+                Content="{x:Static text:Resources.ConnectionRefresh}"
+                Command="{Binding RefreshCommand}" />
+
+        <Button Name="Connect"
+                Content="{x:Static text:Resources.ConnectionConnect}"
+                Command="{Binding ConnectCommand}" />
+
+        <Button Name="Disconnect"
+                Content="{x:Static text:Resources.ConnectionDisconnect}"
+                Command="{Binding DisconnectCommand}" />
+
+    </StackPanel>
+
+</UserControl>

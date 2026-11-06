@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <AssemblyName>SemiSpec</AssemblyName>
+    <RootNamespace>SemiSpec.UI</RootNamespace>
+    <StartupObject>SemiSpec.UI.Program</StartupObject>
+    <NeutralLanguage>en</NeutralLanguage>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Localization/Resources.resx" GenerateSource="true" EmitFormatMethods="true"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SemiSpec.Tests.Unit"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia"/>
+    <PackageReference Include="Avalonia.Desktop"/>
+    <PackageReference Include="Avalonia.HarfBuzz"/>
+    <PackageReference Include="Avalonia.Win32"/>
+    <PackageReference Include="Avalonia.Skia"/>
+    <PackageReference Include="ReactiveUI.Avalonia"/>
+    <PackageReference Include="RJCP.SerialPortStream"/>
+    <PackageReference Include="ScottPlot.Avalonia"/>
+    <PackageReference Include="Semi.Avalonia"/>
+    <PackageReference Include="Microsoft.CodeAnalysis.ResxSourceGenerator" PrivateAssets="all"/>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
+    <PackageReference Include="Microsoft.Extensions.Logging"/>
+    <PackageReference Include="Serilog"/>
+    <PackageReference Include="Serilog.Extensions.Logging"/>
+    <PackageReference Include="Serilog.Sinks.File"/>
+    <PackageReference Include="System.Reactive"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SemiSpec.Core\SemiSpec.Core.csproj"/>
+  </ItemGroup>
+
+</Project>

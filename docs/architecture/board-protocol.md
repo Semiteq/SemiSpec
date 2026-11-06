@@ -2,8 +2,8 @@
 
 The board sends frames to the PC over a serial port, one way only; the app sends nothing. The contract is
 Semiteq/OptoskyProj#20. This page restates it in English and describes the Core code that reads it
-(`SpectrumVisualizer.Core/Protocol/`, `SpectrumVisualizer.Core/Calibration/`), the serial link that carries it into
-the app (`SpectrumVisualizer.UI/Link/`) and the board emulator (`SpectrumVisualizer.Tools.BoardEmulator`). Core holds
+(`SemiSpec.Core/Protocol/`, `SemiSpec.Core/Calibration/`), the serial link that carries it into
+the app (`SemiSpec.UI/Link/`) and the board emulator (`SemiSpec.Tools.BoardEmulator`). Core holds
 no serial port code.
 
 ## Channel
@@ -67,7 +67,7 @@ sync   len    st  seq crc16
 CRC-16/MODBUS: reflected polynomial 0xA001, initial value 0xFFFF, no final XOR (`Crc16Modbus`). ASCII `123456789`
 gives `0x4B37`.
 
-`SpectrumVisualizer.Tests.Unit/Core/Protocol/FirmwareFrames.txt` holds frames written by the firmware's own frame code,
+`SemiSpec.Tests.Unit/Core/Protocol/FirmwareFrames.txt` holds frames written by the firmware's own frame code,
 `pc_link.c` in OptoskyProj, built on the PC: the heartbeat above, an ATP-2000 spectrum, an ATP-8000 spectrum and an
 ATP-8000 dark frame, one per line as a name and the frame bytes in hex. `FirmwareFrameTests` runs two checks on each
 line against the same frame built in C#: `FrameDecoder` decodes the line to a `BoardFrame` equal field by field to that
@@ -157,7 +157,7 @@ long before that.
 
 ## Serial link
 
-`SerialLink` (`SpectrumVisualizer.UI/Link/`) carries the board's bytes from a COM port to decoded frames. It holds the
+`SerialLink` (`SemiSpec.UI/Link/`) carries the board's bytes from a COM port to decoded frames. It holds the
 public surface: `Connect(port)`, `DisconnectAsync()`, `Dispose()`, `Status`, `StatusChanged`, `StatusUpdates(scheduler)`
 and `Frames`. `StatusUpdates` is the current status followed by every change, observed on the given scheduler; the
 status bar and the connection row both follow the link through it. Each Connect creates one `LinkSession` and runs it as
@@ -350,12 +350,12 @@ band is the app's window, ±`delta` nm around the frame's wavelength.
 
 ## Board emulator
 
-`SpectrumVisualizer.Tools.BoardEmulator` writes protocol frames to a COM port, for manual runs over crossed USB-UART
+`SemiSpec.Tools.BoardEmulator` writes protocol frames to a COM port, for manual runs over crossed USB-UART
 adapters or a com0com pair:
 
 ```powershell
-dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator -- --port COM5
-dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator -- --help
+dotnet run --project SemiSpec/SemiSpec.Tools.BoardEmulator -- --port COM5
+dotnet run --project SemiSpec/SemiSpec.Tools.BoardEmulator -- --help
 ```
 
 `--help` lists the options and their defaults. The port runs at 115200 baud, fixed. An ATP-2000 frame takes

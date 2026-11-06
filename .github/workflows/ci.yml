@@ -8,8 +8,8 @@ on:
       - ".gitattributes"
       - ".config/dotnet-tools.json"
       - ".githooks/**"
-      - "SpectrumVisualizer/**"
-      - "SpectrumVisualizer.slnx"
+      - "SemiSpec/**"
+      - "SemiSpec.slnx"
       - "global.json"
       - "nuget.config"
       - "!**.md"
@@ -19,8 +19,8 @@ on:
       - ".gitattributes"
       - ".config/dotnet-tools.json"
       - ".githooks/**"
-      - "SpectrumVisualizer/**"
-      - "SpectrumVisualizer.slnx"
+      - "SemiSpec/**"
+      - "SemiSpec.slnx"
       - "global.json"
       - "nuget.config"
       - "!**.md"
@@ -49,24 +49,24 @@ jobs:
           global-json-file: global.json
 
       - name: restore
-        run: dotnet restore SpectrumVisualizer.slnx
+        run: dotnet restore SemiSpec.slnx
 
       - name: build
-        run: dotnet build SpectrumVisualizer.slnx -c Release --no-restore
+        run: dotnet build SemiSpec.slnx -c Release --no-restore
 
       - name: unit tests
-        run: dotnet test SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/SpectrumVisualizer.Tests.Unit.csproj -c Release --no-build --logger "console;verbosity=normal"
+        run: dotnet test SemiSpec/SemiSpec.Tests.Unit/SemiSpec.Tests.Unit.csproj -c Release --no-build --logger "console;verbosity=normal"
 
       - name: format check
-        run: dotnet format SpectrumVisualizer.slnx --verify-no-changes
+        run: dotnet format SemiSpec.slnx --verify-no-changes
 
       # The format check above is the byte order mark gate (error CHARSET); terse is the character gate.
       - name: comment gate
         shell: bash
         run: |
           dotnet tool restore
-          if [ -z "$(git ls-files 'SpectrumVisualizer/*.cs')" ]; then
+          if [ -z "$(git ls-files 'SemiSpec/*.cs')" ]; then
             echo "comment gate: no tracked .cs file to lint" >&2
             exit 1
           fi
-          git ls-files -z 'SpectrumVisualizer/*.cs' | xargs -0 dotnet terse
+          git ls-files -z 'SemiSpec/*.cs' | xargs -0 dotnet terse

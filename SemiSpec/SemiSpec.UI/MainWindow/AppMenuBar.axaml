@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="clr-namespace:SemiSpec.UI.MainWindow"
+             xmlns:text="clr-namespace:SemiSpec.UI.Localization"
+             mc:Ignorable="d"
+             d:DesignWidth="1280"
+             d:DesignHeight="32"
+             x:Class="SemiSpec.UI.MainWindow.AppMenuBar"
+             x:DataType="local:MainWindowViewModel">
+
+    <Menu Name="MainMenu">
+
+        <MenuItem Name="FileMenu"
+                  Header="{x:Static text:Resources.MenuFile}">
+            <MenuItem Name="FileExit"
+                      Header="{x:Static text:Resources.MenuFileExit}"
+                      Command="{Binding ExitCommand}" />
+        </MenuItem>
+
+        <MenuItem Name="ViewMenu"
+                  Header="{x:Static text:Resources.MenuView}">
+            <MenuItem Name="ViewVerboseLogging"
+                      Header="{x:Static text:Resources.MenuViewVerboseLogging}"
+                      Command="{Binding ToggleVerboseLoggingCommand}"
+                      ToggleType="CheckBox"
+                      IsChecked="{Binding IsVerboseLogging, Mode=OneWay}" />
+        </MenuItem>
+
+    </Menu>
+
+</UserControl>
