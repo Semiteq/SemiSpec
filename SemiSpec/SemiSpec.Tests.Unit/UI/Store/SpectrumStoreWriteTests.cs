@@ -150,6 +150,22 @@ public sealed class SpectrumStoreWriteTests : SpectrumStoreTestBase
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
+	public async Task OpenedCompletesTrueAfterTheRetentionAtOpen()
+	{
+		var now = StoreSamples.Start.AddHours(25);
+		WriteBeforeTheStart(
+			StoreSamples.Spectrum(now - TimeSpan.FromHours(25), seq: 1),
+			StoreSamples.Spectrum(now - TimeSpan.FromHours(23), seq: 2));
+		CreateStore(new RetentionClock(now));
+		StartStore();
+
+		var opened = await Store.Opened.WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
+
+		opened.Should().BeTrue();
+		Count("spectrum").Should().Be(1, "the pass at the open ran before Opened completed");
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
 	public async Task RetentionAtOpenEmptiesAFullyExpiredFile()
 	{
 		var now = StoreSamples.Start.AddHours(50);
@@ -191,7 +207,7 @@ public sealed class SpectrumStoreWriteTests : SpectrumStoreTestBase
 		LinkFrames = LinkChannel();
 		CreateStore(clock);
 		StartStore();
-		await Waits.UntilAsync(() => LogTimes("Spectrum store file").Count == 2);
+		await OpenedAsync();
 		await FeedAsync([.. SpectraWithSeq(11, 5)]);
 		await StopAsync();
 

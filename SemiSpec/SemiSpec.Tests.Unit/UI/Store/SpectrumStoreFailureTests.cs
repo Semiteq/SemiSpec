@@ -109,6 +109,21 @@ public sealed class SpectrumStoreFailureTests : SpectrumStoreTestBase
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
+	public async Task OpenedCompletesFalseWhenTheOpenFails()
+	{
+		var blocker = Folder.FileIn("blocker");
+		await File.WriteAllTextAsync(
+			blocker, "a file where the store folder belongs", TestContext.Current.CancellationToken);
+		CreateStore(path: Path.Combine(blocker, "spectra.db"));
+		StartStore();
+
+		var opened = await Store.Opened.WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
+
+		opened.Should().BeFalse();
+		Panel.Entries.Should().ContainSingle().Which.View.Title.Should().Be(Resources.StoreOpenTitle);
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
 	public async Task AnOpenThatThrowsReportsOneErrorAndCountsEveryFrameAsDropped()
 	{
 		var path = Folder.FileIn("spectra-\0.db");

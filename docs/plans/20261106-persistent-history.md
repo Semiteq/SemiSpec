@@ -497,10 +497,14 @@ file to the developer." / ru "Действий не требуется. Если
 - Modify: `SemiSpec/SemiSpec.UI/Store/SpectrumStore.cs`, `StoreWriter.cs`
 - Modify: `SemiSpec/SemiSpec.Tests.Unit/UI/Store/SpectrumStoreWriteTests.cs`, `SpectrumStoreStopTests.cs`
 
-- [ ] add `Opened`, completed by the writer per Solution Overview; `StopAsync` before `Start` completes it false
-- [ ] write `OpenedCompletesTrueAfterTheRetentionAtOpen`, `OpenedCompletesFalseWhenTheOpenFails`,
+- [x] add `Opened`, completed by the writer per Solution Overview; `StopAsync` before `Start` completes it false
+- [x] write `OpenedCompletesTrueAfterTheRetentionAtOpen`, `OpenedCompletesFalseWhenTheOpenFails`,
   `OpenedCompletesFalseOnDisposeBeforeTheOpen`
-- [ ] run `dotnet test SemiSpec.slnx` - must pass before next task
+- [x] run `dotnet test SemiSpec.slnx` - must pass before next task (1024 of 1024)
+- ➕ a dispose during the open completes `Opened` false: the writer checks the token after the retention at open,
+  before it completes `Opened` true. The dispose test holds the writer inside that retention pass with a clock
+  whose reads block. `OpenedCompletesFalseWhenTheOpenFails` sits in `SpectrumStoreFailureTests` beside the other
+  failed-open tests. The test base's `OpenedAsync` awaits `Opened` instead of the "Spectrum store file" log line.
 
 ### Task 7: NoSpectra breaks from point gaps
 **Files:**

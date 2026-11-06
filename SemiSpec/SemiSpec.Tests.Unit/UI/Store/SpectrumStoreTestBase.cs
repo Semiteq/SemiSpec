@@ -135,10 +135,10 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 		await OpenedAsync();
 	}
 
-	/// <summary>Waits for the line the writer logs once the open, the legacy cleanup and the first retention ran.</summary>
-	protected Task OpenedAsync()
+	/// <summary>Waits until Opened says the open, the legacy cleanup and the retention at open ran.</summary>
+	protected async Task OpenedAsync()
 	{
-		return Waits.UntilAsync(() => LogTimes("Spectrum store file").Count > 0);
+		(await Store.Opened.WaitAsync(Waits.Limit)).Should().BeTrue();
 	}
 
 	protected Task StopAsync()

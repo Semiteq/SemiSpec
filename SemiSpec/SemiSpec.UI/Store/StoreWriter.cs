@@ -14,11 +14,13 @@ namespace SemiSpec.UI.Store;
 /// <summary>
 /// The writer task of the spectrum store: drains the queue into the store file in batches, runs the retention pass
 /// at the open and once a minute and closes the file with a checkpoint; every frame it loses goes to countDropped.
+/// It completes opened true once the open and the retention at open ran, false when it ends without that.
 /// </summary>
 internal sealed class StoreWriter(
 	StoreFile storeFile,
 	ChannelReader<ReceivedFrame> queue,
 	Action<long> countDropped,
+	TaskCompletionSource<bool> opened,
 	MessagePanelViewModel messagePanel,
 	IScheduler uiScheduler,
 	TimeProvider timeProvider,
@@ -64,6 +66,7 @@ internal sealed class StoreWriter(
 		{
 			if (!await StoreAsync(cancellationToken, drainToken).ConfigureAwait(false))
 			{
+				opened.TrySetResult(false);
 				await DiscardUntilCompletedAsync(cancellationToken).ConfigureAwait(false);
 			}
 		}
@@ -71,6 +74,10 @@ internal sealed class StoreWriter(
 		{
 			// Dispose ends the writer this way; the file is already closed without a checkpoint.
 			countDropped(DiscardQueued());
+		}
+		finally
+		{
+			opened.TrySetResult(false);
 		}
 	}
 
@@ -80,16 +87,18 @@ internal sealed class StoreWriter(
 		SpectrumDatabase? database = null;
 		try
 		{
-			var opened = _opening.Open();
-			if (opened.IsFailed)
+			var openResult = _opening.Open();
+			if (openResult.IsFailed)
 			{
-				ReportOpenFailure(opened.Errors);
+				ReportOpenFailure(openResult.Errors);
 				return false;
 			}
 
-			database = opened.Value;
+			database = openResult.Value;
 			RunRetentionUnlessStopped(database);
 			logger.LogInformation("Spectrum store file {Path}", storeFile.Path);
+			cancellationToken.ThrowIfCancellationRequested();
+			opened.TrySetResult(true);
 			await WriteQueuedAsync(database, cancellationToken, drainToken).ConfigureAwait(false);
 			CheckpointAndClose(database);
 			database = null;
