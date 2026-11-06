@@ -25,63 +25,62 @@ public sealed class SpectrumViewModelCommandTests : SpectrumViewModelTestBase
 	private static readonly DateTimeOffset _moment = new(2026, 11, 4, 8, 30, 15, TimeSpan.Zero);
 
 	[AvaloniaFact]
-	public void StickToZeroIsEnabledOnceASpectrumIsShown()
+	public async Task AutoscaleTogglesBetweenFollowingAndFrozen()
 	{
-		CanExecute(ViewModel.StickToZeroCommand).Should().BeFalse();
-
 		_source.Current = Atp8000Peak;
 		SignalAndRun();
 
-		CanExecute(ViewModel.StickToZeroCommand).Should().BeTrue();
-	}
+		await ViewModel.AutoscaleCommand.Execute();
+		ViewModel.Chart.IsFollowing.Should().BeFalse("Autoscale off holds the scale where it stands");
 
-	[AvaloniaFact]
-	public async Task ResetScaleShowsTheFrozenState()
-	{
-		CanExecute(ViewModel.ResetScaleCommand).Should().BeFalse("there is no spectrum yet");
-		ViewModel.Chart.TakeManualScale();
-		CanExecute(ViewModel.ResetScaleCommand).Should().BeFalse("there is no spectrum yet");
-
-		_source.Current = Atp8000Peak;
-		SignalAndRun();
-		ViewModel.Chart.ResetScale();
-		CanExecute(ViewModel.ResetScaleCommand).Should().BeFalse("the scale follows the data");
-
-		ViewModel.Chart.TakeManualScale();
-		CanExecute(ViewModel.ResetScaleCommand).Should().BeTrue();
-
-		await ViewModel.ResetScaleCommand.Execute();
-
+		await ViewModel.AutoscaleCommand.Execute();
 		ViewModel.Chart.IsFollowing.Should().BeTrue();
-		CanExecute(ViewModel.ResetScaleCommand).Should().BeFalse();
 	}
 
 	[AvaloniaFact]
-	public async Task StickToZeroFreezesTheScale()
+	public async Task TypedBoundsFreezeTheScale()
 	{
 		_source.Current = Atp8000Peak;
 		SignalAndRun();
+		ViewModel.VerticalForm.Seed();
 
-		await ViewModel.StickToZeroCommand.Execute();
+		ViewModel.VerticalForm.MinimumText = "0";
+		ViewModel.VerticalForm.MaximumText = "50000";
+		await ViewModel.VerticalForm.CommitCommand.Execute();
 
 		ViewModel.Chart.IsFollowing.Should().BeFalse();
+		var limits = ViewModel.Chart.Plot.Axes.GetLimits();
+		(limits.Bottom, limits.Top).Should().Be((0.0, 50000.0));
+	}
+
+	[AvaloniaFact]
+	public async Task FromZeroFollowsFromZero()
+	{
+		_source.Current = Atp8000Peak;
+		SignalAndRun();
+		ViewModel.Chart.TakeManualScale();
+
+		await ViewModel.ToggleFromZeroCommand.Execute();
+
+		ViewModel.IsFromZero.Should().BeTrue();
+		ViewModel.Chart.IsFollowing.Should().BeTrue("a mode toggle returns the scale to following");
 		ViewModel.Chart.Plot.Axes.GetLimits().Bottom.Should().Be(0);
 	}
 
 	[AvaloniaFact]
-	public void TheCheckboxesReachTheChart()
+	public async Task TheTogglesReachTheChart()
 	{
 		_source.Current = Atp8000Peak;
 		SignalAndRun();
 
-		ViewModel.IsLogarithmic = true;
+		await ViewModel.ToggleLogarithmicCommand.Execute();
 		ViewModel.Chart.Plot.Axes.Left.TickGenerator.Should().BeOfType<LogTickGenerator>();
 
-		ViewModel.IsLogarithmic = false;
+		await ViewModel.ToggleLogarithmicCommand.Execute();
 		ViewModel.Chart.Plot.Axes.Left.TickGenerator.Should().BeOfType<NumericAutomatic>();
 
 		ViewModel.Chart.TakeManualScale();
-		ViewModel.IsInverted = true;
+		await ViewModel.ToggleInvertCommand.Execute();
 		ViewModel.Chart.IsFollowing.Should().BeTrue("an inversion toggle returns the scale to following");
 	}
 
@@ -107,17 +106,32 @@ public sealed class SpectrumViewModelCommandTests : SpectrumViewModelTestBase
 	}
 
 	[AvaloniaFact]
-	public void TheHistoricalLineShowsTheMomentInLocalTime()
+	public void TheStateLineShowsTheMomentInLocalTime()
 	{
-		ViewModel.Chart.HistoricalText.Should().BeEmpty("the live spectrum is shown");
+		ViewModel.StateText.Should().BeEmpty("nothing is shown yet");
 
 		_switching.ShowMoment(Atp8000Peak.Measurement, _moment);
+		Dispatcher.UIThread.RunJobs();
 
 		var localTime = _moment.ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture);
-		ViewModel.Chart.HistoricalText.Should().Be(Resources.FormatSpectrumHistoricalFormat(localTime));
+		ViewModel.StateText.Should().Be(Resources.FormatSpectrumHistoricalFormat(localTime));
 
 		_switching.ReturnToLive();
+		Dispatcher.UIThread.RunJobs();
 
-		ViewModel.Chart.HistoricalText.Should().BeEmpty();
+		ViewModel.StateText.Should().BeEmpty();
+	}
+
+	[AvaloniaFact]
+	public async Task TheStateLineNamesStaleDataAndTheModes()
+	{
+		_source.Current = Atp8000Peak;
+		SignalAndRun();
+		await ViewModel.ToggleLogarithmicCommand.Execute();
+
+		var receivedAt = ClockText.TimeOfDay(Atp8000Peak.ReceivedAt);
+		ViewModel.StateText.Should().Be(
+			Resources.FormatSpectrumStaleFormat(receivedAt) + Resources.ChartStateSeparator + Resources.SpectrumStateLog,
+			"the link is not receiving");
 	}
 }

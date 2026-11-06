@@ -30,9 +30,29 @@
                 BorderThickness="0,0,0,1"
                 BorderBrush="{DynamicResource AppBorderBrush}"
                 Padding="16,8">
-            <local:ConnectionBar DataContext="{Binding ConnectionBar}" />
+            <!-- SemiPlot keeps its live-navigation buttons in the top bar; here they follow the connection row. -->
+            <StackPanel Orientation="Horizontal"
+                        Spacing="16">
+                <local:ConnectionBar DataContext="{Binding ConnectionBar}" />
+                <Border Name="LiveSeparator"
+                        Width="1"
+                        Height="24"
+                        VerticalAlignment="Center"
+                        Background="{DynamicResource AppBorderBrush}" />
+                <StackPanel Orientation="Horizontal"
+                            Spacing="8"
+                            VerticalAlignment="Center">
+                    <Button Name="BackToLive"
+                            Content="{x:Static text:Resources.ChartBackToLive}"
+                            Command="{Binding Spectrum.BackToLiveCommand}" />
+                    <Button Name="FollowLive"
+                            Content="{x:Static text:Resources.TrendFollowLive}"
+                            Command="{Binding Trend.FollowLiveCommand}" />
+                </StackPanel>
+            </StackPanel>
         </Border>
 
+        <!-- The readout sits beside the spectrum only; the trend and the overview span the full width. -->
         <Grid Grid.Row="2"
               Name="ContentArea"
               ColumnDefinitions="*,Auto">
@@ -49,11 +69,27 @@
                     Grid.Column="0"
                     Name="SpectrumPane"
                     Background="{DynamicResource AppPanelBackgroundBrush}">
-                <spectrum:SpectrumChartView DataContext="{Binding Spectrum.Chart}" />
+                <spectrum:SpectrumChartView DataContext="{Binding Spectrum}" />
+            </Border>
+
+            <Border Grid.Row="0"
+                    Grid.Column="1"
+                    Name="SignalPane"
+                    Width="{x:Static spectrum:SpectrumPanel.PaneWidth}"
+                    Background="{DynamicResource AppPanelBackgroundBrush}"
+                    BorderThickness="1,0,0,0"
+                    BorderBrush="{DynamicResource AppBorderBrush}"
+                    Padding="16,12">
+                <ScrollViewer Name="SidePaneScroll"
+                              HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <spectrum:SpectrumPanel DataContext="{Binding Spectrum}" />
+                </ScrollViewer>
             </Border>
 
             <Border Grid.Row="1"
                     Grid.Column="0"
+                    Grid.ColumnSpan="2"
                     Name="TrendPane"
                     Background="{DynamicResource AppPanelBackgroundBrush}"
                     BorderThickness="0,1,0,0"
@@ -63,6 +99,7 @@
 
             <Border Grid.Row="2"
                     Grid.Column="0"
+                    Grid.ColumnSpan="2"
                     Name="OverviewPane"
                     Background="{DynamicResource AppPanelBackgroundBrush}"
                     BorderThickness="0,1,0,0"
@@ -70,34 +107,16 @@
                 <trend:OverviewView DataContext="{Binding Trend.Overview}" />
             </Border>
 
-            <Border Grid.Row="0"
-                    Grid.RowSpan="3"
-                    Grid.Column="1"
-                    Name="SignalPane"
-                    Width="{x:Static spectrum:SpectrumPanel.PaneWidth}"
-                    Background="{DynamicResource AppPanelBackgroundBrush}"
-                    BorderThickness="1,0,0,0"
-                    BorderBrush="{DynamicResource AppBorderBrush}"
-                    Padding="16">
-                <ScrollViewer Name="SidePaneScroll"
-                              HorizontalScrollBarVisibility="Disabled"
-                              VerticalScrollBarVisibility="Auto">
-                    <StackPanel Grid.IsSharedSizeScope="True">
-                        <spectrum:SpectrumPanel DataContext="{Binding Spectrum}" />
-                        <trend:TrendPanel DataContext="{Binding Trend}" />
-                    </StackPanel>
-                </ScrollViewer>
-            </Border>
-
         </Grid>
 
         <Border Grid.Row="3"
                 Name="MessagePanel"
+                Height="{x:Static local:MainWindow.MessagePanelHeight}"
                 Background="{DynamicResource AppPanelBackgroundBrush}"
                 BorderThickness="0,1,0,0"
                 BorderBrush="{DynamicResource AppBorderBrush}"
-                Padding="16"
-                IsVisible="{Binding MessagePanel.HasEntries}">
+                Padding="16,8"
+                IsVisible="{Binding MessagePanel.IsVisible}">
             <messages:MessagePanelView DataContext="{Binding MessagePanel}" />
         </Border>
 

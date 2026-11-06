@@ -1,3 +1,5 @@
+using SemiSpec.Core.Chart;
+
 namespace SemiSpec.Core.Spectrum;
 
 public readonly record struct AxisRange(double Min, double Max);
@@ -12,8 +14,6 @@ public static class SpectrumScale
 	private const double PaddingShare = 0.05;
 	private const double LinearFlatHalfRange = 1.0;
 	private const double LogFlatHalfRange = 0.5;
-	private const double StuckHeadroom = 1.2;
-	private static readonly AxisRange _stuckEmptyRange = new(0.0, 1.0);
 
 	/// <summary>X over the device range of xs; Y over ys padded by five percent, or widened when ys is flat.</summary>
 	public static SpectrumLimits Following(ReadOnlySpan<double> xs, ReadOnlySpan<double> ys, SpectrumDisplay display)
@@ -34,17 +34,19 @@ public static class SpectrumScale
 		return new SpectrumLimits(x, new AxisRange(min - padding, max + padding));
 	}
 
-	/// <summary>Y from zero to 1.2 times rawMax, the largest displayed value before the log step; 0..1 when rawMax gives no range.</summary>
-	public static SpectrumLimits StuckToZero(ReadOnlySpan<double> xs, double rawMax, SpectrumDisplay display)
+	/// <summary>
+	/// X over the device range of xs; Y from zero to the largest of ys plus 5 %, in decades on the log axis.
+	/// </summary>
+	public static SpectrumLimits FromZero(ReadOnlySpan<double> xs, ReadOnlySpan<double> ys)
 	{
-		var x = DeviceRange(xs);
-		if (display.IsLogarithmic)
+		var max = double.NegativeInfinity;
+		foreach (var y in ys)
 		{
-			var y = rawMax <= 1.0 ? _stuckEmptyRange : new AxisRange(0.0, Math.Log10(rawMax * StuckHeadroom));
-			return new SpectrumLimits(x, y);
+			max = Math.Max(max, y);
 		}
 
-		return new SpectrumLimits(x, rawMax == 0.0 ? _stuckEmptyRange : new AxisRange(0.0, rawMax * StuckHeadroom));
+		var (bottom, top) = FromZeroRange.Over(max);
+		return new SpectrumLimits(DeviceRange(xs), new AxisRange(bottom, top));
 	}
 
 	private static AxisRange DeviceRange(ReadOnlySpan<double> xs)

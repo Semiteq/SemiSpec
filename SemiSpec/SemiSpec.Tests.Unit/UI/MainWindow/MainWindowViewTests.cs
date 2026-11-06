@@ -23,7 +23,6 @@ using SemiSpec.UI.Logging;
 using SemiSpec.UI.MainWindow;
 using SemiSpec.UI.Messages;
 using SemiSpec.UI.Spectrum;
-using SemiSpec.UI.Trend;
 
 using Xunit;
 
@@ -68,6 +67,7 @@ public sealed class MainWindowViewTests : IDisposable
 		_switchingSource = new SwitchingSpectrumSource(_spectrumSource);
 		_spectrum = new SpectrumViewModel(
 			_switchingSource,
+			_serialLink,
 			_messagePanel,
 			TimeProvider.System,
 			AvaloniaScheduler.Instance,
@@ -100,11 +100,9 @@ public sealed class MainWindowViewTests : IDisposable
 		new Control[] { spectrumPane, signalPane }.Select(pane => pane.Parent).Should().AllBeEquivalentTo(content);
 		new Control[] { spectrumPane, signalPane }.Select(Grid.GetColumn).Should().Equal(0, 1);
 		spectrumPane.Child.Should().BeOfType<SpectrumChartView>()
-			.Which.DataContext.Should().BeSameAs(_spectrum.Chart);
-		var sideForms = signalPane.Child.Should().BeOfType<ScrollViewer>()
-			.Which.Content.Should().BeOfType<StackPanel>().Which.Children;
-		sideForms.Select(form => form.GetType()).Should().Equal(typeof(SpectrumPanel), typeof(TrendPanel));
-		sideForms.Select(form => form.DataContext).Should().Equal(_spectrum, _trend.Trend);
+			.Which.DataContext.Should().BeSameAs(_spectrum);
+		signalPane.Child.Should().BeOfType<ScrollViewer>()
+			.Which.Content.Should().BeOfType<SpectrumPanel>().Which.DataContext.Should().BeSameAs(_spectrum);
 		signalPane.Bounds.Width.Should().Be(SpectrumPanel.PaneWidth);
 		_window.GetVisualDescendants().OfType<Control>()
 			.Should().NotContain(control => control.Name == "ContentPlaceholder");
@@ -165,7 +163,7 @@ public sealed class MainWindowViewTests : IDisposable
 
 		var connectionRow = Named<Border>(_window, "ConnectionRow");
 		connectionRow.IsEffectivelyVisible.Should().BeTrue();
-		var bar = connectionRow.Child.Should().BeOfType<ConnectionBar>().Which;
+		var bar = connectionRow.GetVisualDescendants().OfType<ConnectionBar>().Single();
 
 		Named<TextBlock>(bar, "PortLabel").Text.Should().Be(Resources.ConnectionPortLabel);
 		var portList = Named<ComboBox>(bar, "PortList");

@@ -70,19 +70,20 @@ public sealed class SpectrumChartViewModelDarkFrameTests : SpectrumChartViewMode
 	}
 
 	[AvaloniaTheory]
-	[InlineData(false, PeakTop * 1.2)]
-	[InlineData(true, LogStuckTop)]
-	public void StickToZeroOnADarkFrameUsesTheLastNonDarkMaximum(bool logarithmic, double expectedTop)
+	[InlineData(false)]
+	[InlineData(true)]
+	public void FromZeroOnADarkFrameUsesTheLastNonDarkMaximum(bool logarithmic)
 	{
 		_chart.SetDisplay(new SpectrumDisplay(IsInverted: false, logarithmic));
 		_chart.Show(Atp2000Peak);
 		_chart.Show(Dark(Spectrometer.Atp2000));
 
-		_chart.StickToZero();
+		_chart.SetFromZero(true);
 
 		var limits = _chart.Plot.Axes.GetLimits();
 		limits.Bottom.Should().Be(0);
-		limits.Top.Should().BeApproximately(expectedTop, Tolerance);
+		var top = logarithmic ? Math.Log10(PeakTop) : PeakTop;
+		limits.Top.Should().BeApproximately(top * 1.05, Tolerance);
 		_chart.ShouldSpanTheDeviceRange(Spectrometer.Atp2000);
 	}
 

@@ -20,6 +20,9 @@ public partial class MainWindow : Window
 	/// </summary>
 	public const double MinimumHeight = 688;
 
+	/// <summary>The newest message with a two-line remedy, the border and the padding.</summary>
+	public const double MessagePanelHeight = 93;
+
 	/// <summary>At least 120 px of data area under the measured axis margins.</summary>
 	public const double SpectrumRowMinHeight = 192;
 

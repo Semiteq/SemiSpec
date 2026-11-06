@@ -63,7 +63,7 @@ public sealed class SpectrumChartViewTests : SpectrumChartViewTestBase
 	[AvaloniaFact]
 	public void ARequestOnADetachedViewServesNothing()
 	{
-		var detached = new SpectrumChartView { DataContext = Chart };
+		var detached = new SpectrumChartView { DataContext = Spectrum };
 		var host = new Window { Width = WindowWidth, Height = WindowHeight };
 		try
 		{
@@ -157,7 +157,7 @@ public sealed class SpectrumChartViewTests : SpectrumChartViewTestBase
 		var plottables = Chart.Plot.GetPlottables().ToList();
 
 		View.DataContext = null;
-		View.DataContext = Chart;
+		View.DataContext = Spectrum;
 		Dispatcher.UIThread.RunJobs();
 
 		PlotControl.Plot.Should().BeSameAs(Chart.Plot);
@@ -167,7 +167,7 @@ public sealed class SpectrumChartViewTests : SpectrumChartViewTestBase
 	[AvaloniaFact]
 	public void ADataContextSwitchEndsTheOldRedrawSubscription()
 	{
-		using var other = new SpectrumChartViewModel();
+		using var other = NewSpectrum();
 		Realise();
 
 		View.DataContext = other;
@@ -176,20 +176,20 @@ public sealed class SpectrumChartViewTests : SpectrumChartViewTestBase
 		Chart.Show(SpectrumSamples.Atp8000Peak);
 		DriveOneFrame();
 
-		PlotControl.Plot.Should().BeSameAs(other.Plot);
+		PlotControl.Plot.Should().BeSameAs(other.Chart.Plot);
 		View.ServedFrameCount.Should().Be(framesBefore, "the old view model's requests no longer reach the view");
 	}
 
 	[AvaloniaFact]
 	public void DisposingTheViewModelClearsThePendingFrame()
 	{
-		var disposed = new SpectrumChartViewModel();
+		var disposed = NewSpectrum();
 		View.DataContext = disposed;
 		Realise();
 		DriveOneFrame();
 		var framesBefore = View.ServedFrameCount;
 
-		disposed.Show(SpectrumSamples.Atp8000Peak);
+		disposed.Chart.Show(SpectrumSamples.Atp8000Peak);
 		disposed.Dispose();
 		DriveOneFrame();
 

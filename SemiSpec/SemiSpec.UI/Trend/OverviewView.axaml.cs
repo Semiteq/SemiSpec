@@ -47,7 +47,8 @@ public partial class OverviewView : UserControl
 				model => model.HasExtent,
 				model => model.ExtentFirst,
 				model => model.ExtentLast,
-				model => model.Band)
+				model => model.Band,
+				model => model.IsFromZero)
 			.Subscribe(_ => LayoutBand()));
 		_subscriptions.Add(viewModel
 			.WhenAnyValue(
@@ -70,7 +71,13 @@ public partial class OverviewView : UserControl
 		BandLayer.Width = width;
 		BandLayer.Height = height;
 		BandLayer.Figures = DataContext is OverviewViewModel { HasExtent: true, Band: { } band } viewModel
-			? OverviewGeometry.BandFigures(band, viewModel.ExtentFirst, viewModel.ExtentLast, width, height)
+			? OverviewGeometry.BandFigures(
+				band,
+				viewModel.ExtentFirst,
+				viewModel.ExtentLast,
+				width,
+				height,
+				viewModel.IsFromZero)
 			: [];
 	}
 

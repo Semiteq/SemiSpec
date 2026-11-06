@@ -36,6 +36,21 @@ public readonly record struct EnvelopeColumn(double X, double Min, double Max, d
 		return columns;
 	}
 
+	/// <summary>The largest drawn value; negative infinity when none is drawn.</summary>
+	public static double DrawnMaximum(IReadOnlyList<EnvelopeColumn> columns)
+	{
+		var top = double.NegativeInfinity;
+		foreach (var column in columns)
+		{
+			if (!column.IsGap)
+			{
+				top = Math.Max(top, column.Max);
+			}
+		}
+
+		return top;
+	}
+
 	/// <summary>
 	/// The drawn values padded by 5 % of their span, or a 2-wide range on their centre when the span is narrower;
 	/// null when none is drawn.

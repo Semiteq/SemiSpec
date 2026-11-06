@@ -210,9 +210,6 @@
   <data name="SpectrumHistoricalFormat" xml:space="preserve">
     <value>Spectrum from {0}</value>
   </data>
-  <data name="SignalTitle" xml:space="preserve">
-    <value>Signal</value>
-  </data>
   <data name="SignalDevice" xml:space="preserve">
     <value>Spectrometer</value>
   </data>
@@ -240,29 +237,11 @@
   <data name="SignalWindowFormat" xml:space="preserve">
     <value>±{0} nm</value>
   </data>
-  <data name="ChartTitle" xml:space="preserve">
-    <value>Chart</value>
-  </data>
   <data name="ChartInvert" xml:space="preserve">
     <value>Invert spectrum</value>
   </data>
-  <data name="ChartLogScale" xml:space="preserve">
-    <value>Logarithmic scale</value>
-  </data>
-  <data name="ChartResetScale" xml:space="preserve">
-    <value>Reset scale</value>
-  </data>
-  <data name="ChartStickToZero" xml:space="preserve">
-    <value>Stick to zero</value>
-  </data>
   <data name="ChartBackToLive" xml:space="preserve">
     <value>Back to live</value>
-  </data>
-  <data name="TrendTitle" xml:space="preserve">
-    <value>Trend</value>
-  </data>
-  <data name="TrendTimeWindow" xml:space="preserve">
-    <value>Time window</value>
   </data>
   <data name="TrendFollowLive" xml:space="preserve">
     <value>Follow live</value>
@@ -321,5 +300,104 @@
   </data>
   <data name="TrendMomentRemedy" xml:space="preserve">
     <value>Click another moment.</value>
+  </data>
+  <data name="MenuViewMessagePanel" xml:space="preserve">
+    <value>Message panel</value>
+  </data>
+  <data name="MessagePanelMoreFormat" xml:space="preserve">
+    <value>{0} more</value>
+  </data>
+  <data name="MessagePanelEmpty" xml:space="preserve">
+    <value>No messages</value>
+  </data>
+  <data name="ChartFromZero" xml:space="preserve">
+    <value>From zero</value>
+  </data>
+  <data name="SpectrumStaleFormat" xml:space="preserve">
+    <value>No new data since {0}</value>
+  </data>
+  <data name="SpectrumStateLog" xml:space="preserve">
+    <value>Log</value>
+  </data>
+  <data name="SpectrumStateInverted" xml:space="preserve">
+    <value>Inverted</value>
+  </data>
+  <data name="SpectrumStateFromZero" xml:space="preserve">
+    <value>From zero</value>
+  </data>
+  <data name="SpectrumStateFrozen" xml:space="preserve">
+    <value>Scale frozen</value>
+  </data>
+  <data name="TrendStateNotFollowing" xml:space="preserve">
+    <value>Not following the data</value>
+  </data>
+  <data name="TrendWidthSecondsFormat" xml:space="preserve">
+    <value>{0} s</value>
+  </data>
+  <data name="TrendAxisTimeFormat" xml:space="preserve">
+    <value>Time, {0}</value>
+  </data>
+  <data name="TrendAxisTimeRangeFormat" xml:space="preserve">
+    <value>Time, {0} – {1}</value>
+  </data>
+  <data name="AxisScaleMaximumLabel" xml:space="preserve">
+    <value>Maximum</value>
+  </data>
+  <data name="AxisScaleMinimumLabel" xml:space="preserve">
+    <value>Minimum</value>
+  </data>
+  <data name="AxisScaleTypeLabel" xml:space="preserve">
+    <value>Scale type</value>
+  </data>
+  <data name="AxisScaleLogarithmic" xml:space="preserve">
+    <value>Logarithmic</value>
+  </data>
+  <data name="AxisScaleAutoscale" xml:space="preserve">
+    <value>Autoscale</value>
+  </data>
+  <data name="AxisScaleStartNmLabel" xml:space="preserve">
+    <value>Start, nm</value>
+  </data>
+  <data name="AxisScaleEndNmLabel" xml:space="preserve">
+    <value>End, nm</value>
+  </data>
+  <data name="AxisScaleBoundInvalid" xml:space="preserve">
+    <value>Enter a number in each field</value>
+  </data>
+  <data name="AxisScaleMinimumBelowMaximum" xml:space="preserve">
+    <value>The minimum must be below the maximum</value>
+  </data>
+  <data name="TimeWindowStartLabel" xml:space="preserve">
+    <value>Start</value>
+  </data>
+  <data name="TimeWindowEndLabel" xml:space="preserve">
+    <value>End</value>
+  </data>
+  <data name="TimeWindowWidthLabel" xml:space="preserve">
+    <value>Width</value>
+  </data>
+  <data name="TimeWindowPresets" xml:space="preserve">
+    <value>Presets</value>
+  </data>
+  <data name="TimeWindowDateFormat" xml:space="preserve">
+    <value>yyyy-MM-dd</value>
+  </data>
+  <data name="TimeWindowClockPattern" xml:space="preserve">
+    <value>hh:mm:ss</value>
+  </data>
+  <data name="TimeWindowStartUnreadableFormat" xml:space="preserve">
+    <value>Start time: write it as {0}.</value>
+  </data>
+  <data name="TimeWindowEndUnreadableFormat" xml:space="preserve">
+    <value>End time: write it as {0}.</value>
+  </data>
+  <data name="TimeWindowWidthUnreadableFormat" xml:space="preserve">
+    <value>Width: write it as {0}.</value>
+  </data>
+  <data name="TimeWindowEndNotAfterStart" xml:space="preserve">
+    <value>The end has to be later than the start.</value>
+  </data>
+  <data name="ChartStateSeparator" xml:space="preserve">
+    <value> · </value>
   </data>
 </root>

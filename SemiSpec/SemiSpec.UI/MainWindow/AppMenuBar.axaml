@@ -21,6 +21,12 @@
 
         <MenuItem Name="ViewMenu"
                   Header="{x:Static text:Resources.MenuView}">
+            <MenuItem Name="ViewMessagePanel"
+                      Header="{x:Static text:Resources.MenuViewMessagePanel}"
+                      Command="{Binding MessagePanel.ToggleCommand}"
+                      ToggleType="CheckBox"
+                      IsChecked="{Binding MessagePanel.IsVisible, Mode=OneWay}" />
+            <Separator />
             <MenuItem Name="ViewVerboseLogging"
                       Header="{x:Static text:Resources.MenuViewVerboseLogging}"
                       Command="{Binding ToggleVerboseLoggingCommand}"

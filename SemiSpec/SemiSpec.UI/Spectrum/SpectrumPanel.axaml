@@ -5,8 +5,8 @@
              xmlns:local="clr-namespace:SemiSpec.UI.Spectrum"
              xmlns:text="clr-namespace:SemiSpec.UI.Localization"
              mc:Ignorable="d"
-             d:DesignWidth="320"
-             d:DesignHeight="600"
+             d:DesignWidth="312"
+             d:DesignHeight="220"
              x:Class="SemiSpec.UI.Spectrum.SpectrumPanel"
              x:DataType="local:SpectrumViewModel">
 
@@ -17,122 +17,71 @@
         </Style>
     </UserControl.Styles>
 
-    <!-- 120 px is the number width. -->
+    <!-- The readout of the shown spectrum; 120 px is the number width. -->
     <Grid ColumnSpacing="12"
           RowSpacing="8"
-          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"
-                              SharedSizeGroup="SidePaneLabel" />
+            <ColumnDefinition Width="Auto" />
             <ColumnDefinition Width="Auto"
                               MinWidth="120" />
         </Grid.ColumnDefinitions>
 
         <TextBlock Grid.Row="0"
-                   Grid.ColumnSpan="2"
-                   Name="SignalHeader"
-                   Text="{x:Static text:Resources.SignalTitle}"
-                   FontWeight="Bold" />
-
-        <TextBlock Grid.Row="1"
                    Name="DeviceLabel"
                    Text="{x:Static text:Resources.SignalDevice}" />
-        <TextBlock Grid.Row="1"
+        <TextBlock Grid.Row="0"
                    Grid.Column="1"
                    Name="DeviceValue"
                    Text="{Binding SignalInfo.SpectrometerText}" />
 
-        <TextBlock Grid.Row="2"
+        <TextBlock Grid.Row="1"
                    Name="WavelengthLabel"
                    Text="{x:Static text:Resources.SignalWavelength}" />
-        <TextBlock Grid.Row="2"
+        <TextBlock Grid.Row="1"
                    Grid.Column="1"
                    Name="WavelengthValue"
                    Text="{Binding SignalInfo.WavelengthText}" />
 
-        <TextBlock Grid.Row="3"
+        <TextBlock Grid.Row="2"
                    Name="WindowLabel"
                    Text="{x:Static text:Resources.SignalWindow}" />
-        <TextBlock Grid.Row="3"
+        <TextBlock Grid.Row="2"
                    Grid.Column="1"
                    Name="WindowValue"
                    Text="{Binding SignalInfo.WindowText}" />
 
-        <TextBlock Grid.Row="4"
+        <TextBlock Grid.Row="3"
                    Name="AmplitudeLabel"
                    Text="{x:Static text:Resources.SignalAmplitude}" />
-        <TextBlock Grid.Row="4"
+        <TextBlock Grid.Row="3"
                    Grid.Column="1"
                    Name="AmplitudeValue"
                    Text="{Binding SignalInfo.AmplitudeText}" />
 
-        <TextBlock Grid.Row="5"
+        <TextBlock Grid.Row="4"
                    Name="SnrLabel"
                    Text="{x:Static text:Resources.SignalSnr}" />
-        <TextBlock Grid.Row="5"
+        <TextBlock Grid.Row="4"
                    Grid.Column="1"
                    Name="SnrValue"
                    Text="{Binding SignalInfo.SnrText}" />
 
-        <TextBlock Grid.Row="6"
+        <TextBlock Grid.Row="5"
                    Name="QLabel"
                    Text="{x:Static text:Resources.SignalQ}" />
-        <TextBlock Grid.Row="6"
+        <TextBlock Grid.Row="5"
                    Grid.Column="1"
                    Name="QValue"
                    Text="{Binding SignalInfo.QText}" />
 
-        <TextBlock Grid.Row="7"
+        <TextBlock Grid.Row="6"
                    Name="UpdatedLabel"
                    Text="{x:Static text:Resources.SignalUpdated}" />
-        <TextBlock Grid.Row="7"
+        <TextBlock Grid.Row="6"
                    Grid.Column="1"
                    Name="UpdatedValue"
                    Text="{Binding SignalInfo.UpdatedText}" />
-
-        <!-- The 8 px margin on top of the 8 px row spacing gives the 16 px above a section header. -->
-        <TextBlock Grid.Row="8"
-                   Grid.ColumnSpan="2"
-                   Name="ChartHeader"
-                   Text="{x:Static text:Resources.ChartTitle}"
-                   FontWeight="Bold"
-                   Margin="0,8,0,0" />
-
-        <!-- A text block, not string content: Semi's template wraps a string; the pane style keeps this NoWrap. -->
-        <CheckBox Grid.Row="9"
-                  Grid.Column="1"
-                  Name="InvertSpectrum"
-                  IsChecked="{Binding IsInverted}">
-            <TextBlock Text="{x:Static text:Resources.ChartInvert}" />
-        </CheckBox>
-
-        <CheckBox Grid.Row="10"
-                  Grid.Column="1"
-                  Name="LogarithmicScale"
-                  IsChecked="{Binding IsLogarithmic}">
-            <TextBlock Text="{x:Static text:Resources.ChartLogScale}" />
-        </CheckBox>
-
-        <Button Grid.Row="11"
-                Grid.Column="1"
-                Name="ResetScale"
-                HorizontalAlignment="Left"
-                Content="{x:Static text:Resources.ChartResetScale}"
-                Command="{Binding ResetScaleCommand}" />
-
-        <Button Grid.Row="12"
-                Grid.Column="1"
-                Name="StickToZero"
-                HorizontalAlignment="Left"
-                Content="{x:Static text:Resources.ChartStickToZero}"
-                Command="{Binding StickToZeroCommand}" />
-
-        <Button Grid.Row="13"
-                Grid.Column="1"
-                Name="BackToLive"
-                HorizontalAlignment="Left"
-                Content="{x:Static text:Resources.ChartBackToLive}"
-                Command="{Binding BackToLiveCommand}" />
     </Grid>
 
 </UserControl>

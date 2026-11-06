@@ -69,13 +69,13 @@ public sealed class MainWindowTextFitChartTests : MainWindowTextFitTestBase
 	[AvaloniaTheory]
 	[InlineData("en")]
 	[InlineData("ru")]
-	public void TheHistoricalLineAndTheWidestReadoutFitTheChartsAtTheMinimumWidth(string culture)
+	public void TheStateLineAndTheWidestReadoutFitTheChartsAtTheMinimumWidth(string culture)
 	{
 		using var cultureScope = new CultureScope(culture);
 		var window = Realise();
 		window.Width = MainWindowView.MinimumWidth;
 		Dispatcher.UIThread.RunJobs();
-		var historical = Named<TextBlock>(Named<Border>(window, "SpectrumPane"), "HistoricalLine");
+		var historical = Named<TextBlock>(Named<Border>(window, "SpectrumPane"), "StateLine");
 		var readoutBox = Named<Border>(Named<Border>(window, "TrendPane"), "ReadoutBox");
 		var readoutText = Named<TextBlock>(readoutBox, "ReadoutText");
 		var chartWidth = Named<Border>(window, "TrendPane").Bounds.Width;

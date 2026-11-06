@@ -24,7 +24,7 @@ public sealed class MainWindowTextFitMessageTests : MainWindowTextFitTestBase
 	[AvaloniaTheory]
 	[InlineData("en")]
 	[InlineData("ru")]
-	public void TheOldFirmwareRemediesFitOneLineAtTheMinimumWidth(string culture)
+	public void TheOldFirmwareRemediesFitTwoLinesAtTheMinimumWidth(string culture)
 	{
 		using var cultureScope = new CultureScope(culture);
 		var window = Realise();
@@ -35,7 +35,7 @@ public sealed class MainWindowTextFitMessageTests : MainWindowTextFitTestBase
 		foreach (var error in new IError[] { new BoardNotRespondingError(PortName), new UnrecognisedDataError(PortName) })
 		{
 			MessagePanel.ReportFailure(error, NullLogger.Instance);
-			var entry = RealisedEntry(window, 0);
+			var entry = NewestEntry(window);
 			var remedy = EntryText(entry, "EntryRemedy");
 			var time = EntryText(entry, "EntryTime");
 
@@ -51,7 +51,7 @@ public sealed class MainWindowTextFitMessageTests : MainWindowTextFitTestBase
 				$"{culture}: {error.GetType().Name} remedy {width:0.#} px in a {slot:0.#} px slot, "
 				+ $"window {window.Bounds.Width} px");
 			remedy.Text.Should().Be(ErrorMessageMapper.Map(error).Remedy);
-			width.Should().BeLessThanOrEqualTo(slot, "the remedy of {0} takes one line", error.GetType().Name);
+			width.Should().BeLessThanOrEqualTo(2 * slot, "the remedy of {0} takes at most two lines", error.GetType().Name);
 		}
 	}
 }

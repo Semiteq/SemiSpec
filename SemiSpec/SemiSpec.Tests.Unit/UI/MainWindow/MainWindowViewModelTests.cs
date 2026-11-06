@@ -73,6 +73,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 		_switchingSource = new SwitchingSpectrumSource(_spectrumSource);
 		_spectrum = new SpectrumViewModel(
 			_switchingSource,
+			_serialLink,
 			_messagePanel,
 			TimeProvider.System,
 			ImmediateScheduler.Instance,

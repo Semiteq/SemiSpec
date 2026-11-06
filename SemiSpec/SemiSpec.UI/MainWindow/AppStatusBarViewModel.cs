@@ -99,14 +99,17 @@ public sealed class AppStatusBarViewModel : ReactiveObject, IDisposable
 	public string Atp8000Text => SpectrometerText(Spectrometer.Atp8000);
 
 	public string LostSpectraText => Resources.FormatStatusLostSpectraFormat(
-		IsDisconnected ? Resources.StatusNoValue : Status.LostSpectra.ToString(Resources.Culture));
+		IsReceiving ? Status.LostSpectra.ToString(Resources.Culture) : Resources.StatusNoValue);
 
 	/// <summary>
 	/// The link's channel drops plus the store's; a number in every state, as both describe the run's history.
 	/// </summary>
 	public string DroppedFramesText => _droppedFramesText.Value;
 
-	private bool IsDisconnected => Status.State == LinkState.Disconnected;
+	/// <summary>
+	/// The link keeps the last board byte in every state, so the board's texts read it only while it is receiving.
+	/// </summary>
+	private bool IsReceiving => Status.State == LinkState.Receiving;
 
 	public void Dispose()
 	{
@@ -129,7 +132,7 @@ public sealed class AppStatusBarViewModel : ReactiveObject, IDisposable
 
 	private string SpectrometerText(Spectrometer device)
 	{
-		var state = Status.Board switch
+		var state = (IsReceiving ? Status.Board : null) switch
 		{
 			null => Resources.StatusSpectrometerNoData,
 			{ } board when !board.HasFlag(device.ConnectedBit) => Resources.StatusSpectrometerNotConnected,

@@ -1,3 +1,4 @@
+using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Windows.Input;
@@ -7,11 +8,14 @@ using Avalonia.Threading;
 using AwesomeAssertions;
 
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Testing;
 
 using ReactiveUI.Avalonia;
 
+using SemiSpec.Tests.Unit.UI.Link;
 using SemiSpec.Tests.Unit.UI.Messages;
+using SemiSpec.UI.Link;
 using SemiSpec.UI.Messages;
 using SemiSpec.UI.Spectrum;
 
@@ -25,6 +29,8 @@ public abstract class SpectrumViewModelTestBase : IDisposable
 	private protected readonly SwitchingSpectrumSource _switching;
 	private protected readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
 	private protected readonly FakeLogger<SpectrumViewModel> _logger = new();
+	private protected readonly SerialLink _serialLink =
+		new(new FakeSerialPortProvider(), ImmediateScheduler.Instance, NullLogger<SerialLink>.Instance);
 	private protected SpectrumViewModel? _viewModel;
 
 	protected SpectrumViewModelTestBase()
@@ -40,6 +46,7 @@ public abstract class SpectrumViewModelTestBase : IDisposable
 		_switching.Dispose();
 		_source.Dispose();
 		_messagePanel.Dispose();
+		_serialLink.Dispose();
 		GC.SuppressFinalize(this);
 	}
 
@@ -50,7 +57,7 @@ public abstract class SpectrumViewModelTestBase : IDisposable
 
 	private protected SpectrumViewModel NewViewModel(SwitchingSpectrumSource source)
 	{
-		return new SpectrumViewModel(source, _messagePanel, TimeProvider.System, AvaloniaScheduler.Instance, _logger);
+		return new SpectrumViewModel(source, _serialLink, _messagePanel, TimeProvider.System, AvaloniaScheduler.Instance, _logger);
 	}
 
 	private protected Func<int> CountRedraws()

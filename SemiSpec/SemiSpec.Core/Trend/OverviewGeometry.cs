@@ -1,3 +1,4 @@
+using SemiSpec.Core.Chart;
 using SemiSpec.Core.Store;
 
 namespace SemiSpec.Core.Trend;
@@ -87,19 +88,28 @@ public static class OverviewGeometry
 		return band with { Columns = columns };
 	}
 
-	/// <summary>The unbroken runs of drawable columns between first and last, scaled to the band's pixels.</summary>
+	/// <summary>
+	/// The unbroken runs of drawable columns between first and last, scaled to the band's pixels; fromZero scales
+	/// the band like the trend's From zero mode.
+	/// </summary>
 	public static IReadOnlyList<BandFigure> BandFigures(
 		IntensitySeries band,
 		DateTimeOffset first,
 		DateTimeOffset last,
 		double width,
-		double height)
+		double height,
+		bool fromZero = false)
 	{
 		var spanSeconds = (last - first).TotalSeconds;
 		if (spanSeconds <= 0.0 || width <= 0.0 || height <= 0.0
 			|| !TryReadBandRange(band.Columns, first, last, out var bottom, out var top))
 		{
 			return [];
+		}
+
+		if (fromZero)
+		{
+			(bottom, top) = FromZeroRange.Over(top);
 		}
 
 		var scale = new BandScale(first, spanSeconds, width, bottom, top, height);

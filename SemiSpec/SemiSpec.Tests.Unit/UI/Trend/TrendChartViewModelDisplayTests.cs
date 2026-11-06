@@ -39,17 +39,32 @@ public sealed class TrendChartViewModelDisplayTests : TrendChartTestBase
 	public void TheYAxisLabelNamesTheKey()
 	{
 		Chart.Plot.Axes.Left.Label.Text.Should().Be(Resources.TrendAxisIntensity);
-		Chart.Plot.Axes.Bottom.Label.Text.Should().Be(Resources.TrendAxisTime);
 
 		AddSpectra(0, 1);
 		Sample();
 
 		Chart.Plot.Axes.Left.Label.Text.Should().Be(Resources.FormatTrendAxisIntensityFormat(SampleNm, SampleDelta));
+		Chart.Plot.Axes.Bottom.Label.Text.Should().StartWith(
+			Resources.FormatTrendAxisTimeFormat(string.Empty),
+			"the date moves from the ticks into the title");
+	}
+
+	[AvaloniaFact]
+	public void FromZeroRunsYFromZeroToTheMaximumPlusFivePercent()
+	{
+		AddFlat(0, 100);
+		AddFlat(1, 200);
+		Sample();
+
+		var limits = Chart.Plot.Axes.GetLimits();
+		limits.Bottom.Should().Be(0.0, "From zero is the trend's default");
+		limits.Top.Should().BeApproximately(210.0, Tolerance);
 	}
 
 	[AvaloniaFact]
 	public void TheYLimitsPadTheVisibleEnvelope()
 	{
+		Chart.SetFromZero(false);
 		AddFlat(0, 100);
 		AddFlat(1, 200);
 		Sample();
@@ -62,6 +77,7 @@ public sealed class TrendChartViewModelDisplayTests : TrendChartTestBase
 	[AvaloniaFact]
 	public void AFlatVisibleRangeTakesPlusMinusOne()
 	{
+		Chart.SetFromZero(false);
 		AddFlat(0, 100);
 		AddFlat(1, 100);
 		Sample();

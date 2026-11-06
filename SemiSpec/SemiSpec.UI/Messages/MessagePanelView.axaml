@@ -6,7 +6,7 @@
              xmlns:text="clr-namespace:SemiSpec.UI.Localization"
              mc:Ignorable="d"
              d:DesignWidth="1280"
-             d:DesignHeight="160"
+             d:DesignHeight="76"
              x:Class="SemiSpec.UI.Messages.MessagePanelView"
              x:DataType="messages:MessagePanelViewModel">
 
@@ -22,80 +22,138 @@
         </Style>
     </UserControl.Styles>
 
-    <DockPanel LastChildFill="True">
+    <!-- The newest entry only; "N more" opens the full list. Remedy rows take at most two lines. -->
+    <Grid ColumnDefinitions="Auto,Auto,*,Auto"
+          RowDefinitions="Auto,Auto">
 
-        <StackPanel DockPanel.Dock="Top"
+        <Ellipse Grid.Row="0"
+                 Grid.Column="0"
+                 Name="EntrySeverity"
+                 Width="8"
+                 Height="8"
+                 Margin="0,0,8,0"
+                 VerticalAlignment="Center"
+                 IsVisible="{Binding HasEntries}"
+                 Classes.severity-error="{Binding NewestEntry.View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Error}, FallbackValue=False}"
+                 Classes.severity-warning="{Binding NewestEntry.View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Warning}, FallbackValue=False}"
+                 Classes.severity-info="{Binding NewestEntry.View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Info}, FallbackValue=False}" />
+
+        <TextBlock Grid.Row="0"
+                   Grid.Column="1"
+                   Name="EntryTime"
+                   Text="{Binding NewestEntry.LastSeen, StringFormat={}{0:HH:mm:ss}, FallbackValue=''}"
+                   IsVisible="{Binding HasEntries}"
+                   Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                   Margin="0,0,8,0"
+                   VerticalAlignment="Center" />
+
+        <DockPanel Grid.Row="0"
+                   Grid.Column="2"
+                   VerticalAlignment="Center">
+            <TextBlock DockPanel.Dock="Left"
+                       Name="EntryTitle"
+                       Text="{Binding NewestEntry.View.Title, FallbackValue=''}"
+                       FontWeight="Bold"
+                       TextWrapping="NoWrap"
+                       Margin="0,0,8,0" />
+            <TextBlock DockPanel.Dock="Left"
+                       Name="EntryRepeat"
+                       Text="{Binding NewestEntry.RepeatCount, StringFormat={x:Static text:Resources.MessagePanelRepeatFormat}, FallbackValue=''}"
+                       IsVisible="{Binding NewestEntry.HasRepeated, FallbackValue=False}"
+                       Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                       TextWrapping="NoWrap"
+                       Margin="0,0,8,0" />
+            <TextBlock Name="EntryDetail"
+                       Text="{Binding NewestEntry.View.Detail, FallbackValue=''}"
+                       ToolTip.Tip="{Binding NewestEntry.View.Detail, FallbackValue=''}"
+                       TextWrapping="NoWrap"
+                       TextTrimming="CharacterEllipsis" />
+        </DockPanel>
+
+        <TextBlock Grid.Row="0"
+                   Grid.Column="0"
+                   Grid.ColumnSpan="3"
+                   Name="EmptyMessages"
+                   Text="{x:Static text:Resources.MessagePanelEmpty}"
+                   IsVisible="{Binding !HasEntries}"
+                   Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                   VerticalAlignment="Center" />
+
+        <StackPanel Grid.Row="0"
+                    Grid.Column="3"
                     Orientation="Horizontal"
                     Spacing="8"
-                    Margin="0,0,0,4">
-
-            <TextBlock Text="{x:Static text:Resources.MessagePanelTitle}"
-                       FontWeight="Bold"
-                       VerticalAlignment="Center" />
-
+                    Margin="16,0,0,0">
+            <Button Name="MoreMessages"
+                    Content="{Binding MoreText}"
+                    IsVisible="{Binding MoreText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <Button.Flyout>
+                    <Flyout Placement="TopEdgeAlignedRight">
+                        <ScrollViewer Width="640"
+                                      MaxHeight="360"
+                                      HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl Name="MessageEntries"
+                                          ItemsSource="{Binding Entries}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <VirtualizingStackPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="messages:MessageEntry">
+                                        <Grid ColumnDefinitions="Auto,Auto,*"
+                                              Margin="0,4">
+                                            <Ellipse Grid.Column="0"
+                                                     Width="8"
+                                                     Height="8"
+                                                     Margin="0,6,8,0"
+                                                     VerticalAlignment="Top"
+                                                     Classes.severity-error="{Binding View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Error}}"
+                                                     Classes.severity-warning="{Binding View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Warning}}"
+                                                     Classes.severity-info="{Binding View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Info}}" />
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding LastSeen, StringFormat={}{0:HH:mm:ss}}"
+                                                       Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                                                       Margin="0,0,8,0"
+                                                       VerticalAlignment="Top" />
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="{Binding View.Title}"
+                                                           FontWeight="Bold"
+                                                           TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding RepeatCount, StringFormat={x:Static text:Resources.MessagePanelRepeatFormat}}"
+                                                           IsVisible="{Binding HasRepeated}"
+                                                           Foreground="{DynamicResource AppSecondaryForegroundBrush}" />
+                                                <TextBlock Text="{Binding View.Detail}"
+                                                           TextWrapping="Wrap" />
+                                                <TextBlock Text="{Binding View.Remedy}"
+                                                           IsVisible="{Binding View.Remedy, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                           Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Flyout>
+                </Button.Flyout>
+            </Button>
             <Button Name="ClearMessages"
                     Content="{x:Static text:Resources.MessagePanelClear}"
                     Command="{Binding ClearCommand}" />
-
         </StackPanel>
 
-        <!-- One three-line entry; a taller cap pushes the chart floors past a 1366 x 768 screen. -->
-        <ScrollViewer MaxHeight="64"
-                      HorizontalScrollBarVisibility="Disabled">
-            <ItemsControl Name="MessageEntries"
-                          ItemsSource="{Binding Entries}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <VirtualizingStackPanel />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="messages:MessageEntry">
-                        <Grid ColumnDefinitions="Auto,Auto,*"
-                              Margin="0,4">
+        <TextBlock Grid.Row="1"
+                   Grid.Column="2"
+                   Name="EntryRemedy"
+                   Text="{Binding NewestEntry.View.Remedy, FallbackValue=''}"
+                   IsVisible="{Binding NewestEntry.View.Remedy, Converter={x:Static StringConverters.IsNotNullOrEmpty}, FallbackValue=False}"
+                   Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                   TextWrapping="Wrap"
+                   MaxLines="2"
+                   TextTrimming="CharacterEllipsis"
+                   Margin="0,4,0,0" />
 
-                            <Ellipse Grid.Column="0"
-                                     Name="EntrySeverity"
-                                     Width="8"
-                                     Height="8"
-                                     Margin="0,4,8,0"
-                                     VerticalAlignment="Top"
-                                     Classes.severity-error="{Binding View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Error}}"
-                                     Classes.severity-warning="{Binding View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Warning}}"
-                                     Classes.severity-info="{Binding View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Info}}" />
-
-                            <TextBlock Grid.Column="1"
-                                       Name="EntryTime"
-                                       Text="{Binding LastSeen, StringFormat={}{0:HH:mm:ss}}"
-                                       Foreground="{DynamicResource AppSecondaryForegroundBrush}"
-                                       Margin="0,0,8,0"
-                                       VerticalAlignment="Top" />
-
-                            <StackPanel Grid.Column="2">
-                                <TextBlock Name="EntryTitle"
-                                           Text="{Binding View.Title}"
-                                           FontWeight="Bold"
-                                           TextWrapping="Wrap" />
-                                <TextBlock Name="EntryRepeat"
-                                           Text="{Binding RepeatCount, StringFormat={x:Static text:Resources.MessagePanelRepeatFormat}}"
-                                           IsVisible="{Binding HasRepeated}"
-                                           Foreground="{DynamicResource AppSecondaryForegroundBrush}" />
-                                <TextBlock Name="EntryDetail"
-                                           Text="{Binding View.Detail}"
-                                           TextWrapping="Wrap" />
-                                <TextBlock Name="EntryRemedy"
-                                           Text="{Binding View.Remedy}"
-                                           IsVisible="{Binding View.Remedy, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                           Foreground="{DynamicResource AppSecondaryForegroundBrush}"
-                                           TextWrapping="Wrap" />
-                            </StackPanel>
-
-                        </Grid>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
-
-    </DockPanel>
+    </Grid>
 
 </UserControl>
