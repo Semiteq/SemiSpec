@@ -113,7 +113,7 @@ the trend's folds and re-reads.
 | `TrendHistoryError`, `TrendMomentError` | UI | The stored points at a new key could not be read; the stored spectrum of a clicked moment could not be read (`UI/Trend/`) |
 | `SpectrumStore`, `StoreWriter`, `StoreRetention`, `StoreFile` | UI | The background writer: `SpectrumStore` enqueues every distributor frame, runs one `StoreWriter` task and counts the frames lost; `StoreWriter` writes the queue to the instance file in batches and runs `StoreRetention` once a minute, which deletes rows older than 24 h and sweeps other instances' files once an hour; `StoreFile` is the instance file's path (`UI/Store/`) |
 | `StoreOpenError`, `StoreWriteError`, `StoreStoppedError` | UI | The store file could not be prepared or opened; a batch could not be written; an unexpected failure after the open ended the writer (`UI/Store/`) |
-| `AppLogging` | UI | Picks the log folder (`C:\DISTR\Logs\SemiSpec`, or the fallback when the write check fails), creates it and the Serilog logger: `semispec.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
+| `AppLogging` | UI | Picks the log folder (`C:\DISTR\Logs\SemiSpec`, or the fallback when the write check or the logger's open there fails), creates it and the Serilog logger: `semispec.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
 | `AddUi(LoggingSetup, AppDataPaths)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` of this process under the store folder, `SpectrumStore`, `SpectrumHistory` over the `StoreFile`, `IntensityCache`, `LiveSpectrumSource`, `SwitchingSpectrumSource` over it, the message panel, the connection row, the status bar, the spectrum view model, `TrendChartViewModel`, `OverviewViewModel`, `TrendFeed` built over `SpectrumHistory.IntensityPointsAsync` and `SpectrumAtAsync` with `DefaultScheduler.Instance` for its throttle, `TrendViewModel` and the main window view model, all singletons |
 | `Program` | UI | Entry point: paths, logging, container, `App.Run` with the logger for unhandled exceptions |
@@ -163,7 +163,9 @@ log on an operator PC. The installer creates it with modify rights for users (Re
 `AppLogging.CanWrite` creates the folder and opens `semispec.log` for append with `FileShare.ReadWrite |
 FileShare.Delete`, which the shared file sink of a running copy allows, so a second copy passes the check. When the
 check fails with an `IOException` or `UnauthorizedAccessException` (a dev run without the installer, a folder without
-rights), the log goes to `%LOCALAPPDATA%\SemiSpec\Logs`, and the first log line is a Warning that names both folders.
+rights), or when the logger cannot open the site folder after the check passed, the log goes to
+`%LOCALAPPDATA%\SemiSpec\Logs`, and the first log line is a Warning that names both folders. The app shows no notice
+on screen for the fallback.
 The check is a `Func<string, bool>` parameter of `AppLogging.Create`, so the tests choose its answer and never touch
 `C:\DISTR`. A user who may create folders under `C:\` gets the site folder even without the installer. The spectrum
 store stays under `%LOCALAPPDATA%` (Spectrum store).
@@ -439,7 +441,8 @@ device never leaves the plot blank, and the operator compares moments of one dev
 The scale follows from the start, after Autoscale returns it to following and after a log, inversion or From zero
 toggle. Once a spectrum is shown it freezes on a wheel step over the plot, on a pointer move with a button held 5 px or
 more from the press, on Autoscale while following, and on typed bounds in an axis flyout. Before the first spectrum
-neither input freezes it, so the first spectrum sets the limits. Tunnel handlers for `PointerWheelChanged`,
+none of these inputs freezes it, and typed bounds change nothing (`HasSpectrum` guards `TakeManualScale`,
+`ToggleAutoscale`, `SetVerticalRange` and `SetHorizontalRange`), so the first spectrum sets the limits. Tunnel handlers for `PointerWheelChanged`,
 `PointerPressed`, `PointerMoved` and `PointerReleased` on `AvaPlot` record the press and forward to the chart: a wheel
 step calls `TakeManualScale()`, and a move calls `OnHeldMove(press, current, isButtonHeld)`, which decides the freeze
 from the held button and the larger of the X and Y distances. The handlers run before ScottPlot's class handler, which
@@ -491,6 +494,9 @@ text over the data area. `ChartStateLine.Place` sizes the line's band to the dat
 after each served frame, and the spectrum view also after a size change, so the line starts at the data area's left
 edge. The line is one `TextBlock` in `AppSecondaryForegroundBrush`, `NoWrap` with an ellipsis, hidden while its text is
 empty, so no state changes the chart's layout.
+At the minimum width the longest spectrum line, a data-age text with all four modes, measures 561.9 px in Russian
+(English 462.8 px) over 878.2 px of data area, and the longest trend line 429.7 px (335.7 px) over 1190.2 px
+(`MainWindowTextFitChartTests`), so neither line trims.
 
 `SpectrumViewModel.StateText` joins its parts with " · " (`ChartStateSeparator`):
 
@@ -733,7 +739,11 @@ The pointer maths runs in device-independent pixels at any Windows scale. ScottP
 hands ScottPlot `PointerEventArgs.GetPosition`, which is in DIPs, renders into a rect of the control's DIP bounds on
 the Skia canvas Avalonia has already scaled, and keeps `DisplayScale` at 1; the app leaves `Plot.ScaleFactor` at 1. So
 `Plot.GetCoordinates` of a DIP position is the hover time, the zoom anchor and the click moment, and the overlay's
-division by `ScaleFactor` is a division by 1.
+division by `ScaleFactor` is a division by 1. With a `ScaleFactor` s, ScottPlot's layout (`LastRender.DataRect`, the
+axis panels) runs in DIPs divided by s, while `GetCoordinates` and `GetPixel` take and return DIPs; `ChartAxisRegion`
+divides a DIP position by s before it compares it with the layout, and `ChartStateLine` multiplies the layout by s,
+which `ChartAxisRegionTests` checks at s = 1 and s = 2. `TrendCursorOverlay` compares `GetPixel`'s DIPs with the
+layout directly, which holds only at s = 1.
 
 Until the first point a line over the plot reads "No trend yet. It appears with the first spectrum."
 
@@ -805,7 +815,8 @@ The number fields are 140 px wide, the time fields 110 px. The checkboxes and Au
 - Enter commits and keeps the flyout open; a close by a click outside commits too; Escape closes it without a commit.
   A field equal to its seed at the shown precision counts as unchanged, so an untouched flyout writes nothing, and
   an edited bound is written with the other bound as it stood at the opening.
-- `AxisRangeForm` reads numbers as `0.###` in the current culture. A pair is written only when both fields read as
+- `AxisRangeForm` shows numbers as `0.###` in the current culture and reads them in the current culture first,
+  then with a point or a comma as the decimal separator, so "1.5" and "1,5" both read as 1.5 under Russian. A pair is written only when both fields read as
   finite numbers, the minimum is below the maximum and the axis's own rule accepts it: on the log scale the spectrum
   intensity axis needs a minimum above 0, which `SpectrumChartViewModel.VerticalRangeProblem` names and
   `SetVerticalRange` checks again. The first rule broken shows on the message line, and the typed text stays.
@@ -813,9 +824,12 @@ The number fields are 140 px wide, the time fields 110 px. The checkboxes and Au
   `yyyy-MM-dd` and the width as `hh:mm:ss`. Changed edges take precedence over a changed width; an end not after the
   start, or a field that does not read, shows its message and changes nothing.
 - The message line is a reserved 40 px row that wraps and ends in an ellipsis, so validation never resizes a flyout.
+  The longest message takes two lines of 18.6 px in Russian at the theme font; the note takes 214.5 px of the 300 px
+  row in Russian (`MainWindowTextFitFlyoutTests`).
 
 `AxisFlyout` binds the form of the current `DataContext` and hides its flyout on the form's close request. A chart view
-hides its flyouts on unload, on a `DataContext` change and on the window's `Closing`, which it subscribes in
+hides its flyouts on unload, on a `DataContext` change (before it detaches the old form, so pending fields commit as
+on unload) and on the window's `Closing`, which it subscribes in
 `OnLoaded` through `AxisFlyout.HideOnClosing` and leaves in `OnUnloaded`. `Hide` closes the calendars and the preset
 list inside the flyout before the flyout: a window that closes with a calendar drop-down open inside a flyout makes
 Avalonia 12 throw `ArgumentOutOfRangeException` from the logical-tree detach, and the app would crash on exit.
@@ -1113,7 +1127,9 @@ its paths relative to `Installer/`; the compiled `SemiSpecInstaller.exe` goes to
   menu entry and, when the operator ticks the unchecked desktop task, a desktop shortcut.
 - `[Dirs]` creates `C:\DISTR\Logs\SemiSpec` (`LogRoot`) with `Permissions: users-modify`, so the operator, not the
   installing administrator, can write the log, and `Flags: uninsneveruninstall`, so uninstall keeps the logs. The
-  entry is SemiPlot's.
+  entry is SemiPlot's. After an upgrade over a folder that already existed, check the rights by hand on the target
+  PC: `icacls C:\DISTR\Logs\SemiSpec` lists `BUILTIN\Users` with modify rights (`(M)`); without them the app logs to
+  the fallback folder.
 - `[Files]` copies the publish folder without `*.pdb` and the `SemiSpec.xml` and `SemiSpec.*.xml` doc files.
 - `CloseApplications=yes` asks to close a running copy before the files change, the 3.0 `SpectrumVisualizer.UI.exe`
   and the 2.x `SpectrumVisualizer.Uart.exe` included, since both sit under the `{app}\*` that the wipe covers.
