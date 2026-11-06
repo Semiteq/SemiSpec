@@ -1,0 +1,7 @@
+{
+  "dap": {
+    "netcoredbg": {
+      "binary": "C:/Users/admin/bin/netcoredbg/netcoredbg.exe"
+    }
+  }
+}
