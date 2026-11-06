@@ -11,6 +11,7 @@ using SemiSpec.Core.Protocol;
 using SemiSpec.UI.Localization;
 using SemiSpec.UI.Messages;
 using SemiSpec.UI.Spectrum;
+using SemiSpec.UI.Trend;
 
 using SkiaSharp;
 
@@ -69,33 +70,53 @@ public sealed class MainWindowTextFitChartTests : MainWindowTextFitTestBase
 	[AvaloniaTheory]
 	[InlineData("en")]
 	[InlineData("ru")]
-	public void TheStateLineAndTheWidestReadoutFitTheChartsAtTheMinimumWidth(string culture)
+	public void TheLongestStateLinesFitTheDataAreasAtTheMinimumWidth(string culture)
 	{
 		using var cultureScope = new CultureScope(culture);
 		var window = Realise();
 		window.Width = MainWindowView.MinimumWidth;
 		Dispatcher.UIThread.RunJobs();
-		var historical = Named<TextBlock>(Named<Border>(window, "SpectrumPane"), "StateLine");
+		var spectrumPane = Named<Border>(window, "SpectrumPane");
+		var trendPane = Named<Border>(window, "TrendPane");
+		var stateLine = Named<TextBlock>(spectrumPane, "StateLine");
+		var spectrumData = DataWidth(Spectrum.Chart.Plot, spectrumPane);
+		var trendData = DataWidth(Trend.Trend.Chart.Plot, trendPane);
+
+		var spectrumWidth = LongestSpectrumStateLines()
+			.Max(line => RenderedText.Width(line, stateLine.FontFamily, stateLine.FontSize));
+		var trendWidth = LongestTrendStateLines()
+			.Max(line => RenderedText.Width(line, stateLine.FontFamily, stateLine.FontSize));
+
+		TestContext.Current.TestOutputHelper?.WriteLine(
+			$"{culture}: spectrum state line {spectrumWidth:0.#} px over {spectrumData:0.#} px of data, "
+			+ $"trend state line {trendWidth:0.#} px over {trendData:0.#} px");
+		stateLine.TextWrapping.Should().Be(TextWrapping.NoWrap);
+		spectrumWidth.Should().BeLessThanOrEqualTo(spectrumData, "the whole spectrum state shows over its data area");
+		trendWidth.Should().BeLessThanOrEqualTo(trendData, "the whole trend state shows over its data area");
+	}
+
+	[AvaloniaTheory]
+	[InlineData("en")]
+	[InlineData("ru")]
+	public void TheWidestReadoutFitsEitherSideOfTheTrendAtTheMinimumWidth(string culture)
+	{
+		using var cultureScope = new CultureScope(culture);
+		var window = Realise();
+		window.Width = MainWindowView.MinimumWidth;
+		Dispatcher.UIThread.RunJobs();
 		var readoutBox = Named<Border>(Named<Border>(window, "TrendPane"), "ReadoutBox");
 		var readoutText = Named<TextBlock>(readoutBox, "ReadoutText");
 		var chartWidth = Named<Border>(window, "TrendPane").Bounds.Width;
 
-		var historicalWidth = RenderedText.Width(
-			Resources.FormatSpectrumHistoricalFormat(WidestUpdateTime[..8]),
-			historical.FontFamily,
-			historical.FontSize);
 		var widestReadout = WidestReadoutLines()
 			.Max(line => RenderedText.Width(line, readoutText.FontFamily, readoutText.FontSize));
 		var readoutWidth = widestReadout + readoutBox.Padding.Left + readoutBox.Padding.Right
 			+ readoutBox.BorderThickness.Left + readoutBox.BorderThickness.Right;
 
 		TestContext.Current.TestOutputHelper?.WriteLine(
-			$"{culture}: historical line {historicalWidth:0.#} px, widest readout box {readoutWidth:0.#} px, "
-			+ $"charts {chartWidth} px wide at the minimum");
-		historical.TextWrapping.Should().Be(TextWrapping.NoWrap);
+			$"{culture}: widest readout box {readoutWidth:0.#} px, trend {chartWidth} px wide at the minimum");
 		readoutText.TextWrapping.Should().Be(TextWrapping.NoWrap);
 		double.IsNaN(readoutBox.Width).Should().BeTrue("the readout box sizes to its content");
-		historicalWidth.Should().BeLessThanOrEqualTo(chartWidth);
 		readoutWidth.Should()
 			.BeLessThanOrEqualTo(chartWidth / 2, "the box fits on either side of a central hover line");
 	}
@@ -148,6 +169,43 @@ public sealed class MainWindowTextFitChartTests : MainWindowTextFitTestBase
 		TestContext.Current.TestOutputHelper?.WriteLine(
 			$"{ChartFloorWidth} px: {labelled.Count} labelled ticks ({string.Join(", ", labelled)})");
 		labelled.Should().HaveCountGreaterThanOrEqualTo(MinimumLabelledTicks);
+	}
+
+	/// <summary>The data area's width when the plot renders at the pane's arranged size.</summary>
+	private static double DataWidth(ScottPlot.Plot plot, Border pane)
+	{
+		plot.RenderInMemory((int)pane.Bounds.Width, (int)(pane.Bounds.Height - pane.BorderThickness.Top));
+		Dispatcher.UIThread.RunJobs();
+
+		return plot.RenderManager.LastRender.Layout.DataRect.Width;
+	}
+
+	/// <summary>A data-age text and every mode the spectrum's state line can carry at once.</summary>
+	private static IEnumerable<string> LongestSpectrumStateLines()
+	{
+		var time = WidestUpdateTime[..8];
+		string[] modes =
+		[
+			Resources.SpectrumStateFrozen,
+			Resources.SpectrumStateLog,
+			Resources.SpectrumStateInverted,
+			Resources.SpectrumStateFromZero,
+		];
+
+		return new[] { Resources.FormatSpectrumHistoricalFormat(time), Resources.FormatSpectrumStaleFormat(time) }
+			.Select(age => string.Join(Resources.ChartStateSeparator, modes.Prepend(age)));
+	}
+
+	/// <summary>The widest window widths with both trend states.</summary>
+	private static IEnumerable<string> LongestTrendStateLines()
+	{
+		TimeSpan[] widths = [new(23, 59, 0), new(0, 59, 59), TimeSpan.FromHours(24)];
+
+		return widths.Select(width => string.Join(
+			Resources.ChartStateSeparator,
+			TrendViewModel.WidthText(width),
+			Resources.TrendStateNotFollowing,
+			Resources.SpectrumStateFrozen));
 	}
 
 	/// <summary>The width ScottPlot gives the text's longest line in the axis label's face.</summary>
