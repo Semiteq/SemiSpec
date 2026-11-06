@@ -168,10 +168,10 @@ public sealed class MainWindowViewModelTests : IDisposable
 	public void DisposeLeavesTheInjectedTrendToItsOwner()
 	{
 		var trend = _viewModel.Trend;
-		var oneMinute = trend.Presets[0];
+		var oneMinute = trend.TimeWindow.Presets[0];
 
 		_viewModel.Dispose();
-		trend.SelectedPreset = oneMinute;
+		trend.TimeWindow.SetWidthCommand.Execute(oneMinute).Subscribe();
 
 		trend.Should().BeSameAs(_trend.Trend);
 		trend.Chart.Width.Should().Be(oneMinute.Width, "the trend view model still drives its chart");

@@ -30,9 +30,6 @@
   <data name="StatusNotConnected" xml:space="preserve">
     <value>Не подключено</value>
   </data>
-  <data name="MessagePanelTitle" xml:space="preserve">
-    <value>Сообщения</value>
-  </data>
   <data name="MessagePanelClear" xml:space="preserve">
     <value>Очистить</value>
   </data>

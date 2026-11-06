@@ -10,13 +10,11 @@ using SemiSpec.UI.Localization;
 namespace SemiSpec.UI.Trend;
 
 /// <summary>
-/// The trend: the chart, the overview, the presets, the axis flyouts' forms, From zero, Follow live and the click to a
-/// moment.
+/// The trend: the chart, the overview, the axis flyouts' forms, From zero, Follow live and the click to a moment.
 /// </summary>
 public sealed class TrendViewModel : ReactiveObject, IDisposable
 {
 	private readonly TrendFeed _feed;
-	private readonly ObservableAsPropertyHelper<TrendPreset?> _selectedPreset;
 	private readonly ObservableAsPropertyHelper<string> _stateText;
 	private readonly CompositeDisposable _disposables = [];
 
@@ -25,14 +23,9 @@ public sealed class TrendViewModel : ReactiveObject, IDisposable
 		Chart = chart;
 		Overview = overview;
 		_feed = feed;
-		Presets = TrendPresets.All;
 		_disposables.Add(TimeWindow = new TimeWindowPanelViewModel(chart));
 		_disposables.Add(VerticalForm = new AxisRangeForm(chart.VerticalRange, chart.SetVerticalRange));
 
-		_disposables.Add(chart
-			.WhenAnyValue(trend => trend.Width)
-			.Select(width => Presets.FirstOrDefault(preset => preset.Width == width))
-			.ToProperty(this, trend => trend.SelectedPreset, out _selectedPreset));
 		_disposables.Add(chart
 			.WhenAnyValue(
 				trend => trend.Width,
@@ -59,8 +52,6 @@ public sealed class TrendViewModel : ReactiveObject, IDisposable
 
 	public OverviewViewModel Overview { get; }
 
-	public IReadOnlyList<TrendPreset> Presets { get; }
-
 	/// <summary>The time axis flyout.</summary>
 	public TimeWindowPanelViewModel TimeWindow { get; }
 
@@ -69,21 +60,6 @@ public sealed class TrendViewModel : ReactiveObject, IDisposable
 
 	/// <summary>Y follows the data again, or holds where it stands while it follows.</summary>
 	public ReactiveCommand<Unit, Unit> VerticalAutoscaleCommand { get; }
-
-	/// <summary>
-	/// The preset of the chart's width, null after a zoom off every preset; a picked preset sets the width.
-	/// </summary>
-	public TrendPreset? SelectedPreset
-	{
-		get => _selectedPreset.Value;
-		set
-		{
-			if (value is not null)
-			{
-				SelectPreset(value);
-			}
-		}
-	}
 
 	/// <summary>The window width, then "Not following" and "Scale frozen" while they apply.</summary>
 	public string StateText => _stateText.Value;
@@ -146,13 +122,5 @@ public sealed class TrendViewModel : ReactiveObject, IDisposable
 		}
 
 		return string.Join(Resources.ChartStateSeparator, parts);
-	}
-
-	private void SelectPreset(TrendPreset preset)
-	{
-		if (preset.Width != Chart.Width)
-		{
-			Chart.SetWidth(preset.Width);
-		}
 	}
 }
