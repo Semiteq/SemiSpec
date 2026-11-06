@@ -19,6 +19,7 @@ public partial class SpectrumChartView : UserControl
 	private readonly AxisFlyout _wavelengthAxis;
 	private readonly CompositeDisposable _subscriptions = [];
 	private SpectrumViewModel? _viewModel;
+	private IDisposable? _windowClosing;
 	private Point? _pressPosition;
 
 	public SpectrumChartView()
@@ -56,10 +57,16 @@ public partial class SpectrumChartView : UserControl
 	{
 		base.OnLoaded(e);
 		_frames.Attach();
+		if (TopLevel.GetTopLevel(this) is Window window)
+		{
+			_windowClosing = AxisFlyout.HideOnClosing(window, _intensityAxis, _wavelengthAxis);
+		}
 	}
 
 	protected override void OnUnloaded(RoutedEventArgs e)
 	{
+		_windowClosing?.Dispose();
+		_windowClosing = null;
 		_intensityAxis.Hide();
 		_wavelengthAxis.Hide();
 		_frames.Detach();

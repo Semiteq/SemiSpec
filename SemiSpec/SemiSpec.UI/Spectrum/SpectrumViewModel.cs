@@ -80,7 +80,10 @@ public sealed class SpectrumViewModel : ReactiveObject, IDisposable
 			() => Reseeding(() => IsLogarithmic = !IsLogarithmic)));
 		_disposables.Add(ToggleFromZeroCommand = ReactiveCommand.Create(() => Reseeding(() => IsFromZero = !IsFromZero)));
 		_disposables.Add(AutoscaleCommand = ReactiveCommand.Create(() => Reseeding(Chart.ToggleAutoscale)));
-		_disposables.Add(VerticalForm = new AxisRangeForm(Chart.VerticalRange, Chart.SetVerticalRange));
+		_disposables.Add(VerticalForm = new AxisRangeForm(
+			Chart.VerticalRange,
+			Chart.SetVerticalRange,
+			Chart.VerticalRangeProblem));
 		_disposables.Add(HorizontalForm = new AxisRangeForm(Chart.HorizontalRange, Chart.SetHorizontalRange));
 		_disposables.Add(BackToLiveCommand = ReactiveCommand.Create(
 			source.ReturnToLive,

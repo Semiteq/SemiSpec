@@ -2,6 +2,7 @@ using System.Reactive;
 using System.Reactive.Disposables;
 
 using Avalonia.Controls;
+using Avalonia.LogicalTree;
 
 namespace SemiSpec.UI.Chart;
 
@@ -29,6 +30,24 @@ internal sealed class AxisFlyout
 		_flyout.Closed += (_, _) => _form?.Close();
 	}
 
+	/// <summary>
+	/// Hides the flyouts when the window starts to close: Avalonia 12 throws when a closing window detaches a
+	/// drop-down still open inside a flyout.
+	/// </summary>
+	public static IDisposable HideOnClosing(Window window, params AxisFlyout[] flyouts)
+	{
+		void OnClosing(object? sender, WindowClosingEventArgs eventArgs)
+		{
+			foreach (var flyout in flyouts)
+			{
+				flyout.Hide();
+			}
+		}
+
+		window.Closing += OnClosing;
+		return Disposable.Create(() => window.Closing -= OnClosing);
+	}
+
 	/// <summary>Binds the form of the current DataContext; disposing unbinds it.</summary>
 	public IDisposable Attach(IAxisFlyoutForm form)
 	{
@@ -52,8 +71,25 @@ internal sealed class AxisFlyout
 		_flyout.ShowAt(_target, true);
 	}
 
+	/// <summary>Closes the drop-downs inside the flyout first, then the flyout.</summary>
 	public void Hide()
 	{
+		if (_flyout.Content is ILogical content)
+		{
+			foreach (var nested in content.GetSelfAndLogicalDescendants())
+			{
+				switch (nested)
+				{
+					case CalendarDatePicker picker:
+						picker.IsDropDownOpen = false;
+						break;
+					case DropDownButton button:
+						button.Flyout?.Hide();
+						break;
+				}
+			}
+		}
+
 		_flyout.Hide();
 	}
 }

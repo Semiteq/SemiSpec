@@ -34,6 +34,7 @@ public partial class TrendChartView : UserControl
 	private readonly AxisFlyout _intensityAxis;
 	private readonly AxisFlyout _timeAxis;
 	private TrendViewModel? _viewModel;
+	private IDisposable? _windowClosing;
 	private ChartDrag? _drag;
 	private DateTimeOffset? _hoverTime;
 
@@ -70,10 +71,16 @@ public partial class TrendChartView : UserControl
 	{
 		base.OnLoaded(e);
 		_frames.Attach();
+		if (TopLevel.GetTopLevel(this) is Window window)
+		{
+			_windowClosing = AxisFlyout.HideOnClosing(window, _intensityAxis, _timeAxis);
+		}
 	}
 
 	protected override void OnUnloaded(RoutedEventArgs e)
 	{
+		_windowClosing?.Dispose();
+		_windowClosing = null;
 		_intensityAxis.Hide();
 		_timeAxis.Hide();
 		_frames.Detach();

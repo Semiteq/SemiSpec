@@ -15,7 +15,7 @@
         <!-- A click on the intensity axis: its bounds, From zero and Autoscale; ported from SemiPlot's axis panel. -->
         <Flyout x:Key="IntensityAxisFlyout" Placement="Pointer">
             <Grid Width="300"
-                  RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto"
                   ColumnDefinitions="Auto,*"
                   ColumnSpacing="12"
                   RowSpacing="8">
@@ -25,9 +25,15 @@
                 </Grid.KeyBindings>
 
                 <TextBlock Grid.Row="0"
+                           Grid.ColumnSpan="2"
+                           Name="TrendAxisNote"
+                           Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                           Text="{x:Static text:Resources.AxisFlyoutSnapshotNote}" />
+
+                <TextBlock Grid.Row="1"
                            VerticalAlignment="Center"
                            Text="{x:Static text:Resources.AxisScaleMaximumLabel}" />
-                <TextBox Grid.Row="0"
+                <TextBox Grid.Row="1"
                          Grid.Column="1"
                          Name="TrendMaximum"
                          Width="140"
@@ -39,10 +45,10 @@
                     </TextBox.KeyBindings>
                 </TextBox>
 
-                <TextBlock Grid.Row="1"
+                <TextBlock Grid.Row="2"
                            VerticalAlignment="Center"
                            Text="{x:Static text:Resources.AxisScaleMinimumLabel}" />
-                <TextBox Grid.Row="1"
+                <TextBox Grid.Row="2"
                          Grid.Column="1"
                          Name="TrendMinimum"
                          Width="140"
@@ -54,14 +60,14 @@
                     </TextBox.KeyBindings>
                 </TextBox>
 
-                <CheckBox Grid.Row="2"
+                <CheckBox Grid.Row="3"
                           Grid.Column="1"
                           Name="TrendFromZero"
                           Content="{x:Static text:Resources.ChartFromZero}"
                           IsChecked="{Binding Chart.IsFromZero, Mode=OneWay}"
                           Command="{Binding ToggleFromZeroCommand}" />
 
-                <ToggleButton Grid.Row="3"
+                <ToggleButton Grid.Row="4"
                               Grid.ColumnSpan="2"
                               Name="TrendAutoscale"
                               HorizontalAlignment="Stretch"
@@ -70,12 +76,13 @@
                               IsChecked="{Binding Chart.IsVerticalAutoscaled, Mode=OneWay}"
                               Command="{Binding VerticalAutoscaleCommand}" />
 
-                <TextBlock Grid.Row="4"
+                <TextBlock Grid.Row="5"
                            Grid.ColumnSpan="2"
                            Name="TrendAxisMessage"
                            Foreground="{DynamicResource AppSeverityErrorBrush}"
                            TextWrapping="Wrap"
-                           IsVisible="{Binding VerticalForm.ValidationMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           Height="40"
+                           TextTrimming="CharacterEllipsis"
                            Text="{Binding VerticalForm.ValidationMessage}" />
             </Grid>
         </Flyout>
@@ -83,7 +90,7 @@
         <!-- A click on the time axis without a drag: SemiPlot's time window panel without its archive calendar. -->
         <Flyout x:Key="TimeWindowFlyout" Placement="Pointer">
             <Grid Width="380"
-                  RowDefinitions="Auto,Auto,Auto,Auto"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto"
                   ColumnDefinitions="Auto,Auto,*"
                   ColumnSpacing="12"
                   RowSpacing="8">
@@ -93,9 +100,15 @@
                 </Grid.KeyBindings>
 
                 <TextBlock Grid.Row="0"
+                           Grid.ColumnSpan="3"
+                           Name="TimeWindowNote"
+                           Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                           Text="{x:Static text:Resources.AxisFlyoutSnapshotNote}" />
+
+                <TextBlock Grid.Row="1"
                            VerticalAlignment="Center"
                            Text="{x:Static text:Resources.TimeWindowStartLabel}" />
-                <TextBox Grid.Row="0"
+                <TextBox Grid.Row="1"
                          Grid.Column="1"
                          Name="TimeWindowStartTime"
                          Width="110"
@@ -105,7 +118,7 @@
                                     Command="{Binding TimeWindow.CommitCommand}" />
                     </TextBox.KeyBindings>
                 </TextBox>
-                <CalendarDatePicker Grid.Row="0"
+                <CalendarDatePicker Grid.Row="1"
                                     Grid.Column="2"
                                     Name="TimeWindowStartDate"
                                     HorizontalAlignment="Stretch"
@@ -113,10 +126,10 @@
                                     CustomDateFormatString="{x:Static text:Resources.TimeWindowDateFormat}"
                                     SelectedDate="{Binding TimeWindow.StartDate}" />
 
-                <TextBlock Grid.Row="1"
+                <TextBlock Grid.Row="2"
                            VerticalAlignment="Center"
                            Text="{x:Static text:Resources.TimeWindowEndLabel}" />
-                <TextBox Grid.Row="1"
+                <TextBox Grid.Row="2"
                          Grid.Column="1"
                          Name="TimeWindowEndTime"
                          Width="110"
@@ -126,7 +139,7 @@
                                     Command="{Binding TimeWindow.CommitCommand}" />
                     </TextBox.KeyBindings>
                 </TextBox>
-                <CalendarDatePicker Grid.Row="1"
+                <CalendarDatePicker Grid.Row="2"
                                     Grid.Column="2"
                                     Name="TimeWindowEndDate"
                                     HorizontalAlignment="Stretch"
@@ -134,10 +147,10 @@
                                     CustomDateFormatString="{x:Static text:Resources.TimeWindowDateFormat}"
                                     SelectedDate="{Binding TimeWindow.EndDate}" />
 
-                <TextBlock Grid.Row="2"
+                <TextBlock Grid.Row="3"
                            VerticalAlignment="Center"
                            Text="{x:Static text:Resources.TimeWindowWidthLabel}" />
-                <TextBox Grid.Row="2"
+                <TextBox Grid.Row="3"
                          Grid.Column="1"
                          Name="TimeWindowWidth"
                          Width="110"
@@ -147,7 +160,7 @@
                                     Command="{Binding TimeWindow.CommitCommand}" />
                     </TextBox.KeyBindings>
                 </TextBox>
-                <DropDownButton Grid.Row="2"
+                <DropDownButton Grid.Row="3"
                                 Grid.Column="2"
                                 Name="TimeWindowPresets"
                                 HorizontalAlignment="Stretch"
@@ -168,12 +181,13 @@
                     </DropDownButton.Flyout>
                 </DropDownButton>
 
-                <TextBlock Grid.Row="3"
+                <TextBlock Grid.Row="4"
                            Grid.ColumnSpan="3"
                            Name="TimeWindowMessage"
                            Foreground="{DynamicResource AppSeverityErrorBrush}"
                            TextWrapping="Wrap"
-                           IsVisible="{Binding TimeWindow.Message, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           Height="40"
+                           TextTrimming="CharacterEllipsis"
                            Text="{Binding TimeWindow.Message}" />
             </Grid>
         </Flyout>

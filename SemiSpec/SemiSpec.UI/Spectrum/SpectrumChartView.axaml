@@ -15,7 +15,7 @@
         <!-- A click on the intensity axis: its bounds, its modes and Autoscale; ported from SemiPlot's axis panel. -->
         <Flyout x:Key="IntensityAxisFlyout" Placement="Pointer">
             <Grid Width="300"
-                  RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
                   ColumnDefinitions="Auto,*"
                   ColumnSpacing="12"
                   RowSpacing="8">
@@ -25,9 +25,15 @@
                 </Grid.KeyBindings>
 
                 <TextBlock Grid.Row="0"
+                           Grid.ColumnSpan="2"
+                           Name="IntensityNote"
+                           Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                           Text="{x:Static text:Resources.AxisFlyoutSnapshotNote}" />
+
+                <TextBlock Grid.Row="1"
                            VerticalAlignment="Center"
                            Text="{x:Static text:Resources.AxisScaleMaximumLabel}" />
-                <TextBox Grid.Row="0"
+                <TextBox Grid.Row="1"
                          Grid.Column="1"
                          Name="IntensityMaximum"
                          Width="140"
@@ -39,10 +45,10 @@
                     </TextBox.KeyBindings>
                 </TextBox>
 
-                <TextBlock Grid.Row="1"
+                <TextBlock Grid.Row="2"
                            VerticalAlignment="Center"
                            Text="{x:Static text:Resources.AxisScaleMinimumLabel}" />
-                <TextBox Grid.Row="1"
+                <TextBox Grid.Row="2"
                          Grid.Column="1"
                          Name="IntensityMinimum"
                          Width="140"
@@ -54,29 +60,29 @@
                     </TextBox.KeyBindings>
                 </TextBox>
 
-                <TextBlock Grid.Row="2"
+                <TextBlock Grid.Row="3"
                            VerticalAlignment="Center"
                            Text="{x:Static text:Resources.AxisScaleTypeLabel}" />
-                <CheckBox Grid.Row="2"
+                <CheckBox Grid.Row="3"
                           Grid.Column="1"
                           Name="IntensityLogarithmic"
                           Content="{x:Static text:Resources.AxisScaleLogarithmic}"
                           IsChecked="{Binding IsLogarithmic, Mode=OneWay}"
                           Command="{Binding ToggleLogarithmicCommand}" />
-                <CheckBox Grid.Row="3"
+                <CheckBox Grid.Row="4"
                           Grid.Column="1"
                           Name="IntensityFromZero"
                           Content="{x:Static text:Resources.ChartFromZero}"
                           IsChecked="{Binding IsFromZero, Mode=OneWay}"
                           Command="{Binding ToggleFromZeroCommand}" />
-                <CheckBox Grid.Row="4"
+                <CheckBox Grid.Row="5"
                           Grid.Column="1"
                           Name="IntensityInvert"
                           Content="{x:Static text:Resources.ChartInvert}"
                           IsChecked="{Binding IsInverted, Mode=OneWay}"
                           Command="{Binding ToggleInvertCommand}" />
 
-                <ToggleButton Grid.Row="5"
+                <ToggleButton Grid.Row="6"
                               Grid.ColumnSpan="2"
                               Name="IntensityAutoscale"
                               HorizontalAlignment="Stretch"
@@ -85,12 +91,13 @@
                               IsChecked="{Binding Chart.IsFollowing, Mode=OneWay}"
                               Command="{Binding AutoscaleCommand}" />
 
-                <TextBlock Grid.Row="6"
+                <TextBlock Grid.Row="7"
                            Grid.ColumnSpan="2"
                            Name="IntensityMessage"
                            Foreground="{DynamicResource AppSeverityErrorBrush}"
                            TextWrapping="Wrap"
-                           IsVisible="{Binding VerticalForm.ValidationMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           Height="40"
+                           TextTrimming="CharacterEllipsis"
                            Text="{Binding VerticalForm.ValidationMessage}" />
             </Grid>
         </Flyout>
@@ -98,7 +105,7 @@
         <!-- A click on the wavelength axis: its start and end in nm and Autoscale. -->
         <Flyout x:Key="WavelengthAxisFlyout" Placement="Pointer">
             <Grid Width="300"
-                  RowDefinitions="Auto,Auto,Auto,Auto"
+                  RowDefinitions="Auto,Auto,Auto,Auto,Auto"
                   ColumnDefinitions="Auto,*"
                   ColumnSpacing="12"
                   RowSpacing="8">
@@ -108,9 +115,15 @@
                 </Grid.KeyBindings>
 
                 <TextBlock Grid.Row="0"
+                           Grid.ColumnSpan="2"
+                           Name="WavelengthNote"
+                           Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                           Text="{x:Static text:Resources.AxisFlyoutSnapshotNote}" />
+
+                <TextBlock Grid.Row="1"
                            VerticalAlignment="Center"
                            Text="{x:Static text:Resources.AxisScaleStartNmLabel}" />
-                <TextBox Grid.Row="0"
+                <TextBox Grid.Row="1"
                          Grid.Column="1"
                          Name="WavelengthStart"
                          Width="140"
@@ -122,10 +135,10 @@
                     </TextBox.KeyBindings>
                 </TextBox>
 
-                <TextBlock Grid.Row="1"
+                <TextBlock Grid.Row="2"
                            VerticalAlignment="Center"
                            Text="{x:Static text:Resources.AxisScaleEndNmLabel}" />
-                <TextBox Grid.Row="1"
+                <TextBox Grid.Row="2"
                          Grid.Column="1"
                          Name="WavelengthEnd"
                          Width="140"
@@ -137,7 +150,7 @@
                     </TextBox.KeyBindings>
                 </TextBox>
 
-                <ToggleButton Grid.Row="2"
+                <ToggleButton Grid.Row="3"
                               Grid.ColumnSpan="2"
                               Name="WavelengthAutoscale"
                               HorizontalAlignment="Stretch"
@@ -146,12 +159,13 @@
                               IsChecked="{Binding Chart.IsFollowing, Mode=OneWay}"
                               Command="{Binding AutoscaleCommand}" />
 
-                <TextBlock Grid.Row="3"
+                <TextBlock Grid.Row="4"
                            Grid.ColumnSpan="2"
                            Name="WavelengthMessage"
                            Foreground="{DynamicResource AppSeverityErrorBrush}"
                            TextWrapping="Wrap"
-                           IsVisible="{Binding HorizontalForm.ValidationMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                           Height="40"
+                           TextTrimming="CharacterEllipsis"
                            Text="{Binding HorizontalForm.ValidationMessage}" />
             </Grid>
         </Flyout>

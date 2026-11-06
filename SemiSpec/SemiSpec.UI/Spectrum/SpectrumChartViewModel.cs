@@ -169,10 +169,16 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		});
 	}
 
-	/// <summary>Shows the typed intensity range and freezes the scale; the log axis needs a positive minimum.</summary>
+	/// <summary>Why the intensity axis cannot show the range, or an empty string when it can.</summary>
+	public string VerticalRangeProblem(AxisRange range)
+	{
+		return _display.IsLogarithmic && range.Min <= 0.0 ? Resources.AxisScaleLogMinimumPositive : string.Empty;
+	}
+
+	/// <summary>Shows the typed intensity range and freezes the scale; a range with a problem changes nothing.</summary>
 	public void SetVerticalRange(AxisRange range)
 	{
-		if (_display.IsLogarithmic && range.Min <= 0.0)
+		if (VerticalRangeProblem(range).Length > 0)
 		{
 			return;
 		}

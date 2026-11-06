@@ -54,6 +54,38 @@ public sealed class SpectrumViewModelCommandTests : SpectrumViewModelTestBase
 	}
 
 	[AvaloniaFact]
+	public async Task ALogMinimumAtOrBelowZeroShowsTheMessageAndKeepsTheScale()
+	{
+		_source.Current = Atp8000Peak;
+		SignalAndRun();
+		await ViewModel.ToggleLogarithmicCommand.Execute();
+		ViewModel.VerticalForm.Seed();
+		var before = ViewModel.Chart.Plot.Axes.GetLimits();
+
+		ViewModel.VerticalForm.MinimumText = "0";
+		await ViewModel.VerticalForm.CommitCommand.Execute();
+
+		ViewModel.VerticalForm.ValidationMessage.Should().Be(Resources.AxisScaleLogMinimumPositive);
+		ViewModel.VerticalForm.MinimumText.Should().Be("0");
+		ViewModel.Chart.IsFollowing.Should().BeTrue();
+		ViewModel.Chart.Plot.Axes.GetLimits().Should().Be(before);
+	}
+
+	[AvaloniaFact]
+	public async Task LeavingTheLogScaleClearsTheLogMinimumMessage()
+	{
+		_source.Current = Atp8000Peak;
+		SignalAndRun();
+		await ViewModel.ToggleLogarithmicCommand.Execute();
+		ViewModel.VerticalForm.Seed();
+		ViewModel.VerticalForm.MinimumText = "0";
+
+		await ViewModel.ToggleLogarithmicCommand.Execute();
+
+		ViewModel.VerticalForm.ValidationMessage.Should().BeEmpty("the toggle seeds the fields from the linear axis");
+	}
+
+	[AvaloniaFact]
 	public async Task FromZeroFollowsFromZero()
 	{
 		_source.Current = Atp8000Peak;

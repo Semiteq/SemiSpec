@@ -367,6 +367,12 @@
   <data name="AxisScaleMinimumBelowMaximum" xml:space="preserve">
     <value>Минимум должен быть меньше максимума</value>
   </data>
+  <data name="AxisScaleLogMinimumPositive" xml:space="preserve">
+    <value>Минимум: на логарифмической шкале должен быть больше 0</value>
+  </data>
+  <data name="AxisFlyoutSnapshotNote" xml:space="preserve">
+    <value>Значения на момент открытия</value>
+  </data>
   <data name="TimeWindowStartLabel" xml:space="preserve">
     <value>Начало</value>
   </data>

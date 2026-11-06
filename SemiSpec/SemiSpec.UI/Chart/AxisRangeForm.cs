@@ -20,14 +20,17 @@ public sealed class AxisRangeForm : ReactiveObject, IAxisFlyoutForm, IDisposable
 
 	private readonly Func<AxisRange> _read;
 	private readonly Action<AxisRange> _write;
+	private readonly Func<AxisRange, string> _axisRule;
 	private readonly Subject<Unit> _closeRequests = new();
 	private AxisRange _seeded;
 	private bool _isCancelled;
 
-	public AxisRangeForm(Func<AxisRange> read, Action<AxisRange> write)
+	/// <summary>The axis rule tells why the axis cannot show a pair, or returns an empty string.</summary>
+	public AxisRangeForm(Func<AxisRange> read, Action<AxisRange> write, Func<AxisRange, string>? axisRule = null)
 	{
 		_read = read;
 		_write = write;
+		_axisRule = axisRule ?? (_ => string.Empty);
 		CommitCommand = ReactiveCommand.Create(Commit);
 		CancelCommand = ReactiveCommand.Create(Cancel);
 	}
@@ -56,18 +59,7 @@ public sealed class AxisRangeForm : ReactiveObject, IAxisFlyoutForm, IDisposable
 	} = string.Empty;
 
 	/// <summary>The rule the pair breaks, or an empty string while it is valid.</summary>
-	public string ValidationMessage
-	{
-		get
-		{
-			if (!TryRead(MinimumText, out var minimum) || !TryRead(MaximumText, out var maximum))
-			{
-				return Resources.AxisScaleBoundInvalid;
-			}
-
-			return minimum < maximum ? string.Empty : Resources.AxisScaleMinimumBelowMaximum;
-		}
-	}
+	public string ValidationMessage => Validate(out _);
 
 	public ReactiveCommand<Unit, Unit> CommitCommand { get; }
 
@@ -85,13 +77,7 @@ public sealed class AxisRangeForm : ReactiveObject, IAxisFlyoutForm, IDisposable
 	/// <summary>Writes a valid pair that differs from the seed, then seeds again; the flyout stays open.</summary>
 	public void Commit()
 	{
-		if (!TryRead(MinimumText, out var minimum) || !TryRead(MaximumText, out var maximum) || minimum >= maximum)
-		{
-			return;
-		}
-
-		var typed = new AxisRange(minimum, maximum);
-		if (typed == Rounded(_seeded))
+		if (Validate(out var typed).Length > 0 || typed == Rounded(_seeded))
 		{
 			return;
 		}
@@ -114,6 +100,18 @@ public sealed class AxisRangeForm : ReactiveObject, IAxisFlyoutForm, IDisposable
 		CommitCommand.Dispose();
 		CancelCommand.Dispose();
 		_closeRequests.Dispose();
+	}
+
+	private string Validate(out AxisRange typed)
+	{
+		typed = default;
+		if (!TryRead(MinimumText, out var minimum) || !TryRead(MaximumText, out var maximum))
+		{
+			return Resources.AxisScaleBoundInvalid;
+		}
+
+		typed = new AxisRange(minimum, maximum);
+		return minimum < maximum ? _axisRule(typed) : Resources.AxisScaleMinimumBelowMaximum;
 	}
 
 	private static bool TryRead(string text, out double value)
