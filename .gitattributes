@@ -71,3 +71,8 @@ global.json text eol=lf
 nuget.config text eol=lf
 .config/** text eol=lf
 .githooks/** text eol=lf
+
+# Images are binary: the text rule above must not rewrite their bytes.
+*.ico binary
+*.png binary
+*.bmp binary

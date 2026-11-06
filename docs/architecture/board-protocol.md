@@ -289,6 +289,12 @@ A run lasts from one Receiving to the next: only its first failed open or port l
 fail the same way stay quiet and the panel gets one entry per incident. An exception anywhere else in the session
 tears the pipe down, closes the port and publishes Disconnected with an `ExceptionalError`.
 
+A board that still runs the old firmware never sends a valid frame, so the link never reaches Receiving. The old
+firmware sends its frame only after a measurement and nothing between measurements. The link reads OtherDevice while
+old frames keep arriving, more than 4120 bytes since the last valid frame, and NotResponding once no byte has come for
+10 s ([Health](#health), the byte rule). Both remedies, `BoardNotRespondingRemedy` and `UnrecognisedDataRemedy`, name the
+board firmware delivered with this version of the program.
+
 The five link errors share the abstract `LinkError` (`LinkErrors.cs`), which puts the port name in the message, and so
 in the log line. The message panel's view of a link error leaves the port
 out, so a repeat on another port coalesces into one row.

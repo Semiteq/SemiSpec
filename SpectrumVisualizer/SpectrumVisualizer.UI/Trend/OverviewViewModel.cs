@@ -55,9 +55,9 @@ public sealed class OverviewViewModel : ReactiveObject, IDisposable
 			.ObserveOn(uiScheduler)
 			.StartWith(Unit.Default)
 			.Subscribe(_ => Reporting(Refold), ReportFailure));
-		// The chart requests a redraw after every refresh, which is where its window and the cache's extent move.
+		// The chart requests a redraw after every refresh, which is where its window moves.
 		_disposables.Add(chart.RedrawRequested
-			.Subscribe(_ => Reporting(() => PlaceWindow(cache.Extent)), ReportFailure));
+			.Subscribe(_ => Reporting(FollowRedraw), ReportFailure));
 	}
 
 	/// <summary>The cache folded to about 250 columns over its extent; null before the first spectrum.</summary>
@@ -80,7 +80,7 @@ public sealed class OverviewViewModel : ReactiveObject, IDisposable
 		private set => this.RaiseAndSetIfChanged(ref field, value);
 	}
 
-	/// <summary>The strip's right bound: the newest point.</summary>
+	/// <summary>The strip's right bound: the newest point of the last fold, so it moves only with the band.</summary>
 	public DateTimeOffset ExtentLast
 	{
 		get;
@@ -122,7 +122,8 @@ public sealed class OverviewViewModel : ReactiveObject, IDisposable
 		{
 			var fold = _cache.FoldCurrent(BandQuery);
 			Band = fold is null ? null : OverviewGeometry.Connected(fold.Series);
-			PlaceWindow(fold?.Extent);
+			PlaceBounds(fold?.Extent);
+			PlaceWindow();
 		}
 		finally
 		{
@@ -139,7 +140,20 @@ public sealed class OverviewViewModel : ReactiveObject, IDisposable
 		return TrendColumns.QueryThrough(extent.Key, extent.First, extent.Newest, columnWidth);
 	}
 
-	private void PlaceWindow(TrendExtent? extent)
+	/// <summary>Places the window against the last fold's bounds; before the first fold, a spectrum refolds at once.</summary>
+	private void FollowRedraw()
+	{
+		if (HasExtent)
+		{
+			PlaceWindow();
+		}
+		else if (_cache.Extent is not null)
+		{
+			Refold();
+		}
+	}
+
+	private void PlaceBounds(TrendExtent? extent)
 	{
 		if (extent is not { } current)
 		{
@@ -151,8 +165,15 @@ public sealed class OverviewViewModel : ReactiveObject, IDisposable
 		ExtentFirst = bandStart < current.First ? bandStart : current.First;
 		ExtentLast = current.Newest;
 		HasExtent = true;
-		(WindowStartFraction, WindowWidthFraction) =
-			OverviewGeometry.WindowFraction(ExtentFirst, ExtentLast, _chart.From, _chart.To);
+	}
+
+	private void PlaceWindow()
+	{
+		if (HasExtent)
+		{
+			(WindowStartFraction, WindowWidthFraction) =
+				OverviewGeometry.WindowFraction(ExtentFirst, ExtentLast, _chart.From, _chart.To);
+		}
 	}
 
 	/// <summary>A failed step is reported and skipped, so the next trigger runs it again.</summary>

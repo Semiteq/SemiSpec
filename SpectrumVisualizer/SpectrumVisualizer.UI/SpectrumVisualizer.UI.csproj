@@ -4,6 +4,7 @@
     <OutputType>WinExe</OutputType>
     <StartupObject>SpectrumVisualizer.UI.Program</StartupObject>
     <NeutralLanguage>en</NeutralLanguage>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

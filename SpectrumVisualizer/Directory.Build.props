@@ -20,9 +20,9 @@
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
-  <!-- Version: permanent default, overridden at build/publish time via /p:Version=X.Y.Z -->
+  <!-- The single source of the app version: release.yml fails unless the vX.Y.Z tag equals it. -->
   <PropertyGroup>
-    <Version>0.0.0</Version>
+    <Version>3.0.0</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Release'">

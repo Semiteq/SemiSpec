@@ -8,6 +8,8 @@ using SpectrumVisualizer.Core.Protocol;
 
 using Xunit;
 
+using MainWindowView = SpectrumVisualizer.UI.MainWindow.MainWindow;
+
 namespace SpectrumVisualizer.Tests.Unit.UI.Trend;
 
 [Trait("Component", "UI")]
@@ -15,6 +17,9 @@ namespace SpectrumVisualizer.Tests.Unit.UI.Trend;
 [Trait("Category", "Unit")]
 public sealed class TrendChartViewModelRenderTests : TrendChartTestBase
 {
+	private const int PlotWidth = 888;
+	private const int DefaultTrendRowHeight = 260;
+
 	[AvaloniaFact]
 	public void ARangeWithGapsRendersWithFiniteLimits()
 	{
@@ -52,6 +57,28 @@ public sealed class TrendChartViewModelRenderTests : TrendChartTestBase
 		Chart.HasPoints.Should().BeFalse();
 		limits.Bottom.Should().Be(0.0);
 		limits.Top.Should().Be(1.0);
+	}
+
+	[AvaloniaTheory]
+	[InlineData("en", (int)MainWindowView.TrendRowMinHeight)]
+	[InlineData("en", DefaultTrendRowHeight)]
+	[InlineData("ru", (int)MainWindowView.TrendRowMinHeight)]
+	[InlineData("ru", DefaultTrendRowHeight)]
+	public void ANearFlatSignalOverAThousandGetsDistinctTickLabels(string cultureName, int plotHeight)
+	{
+		using var culture = new CultureScope(cultureName);
+		AddFlat(0, 18776);
+		AddFlat(1, 18777);
+		Sample();
+
+		Chart.Plot.RenderInMemory(PlotWidth, plotHeight);
+		var labels = Chart.Plot.Axes.Left.TickGenerator.Ticks
+			.Where(tick => tick.IsMajor)
+			.Select(tick => tick.Label)
+			.ToList();
+
+		labels.Should().HaveCountGreaterThan(1);
+		labels.Should().OnlyHaveUniqueItems();
 	}
 
 	private AxisLimits RenderedLimits()

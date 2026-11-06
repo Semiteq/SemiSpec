@@ -117,6 +117,26 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 		return row.GetVisualDescendants().OfType<TextBlock>().Where(text => text.IsEffectivelyVisible);
 	}
 
+	protected static MessagePanelView PanelView(Window window)
+	{
+		return window.GetVisualDescendants().OfType<MessagePanelView>().Single();
+	}
+
+	/// <summary>The realised row of an entry; the virtualizing panel creates it only on a layout pass.</summary>
+	protected static Control RealisedEntry(Window window, int index)
+	{
+		Dispatcher.UIThread.RunJobs();
+		window.UpdateLayout();
+
+		return Named<ItemsControl>(PanelView(window), "MessageEntries").ContainerFromIndex(index)
+			?? throw new InvalidOperationException($"No realised entry at {index}.");
+	}
+
+	protected static TextBlock EntryText(Control entry, string name)
+	{
+		return entry.GetVisualDescendants().OfType<TextBlock>().Single(text => text.Name == name);
+	}
+
 	protected MainWindowView Realise()
 	{
 		_connectionBar = new ConnectionBarViewModel(

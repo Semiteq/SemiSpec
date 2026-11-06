@@ -626,8 +626,11 @@ bottom of the data area in `AppSeverityErrorBrush` and at least 1 px wide, so on
 failed columns less than 5 s apart join into one span, so a steady failure draws one bar instead of dashes. The readout names the failure, so
 colour never carries it alone.
 
-The Y limits pad the drawn values by 5 % of their span, `v - 1 .. v + 1` when they are flat, and stay unchanged when
-nothing is drawn. The Y label names the key on two lines, "Intensity" over "650 nm ±10 nm", so no pane row repeats
+The Y limits pad the drawn values by 5 % of their span. A span under 2 counts as flat and takes `c - 1 .. c + 1` around
+its centre `c`, so float noise on a steady signal does not shrink the axis to fractions of a unit. The limits stay
+unchanged when nothing is drawn. The Y tick labels print the fraction digits each tick needs in the current culture
+(`18 775,5` in Russian); ScottPlot's default rounds values above 1000 to whole numbers, which repeats labels on ticks
+less than 1 apart. The Y label names the key on two lines, "Intensity" over "650 nm ±10 nm", so no pane row repeats
 it: on one line the widest Russian key overruns the room the plot gives a label at the trend's floor. The X label
 reads "Time". While a moment is shown, the shown-moment line stands at it in `AppMarkerLineBrush`.
 
@@ -691,8 +694,10 @@ milliseconds over `[first, newest + 1 ms)`, on the epoch grid, so the first colu
 and the strip's left bound is that column's start. The band takes the trend's gap rule (`OverviewGeometry.Connected`),
 so it breaks where the trend line breaks, not at every empty column of a short extent. It refolds at start, after each
 landed chunk, after each key change, and on a cadence of `clamp(extent / 1000, 2 s, 60 s)`. It reads the cache only,
-so it needs no store read and no cancellation of its own. The window's place along the strip is computed again on each
-`TrendChartViewModel.RedrawRequested`, which follows every refresh.
+so it needs no store read and no cancellation of its own. The strip's right bound is the newest point of the last fold,
+so both bounds move only when the band moves and the band always reaches the right edge. The window's place along the
+strip is computed again against those bounds on each `TrendChartViewModel.RedrawRequested`, which follows every
+refresh; the first redraw that finds a spectrum before any fold refolds at once.
 
 ### Lifecycle
 
@@ -940,7 +945,8 @@ a row: it raises that entry's repeat count and last-seen time, and the log line 
 is compared, so a lost port, a restored link and a second lost port are three rows. The panel row is visible while the
 list has entries: the first entry opens it, Clear empties the list and hides it. The list shows at most 64 px, one
 three-line entry, and scrolls past that, so the panel row stands at most 133 px. An entry with an empty remedy shows
-no remedy line.
+no remedy line. `BoardNotRespondingRemedy` and `UnrecognisedDataRemedy` fit one line at the minimum width in both
+languages, so their entries keep three lines.
 
 `UnhandledErrorObserver` is the handler `BuildAvaloniaApp` passes to `UseReactiveUI(... WithExceptionHandler ...)`.
 `App.Run` builds it once with the logger `Program` hands over, and it lives for the process, because ReactiveUI takes
@@ -952,3 +958,50 @@ outside ReactiveUI, for example in a code-behind event handler. With a panel it 
 `TryReportFailure` and sets `Handled`, so the app keeps running. Before `Configure` there is no panel: the exception
 stays unhandled, ends the dispatcher loop, and `Program` logs it as Fatal and exits with code 1; the handler does not
 log it a second time.
+
+## Release
+
+### Publish
+
+The `Version` element of `SpectrumVisualizer/Directory.Build.props` is the one version source. The exe's file version
+comes from it. The installer's version is the tag's, passed as `/DAppVersion`, and the release workflow fails unless
+the tag equals `Version`. In Release the props emit no symbols (`DebugType None`). During `dotnet publish`
+(`_IsPublishing`) they set `RuntimeIdentifier win-x64`, `SelfContained` and `PublishReadyToRun`, so
+`dotnet publish SpectrumVisualizer/SpectrumVisualizer.UI/SpectrumVisualizer.UI.csproj -c Release` writes a folder
+that runs without an installed .NET to `SpectrumVisualizer/Artifacts/publish/SpectrumVisualizer.UI/release_win-x64/`.
+There is no single-file publish.
+
+### The installer script
+
+`Installer/SpectrumVisualizer.iss` packs that folder. It refuses to compile without `/DAppVersion=X.Y.Z` and resolves
+its paths relative to `Installer/`; the compiled `SpectrumVisualizerInstaller.exe` goes to `Installer/Output/`.
+
+- `AppId` is the one of the 2.x installer, so setup upgrades a 2.x install in place and Settings, Apps keeps one
+  entry, `SpectrumVisualizer X.Y.Z` (`AppVerName`).
+- `DisableDirPage=yes` hides the folder page. A fresh install goes to `DefaultDirName`, `{autopf}\SpectrumVisualizer`;
+  an upgrade reuses the folder the 2.x install recorded. The wizard gives the operator no way to pick another folder.
+- `[InstallDelete]` empties the program folder before the copy, so no 2.x file outlives the upgrade. This is safe
+  because the folder is the app's own and the app keeps nothing in it at run time: the spectra and the logs live
+  under `%LOCALAPPDATA%\SpectrumVisualizer`. A 2.x install that an operator once put into a shared folder loses the
+  other files there.
+- `[InstallDelete]` also deletes the 2.x Start menu and desktop shortcuts, which point at the removed exe. `[Icons]`
+  creates the Start menu entry and, when the operator ticks the unchecked desktop task, a desktop shortcut.
+- `[Files]` copies the publish folder without `*.pdb` and the `SpectrumVisualizer.*.xml` doc files.
+- `CloseApplications=yes` asks to close a running copy, the 2.x exe included, before the files change.
+- `PrivilegesRequired=admin`, because setup writes to Program Files. The post-install launch carries
+  `runasoriginaluser`, so the app runs as the operator and writes the operator's `%LOCALAPPDATA%`, not the
+  administrator's.
+- The wizard offers Russian and English and preselects the Windows language. `UsePreviousLanguage=no` keeps it from
+  reusing the English that the 2.x installer recorded.
+- Uninstall removes the program folder and the shortcuts and leaves `%LOCALAPPDATA%\SpectrumVisualizer`.
+
+### The release workflow
+
+`.github/workflows/release.yml` runs on a pushed tag that matches `vX.Y.Z`, on one Windows runner. Its first step is
+the gate: it fails unless the tag without `v` equals the props `Version`, read with `sed`, and unless `git cat-file
+-t` of the tag prints `tag`, because the release body is the tag annotation and a lightweight tag has none. The tag
+must be created with `git tag -a --cleanup=verbatim`, so the `#` of the Markdown headings survives in the
+annotation. The workflow then restores, builds, runs the unit tests, publishes, installs Inno Setup 7.1.1 with
+winget, compiles the script with the tag's version, and creates the release "SpectrumVisualizer X.Y.Z" with
+`softprops/action-gh-release`, marked latest, with `SpectrumVisualizerInstaller.exe` attached. A failed step stops
+the run before the release exists.

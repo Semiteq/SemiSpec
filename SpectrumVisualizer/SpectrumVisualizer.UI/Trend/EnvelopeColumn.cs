@@ -9,6 +9,7 @@ namespace SpectrumVisualizer.UI.Trend;
 public readonly record struct EnvelopeColumn(double X, double Min, double Max, double Center)
 {
 	private const double VerticalPadding = 0.05;
+	private const double MinimumVerticalSpan = 2.0;
 
 	public bool IsGap => double.IsNaN(Min) || double.IsNaN(Max);
 
@@ -36,7 +37,8 @@ public readonly record struct EnvelopeColumn(double X, double Min, double Max, d
 	}
 
 	/// <summary>
-	/// The drawn values padded by 5 % of their span, plus or minus 1 when flat; null when none is drawn.
+	/// The drawn values padded by 5 % of their span, or a 2-wide range on their centre when the span is narrower;
+	/// null when none is drawn.
 	/// </summary>
 	public static (double Bottom, double Top)? VerticalRange(IReadOnlyList<EnvelopeColumn> columns)
 	{
@@ -56,9 +58,10 @@ public readonly record struct EnvelopeColumn(double X, double Min, double Max, d
 			return null;
 		}
 
-		if (bottom.Equals(top))
+		if (top - bottom < MinimumVerticalSpan)
 		{
-			return (bottom - 1.0, top + 1.0);
+			var centre = (bottom + top) / 2.0;
+			return (centre - (MinimumVerticalSpan / 2.0), centre + (MinimumVerticalSpan / 2.0));
 		}
 
 		var margin = (top - bottom) * VerticalPadding;

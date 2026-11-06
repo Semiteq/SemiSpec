@@ -1,0 +1,7 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Emulator + app" type="CompoundRunConfigurationType">
+    <toRun name="Board emulator" type="DotNetProject" />
+    <toRun name="SpectrumVisualizer" type="DotNetProject" />
+    <method v="2" />
+  </configuration>
+</component>

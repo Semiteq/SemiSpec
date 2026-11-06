@@ -1,0 +1,74 @@
+[
+  {
+    "label": "Build",
+    "command": "dotnet",
+    "args": ["build", "SpectrumVisualizer.slnx"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "Run app",
+    "command": "dotnet",
+    "args": ["run", "--project", "SpectrumVisualizer/SpectrumVisualizer.UI"],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "use_new_terminal": true
+  },
+  {
+    "label": "Run board emulator",
+    "command": "dotnet",
+    "args": [
+      "run",
+      "--project",
+      "SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator",
+      "--",
+      "--port",
+      "COM4",
+      "--device",
+      "2000",
+      "--rate",
+      "2"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "use_new_terminal": true
+  },
+  {
+    "label": "Run emulator + app",
+    "command": "pwsh",
+    "args": [
+      "-NoProfile",
+      "-Command",
+      "dotnet build SpectrumVisualizer.slnx; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; $bin = 'SpectrumVisualizer/Artifacts/bin'; Start-Process \"$bin/SpectrumVisualizer.UI/debug/SpectrumVisualizer.UI.exe\"; & \"$bin/SpectrumVisualizer.Tools.BoardEmulator/debug/SpectrumVisualizer.Tools.BoardEmulator.exe\" --port COM4 --device 2000 --rate 2"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "reveal": "always",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "Test All",
+    "command": "dotnet",
+    "args": ["test", "SpectrumVisualizer.slnx"],
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "Test Current File",
+    "command": "dotnet",
+    "args": [
+      "test",
+      "SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/SpectrumVisualizer.Tests.Unit.csproj",
+      "--filter",
+      "FullyQualifiedName~$ZED_STEM"
+    ],
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "format",
+    "command": "dotnet",
+    "args": ["format", "SpectrumVisualizer.slnx"],
+    "cwd": "$ZED_WORKTREE_ROOT"
+  }
+]

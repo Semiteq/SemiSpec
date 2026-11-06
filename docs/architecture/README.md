@@ -5,7 +5,7 @@ English, present tense, the design as it is. Build and test commands live in the
 ## Documents
 
 - [overview.md](./overview.md): purpose, stack, components, startup, the main window, the spectrum screen, the
-  trend, the spectrum store and the error route.
+  trend, the spectrum store, the error route and the release.
 - [board-protocol.md](./board-protocol.md): the board-to-PC frame, the decoder, the `seq` rules, the serial link,
   the wavelength calibration and the board emulator.
 - [testing-strategy.md](./testing-strategy.md): the test project, what each kind of test owns, the headless setup.
@@ -24,7 +24,7 @@ None.
 | Platform | .NET 10 (`net10.0`), C# 14, Windows only |
 | Desktop shell | Avalonia 12 (Win32, Skia, HarfBuzz), ReactiveUI MVVM, Semi.Avalonia theme with the palette shared with SemiPlot |
 | Conventions | SemiPlot (`Semiteq/SemiPlot`) is the reference app: same package pins, build gates, folder shape and error route |
-| Layout | New projects under `SpectrumVisualizer/` with their own `Directory.Build.props`, `Directory.Packages.props` and `.editorconfig`; `SpectrumVisualizer.slnx` at the root lists them. The old WinForms app stays at the root under its own settings |
+| Layout | The projects under `SpectrumVisualizer/` with their own `Directory.Build.props`, `Directory.Packages.props` and `.editorconfig`; `SpectrumVisualizer.slnx` at the root lists them; the Inno Setup script sits in `Installer/` |
 | Startup | No launch keys and no config files: every site runs the same setup |
 | Logging | Serilog to `%LOCALAPPDATA%\SpectrumVisualizer\Logs`; the operator raises the level to Debug from the menu at run time; the level is not persisted |
 | Errors | FluentResults for failures; one route to the message panel, with an Info, Warning or Error severity per entry; ReactiveUI's unhandled exceptions and exceptions that escape a dispatcher job reach the same panel and the app keeps running; before the panel exists an escaped exception ends the app and is logged as Fatal |
@@ -39,4 +39,4 @@ None.
 | Tools | Console tools live under `SpectrumVisualizer/` as `SpectrumVisualizer.Tools.*` on `System.CommandLine` 2.0.2: the board emulator writes protocol frames to a port, the store benchmark measures the store file |
 | Spectrum storage | SQLite (`Microsoft.Data.Sqlite`), one file `spectra-<process id>.db` per running instance under `%LOCALAPPDATA%\SpectrumVisualizer\Spectra`; the own file is wiped at start, and the sweep deletes every other file no live instance holds open; WAL with `synchronous=NORMAL` and a 64 MB journal limit; one background writer drains a bounded queue in batched transactions and deletes rows older than 24 h; the intensity series reads each row's window from its full pixels with `substr` in one statement (`overview.md`, Spectrum store) |
 | Trend | The intensity at the key (wavelength and `delta`) of the latest spectrum frame, one point per spectrum, in an in-memory cache of the last 24 h fed by the distributor; the chart and the overview fold the cache on the store's epoch grid; the store is re-read only on a key change, the visible window first, then the rest of the day in hour chunks, cancelled by a newer key change; more than 10 s without any frame resets the `seq` baseline, and more than 10 s without a spectrum breaks the line; breaks and failure marks belong to the run and survive a key change; a click shows that moment's spectrum until Back to live (`overview.md`, Trend) |
-| Installer | Inno Setup over a self-contained win-x64 publish folder; no single-file publish |
+| Installer | Inno Setup over a self-contained win-x64 publish folder; no single-file publish. The script keeps the `AppId` of the 2.x installer (`overview.md`, Release) |

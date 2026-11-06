@@ -111,12 +111,35 @@ public sealed class OverviewViewModelTests : TrendChartTestBase
 		Sample();
 
 		_overview.Band.Should().BeSameAs(band, "the band refolds on its cadence, not per frame");
-		_overview.ExtentLast.Should().Be(At(600), "the extent follows the newest point at once");
+		_overview.ExtentLast.Should().Be(At(599), "the strip's bounds move with the band");
 
 		Refold();
 
 		_overview.Band.Should().NotBeSameAs(band);
 		_overview.Band!.Columns.Sum(column => column.Count).Should().Be(601);
+		_overview.ExtentLast.Should().Be(At(600));
+	}
+
+	[AvaloniaFact]
+	public void BetweenRefoldsTheBandReachesTheStripsRightEdgeAndTheWindowStillMoves()
+	{
+		AddSpectra(0, 1800);
+		Sample();
+		Refold();
+
+		AddSpectra(1800, 60);
+		Sample();
+
+		_overview.ExtentLast.Should().Be(At(1799), "the right bound waits for the next refold");
+		ShouldReachTheRightBound(_overview.Band!);
+		_overview.WindowStartFraction.Should().BeApproximately(1259.0 / 1799.0, FractionTolerance);
+		_overview.WindowWidthFraction.Should().BeApproximately(540.0 / 1799.0, FractionTolerance);
+
+		Refold();
+
+		_overview.ExtentLast.Should().Be(At(1859));
+		ShouldReachTheRightBound(_overview.Band!);
+		_overview.WindowStartFraction.Should().BeApproximately(1259.0 / 1859.0, FractionTolerance);
 	}
 
 	[AvaloniaFact]
@@ -161,5 +184,12 @@ public sealed class OverviewViewModelTests : TrendChartTestBase
 	private void Refold()
 	{
 		Scheduler.AdvanceBy(_refoldFloor.Ticks);
+	}
+
+	private void ShouldReachTheRightBound(IntensitySeries band)
+	{
+		var lastColumn = band.Columns[^1];
+		lastColumn.Start.Should().BeOnOrBefore(_overview.ExtentLast);
+		(lastColumn.Start + band.ColumnWidth).Should().BeAfter(_overview.ExtentLast);
 	}
 }
