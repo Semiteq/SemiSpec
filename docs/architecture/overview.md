@@ -691,8 +691,10 @@ milliseconds over `[first, newest + 1 ms)`, on the epoch grid, so the first colu
 and the strip's left bound is that column's start. The band takes the trend's gap rule (`OverviewGeometry.Connected`),
 so it breaks where the trend line breaks, not at every empty column of a short extent. It refolds at start, after each
 landed chunk, after each key change, and on a cadence of `clamp(extent / 1000, 2 s, 60 s)`. It reads the cache only,
-so it needs no store read and no cancellation of its own. The window's place along the strip is computed again on each
-`TrendChartViewModel.RedrawRequested`, which follows every refresh.
+so it needs no store read and no cancellation of its own. The strip's right bound is the newest point of the last fold,
+so both bounds move only when the band moves and the band always reaches the right edge. The window's place along the
+strip is computed again against those bounds on each `TrendChartViewModel.RedrawRequested`, which follows every
+refresh; the first redraw that finds a spectrum before any fold refolds at once.
 
 ### Lifecycle
 
