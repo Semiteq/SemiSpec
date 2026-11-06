@@ -628,7 +628,9 @@ colour never carries it alone.
 
 The Y limits pad the drawn values by 5 % of their span. A span under 2 counts as flat and takes `c - 1 .. c + 1` around
 its centre `c`, so float noise on a steady signal does not shrink the axis to fractions of a unit. The limits stay
-unchanged when nothing is drawn. The Y label names the key on two lines, "Intensity" over "650 nm ±10 nm", so no pane row repeats
+unchanged when nothing is drawn. The Y tick labels print the fraction digits each tick needs in the current culture
+(`18 775,5` in Russian); ScottPlot's default rounds values above 1000 to whole numbers, which repeats labels on ticks
+less than 1 apart. The Y label names the key on two lines, "Intensity" over "650 nm ±10 nm", so no pane row repeats
 it: on one line the widest Russian key overruns the room the plot gives a label at the trend's floor. The X label
 reads "Time". While a moment is shown, the shown-moment line stands at it in `AppMarkerLineBrush`.
 

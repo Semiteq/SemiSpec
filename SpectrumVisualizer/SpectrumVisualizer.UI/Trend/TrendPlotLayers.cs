@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using ScottPlot;
 using ScottPlot.Plottables;
 using ScottPlot.TickGenerators;
@@ -13,6 +15,9 @@ namespace SpectrumVisualizer.UI.Trend;
 /// </summary>
 public sealed class TrendPlotLayers
 {
+	private const int LabelDecimals = 10;
+	private const string LabelFormat = "#,0.##########";
+
 	private readonly Plot _plot;
 	private readonly EnvelopeLine _envelope = new();
 	private readonly TrendMarkerStrip _strip = new();
@@ -27,6 +32,7 @@ public sealed class TrendPlotLayers
 		_momentLine.IsVisible = false;
 		plot.Axes.Bottom.TickGenerator = new DateTimeAutomatic();
 		plot.Axes.Bottom.Label.Text = Resources.TrendAxisTime;
+		plot.Axes.Left.TickGenerator = new NumericAutomatic { LabelFormatter = IntensityLabel };
 		plot.Axes.Left.Label.Text = Resources.TrendAxisIntensity;
 		plot.Axes.SetLimitsY(0.0, 1.0);
 		plot.Font.Automatic();
@@ -75,5 +81,15 @@ public sealed class TrendPlotLayers
 				_momentLine.X = LocalTimeAxis.ToAxis(shown);
 			}
 		}
+	}
+
+	/// <summary>
+	/// Prints the digits a tick needs; ScottPlot's default drops the fraction above 1000, so ticks under 1 apart repeat.
+	/// </summary>
+	private static string IntensityLabel(double value)
+	{
+		var rounded = Math.Round(value, LabelDecimals);
+		var withoutNegativeZero = rounded == 0.0 ? 0.0 : rounded;
+		return withoutNegativeZero.ToString(LabelFormat, CultureInfo.CurrentCulture);
 	}
 }
