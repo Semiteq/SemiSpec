@@ -14,12 +14,13 @@ The app sets no culture. The generated accessor reads `ResourceManager.GetString
 left null, which falls through to `CultureInfo.CurrentUICulture`, the Windows UI language. A Russian Windows shows the
 Russian set; any other language shows English. Semi's own control strings follow the same culture (`ui-theme.md`).
 
-Numbers and times follow `CultureInfo.CurrentCulture`: the signal pane's amplitude, SNR and Q in `G6`, the log
-axis's tick labels in `"0.###"`, the trend readout's values in `G6` and its counts, and the numbers in the preset
-labels. These outputs are the exception. `AppLogging` writes the log file with the invariant culture, so every machine
-produces the same log format. The signal pane's update time is the fixed `HH:mm:ss.fff`, and the trend readout's time
-and the historical line's time are the fixed `HH:mm:ss` in local time, all formatted with the invariant culture.
-ScottPlot's `DateTimeAutomatic` labels the trend's time axis.
+Numbers and times follow `CultureInfo.CurrentCulture`: the readout pane's amplitude, SNR and Q in `G6`, the log
+axis's tick labels in `"0.###"`, the axis flyouts' bounds in `"0.###"`, the trend readout's values in `G6` and its
+counts, the numbers in the preset labels and the trend's width text, and the date in the trend's time axis title. These outputs are the exception. `AppLogging` writes the log file with the invariant culture, so every machine
+produces the same log format. The readout pane's update time is the fixed `HH:mm:ss.fff`; the trend readout's time, the
+times in the spectrum's state line and the time flyout's fields are the fixed `HH:mm:ss` in local time; the trend's
+time ticks are `HH:mm:ss` or `HH:mm`; all are formatted with the invariant culture. ScottPlot's `DateTimeAutomatic`
+places the trend's time ticks.
 
 ## The generated accessor
 
@@ -43,15 +44,15 @@ AXAML reads a key as `{x:Static text:Resources.Key}` with
 | Owner | Keys |
 | --- | --- |
 | Main window | `WindowTitle` |
-| Menu | `MenuFile`, `MenuFileExit`, `MenuView`, `MenuViewVerboseLogging` |
-| Connection row | `ConnectionPortLabel`, `ConnectionPortPlaceholder`, `ConnectionRefresh`, `ConnectionConnect`, `ConnectionDisconnect` |
+| Menu | `MenuFile`, `MenuFileExit`, `MenuView`, `MenuViewMessagePanel`, `MenuViewVerboseLogging` |
+| Connection row | `ConnectionPortLabel`, `ConnectionPortPlaceholder`, `ConnectionRefresh`, `ConnectionConnect`, `ConnectionDisconnect`, `ChartBackToLive`, `TrendFollowLive` |
 | Status bar | `StatusNotConnected`, `StatusConnecting`, `StatusPortUnavailable`, `StatusWaiting`, `StatusReceiving`, `StatusNotResponding`, `StatusOtherDevice`, `StatusSpectrometerFormat`, `StatusSpectrometerConnected`, `StatusSpectrometerNotConnected`, `StatusSpectrometerFailed`, `StatusSpectrometerNoData`, `StatusLostSpectraFormat`, `StatusDroppedFramesFormat`, `StatusNoValue`; the restored entry: `LinkRestoredTitle`, `LinkRestoredDetail` |
-| Message panel | `MessagePanelTitle`, `MessagePanelClear`, `MessagePanelRepeatFormat` |
-| Signal pane | `SignalTitle`, `SignalDevice`, `SignalWavelength`, `SignalWindow`, `SignalAmplitude`, `SignalSnr`, `SignalQ`, `SignalUpdated`, `SignalWavelengthFormat`, `SignalWindowFormat`; it also reads the status bar's `StatusNoValue` for a row with no value |
-| Chart controls | `ChartTitle`, `ChartInvert`, `ChartLogScale`, `ChartResetScale`, `ChartStickToZero`, `ChartBackToLive` |
-| Spectrum chart | `SpectrumAxisWavelength`, `SpectrumAxisIntensity`, `SpectrumEmpty`; the historical line: `SpectrumHistoricalFormat` |
-| Trend pane | `TrendTitle`, `TrendTimeWindow`, `TrendFollowLive`; the preset labels: `TrendPresetMinutesFormat`, `TrendPresetHoursFormat` |
-| Trend chart | `TrendAxisTime`, `TrendAxisIntensity` (before the first spectrum), `TrendAxisIntensityFormat` (the key, with a line break after the first word), `TrendEmpty` |
+| Message panel | `MessagePanelClear`, `MessagePanelRepeatFormat`, `MessagePanelMoreFormat`, `MessagePanelEmpty` |
+| Readout pane | `SignalDevice`, `SignalWavelength`, `SignalWindow`, `SignalAmplitude`, `SignalSnr`, `SignalQ`, `SignalUpdated`, `SignalWavelengthFormat`, `SignalWindowFormat`; it also reads the status bar's `StatusNoValue` for a row with no value |
+| Axis flyouts | `AxisFlyoutSnapshotNote`; the bounds: `AxisScaleMaximumLabel`, `AxisScaleMinimumLabel`, `AxisScaleStartNmLabel`, `AxisScaleEndNmLabel`, `AxisScaleBoundInvalid`, `AxisScaleMinimumBelowMaximum`, `AxisScaleLogMinimumPositive`; the modes: `AxisScaleTypeLabel`, `AxisScaleLogarithmic`, `ChartFromZero`, `ChartInvert`, `AxisScaleAutoscale`; the time flyout: `TimeWindowStartLabel`, `TimeWindowEndLabel`, `TimeWindowWidthLabel`, `TimeWindowPresets`, `TimeWindowDateFormat`, `TimeWindowClockPattern`, `TimeWindowStartUnreadableFormat`, `TimeWindowEndUnreadableFormat`, `TimeWindowWidthUnreadableFormat`, `TimeWindowEndNotAfterStart` |
+| State lines | `ChartStateSeparator`; the spectrum's: `SpectrumHistoricalFormat`, `SpectrumStaleFormat`, `SpectrumStateLog`, `SpectrumStateInverted`, `SpectrumStateFromZero`, `SpectrumStateFrozen`; the trend's: `TrendStateNotFollowing`, `SpectrumStateFrozen`, and the width through the preset labels `TrendPresetMinutesFormat`, `TrendPresetHoursFormat` and `TrendWidthSecondsFormat` |
+| Spectrum chart | `SpectrumAxisWavelength`, `SpectrumAxisIntensity`, `SpectrumEmpty` |
+| Trend chart | `TrendAxisTime` (before the first refresh), `TrendAxisTimeFormat`, `TrendAxisTimeRangeFormat` (the date of a window across midnight), `TrendAxisIntensity` (before the first spectrum), `TrendAxisIntensityFormat` (the key, with a line break after the first word), `TrendEmpty` |
 | Trend readout | `TrendReadoutRangeFormat`, `TrendReadoutCountFormat`, `TrendReadoutNoData`, `TrendReadoutLostFormat`, `TrendReadoutNoSpectra`, `TrendReadoutUncoveredFormat`, `TrendReadoutFailedFormat` |
 | `ErrorMessageMapper` | `FailureThrownTitle`, `FailureThrownDetail`, `FailureThrownRemedy`, `FailureUnknownTitle`, `FailureUnknownRemedy`; for each link error a `Title`, `Detail` and `Remedy` key: `PortBusy*`, `PortNotFound*`, `PortLost*`, `BoardNotResponding*`, `UnrecognisedData*`; for a failed port listing `PortListTitle`, `PortListDetail`, `PortListRemedy`; for the store errors `StoreOpenTitle`, `StoreOpenDetail`, `StoreOpenRemedy`, `StoreWriteTitle`, `StoreWriteDetail`, `StoreWriteRemedy`, `StoreStoppedTitle`, `StoreStoppedDetail`, `StoreStoppedRemedy`; for the trend errors `TrendHistoryTitle`, `TrendHistoryDetail`, `TrendMomentTitle`, `TrendMomentDetail`, `TrendMomentRemedy` |
 
