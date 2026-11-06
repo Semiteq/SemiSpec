@@ -65,7 +65,12 @@
             <SolidColorBrush x:Key="AppContentBackgroundBrush" Color="#FFFFFF" />
             <SolidColorBrush x:Key="AppBorderBrush" Color="#EBECF0" />
             <SolidColorBrush x:Key="AppSecondaryForegroundBrush" Color="#818594" />
+            <SolidColorBrush x:Key="AppSubtleLineBrush" Color="#EBECF0" />
             <SolidColorBrush x:Key="AppSeverityErrorBrush" Color="#DB3B4B" />
+            <SolidColorBrush x:Key="AppSeverityWarningBrush" Color="#E3AE4D" />
+            <SolidColorBrush x:Key="AppSeverityInfoBrush" Color="#3574F0" />
+            <SolidColorBrush x:Key="AppConnectionOkBrush" Color="#208A3C" />
+            <SolidColorBrush x:Key="AppConnectionFaultBrush" Color="#DB3B4B" />
         </ResourceDictionary>
 
         <ResourceDictionary x:Key="Dark">
@@ -124,7 +129,12 @@
             <SolidColorBrush x:Key="AppContentBackgroundBrush" Color="#1E1F22" />
             <SolidColorBrush x:Key="AppBorderBrush" Color="#393B40" />
             <SolidColorBrush x:Key="AppSecondaryForegroundBrush" Color="#6F737A" />
+            <SolidColorBrush x:Key="AppSubtleLineBrush" Color="#393B40" />
             <SolidColorBrush x:Key="AppSeverityErrorBrush" Color="#E55765" />
+            <SolidColorBrush x:Key="AppSeverityWarningBrush" Color="#F2C55C" />
+            <SolidColorBrush x:Key="AppSeverityInfoBrush" Color="#3574F0" />
+            <SolidColorBrush x:Key="AppConnectionOkBrush" Color="#5FAD65" />
+            <SolidColorBrush x:Key="AppConnectionFaultBrush" Color="#E55765" />
         </ResourceDictionary>
 
     </ResourceDictionary.ThemeDictionaries>

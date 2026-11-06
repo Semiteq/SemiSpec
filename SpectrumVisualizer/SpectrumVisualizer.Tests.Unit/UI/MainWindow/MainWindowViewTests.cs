@@ -1,7 +1,9 @@
 using System.Globalization;
+using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -12,6 +14,10 @@ using FluentResults;
 
 using Microsoft.Extensions.Logging.Abstractions;
 
+using ReactiveUI.Avalonia;
+
+using SpectrumVisualizer.Tests.Unit.UI.Link;
+using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Localization;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
@@ -29,14 +35,31 @@ namespace SpectrumVisualizer.Tests.Unit.UI.MainWindow;
 public sealed class MainWindowViewTests : IDisposable
 {
 	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
+	private readonly SerialLink _serialLink;
+	private readonly ConnectionBarViewModel _connectionBar;
+	private readonly AppStatusBarViewModel _statusBar;
 	private readonly MainWindowViewModel _viewModel;
 	private readonly MainWindowView _window;
 
 	public MainWindowViewTests()
 	{
+		var portProvider = new FakeSerialPortProvider();
+		_serialLink = new SerialLink(portProvider, ImmediateScheduler.Instance, NullLogger<SerialLink>.Instance);
+		_connectionBar = new ConnectionBarViewModel(
+			portProvider,
+			_serialLink,
+			_messagePanel,
+			AvaloniaScheduler.Instance,
+			NullLogger<ConnectionBarViewModel>.Instance);
+		_statusBar = new AppStatusBarViewModel(
+			_serialLink,
+			_messagePanel,
+			AvaloniaScheduler.Instance,
+			NullLogger<AppStatusBarViewModel>.Instance);
 		_viewModel = new MainWindowViewModel(
 			_messagePanel,
-			new AppStatusBarViewModel(),
+			_connectionBar,
+			_statusBar,
 			new LogLevelControl(),
 			NullLogger<MainWindowViewModel>.Instance);
 		_window = new MainWindowView { DataContext = _viewModel };
@@ -60,24 +83,67 @@ public sealed class MainWindowViewTests : IDisposable
 
 		var statusBar = Named<Border>(_window, "StatusBar");
 		statusBar.IsEffectivelyVisible.Should().BeTrue();
-		var statusBarContent = statusBar.Child.Should().BeOfType<AppStatusBar>().Which;
-		Named<TextBlock>(statusBarContent, "ConnectionText").Text.Should().Be(Resources.StatusNotConnected);
+		statusBar.Child.Should().BeOfType<AppStatusBar>();
 	}
 
 	[AvaloniaFact]
-	public void TheRowsStandTopToBottomAsMenuContentMessagePanelAndStatusBar()
+	public void TheStatusBarRealisesTheDotAndEverySegmentOfADisconnectedLink()
+	{
+		Realise();
+
+		var bar = Named<Border>(_window, "StatusBar").Child.Should().BeOfType<AppStatusBar>().Which;
+		var dot = Named<Ellipse>(bar, "LinkDot");
+		dot.IsEffectivelyVisible.Should().BeTrue();
+		dot.Classes.Where(name => name.StartsWith("tone-", StringComparison.Ordinal)).Should().Equal("tone-neutral");
+
+		string[] segments = ["LinkText", "PortText", "Atp2000Text", "Atp8000Text", "LostSpectraText"];
+		segments.Select(name => Named<TextBlock>(bar, name))
+			.Should().OnlyContain(segment => segment.IsEffectivelyVisible && segment.Bounds.Width > 0);
+		segments.Select(name => Named<TextBlock>(bar, name).Text).Should().Equal(
+			Resources.StatusNotConnected,
+			Resources.StatusNoValue,
+			Resources.FormatStatusSpectrometerFormat("ATP-2000", Resources.StatusSpectrometerNoData),
+			Resources.FormatStatusSpectrometerFormat("ATP-8000", Resources.StatusSpectrometerNoData),
+			Resources.FormatStatusLostSpectraFormat(Resources.StatusNoValue));
+	}
+
+	[AvaloniaFact]
+	public void TheRowsStandTopToBottomAsMenuConnectionRowContentMessagePanelAndStatusBar()
 	{
 		Realise();
 
 		new Control[]
 			{
 				Named<AppMenuBar>(_window, "MenuBar"),
+				Named<Border>(_window, "ConnectionRow"),
 				Named<Border>(_window, "ContentArea"),
 				Named<Border>(_window, "MessagePanel"),
 				Named<Border>(_window, "StatusBar"),
 			}
 			.Select(Grid.GetRow)
-			.Should().Equal(0, 1, 2, 3);
+			.Should().Equal(0, 1, 2, 3, 4);
+	}
+
+	[AvaloniaFact]
+	public void TheConnectionRowShowsTheLabelTheEmptyPortListAndThreeButtons()
+	{
+		Realise();
+
+		var connectionRow = Named<Border>(_window, "ConnectionRow");
+		connectionRow.IsEffectivelyVisible.Should().BeTrue();
+		var bar = connectionRow.Child.Should().BeOfType<ConnectionBar>().Which;
+
+		Named<TextBlock>(bar, "PortLabel").Text.Should().Be(Resources.ConnectionPortLabel);
+		var portList = Named<ComboBox>(bar, "PortList");
+		portList.Width.Should().Be(240);
+		portList.PlaceholderText.Should().Be(Resources.ConnectionPortPlaceholder);
+		portList.IsEnabled.Should().BeTrue("the link is idle");
+
+		Named<Button>(bar, "RefreshPorts").Content.Should().Be(Resources.ConnectionRefresh);
+		Named<Button>(bar, "Connect").Content.Should().Be(Resources.ConnectionConnect);
+		Named<Button>(bar, "Disconnect").Content.Should().Be(Resources.ConnectionDisconnect);
+		Named<Button>(bar, "Connect").IsEffectivelyEnabled.Should().BeFalse("no port is selected");
+		Named<Button>(bar, "Disconnect").IsEffectivelyEnabled.Should().BeFalse("the link is idle");
 	}
 
 	[AvaloniaFact]
@@ -119,11 +185,29 @@ public sealed class MainWindowViewTests : IDisposable
 	{
 		Realise();
 
-		_messagePanel.Report(new MessageView("title", "detail", string.Empty));
+		_messagePanel.Report(new MessageView("title", "detail", string.Empty, MessageSeverity.Error));
 		var entry = RealisedEntry(0);
 
 		EntryText(entry, "EntryRepeat").IsVisible.Should().BeFalse();
 		EntryText(entry, "EntryRemedy").IsVisible.Should().BeFalse();
+	}
+
+	[AvaloniaTheory]
+	[InlineData(MessageSeverity.Info, "severity-info")]
+	[InlineData(MessageSeverity.Warning, "severity-warning")]
+	[InlineData(MessageSeverity.Error, "severity-error")]
+	public void TheEntryDotCarriesTheClassOfItsSeverityOnly(MessageSeverity severity, string expected)
+	{
+		Realise();
+
+		_messagePanel.Report(new MessageView("title", "detail", "remedy", severity));
+		var dot = RealisedEntry(0)
+			.GetVisualDescendants()
+			.OfType<Ellipse>()
+			.Single(item => item.Name == "EntrySeverity");
+
+		dot.Classes.Where(name => name.StartsWith("severity-", StringComparison.Ordinal))
+			.Should().Equal(expected);
 	}
 
 	[AvaloniaFact]
@@ -170,6 +254,9 @@ public sealed class MainWindowViewTests : IDisposable
 	{
 		_window.Close();
 		_viewModel.Dispose();
+		_connectionBar.Dispose();
+		_statusBar.Dispose();
+		_serialLink.Dispose();
 		_messagePanel.Dispose();
 	}
 

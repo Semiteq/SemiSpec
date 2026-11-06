@@ -1,7 +1,13 @@
+using System.Reactive.Concurrency;
+
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+using ReactiveUI.Avalonia;
 
 using Serilog;
 
+using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
@@ -16,7 +22,14 @@ public static class UiServiceCollectionExtensions
 		services.AddLogging(builder => builder.AddSerilog(logging.Logger, dispose: false));
 		services.AddSingleton(logging.LevelControl);
 		services.AddSingleton(TimeProvider.System);
+		services.AddSingleton<IScheduler>(AvaloniaScheduler.Instance);
+		services.AddSingleton<ISerialPortProvider, RjcpSerialPortProvider>();
+		services.AddSingleton(provider => new SerialLink(
+			provider.GetRequiredService<ISerialPortProvider>(),
+			DefaultScheduler.Instance,
+			provider.GetRequiredService<ILogger<SerialLink>>()));
 		services.AddSingleton<MessagePanelViewModel>();
+		services.AddSingleton<ConnectionBarViewModel>();
 		services.AddSingleton<AppStatusBarViewModel>();
 		services.AddSingleton<MainWindowViewModel>();
 

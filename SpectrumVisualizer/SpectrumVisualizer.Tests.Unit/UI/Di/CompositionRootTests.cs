@@ -1,3 +1,4 @@
+using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 
 using Avalonia.Headless.XUnit;
@@ -7,12 +8,15 @@ using AwesomeAssertions;
 
 using Microsoft.Extensions.DependencyInjection;
 
+using ReactiveUI.Avalonia;
+
 using Serilog;
 using Serilog.Events;
 
 using SpectrumVisualizer.Tests.Unit.UI.Logging;
 
 using SpectrumVisualizer.UI;
+using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
@@ -50,6 +54,34 @@ public sealed class CompositionRootTests : IDisposable
 		{
 			provider.GetRequiredService(descriptor.ServiceType).Should().NotBeNull(descriptor.ServiceType.Name);
 		}
+	}
+
+	[AvaloniaFact]
+	public void TheSchedulerIsTheUiScheduler()
+	{
+		using var provider = BuildContainer();
+
+		provider.GetRequiredService<IScheduler>().Should().BeSameAs(AvaloniaScheduler.Instance);
+	}
+
+	[AvaloniaFact]
+	public void TheLinkIsOneSingletonOverTheRjcpPortProvider()
+	{
+		using var provider = BuildContainer();
+
+		provider.GetRequiredService<ISerialPortProvider>().Should().BeOfType<RjcpSerialPortProvider>();
+		provider.GetRequiredService<SerialLink>().Should().BeSameAs(provider.GetRequiredService<SerialLink>());
+	}
+
+	[AvaloniaFact]
+	public void TheMainWindowShowsTheContainersStatusBarSeededFromTheLink()
+	{
+		using var provider = BuildContainer();
+
+		var statusBar = provider.GetRequiredService<MainWindowViewModel>().StatusBar;
+
+		statusBar.Should().BeSameAs(provider.GetRequiredService<AppStatusBarViewModel>());
+		statusBar.Status.Should().BeSameAs(provider.GetRequiredService<SerialLink>().Status);
 	}
 
 	[AvaloniaFact]

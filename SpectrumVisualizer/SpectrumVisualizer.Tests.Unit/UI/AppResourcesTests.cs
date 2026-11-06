@@ -26,7 +26,12 @@ public sealed class AppResourcesTests
 		"AppContentBackgroundBrush",
 		"AppBorderBrush",
 		"AppSecondaryForegroundBrush",
+		"AppSubtleLineBrush",
 		"AppSeverityErrorBrush",
+		"AppSeverityWarningBrush",
+		"AppSeverityInfoBrush",
+		"AppConnectionOkBrush",
+		"AppConnectionFaultBrush",
 	];
 
 	[Fact]

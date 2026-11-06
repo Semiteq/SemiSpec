@@ -10,6 +10,18 @@
              x:Class="SpectrumVisualizer.UI.Messages.MessagePanelView"
              x:DataType="messages:MessagePanelViewModel">
 
+    <UserControl.Styles>
+        <Style Selector="Ellipse.severity-error">
+            <Setter Property="Fill" Value="{DynamicResource AppSeverityErrorBrush}" />
+        </Style>
+        <Style Selector="Ellipse.severity-warning">
+            <Setter Property="Fill" Value="{DynamicResource AppSeverityWarningBrush}" />
+        </Style>
+        <Style Selector="Ellipse.severity-info">
+            <Setter Property="Fill" Value="{DynamicResource AppSeverityInfoBrush}" />
+        </Style>
+    </UserControl.Styles>
+
     <DockPanel LastChildFill="True">
 
         <StackPanel DockPanel.Dock="Top"
@@ -42,11 +54,14 @@
                               Margin="0,4">
 
                             <Ellipse Grid.Column="0"
+                                     Name="EntrySeverity"
                                      Width="8"
                                      Height="8"
                                      Margin="0,4,8,0"
                                      VerticalAlignment="Top"
-                                     Fill="{DynamicResource AppSeverityErrorBrush}" />
+                                     Classes.severity-error="{Binding View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Error}}"
+                                     Classes.severity-warning="{Binding View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Warning}}"
+                                     Classes.severity-info="{Binding View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Info}}" />
 
                             <TextBlock Grid.Column="1"
                                        Name="EntryTime"

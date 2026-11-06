@@ -13,14 +13,24 @@
         Title="{x:Static text:Resources.WindowTitle}"
         Width="1280"
         Height="800"
+        MinWidth="{x:Static local:MainWindow.MinimumWidth}"
         WindowStartupLocation="CenterScreen">
 
-    <Grid RowDefinitions="Auto,*,Auto,Auto">
+    <Grid RowDefinitions="Auto,Auto,*,Auto,Auto">
 
         <local:AppMenuBar Grid.Row="0"
                           Name="MenuBar" />
 
         <Border Grid.Row="1"
+                Name="ConnectionRow"
+                Background="{DynamicResource AppPanelBackgroundBrush}"
+                BorderThickness="0,0,0,1"
+                BorderBrush="{DynamicResource AppBorderBrush}"
+                Padding="16,8">
+            <local:ConnectionBar DataContext="{Binding ConnectionBar}" />
+        </Border>
+
+        <Border Grid.Row="2"
                 Name="ContentArea"
                 Background="{DynamicResource AppContentBackgroundBrush}"
                 Padding="16">
@@ -31,7 +41,7 @@
                        VerticalAlignment="Center" />
         </Border>
 
-        <Border Grid.Row="2"
+        <Border Grid.Row="3"
                 Name="MessagePanel"
                 Background="{DynamicResource AppPanelBackgroundBrush}"
                 BorderThickness="0,1,0,0"
@@ -41,7 +51,7 @@
             <messages:MessagePanelView DataContext="{Binding MessagePanel}" />
         </Border>
 
-        <Border Grid.Row="3"
+        <Border Grid.Row="4"
                 Name="StatusBar"
                 Background="{DynamicResource AppPanelBackgroundBrush}"
                 BorderThickness="0,1,0,0"

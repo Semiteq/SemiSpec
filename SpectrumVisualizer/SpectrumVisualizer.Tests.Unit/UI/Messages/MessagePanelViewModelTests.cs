@@ -139,9 +139,21 @@ public sealed class MessagePanelViewModelTests
 		panel.HasEntries.Should().BeFalse();
 	}
 
-	private static MessageView Failure(string title)
+	[AvaloniaFact]
+	public void ReportKeepsTwoViewsThatDifferOnlyInSeverityApart()
 	{
-		return new MessageView(title, "detail", "remedy");
+		using var panel = new MessagePanelViewModel(new SteppingClock());
+
+		panel.Report(Failure("archive", MessageSeverity.Warning)).Should().BeFalse();
+		panel.Report(Failure("archive", MessageSeverity.Error)).Should().BeFalse();
+
+		panel.Entries.Select(entry => entry.View.Severity)
+			.Should().Equal(MessageSeverity.Error, MessageSeverity.Warning);
+	}
+
+	private static MessageView Failure(string title, MessageSeverity severity = MessageSeverity.Error)
+	{
+		return new MessageView(title, "detail", "remedy", severity);
 	}
 
 	private static MessageView Thrown(string message)

@@ -19,6 +19,7 @@ All commands run from the repo root.
 ```powershell
 dotnet build SpectrumVisualizer.slnx -c Release       # new app; warnings are errors
 dotnet run --project SpectrumVisualizer/SpectrumVisualizer.UI
+dotnet run --project SpectrumVisualizer/SpectrumVisualizer.Tools.BoardEmulator -- --help
 dotnet build SpectrumVisualizer.sln                   # old app
 ```
 
@@ -36,10 +37,10 @@ dotnet test SpectrumVisualizer.Tests                  # old app
 ```
 
 `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit` is the only test project of the new app: xUnit, AwesomeAssertions,
-Avalonia.Headless. Every test class carries three traits: `Component` (`Core|UI`), `Area`
-(`Di|Logging|MainWindow|Messages|Paths|Resources`) and `Category` (`Unit`). `xunit.runner.json` sets `failSkips`, so a
-skipped test fails the run. A hung run leaves `SpectrumVisualizer.Tests.Unit.exe` locked, and the next build fails with
-MSB3027 until the process is killed.
+Avalonia.Headless. Every test class carries three traits: `Component` (`Core|UI|Tools`), `Area`
+(`Calibration|Di|Emulator|Link|Logging|MainWindow|Messages|Paths|Protocol|Resources`) and `Category` (`Unit`).
+`xunit.runner.json` sets `failSkips`, so a skipped test fails the run. A hung run leaves
+`SpectrumVisualizer.Tests.Unit.exe` locked, and the next build fails with MSB3027 until the process is killed.
 
 ## Format
 
@@ -64,8 +65,10 @@ then builds and tests the old app.
 .githooks/                       pre-commit hook
 .github/workflows/               CI
 SpectrumVisualizer/              new app: build props, .editorconfig, projects below
-  SpectrumVisualizer.Core/       UI-free code (paths)
-  SpectrumVisualizer.UI/         Avalonia WinExe: startup, logging, main window, messages, styles, resx text
+  SpectrumVisualizer.Core/       UI-free code: paths, board protocol, wavelength calibration
+  SpectrumVisualizer.UI/         Avalonia WinExe: startup, logging, serial link, main window, messages, styles, resx text
+  SpectrumVisualizer.Tools.BoardEmulator/
+                                 console tool: writes board frames to a COM port
   SpectrumVisualizer.Tests.Unit/ unit and headless UI tests
 SpectrumVisualizer.Uart/         old WinForms app
 SpectrumVisualizer.Tests/        old app's MSTest tests

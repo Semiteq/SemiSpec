@@ -43,11 +43,16 @@ Semi owns the controls; the `App*` keys are ours, and each exists in both varian
 
 | Key | Consumers | Light | Dark |
 | --- | --- | --- | --- |
-| `AppPanelBackgroundBrush` | Message panel row, status bar row | `#F7F8FA` | `#2B2D30` |
+| `AppPanelBackgroundBrush` | Connection row, message panel row, status bar row | `#F7F8FA` | `#2B2D30` |
 | `AppContentBackgroundBrush` | Content area | `#FFFFFF` | `#1E1F22` |
-| `AppBorderBrush` | The top border of the message panel row and the status bar row | `#EBECF0` | `#393B40` |
-| `AppSecondaryForegroundBrush` | Content placeholder; an entry's remedy, repeat count and time | `#818594` | `#6F737A` |
-| `AppSeverityErrorBrush` | The message panel's dot on every entry | `#DB3B4B` | `#E55765` |
+| `AppBorderBrush` | The bottom border of the connection row; the top border of the message panel row and the status bar row | `#EBECF0` | `#393B40` |
+| `AppSecondaryForegroundBrush` | Content placeholder; an entry's remedy, repeat count and time; the status bar dot in a neutral link state | `#818594` | `#6F737A` |
+| `AppSubtleLineBrush` | The 1 px separators between status bar segments | `#EBECF0` | `#393B40` |
+| `AppSeverityErrorBrush` | The message panel's dot on an Error entry | `#DB3B4B` | `#E55765` |
+| `AppSeverityWarningBrush` | The message panel's dot on a Warning entry | `#E3AE4D` | `#F2C55C` |
+| `AppSeverityInfoBrush` | The message panel's dot on an Info entry | `#3574F0` | `#3574F0` |
+| `AppConnectionOkBrush` | The status bar dot in Receiving | `#208A3C` | `#5FAD65` |
+| `AppConnectionFaultBrush` | The status bar dot in PortUnavailable, NotResponding and OtherDevice | `#DB3B4B` | `#E55765` |
 
 `SpectrumVisualizer/SpectrumVisualizer.Tests.Unit/UI/AppResourcesTests.cs` resolves every key in this table under both
 variants.

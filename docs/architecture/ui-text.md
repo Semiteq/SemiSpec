@@ -40,9 +40,12 @@ AXAML reads a key as `{x:Static text:Resources.Key}` with
 | --- | --- |
 | Main window | `WindowTitle`, `ContentPlaceholder` |
 | Menu | `MenuFile`, `MenuFileExit`, `MenuView`, `MenuViewVerboseLogging` |
-| Status bar | `StatusNotConnected` |
+| Connection row | `ConnectionPortLabel`, `ConnectionPortPlaceholder`, `ConnectionRefresh`, `ConnectionConnect`, `ConnectionDisconnect` |
+| Status bar | `StatusNotConnected`, `StatusConnecting`, `StatusPortUnavailable`, `StatusWaiting`, `StatusReceiving`, `StatusNotResponding`, `StatusOtherDevice`, `StatusSpectrometerFormat`, `StatusSpectrometerConnected`, `StatusSpectrometerNotConnected`, `StatusSpectrometerFailed`, `StatusSpectrometerNoData`, `StatusLostSpectraFormat`, `StatusNoValue`; the restored entry: `LinkRestoredTitle`, `LinkRestoredDetail` |
 | Message panel | `MessagePanelTitle`, `MessagePanelClear`, `MessagePanelRepeatFormat` |
-| `ErrorMessageMapper` | `FailureThrownTitle`, `FailureThrownDetail`, `FailureThrownRemedy`, `FailureUnknownTitle`, `FailureUnknownRemedy` |
+| `ErrorMessageMapper` | `FailureThrownTitle`, `FailureThrownDetail`, `FailureThrownRemedy`, `FailureUnknownTitle`, `FailureUnknownRemedy`; for each link error a `Title`, `Detail` and `Remedy` key: `PortBusy*`, `PortNotFound*`, `PortLost*`, `BoardNotResponding*`, `UnrecognisedData*`; for a failed port listing `PortListTitle`, `PortListDetail`, `PortListRemedy` |
+
+The device names `ATP-2000` and `ATP-8000` stay literals in code: they read the same in both sets.
 
 A message has three parts: the title names what failed in one short line, the detail names what the app observed, and
 the remedy names the action that fixes it. The remedy is empty when no action is owed.

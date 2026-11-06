@@ -23,13 +23,23 @@ public static class ResultReporting
 		finally
 		{
 			logger.Log(
-				coalesced ? LogLevel.Debug : LogLevel.Error,
+				coalesced ? LogLevel.Debug : ToLogLevel(view.Severity),
 				(error as IExceptionalError)?.Exception,
 				"{Title}. {Detail} {Remedy}",
 				view.Title,
 				view.Detail,
 				view.Remedy);
 		}
+	}
+
+	private static LogLevel ToLogLevel(MessageSeverity severity)
+	{
+		return severity switch
+		{
+			MessageSeverity.Error => LogLevel.Error,
+			MessageSeverity.Warning => LogLevel.Warning,
+			_ => LogLevel.Information
+		};
 	}
 
 	/// <summary>

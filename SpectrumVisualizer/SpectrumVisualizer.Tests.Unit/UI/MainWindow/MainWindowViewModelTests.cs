@@ -1,3 +1,4 @@
+using System.Reactive.Concurrency;
 using System.Reactive.Linq;
 
 using Avalonia.Headless.XUnit;
@@ -5,13 +6,16 @@ using Avalonia.Headless.XUnit;
 using AwesomeAssertions;
 
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using Serilog;
 using Serilog.Core;
 using Serilog.Events;
 using Serilog.Extensions.Logging;
 
+using SpectrumVisualizer.Tests.Unit.UI.Link;
 using SpectrumVisualizer.Tests.Unit.UI.Logging;
+using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Logging;
 using SpectrumVisualizer.UI.MainWindow;
 using SpectrumVisualizer.UI.Messages;
@@ -30,18 +34,35 @@ public sealed class MainWindowViewModelTests : IDisposable
 	private readonly Logger _serilogLogger;
 	private readonly SerilogLoggerFactory _loggerFactory;
 	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
+	private readonly SerialLink _serialLink;
+	private readonly ConnectionBarViewModel _connectionBar;
+	private readonly AppStatusBarViewModel _statusBar;
 	private readonly MainWindowViewModel _viewModel;
 
 	public MainWindowViewModelTests()
 	{
+		var portProvider = new FakeSerialPortProvider();
+		_serialLink = new SerialLink(portProvider, ImmediateScheduler.Instance, NullLogger<SerialLink>.Instance);
+		_connectionBar = new ConnectionBarViewModel(
+			portProvider,
+			_serialLink,
+			_messagePanel,
+			ImmediateScheduler.Instance,
+			NullLogger<ConnectionBarViewModel>.Instance);
 		_serilogLogger = new LoggerConfiguration()
 			.MinimumLevel.ControlledBy(_logLevelControl.Switch)
 			.WriteTo.Sink(_sink)
 			.CreateLogger();
 		_loggerFactory = new SerilogLoggerFactory(_serilogLogger);
+		_statusBar = new AppStatusBarViewModel(
+			_serialLink,
+			_messagePanel,
+			ImmediateScheduler.Instance,
+			NullLogger<AppStatusBarViewModel>.Instance);
 		_viewModel = new MainWindowViewModel(
 			_messagePanel,
-			new AppStatusBarViewModel(),
+			_connectionBar,
+			_statusBar,
 			_logLevelControl,
 			_loggerFactory.CreateLogger<MainWindowViewModel>());
 	}
@@ -129,6 +150,9 @@ public sealed class MainWindowViewModelTests : IDisposable
 	public void Dispose()
 	{
 		_viewModel.Dispose();
+		_connectionBar.Dispose();
+		_statusBar.Dispose();
+		_serialLink.Dispose();
 		_messagePanel.Dispose();
 		_loggerFactory.Dispose();
 		_serilogLogger.Dispose();

@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Logging.Testing;
 
+using SpectrumVisualizer.UI.Link;
 using SpectrumVisualizer.UI.Messages;
 
 using Xunit;
@@ -68,6 +69,18 @@ public sealed class ResultReportingTests : IDisposable
 
 		_panel.Entries.Should().HaveCount(2);
 		logger.Levels().Should().Equal(LogLevel.Error, LogLevel.Debug, LogLevel.Debug, LogLevel.Error);
+	}
+
+	[AvaloniaFact]
+	public void ReportFailureLogsAWarningErrorAtWarningAndItsRepeatAtDebug()
+	{
+		var logger = new FakeLogger();
+
+		_panel.ReportFailure(new PortLostError("COM3"), logger);
+		_panel.ReportFailure(new PortLostError("COM4"), logger);
+
+		_panel.Entries.Should().ContainSingle().Which.View.Severity.Should().Be(MessageSeverity.Warning);
+		logger.Levels().Should().Equal(LogLevel.Warning, LogLevel.Debug);
 	}
 
 	[AvaloniaFact]

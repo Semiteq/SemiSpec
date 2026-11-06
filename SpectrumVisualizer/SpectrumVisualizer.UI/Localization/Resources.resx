@@ -57,4 +57,118 @@
   <data name="FailureUnknownRemedy" xml:space="preserve">
     <value>Send the log file to the developer. It carries the full entry.</value>
   </data>
+  <data name="PortBusyTitle" xml:space="preserve">
+    <value>Port is busy</value>
+  </data>
+  <data name="PortBusyDetail" xml:space="preserve">
+    <value>Another program holds the port, or Windows denied access to it.</value>
+  </data>
+  <data name="PortBusyRemedy" xml:space="preserve">
+    <value>Close the program that uses the port, or press Disconnect and select another port.</value>
+  </data>
+  <data name="PortNotFoundTitle" xml:space="preserve">
+    <value>Port not found</value>
+  </data>
+  <data name="PortNotFoundDetail" xml:space="preserve">
+    <value>The selected port is not on this computer.</value>
+  </data>
+  <data name="PortNotFoundRemedy" xml:space="preserve">
+    <value>Check the cable and the adapter. The application retries every second; to pick another port, press Disconnect.</value>
+  </data>
+  <data name="PortListTitle" xml:space="preserve">
+    <value>Cannot list the ports</value>
+  </data>
+  <data name="PortListDetail" xml:space="preserve">
+    <value>Windows did not return the list of serial ports.</value>
+  </data>
+  <data name="PortListRemedy" xml:space="preserve">
+    <value>Press Refresh. If the list stays empty, check the adapter driver.</value>
+  </data>
+  <data name="PortLostTitle" xml:space="preserve">
+    <value>Connection lost</value>
+  </data>
+  <data name="PortLostDetail" xml:space="preserve">
+    <value>The port stopped answering or left the port list.</value>
+  </data>
+  <data name="PortLostRemedy" xml:space="preserve">
+    <value>Check the cable and the adapter. The application reopens the port every second. If the adapter came back under another port, press Disconnect, Refresh and choose it.</value>
+  </data>
+  <data name="BoardNotRespondingTitle" xml:space="preserve">
+    <value>Board not responding</value>
+  </data>
+  <data name="BoardNotRespondingDetail" xml:space="preserve">
+    <value>No data came from the board for 10 seconds.</value>
+  </data>
+  <data name="BoardNotRespondingRemedy" xml:space="preserve">
+    <value>Check the board's power and the cable.</value>
+  </data>
+  <data name="UnrecognisedDataTitle" xml:space="preserve">
+    <value>Unrecognised data</value>
+  </data>
+  <data name="UnrecognisedDataDetail" xml:space="preserve">
+    <value>Data arrives on the port, but no valid frame came for 10 seconds.</value>
+  </data>
+  <data name="UnrecognisedDataRemedy" xml:space="preserve">
+    <value>Check that the spectrometer board is connected to this port and sends at 115200 baud.</value>
+  </data>
+  <data name="LinkRestoredTitle" xml:space="preserve">
+    <value>Receiving data</value>
+  </data>
+  <data name="LinkRestoredDetail" xml:space="preserve">
+    <value>The board sends valid frames.</value>
+  </data>
+  <data name="ConnectionPortLabel" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="ConnectionPortPlaceholder" xml:space="preserve">
+    <value>No ports found</value>
+  </data>
+  <data name="ConnectionRefresh" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="ConnectionConnect" xml:space="preserve">
+    <value>Connect</value>
+  </data>
+  <data name="ConnectionDisconnect" xml:space="preserve">
+    <value>Disconnect</value>
+  </data>
+  <data name="StatusConnecting" xml:space="preserve">
+    <value>Connecting</value>
+  </data>
+  <data name="StatusPortUnavailable" xml:space="preserve">
+    <value>Port unavailable, retrying</value>
+  </data>
+  <data name="StatusWaiting" xml:space="preserve">
+    <value>Waiting for data</value>
+  </data>
+  <data name="StatusReceiving" xml:space="preserve">
+    <value>Receiving data</value>
+  </data>
+  <data name="StatusNotResponding" xml:space="preserve">
+    <value>Board not responding</value>
+  </data>
+  <data name="StatusOtherDevice" xml:space="preserve">
+    <value>Other device</value>
+  </data>
+  <data name="StatusSpectrometerFormat" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
+  <data name="StatusSpectrometerConnected" xml:space="preserve">
+    <value>connected</value>
+  </data>
+  <data name="StatusSpectrometerNotConnected" xml:space="preserve">
+    <value>not connected</value>
+  </data>
+  <data name="StatusSpectrometerFailed" xml:space="preserve">
+    <value>measurement failed</value>
+  </data>
+  <data name="StatusSpectrometerNoData" xml:space="preserve">
+    <value>no data</value>
+  </data>
+  <data name="StatusLostSpectraFormat" xml:space="preserve">
+    <value>Lost spectra: {0}</value>
+  </data>
+  <data name="StatusNoValue" xml:space="preserve">
+    <value>-</value>
+  </data>
 </root>

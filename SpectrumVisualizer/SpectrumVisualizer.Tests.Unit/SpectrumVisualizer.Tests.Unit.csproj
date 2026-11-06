@@ -29,6 +29,7 @@
   <ItemGroup>
     <ProjectReference Include="..\SpectrumVisualizer.Core\SpectrumVisualizer.Core.csproj"/>
     <ProjectReference Include="..\SpectrumVisualizer.UI\SpectrumVisualizer.UI.csproj"/>
+    <ProjectReference Include="..\SpectrumVisualizer.Tools.BoardEmulator\SpectrumVisualizer.Tools.BoardEmulator.csproj"/>
   </ItemGroup>
 
 </Project>

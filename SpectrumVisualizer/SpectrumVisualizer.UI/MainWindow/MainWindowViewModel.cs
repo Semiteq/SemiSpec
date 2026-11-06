@@ -22,11 +22,13 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 
 	public MainWindowViewModel(
 		MessagePanelViewModel messagePanel,
+		ConnectionBarViewModel connectionBar,
 		AppStatusBarViewModel statusBar,
 		LogLevelControl logLevelControl,
 		ILogger<MainWindowViewModel> logger)
 	{
 		MessagePanel = messagePanel;
+		ConnectionBar = connectionBar;
 		StatusBar = statusBar;
 		_logLevelControl = logLevelControl;
 		_logger = logger;
@@ -38,6 +40,8 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 
 	/// <summary>The process-wide panel, owned by the container and shown in the window's panel row.</summary>
 	public MessagePanelViewModel MessagePanel { get; }
+
+	public ConnectionBarViewModel ConnectionBar { get; }
 
 	public AppStatusBarViewModel StatusBar { get; }
 
