@@ -150,6 +150,21 @@ public sealed class SpectrumStoreWriteTests : SpectrumStoreTestBase
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
+	public async Task RetentionAtOpenEmptiesAFullyExpiredFile()
+	{
+		var now = StoreSamples.Start.AddHours(50);
+		WriteBeforeTheStart(
+			StoreSamples.Spectrum(now - TimeSpan.FromHours(50), seq: 1),
+			StoreSamples.Heartbeat(now - TimeSpan.FromHours(26), seq: 2),
+			StoreSamples.Spectrum(now - TimeSpan.FromHours(25), seq: 3));
+
+		await StartOpenedAsync(new RetentionClock(now));
+
+		Count("spectrum").Should().Be(0);
+		Count("heartbeat").Should().Be(0);
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
 	public async Task LegacyFilesAreDeletedAtOpen()
 	{
 		var legacy = Folder.FileIn("spectra-1234.db");

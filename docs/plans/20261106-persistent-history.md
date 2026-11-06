@@ -208,6 +208,10 @@ Automatable (baseline: the count at the `ui-redesign` merge commit, recorded in 
    5. Record both real times, the file size and the date. Expected: the fast path well under the row-wise one, since
       a `DELETE` without `WHERE` on a table without triggers takes SQLite's truncate optimisation and frees whole
       pages instead of visiting each row. A fast path that is not faster is a blocker with ⚠️.
+   6. Recorded 2026-11-06 on `persistent-history` (Task 2, over `7cf1765`), dev laptop, warm OS cache, file
+      799 457 280 bytes (762.4 MB), 172 800 spectra. The statements ran through Python's `sqlite3` module (SQLite
+      3.50.4) instead of the `sqlite3` CLI, one fresh copy per run, three rounds: row-wise 830.2, 965.1, 908.5 ms
+      (median 908.5 ms); fast path 77.9, 82.0, 75.4 ms (median 77.9 ms), about 11 times faster.
 9. Cold read of the start path (a reboot drops the OS file cache; the tool alone cannot measure cold):
    1. `dotnet run -c Release --project SemiSpec/SemiSpec.Tools.StoreBenchmark -- --rows 172800 --device 2000
       --churn-rounds 0 --folder C:\Temp\semispec-cold --keep`. `--churn-rounds 0` keeps every row in the past; the
@@ -414,10 +418,11 @@ file to the developer." / ru "Действий не требуется. Если
 - Modify: `SemiSpec/SemiSpec.Tests.Unit/Core/Store/SpectrumDatabaseTests.cs`
 - Modify: `SemiSpec/SemiSpec.Tests.Unit/UI/Store/SpectrumStoreWriteTests.cs`
 
-- [ ] `DeleteBefore`: read both maxima in the transaction; empty both tables when every row has expired
-- [ ] write the three `DeleteBefore` tests of Acceptance Evidence item 1 and `RetentionAtOpenEmptiesAFullyExpiredFile`
-- [ ] run Acceptance Evidence item 8 and record both timings in this plan
-- [ ] run `dotnet test SemiSpec.slnx` - must pass before next task
+- [x] `DeleteBefore`: read both maxima in the transaction; empty both tables when every row has expired
+- [x] write the three `DeleteBefore` tests of Acceptance Evidence item 1 and `RetentionAtOpenEmptiesAFullyExpiredFile`
+- [x] run Acceptance Evidence item 8 and record both timings in this plan (item 8.6: row-wise 908.5 ms, fast path
+  77.9 ms, medians)
+- [x] run `dotnet test SemiSpec.slnx` - must pass before next task (996 of 996)
 
 ### Task 3: Schema version
 **Files:**

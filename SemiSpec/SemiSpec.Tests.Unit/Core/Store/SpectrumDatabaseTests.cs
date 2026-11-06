@@ -161,6 +161,58 @@ public sealed class SpectrumDatabaseTests : IDisposable
 	}
 
 	[Fact]
+	public void DeleteBeforeACutoffPastEveryRowEmptiesBothTables()
+	{
+		var cutoff = StoreSamples.Start;
+		using var database = OpenDatabase();
+		database.Write(
+		[
+			StoreSamples.Spectrum(cutoff.AddHours(-2), seq: 1),
+			StoreSamples.Heartbeat(cutoff.AddHours(-1), seq: 2),
+			StoreSamples.Spectrum(cutoff.AddMilliseconds(-1), seq: 3),
+		]).IsSuccess.Should().BeTrue();
+
+		database.DeleteBefore(cutoff).IsSuccess.Should().BeTrue();
+
+		using var plain = OpenPlain();
+		Scalar(plain, "SELECT count(*) FROM spectrum").Should().Be(0L);
+		Scalar(plain, "SELECT count(*) FROM heartbeat").Should().Be(0L);
+	}
+
+	[Fact]
+	public void DeleteBeforeACutoffInsideTheRowsKeepsTheNewerRows()
+	{
+		var cutoff = StoreSamples.Start;
+		using var database = OpenDatabase();
+		database.Write(
+		[
+			StoreSamples.Spectrum(cutoff.AddHours(-2), seq: 1),
+			StoreSamples.Spectrum(cutoff.AddMilliseconds(-1), seq: 2),
+			StoreSamples.Heartbeat(cutoff.AddHours(-1), seq: 3),
+			StoreSamples.Heartbeat(cutoff, seq: 4),
+		]).IsSuccess.Should().BeTrue();
+
+		database.DeleteBefore(cutoff).IsSuccess.Should().BeTrue();
+
+		using var plain = OpenPlain();
+		Scalar(plain, "SELECT count(*) FROM spectrum").Should().Be(0L, "every spectrum is older than the cutoff");
+		Scalar(plain, "SELECT group_concat(seq) FROM heartbeat").Should().Be("4",
+			"one newer heartbeat keeps the row-wise delete for both tables");
+	}
+
+	[Fact]
+	public void DeleteBeforeOnAnEmptyFileSucceeds()
+	{
+		using var database = OpenDatabase();
+
+		database.DeleteBefore(StoreSamples.Start).IsSuccess.Should().BeTrue();
+
+		database.Write([StoreSamples.Spectrum(StoreSamples.Start)]).IsSuccess.Should().BeTrue();
+		using var plain = OpenPlain();
+		Scalar(plain, "SELECT count(*) FROM spectrum").Should().Be(1L);
+	}
+
+	[Fact]
 	public void CheckpointTruncatesTheWal()
 	{
 		using var database = OpenDatabase();

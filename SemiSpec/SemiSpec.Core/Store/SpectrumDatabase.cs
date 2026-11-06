@@ -44,9 +44,19 @@ public sealed class SpectrumDatabase : IDisposable
 		INSERT INTO heartbeat (received_at, seq, state) VALUES ($received_at, $seq, $state)
 		""";
 
+	private const string NewestReceivedAt = """
+		SELECT (SELECT max(received_at) FROM spectrum), (SELECT max(received_at) FROM heartbeat)
+		""";
+
 	private const string DeleteOlder = """
 		DELETE FROM spectrum WHERE received_at < $cutoff;
 		DELETE FROM heartbeat WHERE received_at < $cutoff;
+		""";
+
+	// A DELETE without WHERE on a table without triggers takes SQLite's truncate optimisation and frees whole pages.
+	private const string DeleteAll = """
+		DELETE FROM spectrum;
+		DELETE FROM heartbeat;
 		""";
 
 	// Microsoft.Data.Sqlite counts the busy timeout in whole seconds and waits forever on 0, so 1 s is the shortest.
@@ -126,16 +136,29 @@ public sealed class SpectrumDatabase : IDisposable
 		}
 	}
 
-	/// <summary>Deletes the spectra and heartbeats received before the cutoff, in one transaction.</summary>
+	/// <summary>
+	/// Deletes the spectra and heartbeats received before the cutoff in one transaction; empties both tables when every
+	/// row has expired.
+	/// </summary>
 	public Result DeleteBefore(DateTimeOffset cutoff)
 	{
 		try
 		{
+			var cutoffMs = cutoff.ToUnixTimeMilliseconds();
 			using var transaction = _connection.BeginTransaction(deferred: false);
 			using var command = _connection.CreateCommand();
 			command.Transaction = transaction;
-			command.CommandText = DeleteOlder;
-			command.Parameters.AddWithValue("$cutoff", cutoff.ToUnixTimeMilliseconds());
+			command.CommandText = NewestReceivedAt;
+			if (EveryRowIsBefore(command, cutoffMs))
+			{
+				command.CommandText = DeleteAll;
+			}
+			else
+			{
+				command.CommandText = DeleteOlder;
+				command.Parameters.AddWithValue("$cutoff", cutoffMs);
+			}
+
 			command.ExecuteNonQuery();
 			transaction.Commit();
 			return Result.Ok();
@@ -209,6 +232,18 @@ public sealed class SpectrumDatabase : IDisposable
 		parameters["$seq"].Value = received.Frame.Seq;
 		parameters["$state"].Value = (byte)received.Frame.State;
 		_insertHeartbeat.ExecuteNonQuery();
+	}
+
+	private static bool EveryRowIsBefore(SqliteCommand newestReceivedAt, long cutoffMs)
+	{
+		using var reader = newestReceivedAt.ExecuteReader();
+		reader.Read();
+		return IsEmptyOrBefore(reader, 0, cutoffMs) && IsEmptyOrBefore(reader, 1, cutoffMs);
+	}
+
+	private static bool IsEmptyOrBefore(SqliteDataReader newest, int table, long cutoffMs)
+	{
+		return newest.IsDBNull(table) || newest.GetInt64(table) < cutoffMs;
 	}
 
 	private static object NullForNaN(float value)
