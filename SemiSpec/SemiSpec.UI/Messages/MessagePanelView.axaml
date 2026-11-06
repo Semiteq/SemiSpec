@@ -106,7 +106,7 @@
                                             <Ellipse Grid.Column="0"
                                                      Width="8"
                                                      Height="8"
-                                                     Margin="0,6,8,0"
+                                                     Margin="0,4,8,0"
                                                      VerticalAlignment="Top"
                                                      Classes.severity-error="{Binding View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Error}}"
                                                      Classes.severity-warning="{Binding View.Severity, Converter={x:Static ObjectConverters.Equal}, ConverterParameter={x:Static messages:MessageSeverity.Warning}}"
