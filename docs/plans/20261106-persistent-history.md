@@ -512,14 +512,18 @@ file to the developer." / ru "Действий не требуется. Если
 - Modify: `SemiSpec/SemiSpec.Tests.Unit/Core/Trend/FrameContinuityTests.cs`, `IntensityCacheHistoryTests.cs`
 - Create: `SemiSpec/SemiSpec.Tests.Unit/Core/Trend/IntensityCacheGapTests.cs`
 
-- [ ] remove `_lastSpectrumAt` and `NoSpectra` from `FrameContinuity` and `Continuity`; `TrendTimeline.Observe`
+- [x] remove `_lastSpectrumAt` and `NoSpectra` from `FrameContinuity` and `Continuity`; `TrendTimeline.Observe`
   inserts Loss breaks and failure marks only
-- [ ] `TrendTimeline.Fold` adds a NoSpectra break for each point in range more than `SilenceLimit` after its
+- [x] `TrendTimeline.Fold` adds a NoSpectra break for each point in range more than `SilenceLimit` after its
   predecessor
-- [ ] write `IntensityCacheGapTests` of Acceptance Evidence item 2, `UncoveredPointsCountAsSpectraForTheGapRule`
+- [x] write `IntensityCacheGapTests` of Acceptance Evidence item 2, `UncoveredPointsCountAsSpectraForTheGapRule`
   included; move the NoSpectra cases out of `FrameContinuityTests`; keep the store-equality test on gap-free rows
-- [ ] run `dotnet test SemiSpec.slnx` - must pass before next task; the readout and chart tests that count
-  `NoSpectraCount` must pass unchanged
+- [x] run `dotnet test SemiSpec.slnx` - must pass before next task; the readout and chart tests that count
+  `NoSpectraCount` must pass unchanged (1031 of 1031)
+- ➕ `IntensityCacheHistoryTests` stays unchanged: `MixedFrames` skips one second in eleven, so its widest gap is
+  2 s and the store-equality test already runs on gap-free rows. The gap tests land stored chunks at generation 0,
+  the generation before any key change. `FrameContinuityTests` renames the two silence cases to
+  `AGapOverTenSecondsWithoutAnyFrameIgnoresTheSeqStep` and `HeartbeatsOnlyForOverTenSecondsKeepTheSeqSession`.
 
 ### Task 8: Trend start read
 **Files:**
