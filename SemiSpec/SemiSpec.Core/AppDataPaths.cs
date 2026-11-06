@@ -2,8 +2,11 @@ using FluentResults;
 
 namespace SemiSpec.Core;
 
-/// <summary>Folders the application owns under the per-user local application data root.</summary>
-public sealed record AppDataPaths(string LogFolder, string StoreFolder)
+/// <summary>
+/// Folders the application owns under the per-user local application data root: the store, and the log folder used
+/// when the site log folder cannot be written.
+/// </summary>
+public sealed record AppDataPaths(string FallbackLogFolder, string StoreFolder)
 {
 	private const string AppFolderName = "SemiSpec";
 	private const string LogFolderName = "Logs";

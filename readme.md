@@ -47,4 +47,4 @@ SemiSpec показывает спектр с платы спектрометр�
 Установщик `SemiSpecInstaller.exe` находится на странице
 [Releases](https://github.com/Semiteq/SemiSpec/releases/latest).
 
-Журнал программы лежит в папке `%LOCALAPPDATA%\SemiSpec\Logs`.
+Журнал программы лежит в папке `C:\DISTR\Logs\SemiSpec`.

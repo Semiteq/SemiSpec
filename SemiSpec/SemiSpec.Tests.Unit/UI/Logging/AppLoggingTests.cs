@@ -48,6 +48,67 @@ public sealed class AppLoggingTests : IDisposable
 	}
 
 	[Fact]
+	public void AWritableSiteFolderTakesTheLog()
+	{
+		var site = Path.Combine(_root, "site");
+		var fallback = Path.Combine(_root, "fallback");
+
+		var setup = AppLogging.Create(site, fallback, _ => true).Value;
+		setup.Logger.Information("on-site");
+		setup.Logger.Dispose();
+
+		setup.Folder.Should().Be(site);
+		File.ReadAllText(Path.Combine(site, AppLogging.LogFileName)).Should().Contain("on-site");
+		Directory.Exists(fallback).Should().BeFalse();
+	}
+
+	[Fact]
+	public void AnUnwritableSiteFolderFallsBackWithAWarningThatNamesBothFolders()
+	{
+		var site = Path.Combine(_root, "site");
+		var fallback = Path.Combine(_root, "fallback");
+		var checkedFolders = new List<string>();
+
+		var setup = AppLogging.Create(
+			site,
+			fallback,
+			folder =>
+			{
+				checkedFolders.Add(folder);
+				return false;
+			}).Value;
+		setup.Logger.Dispose();
+
+		checkedFolders.Should().Equal(site);
+		setup.Folder.Should().Be(fallback);
+		var line = File.ReadAllLines(Path.Combine(fallback, AppLogging.LogFileName)).Single();
+		line.Should().Contain("[WRN]").And.Contain(site).And.Contain(fallback);
+	}
+
+	[Fact]
+	public void TheWriteCheckPassesForACreatableFolderAndKeepsTheFileOpenToTheSink()
+	{
+		var folder = Path.Combine(_root, "nested", "Logs");
+		var setup = AppLogging.Create(folder).Value;
+		setup.Logger.Information("held-open");
+
+		var canWrite = AppLogging.CanWrite(folder);
+		setup.Logger.Dispose();
+
+		canWrite.Should().BeTrue("the check shares the file the way the running sink does");
+	}
+
+	[Fact]
+	public void TheWriteCheckFailsWhereAFileBlocksTheFolder()
+	{
+		Directory.CreateDirectory(_root);
+		var fileInTheWay = Path.Combine(_root, "occupied");
+		File.WriteAllText(fileInTheWay, string.Empty);
+
+		AppLogging.CanWrite(fileInTheWay).Should().BeFalse();
+	}
+
+	[Fact]
 	public void ALogFolderThatCannotBeCreatedFails()
 	{
 		Directory.CreateDirectory(_root);

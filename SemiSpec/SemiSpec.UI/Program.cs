@@ -24,7 +24,7 @@ public static class Program
 			return FailedExitCode;
 		}
 
-		var logging = AppLogging.Create(paths.Value.LogFolder);
+		var logging = AppLogging.Create(AppLogging.SiteLogFolder, paths.Value.FallbackLogFolder, AppLogging.CanWrite);
 
 		if (logging.IsFailed)
 		{
@@ -35,7 +35,7 @@ public static class Program
 
 		try
 		{
-			Log.Information("SemiSpec starting; log folder {LogFolder}", paths.Value.LogFolder);
+			Log.Information("SemiSpec starting; log folder {LogFolder}", logging.Value.Folder);
 
 			using var serviceProvider = new ServiceCollection()
 				.AddUi(logging.Value, paths.Value)

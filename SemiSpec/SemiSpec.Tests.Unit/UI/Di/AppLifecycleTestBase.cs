@@ -42,7 +42,7 @@ public abstract class AppLifecycleTestBase : IAsyncDisposable
 			.MinimumLevel.ControlledBy(logLevelControl.Switch)
 			.WriteTo.Sink(_sink)
 			.CreateLogger();
-		_logging = new LoggingSetup(logger, logLevelControl);
+		_logging = new LoggingSetup(logger, logLevelControl, _root.Root);
 		_paths = AppDataPaths.Under(_root.Root).Value;
 	}
 

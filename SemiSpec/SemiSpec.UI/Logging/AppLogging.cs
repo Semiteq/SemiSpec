@@ -7,12 +7,15 @@ using Serilog.Core;
 
 namespace SemiSpec.UI.Logging;
 
-/// <summary>The application logger together with the control that changes its level at run time.</summary>
-public sealed record LoggingSetup(Logger Logger, LogLevelControl LevelControl);
+/// <summary>The application logger, the control that changes its level at run time, and the folder it writes.</summary>
+public sealed record LoggingSetup(Logger Logger, LogLevelControl LevelControl, string Folder);
 
 public static class AppLogging
 {
 	public const string LogFileName = "semispec.log";
+
+	/// <summary>The log folder of every Semi application on an operator PC; the installer creates it.</summary>
+	public const string SiteLogFolder = @"C:\DISTR\Logs\SemiSpec";
 
 	private const string ProcessIdProperty = "ProcessId";
 	private const string Template =
@@ -20,6 +23,49 @@ public static class AppLogging
 		+ "{SourceContext}: {Message:lj}{NewLine}{Exception}";
 	private const long LogFileSizeLimitBytes = 5 * 1024 * 1024;
 	private const int RetainedFileCount = 5;
+
+	/// <summary>
+	/// Logs to the site folder when the check can write there, else to the fallback folder with a Warning that names
+	/// both.
+	/// </summary>
+	public static Result<LoggingSetup> Create(string siteFolder, string fallbackFolder, Func<string, bool> canWrite)
+	{
+		if (canWrite(siteFolder))
+		{
+			return Create(siteFolder);
+		}
+
+		var setup = Create(fallbackFolder);
+		if (setup.IsSuccess)
+		{
+			setup.Value.Logger.Warning(
+				"The log folder {SiteFolder} cannot be created or written; logging to {FallbackFolder}",
+				siteFolder,
+				fallbackFolder);
+		}
+
+		return setup;
+	}
+
+	/// <summary>Creates the folder and opens the log file for append with the sharing the shared file sink uses.</summary>
+	public static bool CanWrite(string folder)
+	{
+		try
+		{
+			Directory.CreateDirectory(folder);
+			using var probe = new FileStream(
+				Path.Combine(folder, LogFileName),
+				FileMode.Append,
+				FileAccess.Write,
+				FileShare.ReadWrite | FileShare.Delete);
+
+			return true;
+		}
+		catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+		{
+			return false;
+		}
+	}
 
 	public static Result<LoggingSetup> Create(string logFolder)
 	{
@@ -49,6 +95,6 @@ public static class AppLogging
 				formatProvider: CultureInfo.InvariantCulture)
 			.CreateLogger();
 
-		return new LoggingSetup(logger, levelControl);
+		return new LoggingSetup(logger, levelControl, logFolder);
 	}
 }
