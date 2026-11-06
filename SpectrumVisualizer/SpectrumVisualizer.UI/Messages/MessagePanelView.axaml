@@ -1,0 +1,85 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:messages="clr-namespace:SpectrumVisualizer.UI.Messages"
+             xmlns:text="clr-namespace:SpectrumVisualizer.UI.Localization"
+             mc:Ignorable="d"
+             d:DesignWidth="1280"
+             d:DesignHeight="160"
+             x:Class="SpectrumVisualizer.UI.Messages.MessagePanelView"
+             x:DataType="messages:MessagePanelViewModel">
+
+    <DockPanel LastChildFill="True">
+
+        <StackPanel DockPanel.Dock="Top"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    Margin="0,0,0,4">
+
+            <TextBlock Text="{x:Static text:Resources.MessagePanelTitle}"
+                       FontWeight="Bold"
+                       VerticalAlignment="Center" />
+
+            <Button Name="ClearMessages"
+                    Content="{x:Static text:Resources.MessagePanelClear}"
+                    Command="{Binding ClearCommand}" />
+
+        </StackPanel>
+
+        <ScrollViewer MaxHeight="140"
+                      HorizontalScrollBarVisibility="Disabled">
+            <ItemsControl Name="MessageEntries"
+                          ItemsSource="{Binding Entries}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="messages:MessageEntry">
+                        <Grid ColumnDefinitions="Auto,Auto,*"
+                              Margin="0,4">
+
+                            <Ellipse Grid.Column="0"
+                                     Width="8"
+                                     Height="8"
+                                     Margin="0,4,8,0"
+                                     VerticalAlignment="Top"
+                                     Fill="{DynamicResource AppSeverityErrorBrush}" />
+
+                            <TextBlock Grid.Column="1"
+                                       Name="EntryTime"
+                                       Text="{Binding LastSeen, StringFormat={}{0:HH:mm:ss}}"
+                                       Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                                       Margin="0,0,8,0"
+                                       VerticalAlignment="Top" />
+
+                            <StackPanel Grid.Column="2">
+                                <TextBlock Name="EntryTitle"
+                                           Text="{Binding View.Title}"
+                                           FontWeight="Bold"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Name="EntryRepeat"
+                                           Text="{Binding RepeatCount, StringFormat={x:Static text:Resources.MessagePanelRepeatFormat}}"
+                                           IsVisible="{Binding HasRepeated}"
+                                           Foreground="{DynamicResource AppSecondaryForegroundBrush}" />
+                                <TextBlock Name="EntryDetail"
+                                           Text="{Binding View.Detail}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Name="EntryRemedy"
+                                           Text="{Binding View.Remedy}"
+                                           IsVisible="{Binding View.Remedy, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                           Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+
+                        </Grid>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+    </DockPanel>
+
+</UserControl>

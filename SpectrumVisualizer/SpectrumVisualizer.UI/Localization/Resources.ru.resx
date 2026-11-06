@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="WindowTitle" xml:space="preserve">
+    <value>Spectrum Visualizer — просмотр спектра</value>
+  </data>
+  <data name="MenuFile" xml:space="preserve">
+    <value>Файл</value>
+  </data>
+  <data name="MenuFileExit" xml:space="preserve">
+    <value>Выход</value>
+  </data>
+  <data name="MenuView" xml:space="preserve">
+    <value>Вид</value>
+  </data>
+  <data name="MenuViewVerboseLogging" xml:space="preserve">
+    <value>Подробный журнал</value>
+  </data>
+  <data name="ContentPlaceholder" xml:space="preserve">
+    <value>Спектр появится здесь после подключения устройства</value>
+  </data>
+  <data name="StatusNotConnected" xml:space="preserve">
+    <value>Не подключено</value>
+  </data>
+  <data name="MessagePanelTitle" xml:space="preserve">
+    <value>Сообщения</value>
+  </data>
+  <data name="MessagePanelClear" xml:space="preserve">
+    <value>Очистить</value>
+  </data>
+  <data name="MessagePanelRepeatFormat" xml:space="preserve">
+    <value>повторений: {0}</value>
+  </data>
+  <data name="FailureThrownTitle" xml:space="preserve">
+    <value>Непредвиденная ошибка</value>
+  </data>
+  <data name="FailureThrownDetail" xml:space="preserve">
+    <value>Программа сообщила об ошибке {0}: {1}</value>
+  </data>
+  <data name="FailureThrownRemedy" xml:space="preserve">
+    <value>Перезапустите программу. Если ошибка повторится, передайте файл журнала разработчику.</value>
+  </data>
+  <data name="FailureUnknownTitle" xml:space="preserve">
+    <value>Операция не выполнена</value>
+  </data>
+  <data name="FailureUnknownRemedy" xml:space="preserve">
+    <value>Передайте файл журнала разработчику: в нём записаны подробности.</value>
+  </data>
+</root>

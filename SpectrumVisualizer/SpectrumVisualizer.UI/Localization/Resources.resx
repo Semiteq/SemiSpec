@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="WindowTitle" xml:space="preserve">
+    <value>Spectrum Visualizer</value>
+  </data>
+  <data name="MenuFile" xml:space="preserve">
+    <value>File</value>
+  </data>
+  <data name="MenuFileExit" xml:space="preserve">
+    <value>Exit</value>
+  </data>
+  <data name="MenuView" xml:space="preserve">
+    <value>View</value>
+  </data>
+  <data name="MenuViewVerboseLogging" xml:space="preserve">
+    <value>Verbose logging</value>
+  </data>
+  <data name="ContentPlaceholder" xml:space="preserve">
+    <value>The spectrum appears here after a device connects</value>
+  </data>
+  <data name="StatusNotConnected" xml:space="preserve">
+    <value>Not connected</value>
+  </data>
+  <data name="MessagePanelTitle" xml:space="preserve">
+    <value>Messages</value>
+  </data>
+  <data name="MessagePanelClear" xml:space="preserve">
+    <value>Clear</value>
+  </data>
+  <data name="MessagePanelRepeatFormat" xml:space="preserve">
+    <value>repeated {0} times</value>
+  </data>
+  <data name="FailureThrownTitle" xml:space="preserve">
+    <value>Unexpected failure</value>
+  </data>
+  <data name="FailureThrownDetail" xml:space="preserve">
+    <value>The application reported {0}: {1}</value>
+  </data>
+  <data name="FailureThrownRemedy" xml:space="preserve">
+    <value>Restart the application. If the failure repeats, send the log file to the developer.</value>
+  </data>
+  <data name="FailureUnknownTitle" xml:space="preserve">
+    <value>Operation failed</value>
+  </data>
+  <data name="FailureUnknownRemedy" xml:space="preserve">
+    <value>Send the log file to the developer. It carries the full entry.</value>
+  </data>
+</root>
