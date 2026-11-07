@@ -3,14 +3,16 @@
 ## Overview
 - Run one copy of SemiSpec per Windows session. A second launch asks the first copy to restore and activate its
   main window, then exits without a window, a port or a store.
-- A first copy that does not answer within 2 s, after one retry, gets a message box in the second copy: "SemiSpec
+- A first copy that does not answer within 2 s, in rounds of re-claims for up to 10 s (➕ review fix, replaces "after
+  one retry"), gets a message box in the second copy: "SemiSpec
   уже запущена, но не отвечает. Закройте её в диспетчере задач и запустите снова" (resx, en and ru); the second copy
   exits. The second copy logs one line.
 - A copy whose close has started stops answering and gives up the claim, so a relaunch during the close starts a
   new copy.
 - Why one copy is enough: the board has one data source, one COM port, and the history file of
   `20261106-persistent-history.md` takes one writer.
-- Scope guard: no UI layout change, no new setting, no change to the store, the link or the trend.
+- Scope guard: no UI layout change, no new setting, no change to the store, the link or the trend. ⚠️ The review
+  fixes widen it by one store change: the open retries a held history file (Task 4, Review fixes).
 
 ## Context (from discovery)
 - Verified 2026-11-06 at `261335e` (master): `dotnet test SemiSpec.slnx` passes 944 of 944.
@@ -88,13 +90,16 @@ Manual smoke checklist (com0com pair `COM10`-`COM11`, emulator on `COM10`, app o
 3. Launch three copies within one second (select `SemiSpec.exe` three times in Explorer and press Enter, or
    `1..3 | % { Start-Process SemiSpec.exe }`): one window, no message box; the log has two second-copy lines.
 4. Suspend the first copy in Resource Monitor (CPU tab, right-click, Suspend Process), launch a second copy: after
-   about 4 s (2 s and one retry) a message box shows the not-responding text in the Windows UI language; the
-   second process exits with code 1. Resume the first copy.
+   about 10 s (the re-claim budget) a message box shows the not-responding text in the Windows UI language. With
+   the box still up, end the first copy in Task Manager and start SemiSpec: a window opens. Close the box: the
+   second process exits with code 1.
 5. With `emu --port COM10 --rate 1` running, Connect, close the window and launch SemiSpec again within 2 s: a new
    window appears. Press Connect in it: the status shows the port unavailable until the closing copy releases
    `COM11`, then it receives; the log of the new copy shows the reopen attempts one second apart.
 6. Note the log timestamps of "SemiSpec starting" and of the first listener line in step 1: the difference is the
    margin behind the 2 s ASSUMPTION on the start-up.
+7. Cold start: after a reboot, with no SemiSpec running, double-click `SemiSpec.exe` twice within one second: one
+   window opens and no message box shows.
 
 ## Progress Tracking
 - mark completed items with `[x]` immediately when done
@@ -126,7 +131,8 @@ Manual smoke checklist (com0com pair `COM10`-`COM11`, emulator on `COM10`, app o
   into one signal of the auto-reset ask event, one secondary's reset can clear the other's answer, and one answer
   releases one waiter. So a secondary without an answer asks once more and waits 2 s again before it shows the
   message box. A hung primary therefore shows the message after about 4 s. More secondaries at the same instant
-  than a retry absorbs is not a case an operator produces; smoke step 3 checks three.
+  than a retry absorbs is not a case an operator produces; smoke step 3 checks three. ⚠️ Superseded by the re-claim
+  rounds of Task 4, Review fixes: the message shows after about 10 s.
 - **Listening starts in `AfterSetup`.** `Dispatcher.UIThread` exists only there, so `App.Run` takes the claim and
   starts `Listen` after `Configure`; this subscription lives until the close begins, which the release below
   declares in code. An ask that arrives earlier stays set and runs once the listener starts. ASSUMPTION: the primary
@@ -231,17 +237,30 @@ Members:
   `Store/`, `Link/` or `Trend/`): `git diff --stat 2e2714b..HEAD` lists only `Instance/`, `App.axaml.cs`,
   `Program.cs`, both resx files, `Di/` test helpers and this plan; a secondary returns before `AddUi`
 - [x] run Acceptance Evidence items 1 to 4; record the final count (2026-11-07):
-  1. `--filter "Area=Instance"`: 17 of 17 pass (`SingleInstanceTests` 10, `SecondLaunchTests` 5,
-     `AppInstanceTests` 2)
+  1. `--filter "Area=Instance"`: 20 of 20 pass, five runs in a row (`SingleInstanceTests` 11, `SecondLaunchTests`
+     7, `AppInstanceTests` 2), after the review fixes
   2. `--filter "Area=Resources"`: 9 of 9 pass; the parity test covers `SingleInstanceNotResponding`
-  3. `dotnet test SemiSpec.slnx`: 1062 of 1062 pass, none skipped (base 1045)
+  3. `dotnet test SemiSpec.slnx`: 1067 of 1067 pass, none skipped (base 1045), after the review fixes
   4. `dotnet build SemiSpec.slnx -c Release --no-incremental`: 0 warnings; `dotnet format --verify-no-changes` and
      `dotnet terse` over every touched `.cs` file exit 0
 - [x] verify edge cases: a claim that throws runs as primary with one Warning
   (`AClaimTheOsRefusesRunsAsAPrimaryWithOneWarning`, added here); a second launch during the primary's close starts
   a new copy (`AppInstanceTests.ALaunchDuringTheCloseClaimsTheNameAsANewPrimary`)
-- [x] manual smoke checklist steps 1 to 6 (manual, for the owner: Win32 activation, the foreground rule and the
-  start-up margin need the operator PC)
+- [x] manual smoke checklist steps 1 to 7: not run here; for the owner on the operator PC (Win32 activation, the
+  foreground rule, the start-up margin and the cold start need that machine)
+- [x] ➕ Review fixes (second-model review, decisions settled by the coordinator):
+  - the secondary disposes its claim after every unanswered ask, so no handle is open while the message shows
+    (`TheMessageShowsWithEveryHandleOfTheLaunchClosed`, which fails when the dispose is removed;
+    `AClaimAfterThePrimaryAndTheSecondaryReleasedIsPrimary`, `AClaimWhileASecondaryStillHoldsTheNameIsSecondary`)
+  - re-claim rounds of 2 s within a 10 s budget replace the one retry; a free name continues the start-up as the
+    primary (`SecondLaunchOutcome`, `ANameFreedAfterAnUnansweredAskContinuesAsThePrimary`,
+    `AnAnswerInALaterRoundExitsWithZero`, `NoAnswerWithinTheBudgetShowsTheNotRespondingTextAndExitsWithOne`)
+  - `StoreOpening` retries an open that fails with `SQLITE_BUSY` or `SQLITE_LOCKED` every 0.5 s for 6 s from the
+    start of the open, never setting the file aside (`SpectrumStoreBusyOpenTests`; its open-after-release case fails
+    with the retry budget set to 0)
+  - test fixes: the close test starts the listener; the stale-answer test uses an `EventLoopScheduler` with a
+    semaphore instead of a `TestScheduler` driven from two threads; the concurrent test is
+    `TwoSecondLaunchesAtOnceBothGetAnAnswerByTheSecondRound` with a budget of two rounds
 
 ### Task 5: [Final] Update documentation
 - [x] `docs/architecture/overview.md`, Startup: the claim, the second launch, the listener in `AfterSetup`, the

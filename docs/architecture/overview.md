@@ -120,7 +120,7 @@ the trend's folds and re-reads.
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
 | `AddUi(LoggingSetup, AppDataPaths)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` `spectra.db` under the store folder, `SpectrumStore`, `SpectrumHistory` over the `StoreFile`, `IntensityCache`, `LiveSpectrumSource`, `SwitchingSpectrumSource` over it, the message panel, the connection row, the status bar, the spectrum view model, `TrendChartViewModel`, `OverviewViewModel`, `TrendFeed` built over `SpectrumHistory.IntensityPointsAsync`, `SpectrumAtAsync` and `SpectrumStore.Opened` with `DefaultScheduler.Instance` for its throttle, `TrendViewModel` and the main window view model, all singletons |
 | `SingleInstance` | UI | The claim on one copy per Windows session: a named mutex in `Local\`, the ask and answer events through which a second launch has the first copy activate its window, the listener that runs the activation on the UI scheduler and answers, and the release (`UI/Instance/`) |
-| `SecondLaunch`, `NativeMethods` | UI | What a launch that finds a running copy does: asks it twice with a 2 s limit, logs one line, shows the not-responding message box when neither ask is answered, and returns the exit code; `NativeMethods` holds the three `user32.dll` calls `MessageBoxW`, `AllowSetForegroundWindow` and `ShowWindow` (`UI/Instance/`) |
+| `SecondLaunch`, `NativeMethods` | UI | What a launch that finds a running copy does: asks it in rounds of 2 s for up to 10 s, closes its claim after each ask and claims the name again, logs one line, and returns an exit code, or the new claim when the name became free; with no answer in the budget it shows the not-responding message box with no handle open; `NativeMethods` holds the three `user32.dll` calls `MessageBoxW`, `AllowSetForegroundWindow` and `ShowWindow` (`UI/Instance/`) |
 | `Program` | UI | Entry point: paths, logging, the single-instance claim and the second launch, container, `App.Run` with the logger for unhandled exceptions and the claim |
 | `App` | UI | Builds the Avalonia app with the exception handler, subscribes dispatcher exceptions, sets Semi's control strings to the UI culture, starts the single-instance listener, creates the main window from the container, refreshes the port list and starts the spectrum store, the trend feed and then the frame distributor when the window opens, and at the first close releases the claim and stops the link, the distributor, the trend feed and the store, in that order, before it closes |
 | `MainWindowViewModel` | UI | Exit request, the verbose-logging command, and the panel, connection row, status bar, spectrum and trend view models; it disposes none of them, the container owns them |
@@ -150,8 +150,9 @@ benchmark references Core only, so it times the same cache and plan the app runs
 2. `AppLogging.Create` picks the log folder and creates the logger there; `Program.Main` sets `Log.Logger` to it
    (Log folder, below).
 3. `SingleInstance.Claim` claims the copy's name (Single instance, below). A second copy calls
-   `AllowSetForegroundWindow` and returns the exit code of `SecondLaunch.Run`, so it builds no container and opens no
-   window, port or store. The first copy names the log folder in its Information line "SemiSpec starting".
+   `AllowSetForegroundWindow` and runs `SecondLaunch.Run`. It returns that exit code, so it builds no container and
+   opens no window, port or store, or it continues as the primary when the name became free. The primary names the
+   log folder in its Information line "SemiSpec starting".
 4. `AddUi` builds the service provider with the paths; the store's history file is named here, and nothing touches
    the store folder until the window opens.
 5. `App.Run` receives a logger from the container's `ILoggerFactory`, which writes to that logger, and the claim; it
@@ -242,21 +243,31 @@ because `SW_RESTORE` would un-maximise it. Then `Window.Activate()` brings it to
 foreground process hand the foreground on, so the secondary, the just-launched process, calls
 `AllowSetForegroundWindow(ASFW_ANY)` before it asks.
 
-`SecondLaunch.Run` resets the answer, sets the ask and waits 2 s on the answer; the reset means a late answer to an
-earlier launch cannot answer this one. Two launches at once can lose an answer: their asks may join into one signal,
-one launch's reset can clear the other's answer, and one answer releases one waiter. So a launch without an answer
-asks once more. An answer logs one Information line and exits with code 0. No answer to either ask logs one Warning,
-shows `SingleInstanceNotResponding` in a Win32 `MessageBoxW` with the caption `SemiSpec`, since no Avalonia window
-opens, and exits with code 1; a hung primary therefore shows the message after about 4 s. The three `user32.dll` calls
+`SecondLaunch.Run` works in rounds within a 10 s budget. Each round resets the answer, sets the ask and waits 2 s on the
+answer; the reset means a late answer to an earlier launch cannot answer this one. After every ask the launch disposes
+its claim, the mutex and both events. An answer logs one Information line and exits with code 0. Without an answer the
+launch claims the name again: a free name means the first copy closed or died, so the launch logs one Information line
+and `Program.Main` continues the normal start-up as the primary with that claim; a held name starts the next round.
+The rounds cover three cases: a first copy on a cold start that has not reached `AfterSetup` yet, a first copy whose
+close has begun, and two launches at once that lose an answer, because their asks may join into one signal, one
+launch's reset can clear the other's answer, and one answer releases one waiter. When the budget runs out the launch
+logs one Warning, shows `SingleInstanceNotResponding` in a Win32 `MessageBoxW` with the caption `SemiSpec`, since no
+Avalonia window opens, and exits with code 1; a hung primary therefore shows the message after about 10 s. The launch
+holds no handle while the message is up: the claim is the existence of a handle, so a held handle would keep the name
+taken after the operator kills the hung copy, and the restart the message asks for would fail again. The three
+`user32.dll` calls
 are classic `DllImport` declarations in `NativeMethods` with an explicit `CharSet` and
 `DefaultDllImportSearchPaths(System32)`; `LibraryImport` would need `AllowUnsafeBlocks` for the string parameter.
 
 The first `Closing` that starts the stop calls `SingleInstance.Release()` first: it unregisters the listener and
 disposes both events and the mutex handle, so a launch from then on claims the name as a new primary instead of
-activating a window that is about to close. The closing copy may hold the port for up to the 5 s stop limit; Connect in
-the new copy fails with `PortBusyError` and the link reopens the port every second until the old copy releases it. The
-two copies also share `spectra.db` for those seconds: SQLite serialises their writes, and the old copy's closing
-checkpoint may return Busy, which it logs. `Release` is idempotent; `Program` disposes the claim again at exit.
+activating a window that is about to close. The release comes before the stop, not after it, because until the release
+the listener still answers: a launch during the stop would activate the closing window, exit with code 0 and leave the
+operator without a running copy. The cost is an overlap of up to the 5 s stop limit. The closing copy may hold the
+port for that long; Connect in the new copy fails with `PortBusyError` and the link reopens the port every second until
+the old copy releases it. The new copy's store open may meet `spectra.db` held by the old copy's last batch or closing
+checkpoint; the open retries (Spectrum store, Files). `Release` is idempotent; `Program` disposes the claim again at
+exit.
 
 ## Main window
 
@@ -938,6 +949,12 @@ legacy files deleted, which the writer logs at Information when it is not 0. The
 the first it finds nothing.
 
 A clean exit checkpoints and closes the file. A crash leaves the WAL, which SQLite replays at the next open.
+
+The open may meet the file held by another connection: a copy of the app whose close has begun keeps it for up to its
+5 s close limit (Startup, Single instance). Each open attempt waits out the 2 s busy timeout. An attempt that then fails
+with `SQLITE_BUSY` (5) or `SQLITE_LOCKED` (6) is retried every 0.5 s for 4 s after the first failure, 6 s from the
+start of the open, and then fails as any other open failure does. `StoreOpening` never sets aside or deletes a held
+file. The stop's drain token ends the retries early.
 
 A damaged file is set aside, never repaired. `StoreDamage.IsDamage` is true for a `SqliteException` with code 11
 (`SQLITE_CORRUPT`) or 26 (`SQLITE_NOTADB`) anywhere in the cause chain; any other failure (a held lock, a file that
