@@ -220,10 +220,11 @@ Members:
 - Modify: `SemiSpec/SemiSpec.UI/App.axaml.cs`, `SemiSpec/SemiSpec.UI/Program.cs`
 - Modify: `SemiSpec/SemiSpec.Tests.Unit/UI/Instance/SingleInstanceTests.cs`
 
-- [ ] `App.Run` takes the claim and starts `Listen` in `AfterSetup` with `ActivateMainWindow` on the UI scheduler
-- [ ] `OnMainWindowClosing` releases the claim before it starts the stop
-- [ ] write `AReleasedPrimaryNoLongerAnswers` and `ReleaseTwiceIsANoOp` if Task 1 did not cover them
-- [ ] run `dotnet test SemiSpec.slnx` - must pass before next task
+- [x] `App.Run` takes the claim and starts `Listen` in `AfterSetup` with `ActivateMainWindow` on the UI scheduler
+- [x] `OnMainWindowClosing` releases the claim before it starts the stop
+- [x] write `AReleasedPrimaryNoLongerAnswers` and `ReleaseTwiceIsANoOp` if Task 1 did not cover them (covered in
+  Task 1)
+- [x] run `dotnet test SemiSpec.slnx` - must pass before next task
 
 ### Task 4: Verify acceptance criteria
 - [ ] verify every Overview item and the scope guard (`git diff` touches no `.axaml` file and nothing under

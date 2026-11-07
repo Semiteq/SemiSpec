@@ -3,12 +3,14 @@ using Avalonia.Threading;
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using SemiSpec.Core;
 using SemiSpec.Core.Protocol;
 using SemiSpec.Tests.Unit.UI.Link;
 using SemiSpec.Tests.Unit.UI.Logging;
 using SemiSpec.UI;
+using SemiSpec.UI.Instance;
 using SemiSpec.UI.Link;
 using SemiSpec.UI.Logging;
 using SemiSpec.UI.Store;
@@ -44,9 +46,15 @@ public abstract class AppLifecycleTestBase : IAsyncDisposable
 			.CreateLogger();
 		_logging = new LoggingSetup(logger, logLevelControl, _root.Root);
 		_paths = AppDataPaths.Under(_root.Root).Value;
+		Instance = SingleInstance.Claim(InstanceName, NullLogger.Instance);
 	}
 
 	protected static TimeSpan WaitLimit { get; } = TimeSpan.FromSeconds(5);
+
+	/// <summary>Each test claims its own name, so tests run in parallel without a shared claim.</summary>
+	protected string InstanceName { get; } = $"SemiSpec-test-{Guid.NewGuid()}";
+
+	private protected SingleInstance Instance { get; }
 
 	private protected FakeSerialPortProvider PortProvider { get; } = new(PortName);
 
@@ -58,6 +66,7 @@ public abstract class AppLifecycleTestBase : IAsyncDisposable
 			await store.StopAsync().WaitAsync(_storeStopLimit);
 		}
 
+		Instance.Dispose();
 		_root.Dispose();
 		_logging.Logger.Dispose();
 		GC.SuppressFinalize(this);
@@ -105,10 +114,10 @@ public abstract class AppLifecycleTestBase : IAsyncDisposable
 		await closed.Task.WaitAsync(WaitLimit, TestContext.Current.CancellationToken);
 	}
 
-	protected static Window ShowMainWindow(IServiceProvider provider)
+	protected Window ShowMainWindow(IServiceProvider provider)
 	{
 		var app = new App();
-		app.Configure(provider);
+		app.Configure(provider, Instance);
 		var window = app.CreateMainWindow();
 		window.Show();
 		Dispatcher.UIThread.RunJobs();

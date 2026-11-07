@@ -14,6 +14,7 @@ using ReactiveUI.Avalonia;
 
 using Semi.Avalonia;
 
+using SemiSpec.UI.Instance;
 using SemiSpec.UI.Link;
 using SemiSpec.UI.MainWindow;
 using SemiSpec.UI.Messages;
@@ -99,6 +100,8 @@ public class App : Application
 				return;
 			}
 
+			// A launch from here on starts a new copy instead of activating a window that is about to close.
+			services.Instance.Release();
 			_backgroundStop = StopBackgroundServicesAsync(services);
 
 			// Services that never ran stop at once; re-closing from inside Closing would re-enter Close.
@@ -178,26 +181,46 @@ public class App : Application
 	/// <summary>
 	/// Runs the app until its window closes; the logger receives what ReactiveUI or a dispatcher job raises unhandled.
 	/// </summary>
-	public static void Run(IServiceProvider services, ILogger unhandledErrorLogger)
+	internal static void Run(IServiceProvider services, ILogger unhandledErrorLogger, SingleInstance instance)
 	{
+		var uiScheduler = services.GetRequiredService<IScheduler>();
+
 		// Process lifetime by design: ReactiveUI takes its exception handler once, before any window exists,
 		// and the dispatcher subscription below is made once and never removed.
-		var unhandledErrors = new UnhandledErrorObserver(
-			ResolveMessagePanel,
-			services.GetRequiredService<IScheduler>(),
-			unhandledErrorLogger);
+		var unhandledErrors = new UnhandledErrorObserver(ResolveMessagePanel, uiScheduler, unhandledErrorLogger);
 
 		BuildAvaloniaApp(unhandledErrors)
 			.AfterSetup(builder =>
 			{
 				// Dispatcher.UIThread exists only once the platform is set up.
 				Dispatcher.UIThread.UnhandledException += unhandledErrors.OnDispatcherUnhandledException;
-				((App)builder.Instance!).Configure(services);
+				var app = (App)builder.Instance!;
+				app.Configure(services, instance);
+				// Ends at the first close of the main window, which releases the claim.
+				instance.Listen(uiScheduler, app.ActivateMainWindow, services.GetRequiredService<ILogger<App>>());
 			})
 			.StartWithClassicDesktopLifetime([]);
 	}
 
-	internal void Configure(IServiceProvider services)
+	/// <summary>
+	/// Restores the main window only when it is minimised, since SW_RESTORE also un-maximises a maximised window.
+	/// </summary>
+	private void ActivateMainWindow()
+	{
+		if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime { MainWindow: { } window })
+		{
+			return;
+		}
+
+		if (window.WindowState == WindowState.Minimized && window.TryGetPlatformHandle() is { } handle)
+		{
+			_ = NativeMethods.ShowWindow(handle.Handle, NativeMethods.RestoreCommand);
+		}
+
+		window.Activate();
+	}
+
+	internal void Configure(IServiceProvider services, SingleInstance instance)
 	{
 		_services = new ConfiguredServices(
 			services.GetRequiredService<MainWindowViewModel>(),
@@ -206,7 +229,8 @@ public class App : Application
 			services.GetRequiredService<FrameDistributor>(),
 			services.GetRequiredService<TrendFeed>(),
 			services.GetRequiredService<SpectrumStore>(),
-			services.GetRequiredService<ILogger<App>>());
+			services.GetRequiredService<ILogger<App>>(),
+			instance);
 	}
 
 	internal static AppBuilder BuildAvaloniaApp(IObserver<Exception> unhandledErrors)
@@ -234,5 +258,6 @@ public class App : Application
 		FrameDistributor FrameDistributor,
 		TrendFeed TrendFeed,
 		SpectrumStore SpectrumStore,
-		ILogger<App> Logger);
+		ILogger<App> Logger,
+		SingleInstance Instance);
 }

@@ -57,7 +57,7 @@ public static class Program
 				.BuildServiceProvider();
 			var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 
-			App.Run(serviceProvider, loggerFactory.CreateLogger(nameof(UnhandledErrorObserver)));
+			App.Run(serviceProvider, loggerFactory.CreateLogger(nameof(UnhandledErrorObserver)), instance);
 
 			return 0;
 		}
