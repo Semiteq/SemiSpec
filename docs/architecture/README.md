@@ -29,7 +29,7 @@ None.
 | Logging | Serilog to `C:\DISTR\Logs\SemiSpec`, the Semi site folder SemiPlot and SemiStep share, which the installer creates; `%LOCALAPPDATA%\SemiSpec\Logs` with a Warning when that folder cannot be written; the operator raises the level to Debug from the menu at run time; the level is not persisted |
 | Errors | FluentResults for failures; one route to the message panel, with an Info, Warning or Error severity per entry; ReactiveUI's unhandled exceptions and exceptions that escape a dispatcher job reach the same panel and the app keeps running; before the panel exists an escaped exception ends the app and is logged as Fatal |
 | Text | resx: English neutral set, Russian satellite; the UI culture follows Windows |
-| Instances | One window per process; a second running copy is allowed |
+| Instances | One copy per Windows session, claimed by a named mutex in `Local\`; a second launch has the first copy restore and activate its window and exits, or shows a message box when the first copy answers neither of two asks within 2 s; a copy whose close has started releases the claim, so a relaunch during the close starts a new copy (`overview.md`, Single instance) |
 | Tests | One `Tests.Unit` project: xUnit 3.2.2, AwesomeAssertions, Avalonia.Headless. No integration project until a test needs Docker or a real port |
 | Chart options | A left click on an axis opens that axis's flyout, as in SemiPlot; the readout pane beside the spectrum holds values only, and the trend spans the window (`overview.md`, Axis flyouts) |
 | Chart renderer | ScottPlot.Avalonia 5.1.59; the plot sits alone in a decorator with a `BitmapCache` and redraws at most once per display frame, as in SemiPlot |

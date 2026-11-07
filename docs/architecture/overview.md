@@ -3,7 +3,8 @@
 ## Purpose
 
 SemiSpec shows the operator the spectrum the spectrometer board sends over a serial port. The code under
-`SemiSpec/` starts, logs to `C:\DISTR\Logs\SemiSpec` and shows the main window. The operator picks a COM port in the
+`SemiSpec/` starts, logs to `C:\DISTR\Logs\SemiSpec` and shows the main window; one copy runs per Windows session, and
+a second launch brings that copy's window to the front. The operator picks a COM port in the
 connection row and connects; the serial link reads the board's frames, reopens the port after an unplug, and the
 status bar shows the link state, both spectrometers' bits, the spectra lost since Connect and the frames dropped since
 the start. Link faults, reported failures, ReactiveUI's unhandled exceptions and exceptions that escape a dispatcher job
@@ -118,8 +119,10 @@ the trend's folds and re-reads.
 | `AppLogging` | UI | Picks the log folder (`C:\DISTR\Logs\SemiSpec`, or the fallback when the write check or the logger's open there fails), creates it and the Serilog logger: `semispec.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
 | `AddUi(LoggingSetup, AppDataPaths)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` `spectra.db` under the store folder, `SpectrumStore`, `SpectrumHistory` over the `StoreFile`, `IntensityCache`, `LiveSpectrumSource`, `SwitchingSpectrumSource` over it, the message panel, the connection row, the status bar, the spectrum view model, `TrendChartViewModel`, `OverviewViewModel`, `TrendFeed` built over `SpectrumHistory.IntensityPointsAsync`, `SpectrumAtAsync` and `SpectrumStore.Opened` with `DefaultScheduler.Instance` for its throttle, `TrendViewModel` and the main window view model, all singletons |
-| `Program` | UI | Entry point: paths, logging, container, `App.Run` with the logger for unhandled exceptions |
-| `App` | UI | Builds the Avalonia app with the exception handler, subscribes dispatcher exceptions, sets Semi's control strings to the UI culture, creates the main window from the container, refreshes the port list and starts the spectrum store, the trend feed and then the frame distributor when the window opens, and stops the link, the distributor, the trend feed and the store, in that order, before it closes |
+| `SingleInstance` | UI | The claim on one copy per Windows session: a named mutex in `Local\`, the ask and answer events through which a second launch has the first copy activate its window, the listener that runs the activation on the UI scheduler and answers, and the release (`UI/Instance/`) |
+| `SecondLaunch`, `NativeMethods` | UI | What a launch that finds a running copy does: asks it twice with a 2 s limit, logs one line, shows the not-responding message box when neither ask is answered, and returns the exit code; `NativeMethods` holds the three `user32.dll` calls `MessageBoxW`, `AllowSetForegroundWindow` and `ShowWindow` (`UI/Instance/`) |
+| `Program` | UI | Entry point: paths, logging, the single-instance claim and the second launch, container, `App.Run` with the logger for unhandled exceptions and the claim |
+| `App` | UI | Builds the Avalonia app with the exception handler, subscribes dispatcher exceptions, sets Semi's control strings to the UI culture, starts the single-instance listener, creates the main window from the container, refreshes the port list and starts the spectrum store, the trend feed and then the frame distributor when the window opens, and at the first close releases the claim and stops the link, the distributor, the trend feed and the store, in that order, before it closes |
 | `MainWindowViewModel` | UI | Exit request, the verbose-logging command, and the panel, connection row, status bar, spectrum and trend view models; it disposes none of them, the container owns them |
 | `ConnectionBarViewModel` | UI | The port list, the selection and the Refresh, Connect and Disconnect commands; reports a failed listing to the panel |
 | `AppStatusBarViewModel` | UI | The status bar texts and dot tone from `SerialLink.Status`, and the dropped-frames text from the link's and the store's counts; reports each fault and the restored entry to the panel |
@@ -144,15 +147,18 @@ benchmark references Core only, so it times the same cache and plan the app runs
 
 1. `AppDataPaths.Under` resolves the store folder and the fallback log folder from
    `Environment.SpecialFolder.LocalApplicationData`.
-2. `AppLogging.Create` picks the log folder and creates the logger there; `Program.Main` sets `Log.Logger` to it and
-   names the folder in its first Information line (Log folder, below).
-3. `AddUi` builds the service provider with the paths; the store's history file is named here, and nothing touches
+2. `AppLogging.Create` picks the log folder and creates the logger there; `Program.Main` sets `Log.Logger` to it
+   (Log folder, below).
+3. `SingleInstance.Claim` claims the copy's name (Single instance, below). A second copy calls
+   `AllowSetForegroundWindow` and returns the exit code of `SecondLaunch.Run`, so it builds no container and opens no
+   window, port or store. The first copy names the log folder in its Information line "SemiSpec starting".
+4. `AddUi` builds the service provider with the paths; the store's history file is named here, and nothing touches
    the store folder until the window opens.
-4. `App.Run` receives a logger from the container's `ILoggerFactory`, which writes to that logger, builds the
-   `UnhandledErrorObserver` with the container's `IScheduler` and builds the Avalonia app. In `AfterSetup` it subscribes
-   `Dispatcher.UIThread.UnhandledException`, which exists only once the platform is set up, and `App.Configure`
+5. `App.Run` receives a logger from the container's `ILoggerFactory`, which writes to that logger, and the claim; it
+   builds the `UnhandledErrorObserver` with the container's `IScheduler` and builds the Avalonia app. In `AfterSetup` it
+   subscribes `Dispatcher.UIThread.UnhandledException`, which exists only once the platform is set up, `App.Configure`
    resolves `MainWindowViewModel`, `MessagePanelViewModel`, `SerialLink`, `FrameDistributor`, `TrendFeed`,
-   `SpectrumStore` and the app's logger.
+   `SpectrumStore` and the app's logger, and the claim starts its listener on the container's `IScheduler`.
    `OnFrameworkInitializationCompleted` shows `MainWindow` with that view model as its `DataContext`.
 
 A failure in step 1 or 2 ends with exit code 1 and shows nothing, because there is no log to write to. A failure after
@@ -180,7 +186,8 @@ The window's `Opened` event refreshes the port list once, starts the spectrum st
 frame distributor, so the store's and the feed's subscriptions exist before the first frame is read. The feed's start
 read waits for `SpectrumStore.Opened` before it reads the store (Trend, Key change and re-read), so no reader opens a
 file the writer may still delete, set aside or create. The window's
-`Closing` event is where an operator close (the close button, File, Exit) stops all four.
+`Closing` event is where an operator close (the close button, File, Exit) stops all four. The first `Closing` that
+starts the stop releases the single-instance claim before it starts it (Single instance).
 `StopBackgroundServicesAsync` awaits `SerialLink.DisconnectAsync()`, then `FrameDistributor.StopAsync()`, then
 `TrendFeed.StopAsync()`, then `SpectrumStore.StopAsync(drainToken)`, all inside one 5 s limit of real time; a timeout
 logs a Warning. The link stops first, so no frame enters the channel after the distributor has stopped reading it, and
@@ -210,6 +217,46 @@ The container's dispose after `App.Run` returns calls `SerialLink.Dispose()`, `F
 writer then closes its file without a checkpoint. After a 5 s timeout the session can outlive the window: `Program`
 then calls `Log.CloseAndFlush()` while the session may still write its last lines (the port close, "The link on port
 ... stopped"), and those lines are not guaranteed to reach the log file. The process exits regardless.
+
+### Single instance
+
+One copy runs per Windows session: the board has one data source and one COM port, and the history file takes one
+writer. `SingleInstance.Claim` creates or opens a named `Mutex` in the `Local\` namespace with
+`SingleInstance.ProductionName`, a fixed name with a GUID suffix, and reads `createdNew`: true makes the primary, false
+a secondary. The claim never waits on the mutex. The OS destroys the mutex when its last handle closes, also after a
+crash, so a dead copy never blocks a start. `Local\` is the session namespace: a copy in another Windows session has
+its own desktop, where the first copy could not show its window, so it runs as its own primary and meets
+`PortBusyError` on the port the first copy holds. A claim the OS refuses (`UnauthorizedAccessException`,
+`WaitHandleCannotBeOpenedException`) logs a Warning and runs as an unguarded primary.
+
+Both copies create or open two auto-reset events in the claim, `Local\<name>-activate` (the ask) and
+`Local\<name>-activated` (the answer), so their creation order does not matter. The primary's listener is a
+`ThreadPool.RegisterWaitForSingleObject` on the ask; each ask schedules the activation on the UI scheduler and sets the
+answer after the activation ran there, so an answer shows that the UI thread runs. An activation that throws is logged
+at Error and still answered. The listener starts in `AfterSetup`, because `Dispatcher.UIThread` exists only there; an
+ask that arrives earlier stays set and runs once the listener starts.
+
+The activation runs on the UI thread. When the main window is minimised, `ShowWindow(handle, SW_RESTORE)` on its Win32
+handle brings it back to its state before the minimise, maximised included; a window that is not minimised skips it,
+because `SW_RESTORE` would un-maximise it. Then `Window.Activate()` brings it to the front. Windows lets only the
+foreground process hand the foreground on, so the secondary, the just-launched process, calls
+`AllowSetForegroundWindow(ASFW_ANY)` before it asks.
+
+`SecondLaunch.Run` resets the answer, sets the ask and waits 2 s on the answer; the reset means a late answer to an
+earlier launch cannot answer this one. Two launches at once can lose an answer: their asks may join into one signal,
+one launch's reset can clear the other's answer, and one answer releases one waiter. So a launch without an answer
+asks once more. An answer logs one Information line and exits with code 0. No answer to either ask logs one Warning,
+shows `SingleInstanceNotResponding` in a Win32 `MessageBoxW` with the caption `SemiSpec`, since no Avalonia window
+opens, and exits with code 1; a hung primary therefore shows the message after about 4 s. The three `user32.dll` calls
+are classic `DllImport` declarations in `NativeMethods` with an explicit `CharSet` and
+`DefaultDllImportSearchPaths(System32)`; `LibraryImport` would need `AllowUnsafeBlocks` for the string parameter.
+
+The first `Closing` that starts the stop calls `SingleInstance.Release()` first: it unregisters the listener and
+disposes both events and the mutex handle, so a launch from then on claims the name as a new primary instead of
+activating a window that is about to close. The closing copy may hold the port for up to the 5 s stop limit; Connect in
+the new copy fails with `PortBusyError` and the link reopens the port every second until the old copy releases it. The
+two copies also share `spectra.db` for those seconds: SQLite serialises their writes, and the old copy's closing
+checkpoint may return Busy, which it logs. `Release` is idempotent; `Program` disposes the claim again at exit.
 
 ## Main window
 
@@ -880,8 +927,7 @@ Avalonia 12 throw `ArgumentOutOfRangeException` from the logical-tree detach, an
 ### Files
 
 The store folder is `%LOCALAPPDATA%\SemiSpec\Spectra`, and the history file is `spectra.db` there. The file stays
-across restarts, and retention keeps it at about one day of data. Two running copies open the same file. Before the
-open, `StoreFiles.Prepare` creates the folder and deletes the per-process files of older builds: each
+across restarts, and retention keeps it at about one day of data. Before the open, `StoreFiles.Prepare` creates the folder and deletes the per-process files of older builds: each
 `spectra-<digits>.db` with its `-wal` and `-shm` sidecars, and the legacy sidecars whose `.db` is gone. A name with
 anything else between `spectra-` and `.db`, such as `spectra-1234 - Copy.db`, stays, and so do `spectra.db`,
 `spectra.db.damaged` and `spectra.broken-*.db`, which carry no digits after `spectra-`. SQLite on Windows opens a file

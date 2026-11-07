@@ -244,14 +244,16 @@ Members:
   start-up margin need the operator PC)
 
 ### Task 5: [Final] Update documentation
-- [ ] `docs/architecture/overview.md`, Startup: the claim, the second launch, the listener in `AfterSetup`, the
-  release at the close; Components: a row for `SingleInstance` and `SecondLaunch`
-- [ ] `docs/architecture/README.md`, Locked decisions, the Instances row: one copy per Windows session, a second
+- [x] `docs/architecture/overview.md`, Startup: the claim, the second launch, the listener in `AfterSetup`, the
+  release at the close; Components: a row for `SingleInstance` and `SecondLaunch` (also: Purpose, a Single instance
+  subsection, and the Spectrum store's "Two running copies open the same file" removed)
+- [x] `docs/architecture/README.md`, Locked decisions, the Instances row: one copy per Windows session, a second
   launch activates the first, a closing copy releases the claim
-- [ ] `docs/architecture/ui-text.md`, The keys: a row for `SingleInstanceNotResponding`
-- [ ] `CLAUDE.md`, Test, and `docs/architecture/testing-strategy.md`: the Area `Instance`
-- [ ] `readme.md`: change it only if a sentence becomes false; none names running two copies today
-- [ ] move this plan to `docs/plans/completed/`
+- [x] `docs/architecture/ui-text.md`, The keys: a row for `SingleInstanceNotResponding`
+- [x] `CLAUDE.md`, Test, and `docs/architecture/testing-strategy.md`: the Area `Instance`
+- [x] `readme.md`: change it only if a sentence becomes false; none names running two copies today (unchanged)
+- [x] move this plan to `docs/plans/completed/` (left in place: archiving belongs to delivery, after the owner's
+  smoke run)
 
 ## Post-Completion
 *Items requiring manual intervention or external systems - no checkboxes, informational only*
