@@ -14,6 +14,8 @@
 
 ## Context (from discovery)
 - Verified 2026-11-06 at `261335e` (master): `dotnet test SemiSpec.slnx` passes 944 of 944.
+- Base count, 2026-11-07 at `1fb7b06` (master `2e2714b` plus this plan): `dotnet test SemiSpec.slnx` passes 1045 of
+  1045, none skipped.
 - This plan executes on master after `ui-redesign` (tip `84b9e06`) and then `20261106-persistent-history.md` merge.
   Expected conflict points:
   - `SemiSpec.UI/Program.cs`: on `ui-redesign` the logger comes from `AppLogging.Create(AppLogging.SiteLogFolder,
@@ -194,10 +196,10 @@ Members:
 - Create: `SemiSpec/SemiSpec.UI/Instance/SingleInstance.cs`
 - Create: `SemiSpec/SemiSpec.Tests.Unit/UI/Instance/SingleInstanceTests.cs`
 
-- [ ] record the test count of `dotnet test SemiSpec.slnx` at the base commit in Context
-- [ ] `SingleInstance`: claim, listen, ask with the answer reset, release, dispose per Solution Overview
-- [ ] write `SingleInstanceTests` of Acceptance Evidence item 1
-- [ ] run `dotnet test SemiSpec.slnx` - must pass before next task
+- [x] record the test count of `dotnet test SemiSpec.slnx` at the base commit in Context
+- [x] `SingleInstance`: claim, listen, ask with the answer reset, release, dispose per Solution Overview
+- [x] write `SingleInstanceTests` of Acceptance Evidence item 1
+- [x] run `dotnet test SemiSpec.slnx` - must pass before next task
 
 ### Task 2: Second launch and its message
 **Files:**
