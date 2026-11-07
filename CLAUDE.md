@@ -32,7 +32,7 @@ dotnet test SemiSpec.slnx --filter "Area=Messages"
 
 `SemiSpec/SemiSpec.Tests.Unit` is the only test project: xUnit, AwesomeAssertions,
 Avalonia.Headless. Every test class carries three traits: `Component` (`Core|UI|Tools`), `Area`
-(`Calibration|Chart|Di|Emulator|Link|Logging|MainWindow|Messages|Paths|Protocol|Resources|Spectrum|Store|Trend`) and
+(`Calibration|Chart|Di|Emulator|Instance|Link|Logging|MainWindow|Messages|Paths|Protocol|Resources|Spectrum|Store|Trend`) and
 `Category` (`Unit`).
 `xunit.runner.json` sets `failSkips`, so a skipped test fails the run. A hung run leaves
 `SemiSpec.Tests.Unit.exe` locked, and the next build fails with MSB3027 until the process is killed.
@@ -75,7 +75,8 @@ SemiSpec/                        build props, .editorconfig, projects below
   SemiSpec.Core/                 UI-free code: paths, board protocol, wavelength calibration,
                                  spectrum projection and scale, log axis ticks, spectrum store (Store/),
                                  trend rules: continuity, intensity cache, history plan, navigation (Trend/)
-  SemiSpec.UI/                   Avalonia WinExe: startup, logging, serial link, main window, spectrum chart,
+  SemiSpec.UI/                   Avalonia WinExe: startup, single instance (Instance/), logging, serial link,
+                                 main window, spectrum chart,
                                  store writer service (Store/), trend chart, overview and feed (Trend/),
                                  messages, styles, resx text
   SemiSpec.Tools.BoardEmulator/  console tool: writes board frames to a COM port

@@ -412,4 +412,7 @@
   <data name="ChartStateSeparator" xml:space="preserve">
     <value> · </value>
   </data>
+  <data name="SingleInstanceNotResponding" xml:space="preserve">
+    <value>SemiSpec уже запущена, но не отвечает. Закройте её в диспетчере задач и запустите снова.</value>
+  </data>
 </root>

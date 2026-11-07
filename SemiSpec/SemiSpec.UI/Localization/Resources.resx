@@ -412,4 +412,7 @@
   <data name="ChartStateSeparator" xml:space="preserve">
     <value> · </value>
   </data>
+  <data name="SingleInstanceNotResponding" xml:space="preserve">
+    <value>SemiSpec is already running but does not respond. Close it in Task Manager and start it again.</value>
+  </data>
 </root>

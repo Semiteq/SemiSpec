@@ -87,7 +87,12 @@ internal sealed class StoreWriter(
 		SpectrumDatabase? database = null;
 		try
 		{
-			var openResult = _opening.Open();
+			Result<SpectrumDatabase> openResult;
+			using (var openGiveUp = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, drainToken))
+			{
+				openResult = await _opening.OpenAsync(openGiveUp.Token).ConfigureAwait(false);
+			}
+
 			if (openResult.IsFailed)
 			{
 				ReportOpenFailure(openResult.Errors);

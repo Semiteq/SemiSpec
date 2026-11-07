@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using AwesomeAssertions;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 using ReactiveUI.Avalonia;
 
@@ -15,6 +16,7 @@ using SemiSpec.Core.Store;
 using SemiSpec.Core.Trend;
 using SemiSpec.Tests.Unit.UI.Logging;
 using SemiSpec.UI;
+using SemiSpec.UI.Instance;
 using SemiSpec.UI.Link;
 using SemiSpec.UI.Logging;
 using SemiSpec.UI.MainWindow;
@@ -189,9 +191,10 @@ public sealed class CompositionRootTests : IAsyncDisposable
 	public void TheAppBuildsTheMainWindowFromTheProvider()
 	{
 		using var provider = BuildContainer();
+		using var instance = SingleInstance.Claim($"SemiSpec-test-{Guid.NewGuid()}", NullLogger.Instance);
 		var app = new App();
 
-		app.Configure(provider);
+		app.Configure(provider, instance);
 		var window = app.CreateMainWindow();
 
 		try

@@ -44,6 +44,7 @@ AXAML reads a key as `{x:Static text:Resources.Key}` with
 | Owner | Keys |
 | --- | --- |
 | Main window | `WindowTitle` |
+| Second launch | `SingleInstanceNotResponding`, in a Win32 message box with the caption `SemiSpec`, since a second copy opens no Avalonia window |
 | Menu | `MenuFile`, `MenuFileExit`, `MenuView`, `MenuViewMessagePanel`, `MenuViewVerboseLogging` |
 | Connection row | `ConnectionPortLabel`, `ConnectionPortPlaceholder`, `ConnectionRefresh`, `ConnectionConnect`, `ConnectionDisconnect`, `ChartBackToLive`, `TrendFollowLive` |
 | Status bar | `StatusNotConnected`, `StatusConnecting`, `StatusPortUnavailable`, `StatusWaiting`, `StatusReceiving`, `StatusNotResponding`, `StatusOtherDevice`, `StatusSpectrometerFormat`, `StatusSpectrometerConnected`, `StatusSpectrometerNotConnected`, `StatusSpectrometerFailed`, `StatusSpectrometerNoData`, `StatusLostSpectraFormat`, `StatusDroppedFramesFormat`, `StatusNoValue`; the restored entry: `LinkRestoredTitle`, `LinkRestoredDetail` |
