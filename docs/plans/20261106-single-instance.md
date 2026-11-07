@@ -227,11 +227,21 @@ Members:
 - [x] run `dotnet test SemiSpec.slnx` - must pass before next task
 
 ### Task 4: Verify acceptance criteria
-- [ ] verify every Overview item and the scope guard (`git diff` touches no `.axaml` file and nothing under
-  `Store/`, `Link/` or `Trend/`)
-- [ ] run Acceptance Evidence items 1 to 4; record the final count
-- [ ] verify edge cases: a claim that throws runs as primary with one Warning; a second launch during the
-  primary's close starts a new copy
+- [x] verify every Overview item and the scope guard (`git diff` touches no `.axaml` file and nothing under
+  `Store/`, `Link/` or `Trend/`): `git diff --stat 2e2714b..HEAD` lists only `Instance/`, `App.axaml.cs`,
+  `Program.cs`, both resx files, `Di/` test helpers and this plan; a secondary returns before `AddUi`
+- [x] run Acceptance Evidence items 1 to 4; record the final count (2026-11-07):
+  1. `--filter "Area=Instance"`: 17 of 17 pass (`SingleInstanceTests` 10, `SecondLaunchTests` 5,
+     `AppInstanceTests` 2)
+  2. `--filter "Area=Resources"`: 9 of 9 pass; the parity test covers `SingleInstanceNotResponding`
+  3. `dotnet test SemiSpec.slnx`: 1062 of 1062 pass, none skipped (base 1045)
+  4. `dotnet build SemiSpec.slnx -c Release --no-incremental`: 0 warnings; `dotnet format --verify-no-changes` and
+     `dotnet terse` over every touched `.cs` file exit 0
+- [x] verify edge cases: a claim that throws runs as primary with one Warning
+  (`AClaimTheOsRefusesRunsAsAPrimaryWithOneWarning`, added here); a second launch during the primary's close starts
+  a new copy (`AppInstanceTests.ALaunchDuringTheCloseClaimsTheNameAsANewPrimary`)
+- [x] manual smoke checklist steps 1 to 6 (manual, for the owner: Win32 activation, the foreground rule and the
+  start-up margin need the operator PC)
 
 ### Task 5: [Final] Update documentation
 - [ ] `docs/architecture/overview.md`, Startup: the claim, the second launch, the listener in `AfterSetup`, the

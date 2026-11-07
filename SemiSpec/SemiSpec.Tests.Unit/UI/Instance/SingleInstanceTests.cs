@@ -46,6 +46,20 @@ public sealed class SingleInstanceTests
 	}
 
 	[Fact]
+	public void AClaimTheOsRefusesRunsAsAPrimaryWithOneWarning()
+	{
+		// An event already holding the mutex name makes the Mutex constructor throw.
+		using var occupant = new EventWaitHandle(false, EventResetMode.AutoReset, @"Local\" + _name);
+		var logger = new FakeLogger();
+
+		using var instance = SingleInstance.Claim(_name, logger);
+
+		instance.IsPrimary.Should().BeTrue();
+		logger.Levels().Should().Equal(LogLevel.Warning);
+		logger.Failures().Should().ContainSingle().Which.Should().BeOfType<WaitHandleCannotBeOpenedException>();
+	}
+
+	[Fact]
 	public void AClaimAfterThePrimaryReleasedIsPrimary()
 	{
 		using var primary = SingleInstance.Claim(_name, NullLogger.Instance);
