@@ -312,8 +312,9 @@ Manual smoke checklist (com0com pair `COM10`-`COM11`, emulator on `COM10`, app o
 - **Store ready signal.** `SpectrumStore.Opened` is a `Task<bool>` from a `TaskCompletionSource<bool>` with
   `RunContinuationsAsynchronously`. The writer completes it true after the open, the set-aside or replace, and the
   retention at open; false when the open fails or a cancel ends the writer before the open; a `StopAsync` before
-  `Start` completes it false. The trend's start read waits for it, so a reader never opens a file the writer is
-  about to delete, rename or create.
+  `Start` completes it false. The trend's start read waits for it. A key-change or moment read does not wait: if a
+  spectrum arrives before the open ends, that reader can hold the file while the writer deletes or renames it, the
+  move fails and the session ends in `StoreOpenError` with the file kept.
 - **Trend start read.** The cache records `RunStart = timeProvider.GetUtcNow()` in its constructor. `Configure`
   resolves the cache before `Opened` starts the distributor (`App.axaml.cs:75-81`, `:200-209`), so every live frame
   is received after `RunStart`, and every stored row before it belongs to an earlier run.
