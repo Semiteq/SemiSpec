@@ -13,8 +13,9 @@ an axis of either chart opens that axis's flyout with its bounds and modes. Unde
 the intensity at the board's wavelength over time across the full window width, from an in-memory cache of the last
 24 h, with an overview strip of that whole history under it; a click on the trend shows the spectrum of that moment
 on the spectrum chart until the operator returns to live. The spectrum store writes every received frame
-to a SQLite file of the running instance and keeps the last 24 h; its query service reads a stored spectrum, the
-intensity series and the intensity points at a wavelength. Two console tools support manual runs: the board emulator
+to one SQLite history file, kept across restarts, and keeps the last 24 h; at start the trend loads the stored day
+from it. The store's query service reads a stored spectrum, the intensity series and the intensity points at a
+wavelength. Two console tools support manual runs: the board emulator
 writes protocol frames to a serial port, and the store benchmark measures the store file's writes, size and reads and
 the trend's folds and re-reads.
 
@@ -56,14 +57,15 @@ the trend's folds and re-reads.
 | `SpectrumScale` | Core | The axis limits of the shown spectrum while following, with and without From zero, as pure functions (`Core/Spectrum/`) |
 | `FromZeroRange` | Core | The From zero range shared by the spectrum, the trend and the overview band: `0 .. max + 5 %`, `0 .. 1` when the maximum is not above 0 (`Core/Chart/`) |
 | `LogAxis` | Core | The ticks of an axis that runs in decades: major and minor positions for the limits and the axis length (`Core/Chart/`) |
-| `StoreFiles` | Core | Names the instance file `spectra-<process id>.db` and prepares the store folder: wipes the own file, deletes the files of dead instances and orphan sidecars (`Core/Store/`) |
+| `StoreFiles` | Core | Names the history file `spectra.db` and prepares the store folder: creates it and deletes the per-process `spectra-<digits>.db` files of older builds with their sidecars; marks the history file damaged with `spectra.db.damaged`; sets a damaged file aside as `spectra.broken-<stamp>.db` and keeps the newest two (`Core/Store/`) |
+| `StoreDamage` | Core | Tells a SQLite failure that means a damaged file, code 11 (`SQLITE_CORRUPT`) or 26 (`SQLITE_NOTADB`) anywhere in the cause chain, from any other (`Core/Store/`) |
 | `StoreConnection` | Core | Opens the writer's connection to a store file, creating it, with the store's connection string and pragmas; `OpenReader` opens an existing file only, with `query_only` (`Core/Store/`) |
-| `SpectrumDatabase` | Core | The writer connection: the schema, a batch of frames in one transaction, the deletion of rows older than a cutoff, and the closing checkpoint (`Core/Store/`) |
+| `SpectrumDatabase` | Core | The writer connection: the open gated on the schema version in `PRAGMA user_version`, a batch of frames in one transaction, the deletion of rows older than a cutoff with a fast path when every row has expired, and the closing checkpoint; `StoreSchemaMismatchError` and `StoreFileUnreadableError` are its open failures (`Core/Store/`) |
 | `QueryWindows` | Core | The queried window of each device as byte offsets in the stored pixels, whether the device covers the wavelength, and the mean of a window's pixels (`Core/Store/`) |
 | `IntensityQuery`, `IntensityBuckets`, `IntensitySeries` | Core | The validated series request with its epoch-aligned column grid, the fold of window means, breaks and failure marks into columns on that grid (min, max, last value, counts, the OR of the failure bits), and its result (`Core/Store/`) |
-| `SpectrumHistory` | Core | The query service: the stored spectrum at a moment, the intensity series, the intensity points and the stored range, each on its own reader connection (`Core/Store/`) |
-| `FrameContinuity` | Core | Turns spectra and heartbeats, in receive order, into the trend's Loss and NoSpectra breaks and failure marks (`Core/Trend/`) |
-| `IntensityCache` | Core | One intensity point per spectrum at the key of the latest spectrum frame, with the run's breaks and failure marks, for the last 24 h; the recent spectra, the key change and its re-read request, the landing of stored chunks, the completion of a re-read, the fold of the current extent under one lock hold and the moment lookup; `TrendTimeline` holds the key's points, breaks and failure marks in time order and folds them. `TrendKey`, `TrendExtent`, `TrendFold` and `ReReadRequest` are its results (`Core/Trend/`) |
+| `SpectrumHistory` | Core | The query service: the stored spectrum at a moment, the intensity series, the intensity points and the stored range, each on its own reader connection; a read that fails on a damaged file marks it (`Core/Store/`) |
+| `FrameContinuity` | Core | Turns spectra and heartbeats, in receive order, into the trend's Loss breaks and failure marks (`Core/Trend/`) |
+| `IntensityCache` | Core | One intensity point per spectrum at the key of the latest spectrum frame, with the run's breaks and failure marks, for the last 24 h; the recent spectra, the key change and its re-read request, the run start and the stored day request, the landing of stored chunks, the completion of a re-read, the fold of the current extent under one lock hold and the moment lookup; `TrendTimeline` holds the key's points, breaks and failure marks in time order and folds them, with a NoSpectra break at each gap of more than 10 s between points. `TrendKey`, `TrendExtent`, `TrendFold` and `ReReadRequest` are its results (`Core/Trend/`) |
 | `TrendHistoryPlan` | Core | The store ranges a re-read runs, in order: the visible window, then the rest of the day in hour chunks, newest first (`Core/Trend/`) |
 | `IntensityChunk`, `TrendPoint` | Core | The result of the store's points read: its start and one `(UnixMs, Value)` point per spectrum; `IntensityBuckets.Add(TrendPoint)` folds a NaN point as uncovered (`Core/Store/`) |
 | `TrendNavigationModel` | Core | The trend's visible window in UTC: width 10 s to 24 h, follow, pan, zoom around an anchor, set width, set an exact window, the pan floor at the first point, and the rule that a pan or a zoom leaving now outside the window stops following (`Core/Trend/`) |
@@ -106,16 +108,16 @@ the trend's folds and re-reads.
 | `TrendChartViewModel` | UI | Owns the trend's `Plot`: folds the cache over the navigation window at one column per data-area pixel, the Y limits with From zero and a typed range, the Y label, the failure strip, the shown-moment line, navigation and the hover text (`UI/Trend/`) |
 | `TrendReadout` | UI | The hover text of one folded column: local time, value or gap reason, failures (`UI/Trend/`) |
 | `TrendPresets` | UI | The time window presets 1 min, 10 min, 1 h, 6 h and 24 h, 10 min by default (`UI/Trend/`) |
-| `TrendFeed` | UI | Fills the cache from the distributor, logs each key change, runs the re-read after a key change and the read of a clicked moment, each as a pipeline where a newer request cancels the read in flight, and cancels the moment read on Back to live (`UI/Trend/`) |
+| `TrendFeed` | UI | Fills the cache from the distributor, loads the stored day once the store has opened, logs each re-read request, runs the re-read after a key change or the stored day request and the read of a clicked moment, each as a pipeline where a newer request cancels the read in flight, and cancels the moment read on Back to live (`UI/Trend/`) |
 | `TrendViewModel` | UI | The trend: the chart, the overview, the time window form, the intensity form, From zero, Autoscale, Follow live, the state line and the click to a moment (`UI/Trend/`) |
 | `TimeWindowPanelViewModel` | UI | The time axis flyout: the window's local start and end (time and date), its width and the presets, ported from SemiPlot's time window panel without its archive calendar (`UI/Trend/`) |
 | `OverviewViewModel`, `OverviewBand` | UI | The overview strip: the whole cache folded to 250 columns, the window's place along it, and the press that moves the trend there; the band control draws it (`UI/Trend/`) |
 | `TrendHistoryError`, `TrendMomentError` | UI | The stored points at a new key could not be read; the stored spectrum of a clicked moment could not be read (`UI/Trend/`) |
-| `SpectrumStore`, `StoreWriter`, `StoreRetention`, `StoreFile` | UI | The background writer: `SpectrumStore` enqueues every distributor frame, runs one `StoreWriter` task and counts the frames lost; `StoreWriter` writes the queue to the instance file in batches and runs `StoreRetention` once a minute, which deletes rows older than 24 h and sweeps other instances' files once an hour; `StoreFile` is the instance file's path (`UI/Store/`) |
-| `StoreOpenError`, `StoreWriteError`, `StoreStoppedError` | UI | The store file could not be prepared or opened; a batch could not be written; an unexpected failure after the open ended the writer (`UI/Store/`) |
+| `SpectrumStore`, `StoreWriter`, `StoreOpening`, `StoreRetention`, `StoreFile` | UI | The background writer: `SpectrumStore` enqueues every distributor frame, runs one `StoreWriter` task, counts the frames lost and signals `Opened`; `StoreWriter` opens the history file through `StoreOpening`, writes the queue to it in batches and runs `StoreRetention` at the open and once a minute, which deletes rows older than 24 h; `StoreOpening` prepares the folder, opens the file, replaces a file of another schema version and sets a damaged one aside; `StoreFile` is the history file's path (`UI/Store/`) |
+| `StoreOpenError`, `StoreWriteError`, `StoreStoppedError`, `StoreFileReplacedError` | UI | The store file could not be prepared or opened; a batch could not be written; an unexpected failure after the open ended the writer; a damaged history file was set aside and a new one started (`UI/Store/`) |
 | `AppLogging` | UI | Picks the log folder (`C:\DISTR\Logs\SemiSpec`, or the fallback when the write check or the logger's open there fails), creates it and the Serilog logger: `semispec.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
-| `AddUi(LoggingSetup, AppDataPaths)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` of this process under the store folder, `SpectrumStore`, `SpectrumHistory` over the `StoreFile`, `IntensityCache`, `LiveSpectrumSource`, `SwitchingSpectrumSource` over it, the message panel, the connection row, the status bar, the spectrum view model, `TrendChartViewModel`, `OverviewViewModel`, `TrendFeed` built over `SpectrumHistory.IntensityPointsAsync` and `SpectrumAtAsync` with `DefaultScheduler.Instance` for its throttle, `TrendViewModel` and the main window view model, all singletons |
+| `AddUi(LoggingSetup, AppDataPaths)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` `spectra.db` under the store folder, `SpectrumStore`, `SpectrumHistory` over the `StoreFile`, `IntensityCache`, `LiveSpectrumSource`, `SwitchingSpectrumSource` over it, the message panel, the connection row, the status bar, the spectrum view model, `TrendChartViewModel`, `OverviewViewModel`, `TrendFeed` built over `SpectrumHistory.IntensityPointsAsync`, `SpectrumAtAsync` and `SpectrumStore.Opened` with `DefaultScheduler.Instance` for its throttle, `TrendViewModel` and the main window view model, all singletons |
 | `Program` | UI | Entry point: paths, logging, container, `App.Run` with the logger for unhandled exceptions |
 | `App` | UI | Builds the Avalonia app with the exception handler, subscribes dispatcher exceptions, sets Semi's control strings to the UI culture, creates the main window from the container, refreshes the port list and starts the spectrum store, the trend feed and then the frame distributor when the window opens, and stops the link, the distributor, the trend feed and the store, in that order, before it closes |
 | `MainWindowViewModel` | UI | Exit request, the verbose-logging command, and the panel, connection row, status bar, spectrum and trend view models; it disposes none of them, the container owns them |
@@ -144,7 +146,7 @@ benchmark references Core only, so it times the same cache and plan the app runs
    `Environment.SpecialFolder.LocalApplicationData`.
 2. `AppLogging.Create` picks the log folder and creates the logger there; `Program.Main` sets `Log.Logger` to it and
    names the folder in its first Information line (Log folder, below).
-3. `AddUi` builds the service provider with the paths; the store's instance file is named here, and nothing touches
+3. `AddUi` builds the service provider with the paths; the store's history file is named here, and nothing touches
    the store folder until the window opens.
 4. `App.Run` receives a logger from the container's `ILoggerFactory`, which writes to that logger, builds the
    `UnhandledErrorObserver` with the container's `IScheduler` and builds the Avalonia app. In `AfterSetup` it subscribes
@@ -175,14 +177,17 @@ use, so a command or property helper built earlier would make the handler that `
 no-op. The view models come from the container inside `AfterSetup` for this reason.
 
 The window's `Opened` event refreshes the port list once, starts the spectrum store, then the trend feed, then the
-frame distributor, so the store's and the feed's subscriptions exist before the first frame is read. The window's
+frame distributor, so the store's and the feed's subscriptions exist before the first frame is read. The feed's start
+read waits for `SpectrumStore.Opened` before it reads the store (Trend, Key change and re-read), so no reader opens a
+file the writer may still delete, set aside or create. The window's
 `Closing` event is where an operator close (the close button, File, Exit) stops all four.
 `StopBackgroundServicesAsync` awaits `SerialLink.DisconnectAsync()`, then `FrameDistributor.StopAsync()`, then
 `TrendFeed.StopAsync()`, then `SpectrumStore.StopAsync(drainToken)`, all inside one 5 s limit of real time; a timeout
 logs a Warning. The link stops first, so no frame enters the channel after the distributor has stopped reading it, and
 the distributor stops before the store, so no frame reaches the store after its queue has closed. The trend feed
 stops in between, so no trend read holds a reader snapshot when the store checkpoints. The trend feed's stop ends
-within one 256-row token check of each tracked read, so it adds milliseconds. Each stop runs in a `finally`
+within one 256-row token check of each tracked read, and ends the start read's wait for `Opened` at once, so it adds
+milliseconds. Each stop runs in a `finally`
 of the one before, so the later services stop even when an earlier stop throws; any failure logs an Error, and the
 window closes anyway, because the stop task never faults. The store's drain token fires 1.5 s before the 5 s limit
 ends. From the store's stop on it starts no retention pass, and a held lock fails each statement it starts after about
@@ -531,7 +536,10 @@ SNR has no unit, because the board sends a ratio. The update time is `ReceivedAt
 4. A key change, throttled at 500 ms, snapshots the visible window on the UI thread and starts one re-read on the
    thread pool: the plan's ranges through `SpectrumHistory.IntensityPointsAsync`, each chunk landed in the cache. A
    newer key change cancels it.
-5. A click on the trend reads the spectrum of that moment, from the cache's recent spectra or the store, and shows it
+5. At start, once `SpectrumStore.Opened` completes true, the feed reads the last stored spectrum before the cache's
+   `RunStart` and asks the cache for the stored day at its key; that request takes the same throttled read as a key
+   change.
+6. A click on the trend reads the spectrum of that moment, from the cache's recent spectra or the store, and shows it
    through `SwitchingSpectrumSource`.
 
 The trend's intensity of a spectrum is the mean of its pixels in the `SpectrometerCalibration.Window(nm, delta)` of its
@@ -547,13 +555,15 @@ the last 120 s by millisecond receive time, held by reference, since the pixel a
 
 `Add(ReceivedFrame)` passes every frame to the continuity rule and keeps its breaks and marks, then for a spectrum:
 
-- the first spectrum sets the key and asks for nothing;
+- the first spectrum sets the key and asks for nothing, unless the stored day request already set a key (Key change
+  and re-read);
 - a spectrum at the key adds one point: `QueryWindows.MeanOf` over the frame's window when the device covers the
   wavelength, NaN otherwise;
 - a spectrum with another wavelength or `delta` changes the key (below).
 
-After each add, and after each landed chunk, it drops the points, breaks and marks older than 24 h before
-`TimeProvider.GetUtcNow()`, the store's retention rule. `Changed` signals after every added frame and every landed
+After each add, after each landed chunk and before each `FoldCurrent`, it drops the points, breaks and marks older
+than 24 h before `TimeProvider.GetUtcNow()`, the store's retention rule, so loaded history leaves the chart after a
+day also while no frame arrives. `Changed` signals after every added frame and every landed
 chunk; `HistoryLanded` signals after a landed chunk, just before its `Changed`. They and `ReReadRequested` are private
 subjects exposed with `AsObservable()`. Every emission happens after the lock is released, one at a time under a
 second lock. `Dispose` sets a flag under the first lock, so a frame or a chunk that arrives after it changes nothing,
@@ -572,16 +582,27 @@ points takes about 3 MB.
 
 ### Continuity
 
-`FrameContinuity` sees every frame in receive order, spectra and heartbeats, and owns a `SequenceTracker`. Two 10 s
-rules use the link's silence limit, `LinkTiming.SilenceLimit`, and they measure different silences:
+Two 10 s rules use the link's silence limit, `LinkTiming.SilenceLimit`, and they measure different silences: the
+`seq` rule of `FrameContinuity` measures the silence between frames of any kind, and the NoSpectra rule of the fold
+measures the gap between points.
+
+`FrameContinuity` sees every frame in receive order, spectra and heartbeats, and owns a `SequenceTracker`:
 
 | Case | Result |
 | --- | --- |
 | the first frame | the `seq` baseline; nothing |
 | more than 10 s after the previous frame of any kind | `SequenceTracker.Reset()`; this frame is the new baseline, so the `seq` step across the silence is no loss |
 | up to 10 s after the previous frame, the tracker counts k > 0 lost | a Loss break at this frame with k lost |
-| a spectrum more than 10 s after the previous spectrum | a NoSpectra break at this spectrum with 0 lost, besides the above, whatever heartbeats came between |
 | the measuring device's measurement-failed bit in the frame's `state` | a failure mark at this frame with only that bit |
+
+Every spectrum, live or stored, is one point, NaN for an uncovered device, so `TrendTimeline.Fold` takes the NoSpectra
+rule from the points. It compares each point in range with the point before it, also the one just before the range,
+and adds a break with 0 lost at a point more than 10 s after its predecessor, whatever heartbeats came between;
+exactly 10 s is no break. NaN points count as spectra. One rule covers a live silence, the time the app was closed and
+the closed periods inside the stored day. While a re-read's chunks land, an hour not read yet shows as a break until
+it lands. Frames the store dropped (a full queue, a failed batch) are absent from the file, so in loaded history a
+dropped stretch of more than 10 s folds as a NoSpectra break although the board sent spectra; in the live run the
+same stretch draws as a line.
 
 The measuring device is the device of this spectrum, or of the last spectrum before a heartbeat; before the first
 spectrum no device has measured and no bit marks. The board measures with one spectrometer, chosen by the wavelength
@@ -596,11 +617,11 @@ heartbeat-only stretch can carry both a NoSpectra and a Loss break. A break's ki
 without spectra. The fold counts both kinds into the column's `BreakCount`, sums the lost spectra into `LostCount` and
 counts the breaks with none lost into `NoSpectraCount`.
 
-Breaks and marks come from `seq`, time and `state`, never from the wavelength or `delta`, so they belong to the run,
-not to the key. The store wipes the instance file at open and the trend feed subscribes before the distributor
-starts, so every stored frame passed through the cache first. The cache therefore keeps its breaks and marks for its
-whole life, a key change recomputes point values only, and the store's points read returns points only. The store's
-heartbeat table has no reader in the app.
+Loss breaks and failure marks come from `seq`, time and `state`, never from the wavelength or `delta`, so they belong
+to the run, not to the key: the cache keeps them for its whole life, and a key change recomputes point values only.
+The store's points read returns points only, so the stored day of earlier runs brings its NoSpectra breaks through the
+fold but none of its Loss breaks or failure marks, although the file keeps `seq` and `state`. The store's heartbeat
+table has no reader in the query service.
 
 ### Key change and re-read
 
@@ -609,9 +630,20 @@ recomputes the recent spectra at the new key at once and raises `ReReadRequested
 the store is asked only for rows older than `recentStart`, the start of the recent spectra.
 The store writes in batches behind its queue, so the newest rows may not be in the file yet; 120 s covers the writer's
 normal lag. `recentStart` and the recent spectra share the millisecond stamps, so the store's `received_at <
-recentStart` and the recent set meet with no double point. The feed logs each key change at Debug with the new key
-and the generation, which counts the key changes. A return to the previous key is a change like any other and
-re-reads; the 500 ms throttle joins fast changes into one read.
+recentStart` and the recent set meet with no double point. The feed logs each re-read request at Debug with its key
+and its generation, which counts the requests. A return to the previous key is a change like any other and re-reads;
+the 500 ms throttle joins fast changes into one read.
+
+The stored day of earlier runs takes the same path. The cache records `RunStart`, the `TimeProvider`'s now, at
+construction. `App.Configure` resolves the cache before `Opened` starts the distributor, so every live frame is
+received after `RunStart`, and every stored row before it belongs to an earlier run. `RequestStoredDay(storedKey)`
+does nothing once a key change raised a request (the generation is not 0), since that re-read covers the stored day
+up to its own `recentStart`. Otherwise it keeps a live key if a live spectrum set one, else takes the stored key,
+raises the generation and raises `ReReadRequested(generation, key, RunStart)`. The plan then runs with `newest =
+RunStart` when no live point exists, so it covers `[RunStart - 24 h, RunStart)`, the visible window first. A later key
+change cancels it like any re-read. When the app was closed for longer than the 10 min window, the window is empty
+and the overview band fills as the hour chunks land, newest first; the chart's empty-state line stays until the first
+chunk with points lands.
 
 `LandHistory(generation, chunk)` inserts a chunk's points in time order when its generation is current and ignores it
 otherwise. Chunks never overlap each other or the recent spectra, because every planned range ends at `recentStart`.
@@ -627,10 +659,11 @@ cancel land within one chunk.
 ### The feed
 
 `TrendFeed` is a singleton over the distributor, the cache, the trend chart, the switching source, two read delegates
-(`SpectrumHistory.IntensityPointsAsync` and `SpectrumAtAsync`), the message panel, the UI scheduler, a throttle
-scheduler and its logger.
+(`SpectrumHistory.IntensityPointsAsync` and `SpectrumAtAsync`), the store's `Opened` task, the message panel, the UI
+scheduler, a throttle scheduler and its logger.
 
-- `Start()` subscribes the key change log, the two read pipelines and Back to live, then `FrameDistributor.Frames`
+- `Start()` subscribes the re-read log, the two read pipelines, the start read and Back to live, then
+  `FrameDistributor.Frames`
   with `IntensityCache.Add`, and logs a Debug line. `Add` takes a mean over at most 2048 pixels; it never touches
   SQLite and never blocks the distributor.
   `Start` after a start or a stop does nothing.
@@ -641,7 +674,15 @@ scheduler and its logger.
   thread. A newer request disposes the read in flight, which cancels its token, and `IntensityPointsAsync` checks it
   every 256 rows. A failed range
   reports one `TrendHistoryError` (Warning) through `TryReportFailure` and ends that read; the trend keeps only the
-  data since the change. A read that ends after the stop reports nothing.
+  data since the change. A read that ends after the stop reports nothing. A read that lands every range logs one
+  Information line "The trend history read for generation {Generation} landed {Points} points: visible window after
+  {VisibleMs} ms, last chunk after {LastChunkMs} ms"; the visible time is that of the first landed chunk. On the
+  operator PC this line of the start read is the cold-read measure.
+- The start read is one `Observable.Create` with a cancellation token, tracked like every read. It awaits `Opened`
+  with that token; on false it logs one Debug line and reads nothing. On true it reads `SpectrumAtAsync(RunStart -
+  1 ms)`: no spectrum logs one Debug line, a failed read reports one `TrendHistoryError`, and a spectrum calls
+  `RequestStoredDay` at its wavelength and `delta`. Disposing the subscription in `StopAsync` or `Dispose` cancels the
+  token, so a stop ends the wait before `Opened` as well as the key read after it.
 - The moment pipeline is `Select(ReadMomentFrom)`, each read hopping with `ObserveOn(uiScheduler)`, then `Switch()`,
   so a second click cancels the first read, also one already queued for the UI thread. A moment inside the cache's recent spectra needs no store read; any other moment reads
   `SpectrumAtAsync`. A found spectrum goes to `SwitchingSpectrumSource.ShowMoment`; none (before the first row) changes
@@ -836,31 +877,44 @@ Avalonia 12 throw `ArgumentOutOfRangeException` from the logical-tree detach, an
 
 ## Spectrum store
 
-### Files and sweep
+### Files
 
-The store folder is `%LOCALAPPDATA%\SemiSpec\Spectra`, and the instance file is `spectra-<process id>.db`.
-Two live processes never share a process id, so two running copies never share a file. Before the open,
-`StoreFiles.Prepare` creates the folder, deletes the own file and its `-wal` and `-shm` sidecars (left by a dead
-process with the same id), then tries to delete every other `spectra-<digits>.db`; a name with anything else between
-`spectra-` and `.db`, such as `spectra-1234 - Copy.db`, stays. SQLite on Windows opens a file without delete sharing,
-so the delete of a live instance's file fails, and that file stays; a delete that succeeds also deletes the file's
-sidecars. Sidecars whose `.db` is gone are deleted too. A failure on the folder or the own file fails `Prepare`; a
-failure on any other file only keeps that file, and a folder that cannot be listed skips the sweep. The result carries
-the counts of deleted and kept files, which the store logs at Debug, or the listing failure. No process-id probing
-exists, so a reused id cannot keep a dead file alive.
+The store folder is `%LOCALAPPDATA%\SemiSpec\Spectra`, and the history file is `spectra.db` there. The file stays
+across restarts, and retention keeps it at about one day of data. Two running copies open the same file. Before the
+open, `StoreFiles.Prepare` creates the folder and deletes the per-process files of older builds: each
+`spectra-<digits>.db` with its `-wal` and `-shm` sidecars, and the legacy sidecars whose `.db` is gone. A name with
+anything else between `spectra-` and `.db`, such as `spectra-1234 - Copy.db`, stays, and so do `spectra.db`,
+`spectra.db.damaged` and `spectra.broken-*.db`, which carry no digits after `spectra-`. SQLite on Windows opens a file
+without delete sharing, so the legacy file of a running older build fails its delete and stays. `Prepare` also deletes
+a damage marker whose `spectra.db` is gone, so a file deleted by hand does not fail every later open. A failure to
+create or list the folder fails `Prepare`; a failure on one file only keeps that file. The result is the count of
+legacy files deleted, which the writer logs at Information when it is not 0. The cleanup runs at every start; after
+the first it finds nothing.
 
-`StoreFiles.Sweep` runs the same sweep without touching the own file. The retention path runs it once an hour while the
-store is not stopped, so a copy that runs for days still deletes the files of copies that exited meanwhile. A listing
-failure follows the incident rule of retention (The writer service): the first logs a Warning with the stack, repeats
-log at Debug, and the next sweep that lists the folder logs one Information line.
+A clean exit checkpoints and closes the file. A crash leaves the WAL, which SQLite replays at the next open.
 
-A clean exit checkpoints and closes the file and leaves it; the next sweep of a running copy, or the next start's
-sweep, deletes it. A crash leaves the same state, so one cleanup path covers both, and a closed run's file can still be
-copied for diagnosis until then.
+A damaged file is set aside, never repaired. `StoreDamage.IsDamage` is true for a `SqliteException` with code 11
+(`SQLITE_CORRUPT`) or 26 (`SQLITE_NOTADB`) anywhere in the cause chain; any other failure (a held lock, a file that
+cannot be opened, an I/O error) leaves the file in place, because the file may be intact. The open reads only the
+header and the schema page, so damage there shows at the open (Writes), and damage deeper in the file shows later, as
+a failed batch, retention pass, checkpoint or read. On such a later failure the writer or `SpectrumHistory` calls
+`StoreFiles.MarkDamaged`, which creates the empty file `spectra.db.damaged` and swallows its own `IOException` and
+`UnauthorizedAccessException`. The running copy keeps its connection and still appends to the intact pages: a rename
+under an open connection fails on Windows, the reader and the writer run on different threads with their own
+connections, and only the open has the file to itself. The next open finds the marker before it opens the file and
+sets the file aside as an unreadable one.
+
+`StoreFiles.SetAside(path, localNow)` renames the closed file to `spectra.broken-<yyyyMMdd-HHmmss>.db` in local time,
+the clock the operator reads, moves its `-wal` beside it as `<new name>-wal`, deletes the `-shm` (SQLite rebuilds it
+from the WAL on any open) and the marker, then deletes the set-aside files beyond the newest 2, ordered by name, since
+the stamp sorts. Two slots keep the latest damage and show whether it repeats, and cap the extra disk at about 1.5 GB.
+No `PRAGMA quick_check` runs at the open: it reads every page, about 765 MB on a full day, before the trend can read.
+`synchronous=NORMAL` in WAL mode loses at most the last transactions on a power cut and leaves the file intact, so a
+damaged file means a disk fault or a foreign write, not a routine crash.
 
 ### Schema and connections
 
-Every start begins with an empty file, so the schema has no migration code:
+The schema is version 1, kept in the file's `PRAGMA user_version`:
 
 ```sql
 CREATE TABLE spectrum (
@@ -882,13 +936,30 @@ CREATE TABLE heartbeat (
 CREATE INDEX heartbeat_time ON heartbeat (received_at);
 ```
 
+`SpectrumDatabase.Open` reads `user_version` and the table count from `sqlite_master` in one `BEGIN IMMEDIATE`
+transaction:
+
+| `user_version` | Tables | Open |
+| --- | --- | --- |
+| 0 | none | creates the schema and sets `user_version = 1` in that transaction |
+| 1 | any | uses the file |
+| 0 | some | fails with `StoreSchemaMismatchError(found: 0)` |
+| other | any | fails with `StoreSchemaMismatchError(found)` |
+
+On a mismatch the writer deletes the file with its sidecars and its damage marker, opens again, and logs one Warning
+naming both versions. No panel entry follows, since an app update causes it and the operator can do nothing about it.
+The writer deletes the file instead of setting it aside: the rows are disposable 24 h history, and no build reads
+another version's file. An older build with a lower `SchemaVersion` deletes a newer file the same way. A schema change
+raises `SchemaVersion`; no migration code exists.
+
 Every spectrum keeps its full pixels, because SCADA can change the wavelength mid-run and a series at any wavelength is
 read from the pixels. `received_at` is not unique: the frames of one decode pass share a stamp, so `id` orders rows
 with equal stamps. SQLite stores a NaN double as NULL, so the float columns are nullable and read NULL back as NaN.
 `pixels` is the last column, so a read of the narrow columns never touches the blob's overflow pages. Heartbeats go to
 their own table, so the series scans spectra only; a heartbeat carries the measuring spectrometer's own failure bit and
-marks 3 s without a spectrum (`board-protocol.md`). No query of the app reads the heartbeat table: the trend takes its
-breaks and marks from the live frames (Trend). The store keeps writing it, for the diagnosis of a copied file.
+marks 3 s without a spectrum (`board-protocol.md`). No read of the query service touches the heartbeat table: the trend
+takes its Loss breaks and marks from the live frames and its NoSpectra breaks from the points (Trend, Continuity), and
+only retention reads the table's newest `received_at`. The store keeps writing it, for the diagnosis of a copied file.
 
 `StoreConnection.Open` uses `Data Source=<file>;Mode=ReadWriteCreate;Pooling=False;Default Timeout=2` and runs
 `PRAGMA journal_mode=WAL`, `PRAGMA synchronous=NORMAL` and `PRAGMA journal_size_limit=67108864` on every connection.
@@ -900,13 +971,20 @@ WAL back to 64 MB after a checkpoint. `Default Timeout=2` bounds Microsoft.Data.
 
 ### Writes
 
-`SpectrumDatabase` owns the writer connection. `Open` creates the schema. `Write` writes a batch in one
+`SpectrumDatabase` owns the writer connection. `Open` applies the version gate (Schema and connections); a
+`SqliteException` with a damage code during the open, at the pragmas, the version read or the schema read, becomes
+`StoreFileUnreadableError` carrying the exception, and any other `SqliteException` or `IOException` stays a plain
+failure. `Write` writes a batch in one
 `BEGIN IMMEDIATE` transaction with one reused parameterised command per table; `BEGIN IMMEDIATE` takes the write lock
 at the start, so a held lock fails the batch there after the busy timeout and never halfway through it. A parameter
 takes a `byte[]`, so each frame's pixels are copied into a new array. `ShortenBusyTimeout` drops the busy timeout of
 every later statement to 1 s, the shortest Microsoft.Data.Sqlite counts, since it counts whole seconds and waits
-forever on 0. `DeleteBefore(cutoff)`
-deletes from both tables in one `BEGIN IMMEDIATE` transaction. `CheckpointAndClose` runs
+forever on 0. `DeleteBefore(cutoff)` reads `max(received_at)` of both tables, one index seek each, inside one
+`BEGIN IMMEDIATE` transaction. When both are below the cutoff or null, it runs `DELETE FROM spectrum; DELETE FROM
+heartbeat;` without `WHERE`: the tables have no triggers, so SQLite takes its truncate optimisation and frees whole
+pages. Otherwise it deletes the rows received before the cutoff from both tables, which visits every such row and its
+index entry. On a fully expired day of 762.4 MB the fast path took a median of 77.9 ms against 908.5 ms row by row
+(dev laptop, warm OS cache, 2026-11-06). The freed pages stay in the file and are reused. `CheckpointAndClose` runs
 `PRAGMA wal_checkpoint(TRUNCATE)` and closes the connection whatever the outcome; it returns `WalCheckpoint.Busy` when
 a reader's snapshot kept the WAL, because that checkpoint calls no busy handler and returns at once. Each operation
 returns a FluentResults `Result`, with a `SqliteException` or `IOException` as an `ExceptionalError`.
@@ -922,10 +1000,21 @@ returns a FluentResults `Result`, with a `SqliteException` or `IOException` as a
   about 6 min of ATP-2000 spectra at the port's cap of about 2.8 per second. Then `Start` runs the writer task.
   `Start` after a start or a stop does nothing. The writer task is a `StoreWriter`, which `Start` creates over the
   queue's reader and the store's count of dropped frames, and which logs through the store's logger.
-- The writer task prepares and opens the file on the thread pool, so the UI thread does no file I/O; frames that
-  arrive meanwhile wait in the queue. The log line "Spectrum store file <path>" names the opened file.
+- The writer task opens the file on the thread pool through `StoreOpening`, so the UI thread does no file I/O; frames
+  that arrive meanwhile wait in the queue. `StoreOpening` runs `Prepare`; when the damage marker exists it sets the
+  file aside before it opens it; otherwise it runs `SpectrumDatabase.Open`. A `StoreSchemaMismatchError` deletes the
+  file and opens again (Schema and connections). A `StoreFileUnreadableError` or the marker sets the file aside (Files),
+  opens a fresh file, logs one Warning naming both paths and the cause, and reports one `StoreFileReplacedError`
+  (Warning) through `TryReportFailure`, whose line adds the panel text with the SQLite stack. A set-aside or a reopen
+  that fails ends in `StoreOpenError`. Then one retention pass runs, so a file closed for days loses its expired rows
+  before the trend reads it; the log line "Spectrum store file <path>" names the opened file.
+- `Opened` is a `Task<bool>` from a `TaskCompletionSource<bool>` with `RunContinuationsAsynchronously`. The writer
+  completes it true after the open and the retention at open, and false when the open fails or a cancel ends the
+  writer before or during the open; a `StopAsync` before `Start` completes it false. The trend's start read waits for
+  it.
 - The loop waits for the queue or the next retention time, whichever comes first, takes up to 256 frames and writes
-  them as one batch. A failed batch counts its frames as dropped. A failure incident runs from the first failed batch
+  them as one batch. A failed batch counts its frames as dropped, and a batch that fails with a damage code marks the
+  file (Files). A failure incident runs from the first failed batch
   to the next successful one. Its first failure reports one `StoreWriteError` through `TryReportFailure`, which writes
   the one Warning line with the cause's stack; each later failure logs one Debug line without the stack and reaches no
   panel, so the panel gets one entry per incident. The next successful batch logs one Information line "Spectrum store
@@ -936,14 +1025,14 @@ returns a FluentResults `Result`, with a `SqliteException` or `IOException` as a
   The report writes the failure's one log line, at Error, with the original exception. The writer closes the file without a checkpoint, keeps the subscription, and from
   then on counts every frame still queued and every later frame as dropped, so "Dropped frames" keeps growing while
   nothing is stored.
-- Retention runs once a minute, also while no frame arrives: `StoreRetention` reads `now` once and runs
-  `DeleteBefore(now - 24 h)`, where the wait is `Task.Delay` on the `TimeProvider`, raced with `WaitToReadAsync`, and
-  `now` is `TimeProvider.GetUtcNow()`, the same UTC wall clock as `ReceivedAt`. No `VACUUM` runs: the freed pages are
-  reused, so the file stays at about one day of data. The first pass records `now`; a later pass whose `now` is an hour
-  or more past the last record runs `StoreFiles.Sweep` and records it again. A failed retention pass reaches no panel,
+- Retention runs at the open and then once a minute, also while no frame arrives: `StoreRetention` reads `now` once
+  and runs `DeleteBefore(now - 24 h)`, where the wait is `Task.Delay` on the `TimeProvider`, raced with
+  `WaitToReadAsync`, and `now` is `TimeProvider.GetUtcNow()`, the same UTC wall clock as `ReceivedAt`. No `VACUUM` runs: the freed pages are
+  reused, so the file stays at about one day of data. A failed retention pass reaches no panel,
   because no data is lost; it follows the batch incident rule: the first failure of a run logs a Warning with the
   stack, each repeat one Debug line without it, and the next successful pass one Information line "Spectrum store
-  retention recovered after N failed passes". A failed checkpoint logs a Warning.
+  retention recovered after N failed passes". A failed checkpoint logs a Warning. A retention pass or a checkpoint that
+  fails with a damage code marks the file.
 - `DroppedFrames` is a count written by the distributor task and the writer task. `DroppedFramesChanged` is a private
   subject exposed with `AsObservable()` that carries the new count; the add and the emission share one lock, so the
   counts of the two threads arrive in order.
@@ -951,7 +1040,7 @@ returns a FluentResults `Result`, with a `SqliteException` or `IOException` as a
   normal end and a plain close after a failure or a cancellation. No other thread closes the connection, so no close
   lands inside a write, a retention pass or a checkpoint. The writer's last line, at Debug, names the stored and
   dropped counts and the checkpoint, kept as the `Result<WalCheckpoint>` of `CheckpointAndClose` or none: `Truncated`,
-  `Busy` (a reader's snapshot kept the WAL, which the next start deletes with the file), `Failed` or `Skipped`.
+  `Busy` (a reader's snapshot kept the WAL, which the next open replays), `Failed` or `Skipped`.
 - `StopAsync(drainToken)` disposes the subscription, completes the queue and awaits the writer, which writes what is
   still queued and checks the token between batches, never inside one. From the stop on, no retention pass starts,
   and the writer calls `ShortenBusyTimeout` right before each batch and the checkpoint, so a statement it starts
@@ -967,7 +1056,7 @@ The link's channel drops are the other half of the dropped count (`board-protoco
 ### Queries
 
 `SpectrumHistory(path)` opens a reader connection per call inside `Task.Run`. A `SqliteException` returns a failed
-`Result`; a cancellation throws `OperationCanceledException` and never returns a failed result.
+`Result`, and one with a damage code also marks the file (Files); a cancellation throws `OperationCanceledException` and never returns a failed result.
 
 - `SpectrumAtAsync(moment)` returns the spectrum with the latest `received_at` at or before the moment, ties to the
   larger `id`, as a `StoredSpectrum` that rebuilds a new `SpectrumMeasurement` with `ReceivedAt`, `seq` and `state`;
@@ -1056,6 +1145,7 @@ extensions:
 | `StoreOpenError` | Error: nothing is stored for the run |
 | `StoreWriteError` | Warning: the lost frames count as dropped; after a failed batch the store keeps trying |
 | `StoreStoppedError` | Error: nothing more is stored for the run, and every later frame counts as dropped |
+| `StoreFileReplacedError` | Warning: the damaged file is set aside and a new one started; the operator acts only when it repeats |
 | `TrendHistoryError` | Warning: the trend shows only the data since the change; no remedy is owed |
 | `TrendMomentError` | Warning: the operator clicks another moment |
 | an exception error | Error; the detail keeps the exception type and message |

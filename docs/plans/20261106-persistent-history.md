@@ -584,17 +584,23 @@ file to the developer." / ru "Действий не требуется. Если
     and awaits a cancelled key read after it, inside the 5 s `_backgroundStopLimit` of `App.axaml.cs`.
 
 ### Task 10: [Final] Update documentation
-- [ ] `docs/architecture/overview.md`: Startup (the store's history file, the start read after `Opened`);
+- [x] `docs/architecture/overview.md`: Startup (the store's history file, the start read after `Opened`);
   Components (the `StoreFiles` row and the store writer row); Trend, Continuity (NoSpectra from point gaps, the
   stored day loaded at start); Trend, Key change and re-read (the start read); Spectrum store, Files and sweep
   (one file, legacy cleanup, schema version, set-aside, the damage marker); Spectrum store, The writer service
   (retention at open and its fast path, `Opened`)
-- [ ] `docs/architecture/README.md`, Locked decisions, the Spectrum storage row: one `spectra.db` kept across
+- [x] `docs/architecture/README.md`, Locked decisions, the Spectrum storage row: one `spectra.db` kept across
   restarts, `user_version`, set-aside of damaged files
-- [ ] `docs/architecture/ui-text.md`, The keys, the `ErrorMessageMapper` row: `StoreFileReplaced*`
-- [ ] `readme.md`: no sentence becomes false (introduction: "хранит спектры за последние 24 часа"; the feature
+- [x] `docs/architecture/ui-text.md`, The keys, the `ErrorMessageMapper` row: `StoreFileReplaced*`
+- [x] `readme.md`: no sentence becomes false (introduction: "хранит спектры за последние 24 часа"; the feature
   list: the trend for 24 h and the overview band); leave it
-- [ ] move this plan to `docs/plans/completed/`
+- [x] move this plan to `docs/plans/completed/` (not moved: archiving belongs to delivery, after the owner tests the
+  branch)
+- ➕ Also updated where a sentence became false: `overview.md` Purpose, Trend Data flow, The intensity cache, The feed,
+  Spectrum store Schema and connections, Writes and Queries, the Error route table; the README Trend row;
+  `testing-strategy.md` Store, Trend, Composition root and App lifecycle rows. "Files and sweep" is now "Files"; no
+  link pointed at the old name. `CLAUDE.md` stays: nothing in it became false. The final count of item 5 is in
+  Task 9: 1045 of 1045.
 
 ## Post-Completion
 *Items requiring manual intervention or external systems - no checkboxes, informational only*
