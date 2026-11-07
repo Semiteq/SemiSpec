@@ -208,12 +208,12 @@ Members:
 - Modify: `SemiSpec/SemiSpec.UI/Localization/Resources.resx`, `Resources.ru.resx`
 - Create: `SemiSpec/SemiSpec.Tests.Unit/UI/Instance/SecondLaunchTests.cs`
 
-- [ ] `SecondLaunch.Run` with one retry; the `SingleInstanceNotResponding` key in both sets
-- [ ] `NativeMethods` with the three `DllImport` declarations
-- [ ] `Program.Main` claims after the logger; a secondary calls `AllowSetForegroundWindow(ASFW_ANY)` and returns
+- [x] `SecondLaunch.Run` with one retry; the `SingleInstanceNotResponding` key in both sets
+- [x] `NativeMethods` with the three `DllImport` declarations
+- [x] `Program.Main` claims after the logger; a secondary calls `AllowSetForegroundWindow(ASFW_ANY)` and returns
   `SecondLaunch.Run`'s exit code before "SemiSpec starting"
-- [ ] write `SecondLaunchTests` of Acceptance Evidence item 1, the concurrent case included
-- [ ] run `dotnet test SemiSpec.slnx` - must pass before next task
+- [x] write `SecondLaunchTests` of Acceptance Evidence item 1, the concurrent case included
+- [x] run `dotnet test SemiSpec.slnx` - must pass before next task
 
 ### Task 3: Activation and release in the app
 **Files:**

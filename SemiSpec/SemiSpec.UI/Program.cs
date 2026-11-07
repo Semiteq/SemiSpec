@@ -2,16 +2,19 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using SemiSpec.Core;
+using SemiSpec.UI.Instance;
 using SemiSpec.UI.Logging;
 using SemiSpec.UI.Messages;
 
 using Serilog;
+using Serilog.Extensions.Logging;
 
 namespace SemiSpec.UI;
 
 public static class Program
 {
 	private const int FailedExitCode = 1;
+	private const string ProductName = "SemiSpec";
 
 	[STAThread]
 	public static int Main()
@@ -35,6 +38,18 @@ public static class Program
 
 		try
 		{
+			using var instanceLoggers = new SerilogLoggerFactory(logging.Value.Logger);
+			var instanceLogger = instanceLoggers.CreateLogger(nameof(SingleInstance));
+			using var instance = SingleInstance.Claim(SingleInstance.ProductionName, instanceLogger);
+
+			if (!instance.IsPrimary)
+			{
+				// Only the foreground process may hand the foreground on, and this just-launched copy is that process.
+				_ = NativeMethods.AllowSetForegroundWindow(NativeMethods.AnyProcess);
+
+				return SecondLaunch.Run(instance, SecondLaunch.AnswerLimit, ShowWarning, instanceLogger);
+			}
+
 			Log.Information("SemiSpec starting; log folder {LogFolder}", logging.Value.Folder);
 
 			using var serviceProvider = new ServiceCollection()
@@ -56,5 +71,11 @@ public static class Program
 		{
 			Log.CloseAndFlush();
 		}
+	}
+
+	/// <summary>A second launch opens no Avalonia window, so its message is a plain Win32 box.</summary>
+	private static void ShowWarning(string text)
+	{
+		_ = NativeMethods.MessageBoxW(0, text, ProductName, NativeMethods.OkButtonWithWarningIcon);
 	}
 }
