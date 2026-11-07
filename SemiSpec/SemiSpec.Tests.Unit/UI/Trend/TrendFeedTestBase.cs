@@ -51,6 +51,7 @@ public abstract class TrendFeedTestBase : TrendChartTestBase
 			Switching,
 			ReadPointsAsync,
 			ReadSpectrumAsync,
+			StoreOpened.Task,
 			MessagePanel,
 			AvaloniaScheduler.Instance,
 			Throttle,
@@ -60,6 +61,10 @@ public abstract class TrendFeedTestBase : TrendChartTestBase
 
 	/// <summary>Every re-read request the cache raised, in order; the cache raises them on the test thread.</summary>
 	protected List<ReReadRequest> Requests { get; } = [];
+
+	/// <summary>The store's ready signal; pending unless a test completes it, so the start read waits.</summary>
+	protected TaskCompletionSource<bool> StoreOpened { get; } =
+		new(TaskCreationOptions.RunContinuationsAsynchronously);
 
 	protected TestScheduler Throttle { get; } = new();
 

@@ -62,6 +62,7 @@ public static class UiServiceCollectionExtensions
 				provider.GetRequiredService<SwitchingSpectrumSource>(),
 				history.IntensityPointsAsync,
 				history.SpectrumAtAsync,
+				provider.GetRequiredService<SpectrumStore>().Opened,
 				provider.GetRequiredService<MessagePanelViewModel>(),
 				provider.GetRequiredService<IScheduler>(),
 				DefaultScheduler.Instance,

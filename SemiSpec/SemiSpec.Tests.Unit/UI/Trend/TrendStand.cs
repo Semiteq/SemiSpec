@@ -49,6 +49,7 @@ public sealed class TrendStand : IDisposable
 			source,
 			(_, _, from, _, _) => Task.FromResult(Result.Ok(new IntensityChunk(from, []))),
 			(_, _) => Task.FromResult(Result.Ok<StoredSpectrum?>(null)),
+			Task.FromResult(false),
 			messagePanel,
 			uiScheduler,
 			uiScheduler,

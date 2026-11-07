@@ -533,13 +533,18 @@ file to the developer." / ru "Действий не требуется. Если
 - Create: `SemiSpec/SemiSpec.Tests.Unit/UI/Trend/TrendFeedStartReadTests.cs`
 - Modify: `SemiSpec/SemiSpec.Tests.Unit/UI/Trend/TrendFeedTestBase.cs`, `UI/Di/AppLifecycleTrendTests.cs`
 
-- [ ] `IntensityCache`: `RunStart`, `RequestStoredDay`, `DropExpired` in `FoldCurrent`
-- [ ] `TrendFeed`: take `storeOpened`, subscribe the tracked start read in `Start` with `WaitAsync(token)`, log the
+- [x] `IntensityCache`: `RunStart`, `RequestStoredDay`, `DropExpired` in `FoldCurrent`
+- [x] `TrendFeed`: take `storeOpened`, subscribe the tracked start read in `Start` with `WaitAsync(token)`, log the
   history read line, reword the key-change line; `AddUi` passes `SpectrumStore.Opened`
-- [ ] write `IntensityCacheStoredDayTests` and `TrendFeedStartReadTests` of Acceptance Evidence item 2, the stop
+- [x] write `IntensityCacheStoredDayTests` and `TrendFeedStartReadTests` of Acceptance Evidence item 2, the stop
   theory covering both phases
-- [ ] write `TheTrendShowsTheStoredPointsAfterARestart` of Acceptance Evidence item 3
-- [ ] run `dotnet test SemiSpec.slnx` - must pass before next task
+- [x] write `TheTrendShowsTheStoredPointsAfterARestart` of Acceptance Evidence item 3
+- [x] run `dotnet test SemiSpec.slnx` - must pass before next task (1044 of 1044)
+- ➕ `storeOpened` sits after `readSpectrum` in the `TrendFeed` constructor. `TrendFeedTestBase.StoreOpened` stays
+  pending unless a test completes it, so the existing feed tests see no start read; `TrendStand` passes a completed
+  false. The start read logs one Debug line when the store did not open or holds no spectrum. The history read line
+  is logged only by a read that lands every range; with no range in the visible window, its visible time is the
+  first chunk's. `EveryKeyChangeLogsAtDebugWithItsRunningCount` becomes `...WithItsGeneration` for the new wording.
 
 ### Task 9: Verify acceptance criteria
 - [ ] verify every Overview item is implemented and the scope guard holds (`git diff` touches no `.axaml` file)
