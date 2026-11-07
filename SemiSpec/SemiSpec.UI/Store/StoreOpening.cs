@@ -2,6 +2,7 @@ using System.Reactive.Concurrency;
 
 using FluentResults;
 
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
 using SemiSpec.Core.Store;
@@ -20,7 +21,17 @@ internal sealed class StoreOpening(
 	TimeProvider timeProvider,
 	ILogger logger)
 {
-	public Result<SpectrumDatabase> Open()
+	private const int SqliteBusy = 5;
+	private const int SqliteLocked = 6;
+
+	private static readonly TimeSpan _busyRetryInterval = TimeSpan.FromSeconds(0.5);
+
+	// Counted from the first busy failure, which itself waited out the 2 s busy timeout: 6 s from the start of the
+	// open, past the 5 s close limit of a closing copy of the app that holds the file.
+	private static readonly TimeSpan _busyRetryBudget = TimeSpan.FromSeconds(4);
+
+	/// <summary>A file another connection holds is retried, never replaced; giveUp ends the retries early.</summary>
+	public async Task<Result<SpectrumDatabase>> OpenAsync(CancellationToken giveUp)
 	{
 		var prepared = StoreFiles.Prepare(storeFile.Path);
 		if (prepared.IsFailed)
@@ -35,7 +46,7 @@ internal sealed class StoreOpening(
 				new Error("A failed read or write of an earlier run marked the spectrum store file as damaged"));
 		}
 
-		var opened = SpectrumDatabase.Open(storeFile.Path);
+		var opened = await OpenWhileBusyAsync(giveUp).ConfigureAwait(false);
 		if (opened.HasError<StoreSchemaMismatchError>(out var mismatches))
 		{
 			return ReplaceMismatched(mismatches.First());
@@ -44,6 +55,41 @@ internal sealed class StoreOpening(
 		return opened.HasError<StoreFileUnreadableError>(out var unreadable)
 			? ReplaceDamaged(unreadable.First())
 			: opened;
+	}
+
+	private async Task<Result<SpectrumDatabase>> OpenWhileBusyAsync(CancellationToken giveUp)
+	{
+		long? firstBusy = null;
+		while (true)
+		{
+			var opened = SpectrumDatabase.Open(storeFile.Path);
+			if (!IsBusy(opened))
+			{
+				return opened;
+			}
+
+			firstBusy ??= timeProvider.GetTimestamp();
+			if (timeProvider.GetElapsedTime(firstBusy.Value) >= _busyRetryBudget)
+			{
+				return opened;
+			}
+
+			logger.LogDebug("The spectrum store file {Path} is held by another connection; retrying", storeFile.Path);
+			try
+			{
+				await Task.Delay(_busyRetryInterval, timeProvider, giveUp).ConfigureAwait(false);
+			}
+			catch (OperationCanceledException) when (giveUp.IsCancellationRequested)
+			{
+				return opened;
+			}
+		}
+	}
+
+	private static bool IsBusy(Result<SpectrumDatabase> opened)
+	{
+		return opened.HasException<SqliteException>(
+			exception => exception.SqliteErrorCode is SqliteBusy or SqliteLocked);
 	}
 
 	private void LogLegacyFilesDeleted(int legacyFiles)
