@@ -547,11 +547,41 @@ file to the developer." / ru "Действий не требуется. Если
   first chunk's. `EveryKeyChangeLogsAtDebugWithItsRunningCount` becomes `...WithItsGeneration` for the new wording.
 
 ### Task 9: Verify acceptance criteria
-- [ ] verify every Overview item is implemented and the scope guard holds (`git diff` touches no `.axaml` file)
-- [ ] run Acceptance Evidence items 1 to 6; record the final count
-- [ ] run the warm benchmark of item 7 and record its trend rows with the date and commit
-- [ ] verify edge cases: a store open that fails leaves the trend empty with one `StoreOpenError`; a key change
+- [x] verify every Overview item is implemented and the scope guard holds (`git diff` touches no `.axaml` file)
+- [x] run Acceptance Evidence items 1 to 6; record the final count
+- [x] run the warm benchmark of item 7 and record its trend rows with the date and commit
+- [x] verify edge cases: a store open that fails leaves the trend empty with one `StoreOpenError`; a key change
   during the start read cancels it; a close during the start read ends inside the 5 s close limit
+- [x] item 8 (retention timing) was recorded in Task 2, item 8.6 (manual, done on the dev laptop)
+- [x] item 9 (cold read after a reboot) and the manual smoke checklist (manual, for the owner on the operator PC)
+- ➕ Results, 2026-11-07, at `26ddaf6` plus the test below:
+  - Scope guard: `git diff --name-only master...HEAD` lists 42 files; none is `.axaml`, a settings file, or under
+    `Protocol/` or `Link/`. Every Overview item maps to a checked task and a named test.
+  - Item 1 `Area=Store` 152 of 152; item 2 `Area=Trend` 270 of 270; item 3 `Area=Di` 31 of 31; item 4
+    `Area=Messages|Area=Resources` 55 of 55. Every test named in items 1 to 4 exists in a class with the matching
+    `Area` trait.
+  - Item 5: `dotnet test SemiSpec.slnx` passes 1045 of 1045, none skipped. Item 6: Release build 0 warnings,
+    `dotnet format --verify-no-changes` exit 0, `dotnet terse` over the 39 `.cs` files the branch adds or changes
+    exit 0.
+  - Item 7, warm, dev laptop, at `26ddaf6`, default options (172 800 ATP-2000 rows, 24 churn rounds); cells read
+    "first; median (min to max)" of 5:
+
+    | Row | Target (warm median, churned) | Fresh | Churned | Verdict |
+    | --- | --- | --- | --- | --- |
+    | Cache fold, 24 h, 2048 columns | at most 20 ms | 1.5; 1.4 (1.4 to 1.4) ms | 1.4; 1.4 (1.4 to 1.4) ms | met |
+    | Cache fold, 10 min, 2048 columns | at most 2 ms | 0.2; 0.1 (0.1 to 0.1) ms | 0.1; 0.1 (0.1 to 0.1) ms | met |
+    | Re-read, visible 10 min, to its landing | at most 100 ms | 10.5; 4.6 (4.4 to 12.6) ms | 5.0; 4.6 (4.4 to 5.2) ms | met |
+    | Re-read, whole day, to the last chunk | at most 2 000 ms | 771.5; 755.6 (733.8 to 825.7) ms | 746.6; 751.6 (743.0 to 840.2) ms | met |
+
+    Against the `ea86598` re-run the churned fold 24 h is unchanged (1.4 ms), so the gap scan costs nothing
+    measurable; the churned whole day moved from 720.4 to 751.6 ms (4 %), inside that run's own 694.7 to 754.9 ms
+    spread.
+  - Edge cases: `AFailedOpenReportsOneErrorAndCountsEveryFrameAsDropped` and `OpenedCompletesFalseWhenTheOpenFails`
+    give one `StoreOpenTitle` entry and `Opened` false; `AFailedStoreOpenAsksNoHistoryRead` shows no read follows,
+    so the trend stays empty. The new `TrendFeedStartReadTests.AKeyChangeDuringTheStartReadCancelsIt` holds the
+    start read's first chunk, feeds a live spectrum at another wavelength, and sees the held read's token cancelled
+    and the new key read. `StopDuringTheStartReadCancelsItAndAwaitsIt` ends the stop within 1 s before `Opened`
+    and awaits a cancelled key read after it, inside the 5 s `_backgroundStopLimit` of `App.axaml.cs`.
 
 ### Task 10: [Final] Update documentation
 - [ ] `docs/architecture/overview.md`: Startup (the store's history file, the start read after `Opened`);

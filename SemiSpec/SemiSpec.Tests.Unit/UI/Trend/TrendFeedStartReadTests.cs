@@ -89,6 +89,25 @@ public sealed class TrendFeedStartReadTests : TrendFeedTestBase
 		Requests.Should().BeEmpty();
 	}
 
+	[AvaloniaFact]
+	public async Task AKeyChangeDuringTheStartReadCancelsIt()
+	{
+		SpectrumResult = _ => Result.Ok<StoredSpectrum?>(StoredAt(Start.AddMinutes(-3), OtherNm));
+		StoreOpened.SetResult(true);
+		HoldPoints();
+		Feed.Start();
+
+		await PassThrottleUntilAPointsReadAsync();
+		var held = PointsCalls.Single();
+		held.WavelengthNm.Should().Be(OtherNm);
+
+		AddAt(1, ThirdNm);
+		PassThrottle();
+
+		held.Token.IsCancellationRequested.Should().BeTrue();
+		await Waits.UntilAsync(() => PointsCalls.Any(call => call.WavelengthNm == ThirdNm));
+	}
+
 	[AvaloniaTheory]
 	[InlineData(StopPhase.BeforeTheStoreOpened)]
 	[InlineData(StopPhase.DuringTheKeyRead)]
