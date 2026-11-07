@@ -4,6 +4,7 @@ using System.Threading.Channels;
 using AwesomeAssertions;
 
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Time.Testing;
 
 using SemiSpec.Core.Protocol;
 using SemiSpec.Tests.Unit.Core.Store;
@@ -81,7 +82,8 @@ public sealed class SpectrumStoreStopTests : SpectrumStoreTestBase
 			// The due timer resumes the writer inline on the advancing thread, so the pass runs off the test thread.
 			var retentionPass = Task.Run(
 				() => clock.Advance(TimeSpan.FromSeconds(61)), TestContext.Current.CancellationToken);
-			await Waits.UntilAsync(() => clock.Reads == 1);
+			// The pass at the open made the first read.
+			await Waits.UntilAsync(() => clock.Reads == 2);
 			await FeedAsync([.. Enumerable.Repeat(StoreSamples.Spectrum(StoreSamples.Start), Fed)]);
 			await Distributor.StopAsync().WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
 			using var drain = new CancellationTokenSource(CloseLimit - CloseReserve);
@@ -140,6 +142,23 @@ public sealed class SpectrumStoreStopTests : SpectrumStoreTestBase
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
+	public async Task OpenedCompletesFalseOnDisposeBeforeTheOpen()
+	{
+		using var clock = new HeldClock(StoreSamples.Start);
+		CreateStore(clock);
+		StartStore();
+		await Waits.UntilAsync(() => clock.Holding);
+
+		Store.Dispose();
+		clock.Release();
+
+		var opened = await Store.Opened.WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
+		opened.Should().BeFalse();
+		await Waits.UntilAsync(StoppedLogged);
+		Logger.Levels().Should().NotContain(level => level >= LogLevel.Warning);
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
 	public async Task StopDrainsTheQueueThenCheckpoints()
 	{
 		const int Fed = 600;
@@ -192,11 +211,39 @@ public sealed class SpectrumStoreStopTests : SpectrumStoreTestBase
 		var stop = Store.StopAsync(TestContext.Current.CancellationToken);
 
 		stop.IsCompletedSuccessfully.Should().BeTrue();
+		Store.Opened.IsCompletedSuccessfully.Should().BeTrue();
+		(await Store.Opened).Should().BeFalse();
 		Store.Start();
 		Distributor.Start();
 		Feed(StoreSamples.Spectrum(StoreSamples.Start));
 		await Task.Delay(NoWriteWait, TestContext.Current.CancellationToken);
 		File.Exists(StorePath).Should().BeFalse("Start after a stop opens no file");
 		Logger.Collector.Count.Should().Be(0);
+	}
+
+	/// <summary>A clock whose reads block until Release: the writer holds inside the retention at open.</summary>
+	private sealed class HeldClock(DateTimeOffset start) : FakeTimeProvider(start), IDisposable
+	{
+		private readonly ManualResetEventSlim _released = new();
+		private int _reads;
+
+		public bool Holding => Volatile.Read(ref _reads) > 0;
+
+		public void Release()
+		{
+			_released.Set();
+		}
+
+		public void Dispose()
+		{
+			_released.Dispose();
+		}
+
+		public override DateTimeOffset GetUtcNow()
+		{
+			Interlocked.Increment(ref _reads);
+			_released.Wait(Waits.Limit);
+			return base.GetUtcNow();
+		}
 	}
 }

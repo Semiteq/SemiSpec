@@ -72,6 +72,7 @@ public sealed class TrendFeedMomentTests : TrendFeedTestBase
 			Switching,
 			ReadPointsAsync,
 			ReadSpectrumAsync,
+			StoreOpened.Task,
 			MessagePanel,
 			ui,
 			Throttle,

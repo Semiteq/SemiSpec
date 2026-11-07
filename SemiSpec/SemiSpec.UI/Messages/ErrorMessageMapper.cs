@@ -53,6 +53,11 @@ public static class ErrorMessageMapper
 				Resources.StoreOpenDetail,
 				Resources.StoreOpenRemedy,
 				MessageSeverity.Error),
+			StoreFileReplacedError => new MessageView(
+				Resources.StoreFileReplacedTitle,
+				Resources.StoreFileReplacedDetail,
+				Resources.StoreFileReplacedRemedy,
+				MessageSeverity.Warning),
 			StoreWriteError => new MessageView(
 				Resources.StoreWriteTitle,
 				Resources.StoreWriteDetail,

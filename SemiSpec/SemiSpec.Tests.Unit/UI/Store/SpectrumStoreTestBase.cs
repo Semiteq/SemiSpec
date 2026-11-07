@@ -4,7 +4,6 @@ using System.Threading.Channels;
 using AwesomeAssertions;
 
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Time.Testing;
 
@@ -34,7 +33,7 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 
 	protected SpectrumStoreTestBase()
 	{
-		StorePath = Folder.FileIn("spectra-1.db");
+		StorePath = Folder.FileIn("spectra.db");
 	}
 
 	/// <summary>
@@ -75,21 +74,28 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 
 	public async ValueTask DisposeAsync()
 	{
+		await DisposeStoreAsync();
+		Panel.Dispose();
+		Folder.Dispose();
+		GC.SuppressFinalize(this);
+	}
+
+	/// <summary>Stops and disposes the distributor and the store, so a test can create the next store.</summary>
+	protected async Task DisposeStoreAsync()
+	{
 		if (_distributor is not null)
 		{
 			await _distributor.StopAsync().WaitAsync(Waits.Limit);
 			_distributor.Dispose();
+			_distributor = null;
 		}
 
 		if (_store is not null)
 		{
 			await _store.StopAsync().WaitAsync(StopLimit);
 			_store.Dispose();
+			_store = null;
 		}
-
-		Panel.Dispose();
-		Folder.Dispose();
-		GC.SuppressFinalize(this);
 	}
 
 	protected static Channel<ReceivedFrame> LinkChannel()
@@ -129,10 +135,10 @@ public abstract class SpectrumStoreTestBase : IAsyncLifetime
 		await OpenedAsync();
 	}
 
-	protected Task OpenedAsync()
+	/// <summary>Waits until Opened says the open, the legacy cleanup and the retention at open ran.</summary>
+	protected async Task OpenedAsync()
 	{
-		return Waits.UntilAsync(
-			() => Logger.Collector.GetSnapshot().Any(record => record.Level == LogLevel.Information));
+		(await Store.Opened.WaitAsync(Waits.Limit)).Should().BeTrue();
 	}
 
 	protected Task StopAsync()

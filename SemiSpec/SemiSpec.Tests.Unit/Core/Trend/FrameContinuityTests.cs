@@ -44,7 +44,6 @@ public sealed class FrameContinuityTests
 		var result = _continuity.Observe(Spectrum(seq: 13, atSeconds: 1));
 
 		result.Loss.Should().Be(new TrendBreak(UnixMs(1), 2));
-		result.NoSpectra.Should().BeNull();
 	}
 
 	[Fact]
@@ -63,22 +62,20 @@ public sealed class FrameContinuityTests
 		var result = _continuity.Observe(HeartbeatAt(seq: 12, atSeconds: 3));
 
 		result.Loss.Should().Be(new TrendBreak(UnixMs(3), 2));
-		result.NoSpectra.Should().BeNull();
 	}
 
 	[Fact]
-	public void AGapOverTenSecondsWithoutAnyFrameBreaksAndIgnoresTheSeqStep()
+	public void AGapOverTenSecondsWithoutAnyFrameIgnoresTheSeqStep()
 	{
 		_continuity.Observe(Spectrum(seq: 7, atSeconds: 0));
 
 		var result = _continuity.Observe(Spectrum(seq: 1, atSeconds: 10.001));
 
-		result.Loss.Should().BeNull("the pause ends the seq session");
-		result.NoSpectra.Should().Be(new TrendBreak(UnixMs(10.001), 0));
+		result.Should().Be(default(Continuity), "the pause ends the seq session");
 	}
 
 	[Fact]
-	public void HeartbeatsOnlyForOverTenSecondsBreakAtTheNextSpectrum()
+	public void HeartbeatsOnlyForOverTenSecondsKeepTheSeqSession()
 	{
 		_continuity.Observe(Spectrum(seq: 20, atSeconds: 0));
 		var heartbeats = Enumerable.Range(1, 5)
@@ -88,7 +85,6 @@ public sealed class FrameContinuityTests
 		var lossAfterHeartbeats = _continuity.Observe(Spectrum(seq: 22, atSeconds: 16));
 
 		heartbeats.Should().AllBeEquivalentTo(default(Continuity));
-		lossAfterHeartbeats.NoSpectra.Should().Be(new TrendBreak(UnixMs(16), 0));
 		lossAfterHeartbeats.Loss.Should().Be(
 			new TrendBreak(UnixMs(16), 1),
 			"the heartbeats kept the seq session, so the skipped seq 21 counts");
@@ -110,7 +106,6 @@ public sealed class FrameContinuityTests
 		var result = _continuity.Observe(Spectrum(seq: 9, atSeconds: 10));
 
 		result.Loss.Should().Be(new TrendBreak(UnixMs(10), 1), "a pause of exactly 10 s keeps the seq session");
-		result.NoSpectra.Should().BeNull();
 	}
 
 	[Theory]
@@ -125,7 +120,7 @@ public sealed class FrameContinuityTests
 
 		var result = _continuity.Observe(WithFailed(frame, BothFailed));
 
-		result.Should().Be(new Continuity(null, null, new TrendFailure(UnixMs(3), device.FailedBit)));
+		result.Should().Be(new Continuity(null, new TrendFailure(UnixMs(3), device.FailedBit)));
 	}
 
 	[Theory]
@@ -170,7 +165,6 @@ public sealed class FrameContinuityTests
 		var result = _continuity.Observe(Spectrum(seq: 1, atSeconds: 5));
 
 		result.Loss.Should().Be(new TrendBreak(UnixMs(5), 201));
-		result.NoSpectra.Should().BeNull();
 	}
 
 	private static ReceivedFrame Spectrum(byte seq, double atSeconds, Spectrometer device = Spectrometer.Atp2000)

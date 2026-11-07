@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 
 using FluentResults;
@@ -13,6 +14,13 @@ namespace SemiSpec.Core.Store;
 /// </summary>
 public sealed class SpectrumDatabase : IDisposable
 {
+	/// <summary>The schema version this build creates and uses, kept in the file's PRAGMA user_version.</summary>
+	public const int SchemaVersion = 1;
+
+	private const string SchemaState = """
+		SELECT (SELECT user_version FROM pragma_user_version), (SELECT count(*) FROM sqlite_master WHERE type = 'table')
+		""";
+
 	private const string Schema = """
 		CREATE TABLE spectrum (
 			id INTEGER PRIMARY KEY,
@@ -44,9 +52,19 @@ public sealed class SpectrumDatabase : IDisposable
 		INSERT INTO heartbeat (received_at, seq, state) VALUES ($received_at, $seq, $state)
 		""";
 
+	private const string NewestReceivedAt = """
+		SELECT (SELECT max(received_at) FROM spectrum), (SELECT max(received_at) FROM heartbeat)
+		""";
+
 	private const string DeleteOlder = """
 		DELETE FROM spectrum WHERE received_at < $cutoff;
 		DELETE FROM heartbeat WHERE received_at < $cutoff;
+		""";
+
+	// A DELETE without WHERE on a table without triggers takes SQLite's truncate optimisation and frees whole pages.
+	private const string DeleteAll = """
+		DELETE FROM spectrum;
+		DELETE FROM heartbeat;
 		""";
 
 	// Microsoft.Data.Sqlite counts the busy timeout in whole seconds and waits forever on 0, so 1 s is the shortest.
@@ -78,23 +96,64 @@ public sealed class SpectrumDatabase : IDisposable
 			("$state", SqliteType.Integer));
 	}
 
-	/// <summary>Opens a fresh store file and creates the schema in it.</summary>
+	/// <summary>
+	/// Opens or creates the store file; a file of another version fails with StoreSchemaMismatchError, its version and
+	/// tables untouched, and one SQLite calls not a database or corrupt with StoreFileUnreadableError; both close it.
+	/// </summary>
 	public static Result<SpectrumDatabase> Open(string path)
 	{
 		SqliteConnection? connection = null;
 		try
 		{
 			connection = StoreConnection.Open(path);
-			using var command = connection.CreateCommand();
-			command.CommandText = Schema;
-			command.ExecuteNonQuery();
+			var schema = UseOrCreateSchema(connection);
+			if (schema.IsFailed)
+			{
+				connection.Dispose();
+				return schema;
+			}
+
 			return new SpectrumDatabase(connection);
+		}
+		catch (SqliteException ex) when (StoreDamage.IsDamage(ex))
+		{
+			connection?.Dispose();
+			return Result.Fail(new StoreFileUnreadableError(ex));
 		}
 		catch (Exception ex) when (ex is SqliteException or IOException)
 		{
 			connection?.Dispose();
 			return Result.Fail(new ExceptionalError("SQLite refused the file or the schema", ex));
 		}
+	}
+
+	private static Result UseOrCreateSchema(SqliteConnection connection)
+	{
+		using var transaction = connection.BeginTransaction(deferred: false);
+		using var command = connection.CreateCommand();
+		command.Transaction = transaction;
+		command.CommandText = SchemaState;
+		var (version, tables) = ReadSchemaState(command);
+		if (version == 0 && tables == 0)
+		{
+			command.CommandText = Schema
+				+ string.Create(CultureInfo.InvariantCulture, $"PRAGMA user_version = {SchemaVersion};");
+			command.ExecuteNonQuery();
+		}
+		else if (version != SchemaVersion)
+		{
+			return Result.Fail(new StoreSchemaMismatchError(version));
+		}
+
+		transaction.Commit();
+		return Result.Ok();
+	}
+
+	private static (int Version, long Tables) ReadSchemaState(SqliteCommand schemaState)
+	{
+		using var reader = schemaState.ExecuteReader();
+		reader.Read();
+		return (reader.GetInt32(0), reader.GetInt64(1));
 	}
 
 	/// <summary>Writes the frames in one transaction: all of them or, on failure, none.</summary>
@@ -126,16 +185,29 @@ public sealed class SpectrumDatabase : IDisposable
 		}
 	}
 
-	/// <summary>Deletes the spectra and heartbeats received before the cutoff, in one transaction.</summary>
+	/// <summary>
+	/// Deletes the spectra and heartbeats received before the cutoff in one transaction; empties both tables when every
+	/// row has expired.
+	/// </summary>
 	public Result DeleteBefore(DateTimeOffset cutoff)
 	{
 		try
 		{
+			var cutoffMs = cutoff.ToUnixTimeMilliseconds();
 			using var transaction = _connection.BeginTransaction(deferred: false);
 			using var command = _connection.CreateCommand();
 			command.Transaction = transaction;
-			command.CommandText = DeleteOlder;
-			command.Parameters.AddWithValue("$cutoff", cutoff.ToUnixTimeMilliseconds());
+			command.CommandText = NewestReceivedAt;
+			if (EveryRowIsBefore(command, cutoffMs))
+			{
+				command.CommandText = DeleteAll;
+			}
+			else
+			{
+				command.CommandText = DeleteOlder;
+				command.Parameters.AddWithValue("$cutoff", cutoffMs);
+			}
+
 			command.ExecuteNonQuery();
 			transaction.Commit();
 			return Result.Ok();
@@ -209,6 +281,18 @@ public sealed class SpectrumDatabase : IDisposable
 		parameters["$seq"].Value = received.Frame.Seq;
 		parameters["$state"].Value = (byte)received.Frame.State;
 		_insertHeartbeat.ExecuteNonQuery();
+	}
+
+	private static bool EveryRowIsBefore(SqliteCommand newestReceivedAt, long cutoffMs)
+	{
+		using var reader = newestReceivedAt.ExecuteReader();
+		reader.Read();
+		return IsEmptyOrBefore(reader, 0, cutoffMs) && IsEmptyOrBefore(reader, 1, cutoffMs);
+	}
+
+	private static bool IsEmptyOrBefore(SqliteDataReader newest, int table, long cutoffMs)
+	{
+		return newest.IsDBNull(table) || newest.GetInt64(table) < cutoffMs;
 	}
 
 	private static object NullForNaN(float value)

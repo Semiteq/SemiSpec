@@ -114,6 +114,15 @@
   <data name="StoreOpenRemedy" xml:space="preserve">
     <value>Restart the application. If the failure repeats, send the log file to the developer.</value>
   </data>
+  <data name="StoreFileReplacedTitle" xml:space="preserve">
+    <value>Spectrum history file was damaged</value>
+  </data>
+  <data name="StoreFileReplacedDetail" xml:space="preserve">
+    <value>The damaged file was set aside and a new empty file started. The history before this start is not shown.</value>
+  </data>
+  <data name="StoreFileReplacedRemedy" xml:space="preserve">
+    <value>No action is needed. If this repeats, send the log file to the developer.</value>
+  </data>
   <data name="StoreWriteTitle" xml:space="preserve">
     <value>Spectrum history write failed</value>
   </data>

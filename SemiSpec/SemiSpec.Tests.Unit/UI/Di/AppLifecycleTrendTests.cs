@@ -1,5 +1,6 @@
 using System.Reactive.Concurrency;
 
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 
 using AwesomeAssertions;
@@ -14,9 +15,11 @@ using SemiSpec.Core.Protocol;
 using SemiSpec.Core.Store;
 using SemiSpec.Core.Trend;
 using SemiSpec.Tests.Unit.Core.Store;
+using SemiSpec.Tests.Unit.UI.Link;
 using SemiSpec.UI.Link;
 using SemiSpec.UI.Messages;
 using SemiSpec.UI.Spectrum;
+using SemiSpec.UI.Store;
 using SemiSpec.UI.Trend;
 
 using Xunit;
@@ -26,13 +29,16 @@ using static SemiSpec.Tests.Unit.Core.Protocol.ProtocolSamples;
 namespace SemiSpec.Tests.Unit.UI.Di;
 
 /// <summary>
-/// The window's open starts the trend feed before the distributor; its close stops the feed, then the store.
+/// The window's open starts the trend feed before the distributor; its close stops the feed, then the store; the next
+/// open shows the stored points.
 /// </summary>
 [Trait("Component", "UI")]
 [Trait("Area", "Di")]
 [Trait("Category", "Unit")]
 public sealed class AppLifecycleTrendTests : AppLifecycleTestBase
 {
+	private const ushort ProtocolSampleNm = 1310;
+	private const byte ProtocolSampleDelta = 5;
 	private const string FeedStarted = "The trend feed started";
 	private const string FeedStopped = "The trend feed stopped";
 	private const string DistributorStarted = "The frame distributor started";
@@ -76,6 +82,7 @@ public sealed class AppLifecycleTrendTests : AppLifecycleTestBase
 					return Result.Ok(new IntensityChunk(from, []));
 				},
 				(_, _) => Task.FromResult(Result.Ok<StoredSpectrum?>(null)),
+				container.GetRequiredService<SpectrumStore>().Opened,
 				container.GetRequiredService<MessagePanelViewModel>(),
 				container.GetRequiredService<IScheduler>(),
 				DefaultScheduler.Instance,
@@ -99,6 +106,76 @@ public sealed class AppLifecycleTrendTests : AppLifecycleTestBase
 		var feedStopped = templates.IndexOf(FeedStopped);
 		feedStopped.Should().BeGreaterThan(templates.IndexOf(DistributorStopped));
 		templates.IndexOf(StoreStopped).Should().BeGreaterThan(feedStopped);
+	}
+
+	[AvaloniaFact]
+	public async Task TheTrendShowsTheStoredPointsAfterARestart()
+	{
+		List<DateTimeOffset> fed;
+		using (var first = BuildContainer())
+		{
+			var window = ShowMainWindow(first);
+			fed = await FeedSpectraThenCloseAsync(first, window, count: 5);
+		}
+
+		using var second = BuildContainer();
+		var restarted = ShowMainWindow(second);
+		var cache = second.GetRequiredService<IntensityCache>();
+
+		await Waits.UntilAsync(() => fed.All(moment => PointsAt(cache, moment) == 1));
+		var span = IntensityQuery.Create(
+			ProtocolSampleNm, ProtocolSampleDelta, fed[0], fed[^1].AddMilliseconds(1), TimeSpan.FromMilliseconds(1));
+		cache.Fold(span.Value).Columns.Sum(column => column.Count).Should().Be(fed.Count);
+		restarted.Close();
+	}
+
+	/// <summary>The cache's points in the millisecond of the moment, at the key of the protocol samples.</summary>
+	private static int PointsAt(IntensityCache cache, DateTimeOffset moment)
+	{
+		var query = IntensityQuery.Create(
+			ProtocolSampleNm, ProtocolSampleDelta, moment, moment.AddMilliseconds(1), TimeSpan.FromMilliseconds(1));
+		return cache.Fold(query.Value).Columns.Sum(column => column.Count);
+	}
+
+	/// <summary>Spectra through the link, one at a time; returns their receive times once the window closed.</summary>
+	private async Task<List<DateTimeOffset>> FeedSpectraThenCloseAsync(
+		IServiceProvider provider, Window window, int count)
+	{
+		await using var port = new FakePortStream();
+		PortProvider.QueueOpen(port);
+		var received = new List<DateTimeOffset>();
+		using var subscription = provider.GetRequiredService<FrameDistributor>().Frames
+			.Subscribe(frame =>
+			{
+				lock (received)
+				{
+					received.Add(frame.ReceivedAt);
+				}
+			});
+		var closed = new TaskCompletionSource();
+		window.Closed += (_, _) => closed.TrySetResult();
+		provider.GetRequiredService<SerialLink>().Connect(PortName);
+		await port.WaitForPendingReadAsync().WaitAsync(WaitLimit, TestContext.Current.CancellationToken);
+
+		for (var seq = 1; seq <= count; seq++)
+		{
+			port.PushBytes(FrameEncoder.Encode(SpectrumFrame(Spectrometer.Atp8000, (byte)seq)));
+			var expected = seq;
+			await Waits.UntilAsync(() =>
+			{
+				lock (received)
+				{
+					return received.Count == expected;
+				}
+			});
+		}
+
+		window.Close();
+		await closed.Task.WaitAsync(WaitLimit, TestContext.Current.CancellationToken);
+		lock (received)
+		{
+			return [.. received];
+		}
 	}
 
 	/// <summary>

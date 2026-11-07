@@ -49,6 +49,119 @@ public sealed class SpectrumDatabaseTests : IDisposable
 	}
 
 	[Fact]
+	public void OpenOfANewFileCreatesTheSchemaAndSetsVersionOne()
+	{
+		OpenDatabase().Dispose();
+
+		using var plain = OpenPlain();
+		Scalar(plain, "PRAGMA user_version").Should().Be(1L);
+		Scalar(plain, "SELECT group_concat(name) FROM (SELECT name FROM sqlite_master ORDER BY name)")
+			.Should().Be("heartbeat,heartbeat_time,spectrum,spectrum_time");
+	}
+
+	[Fact]
+	public void ReopenKeepsTheRows()
+	{
+		using (var first = OpenDatabase())
+		{
+			first.Write([StoreSamples.Spectrum(StoreSamples.Start, seq: 1)]).IsSuccess.Should().BeTrue();
+		}
+
+		using (var second = OpenDatabase())
+		{
+			second.Write([StoreSamples.Spectrum(StoreSamples.Start, seq: 2)]).IsSuccess.Should().BeTrue();
+		}
+
+		using var plain = OpenPlain();
+		Scalar(plain, "SELECT group_concat(seq) FROM (SELECT seq FROM spectrum ORDER BY id)").Should().Be("1,2");
+	}
+
+	[Fact]
+	public void OpenOfAnotherVersionFailsWithASchemaMismatch()
+	{
+		using (var plain = OpenPlain())
+		{
+			Execute(plain, "PRAGMA user_version = 2");
+		}
+
+		var result = SpectrumDatabase.Open(_path);
+
+		result.IsFailed.Should().BeTrue();
+		result.Errors.Should().ContainSingle().Which.Should().BeOfType<StoreSchemaMismatchError>()
+			.Which.Found.Should().Be(2);
+		using var check = OpenPlain();
+		Scalar(check, "PRAGMA user_version").Should().Be(2L);
+		Scalar(check, "SELECT count(*) FROM sqlite_master").Should().Be(0L, "a mismatched file stays unchanged");
+	}
+
+	[Fact]
+	public void OpenOfAVersionZeroFileWithTablesFailsWithASchemaMismatch()
+	{
+		using (var plain = OpenPlain())
+		{
+			Execute(plain, "CREATE TABLE other (x INTEGER)");
+		}
+
+		var result = SpectrumDatabase.Open(_path);
+
+		result.Errors.Should().ContainSingle().Which.Should().BeOfType<StoreSchemaMismatchError>()
+			.Which.Found.Should().Be(0);
+		var deleteTheFile = () => File.Delete(_path);
+		deleteTheFile.Should().NotThrow("the failed open closed its connection");
+	}
+
+	[Fact]
+	public void OpenOfRandomBytesFailsAsUnreadable()
+	{
+		File.WriteAllBytes(_path, DamagedPages.Bytes(2 * DamagedPages.PageBytes));
+
+		var result = SpectrumDatabase.Open(_path);
+
+		result.Errors.Should().ContainSingle().Which.Should().BeOfType<StoreFileUnreadableError>()
+			.Which.SqliteErrorCode.Should().Be(26, "SQLite reports a file without its header as SQLITE_NOTADB");
+		var deleteTheFile = () => File.Delete(_path);
+		deleteTheFile.Should().NotThrow("the failed open closed its connection");
+	}
+
+	[Fact]
+	public void OpenOfADamagedSchemaPageFailsAsUnreadable()
+	{
+		OpenDatabase().Dispose();
+		DamagedPages.SchemaPage(_path);
+
+		var result = SpectrumDatabase.Open(_path);
+
+		result.Errors.Should().ContainSingle().Which.Should().BeOfType<StoreFileUnreadableError>()
+			.Which.SqliteErrorCode.Should().Be(11, "SQLite reports a damaged schema page as SQLITE_CORRUPT");
+	}
+
+	[Fact]
+	public void AWriteToADamagedTablePageFailsWithTheDamageCode()
+	{
+		OpenDatabase().Dispose();
+		DamagedPages.TablePages(_path);
+		using var database = OpenDatabase();
+
+		var result = database.Write([StoreSamples.Spectrum(StoreSamples.Start)]);
+
+		result.Errors.Should().ContainSingle().Which.Should().BeOfType<ExceptionalError>()
+			.Which.Exception.Should().BeOfType<SqliteException>()
+			.Which.SqliteErrorCode.Should().Be(11, "the open reads page 1 only, the write meets the damage");
+		StoreDamage.IsDamage(result.Errors).Should().BeTrue();
+	}
+
+	[Fact]
+	public void OpenOfADirectoryIsNotUnreadable()
+	{
+		Directory.CreateDirectory(_path);
+
+		var result = SpectrumDatabase.Open(_path);
+
+		result.Errors.Should().ContainSingle().Which.Should().BeOfType<ExceptionalError>(
+			"a file SQLite cannot open may be intact, so it is no damage");
+	}
+
+	[Fact]
 	public void ASpectrumRoundTripsEveryField()
 	{
 		var receivedAt = StoreSamples.Start.AddTicks(1234567);
@@ -158,6 +271,58 @@ public sealed class SpectrumDatabaseTests : IDisposable
 		using var plain = OpenPlain();
 		Scalar(plain, "SELECT group_concat(seq) FROM spectrum").Should().Be("3");
 		Scalar(plain, "SELECT group_concat(seq) FROM heartbeat").Should().Be("4");
+	}
+
+	[Fact]
+	public void DeleteBeforeACutoffPastEveryRowEmptiesBothTables()
+	{
+		var cutoff = StoreSamples.Start;
+		using var database = OpenDatabase();
+		database.Write(
+		[
+			StoreSamples.Spectrum(cutoff.AddHours(-2), seq: 1),
+			StoreSamples.Heartbeat(cutoff.AddHours(-1), seq: 2),
+			StoreSamples.Spectrum(cutoff.AddMilliseconds(-1), seq: 3),
+		]).IsSuccess.Should().BeTrue();
+
+		database.DeleteBefore(cutoff).IsSuccess.Should().BeTrue();
+
+		using var plain = OpenPlain();
+		Scalar(plain, "SELECT count(*) FROM spectrum").Should().Be(0L);
+		Scalar(plain, "SELECT count(*) FROM heartbeat").Should().Be(0L);
+	}
+
+	[Fact]
+	public void DeleteBeforeACutoffInsideTheRowsKeepsTheNewerRows()
+	{
+		var cutoff = StoreSamples.Start;
+		using var database = OpenDatabase();
+		database.Write(
+		[
+			StoreSamples.Spectrum(cutoff.AddHours(-2), seq: 1),
+			StoreSamples.Spectrum(cutoff.AddMilliseconds(-1), seq: 2),
+			StoreSamples.Heartbeat(cutoff.AddHours(-1), seq: 3),
+			StoreSamples.Heartbeat(cutoff, seq: 4),
+		]).IsSuccess.Should().BeTrue();
+
+		database.DeleteBefore(cutoff).IsSuccess.Should().BeTrue();
+
+		using var plain = OpenPlain();
+		Scalar(plain, "SELECT count(*) FROM spectrum").Should().Be(0L, "every spectrum is older than the cutoff");
+		Scalar(plain, "SELECT group_concat(seq) FROM heartbeat").Should().Be("4",
+			"one newer heartbeat keeps the row-wise delete for both tables");
+	}
+
+	[Fact]
+	public void DeleteBeforeOnAnEmptyFileSucceeds()
+	{
+		using var database = OpenDatabase();
+
+		database.DeleteBefore(StoreSamples.Start).IsSuccess.Should().BeTrue();
+
+		database.Write([StoreSamples.Spectrum(StoreSamples.Start)]).IsSuccess.Should().BeTrue();
+		using var plain = OpenPlain();
+		Scalar(plain, "SELECT count(*) FROM spectrum").Should().Be(1L);
 	}
 
 	[Fact]

@@ -3,6 +3,7 @@ using AwesomeAssertions;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
+using SemiSpec.Core.Store;
 using SemiSpec.Tests.Unit.Core.Store;
 using SemiSpec.Tests.Unit.UI.Messages;
 using SemiSpec.UI.Localization;
@@ -20,6 +21,8 @@ namespace SemiSpec.Tests.Unit.UI.Store;
 [Trait("Category", "Unit")]
 public sealed class SpectrumStoreFailureTests : SpectrumStoreTestBase
 {
+	private string Marker => StorePath + ".damaged";
+
 	[Fact(Timeout = TestTimeoutMs)]
 	public async Task AFailedBatchCountsItsFramesAndReportsOnce()
 	{
@@ -88,7 +91,7 @@ public sealed class SpectrumStoreFailureTests : SpectrumStoreTestBase
 		var blocker = Folder.FileIn("blocker");
 		await File.WriteAllTextAsync(
 			blocker, "a file where the store folder belongs", TestContext.Current.CancellationToken);
-		var path = Path.Combine(blocker, "spectra-1.db");
+		var path = Path.Combine(blocker, "spectra.db");
 		CreateStore(path: path);
 		StartStore();
 
@@ -103,6 +106,21 @@ public sealed class SpectrumStoreFailureTests : SpectrumStoreTestBase
 		File.Exists(path).Should().BeFalse();
 		Logger.Failures().Should().ContainSingle().Which.Should().BeAssignableTo<IOException>();
 		Logger.Levels().Should().NotContain(LogLevel.Information);
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task OpenedCompletesFalseWhenTheOpenFails()
+	{
+		var blocker = Folder.FileIn("blocker");
+		await File.WriteAllTextAsync(
+			blocker, "a file where the store folder belongs", TestContext.Current.CancellationToken);
+		CreateStore(path: Path.Combine(blocker, "spectra.db"));
+		StartStore();
+
+		var opened = await Store.Opened.WaitAsync(Waits.Limit, TestContext.Current.CancellationToken);
+
+		opened.Should().BeFalse();
+		Panel.Entries.Should().ContainSingle().Which.View.Title.Should().Be(Resources.StoreOpenTitle);
 	}
 
 	[Fact(Timeout = TestTimeoutMs)]
@@ -181,6 +199,130 @@ public sealed class SpectrumStoreFailureTests : SpectrumStoreTestBase
 		recovered.Level.Should().Be(LogLevel.Information);
 		recovered.Message.Should().Be("Spectrum store retention recovered after 3 failed passes");
 		Panel.Entries.Should().BeEmpty("a failed retention pass loses no data");
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task ASchemaMismatchStartsAFreshFileAndLogsOneWarning()
+	{
+		Execute("CREATE TABLE spectrum (seq INTEGER); INSERT INTO spectrum VALUES (7); PRAGMA user_version = 2");
+
+		await StartOpenedAsync();
+		await FeedAsync(StoreSamples.Spectrum(StoreSamples.Start, seq: 1));
+		await Waits.UntilAsync(() => Count("spectrum") == 1);
+		await StopAsync();
+
+		Scalar("PRAGMA user_version").Should().Be(1L);
+		Scalar("SELECT group_concat(seq) FROM spectrum").Should().Be("1", "the rows of the old version are gone");
+		Panel.Entries.Should().BeEmpty("an app update causes a mismatch and the operator can do nothing about it");
+		Logger.Collector.GetSnapshot().Where(record => record.Level >= LogLevel.Warning)
+			.Should().ContainSingle().Which.Message.Should().Be(
+				$"The spectrum store file {StorePath} had schema version 2, this build uses 1; "
+				+ "the file was deleted and a new one started");
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task AnUnreadableFileIsSetAsideAndReportedOnce()
+	{
+		byte[] damaged = [.. Enumerable.Repeat((byte)0xFF, 8192)];
+		await File.WriteAllBytesAsync(StorePath, damaged, TestContext.Current.CancellationToken);
+		var clock = new RetentionClock(StoreSamples.Start);
+		var setAside = Folder.FileIn($"spectra.broken-{clock.GetLocalNow():yyyyMMdd-HHmmss}.db");
+
+		await StartOpenedAsync(clock);
+		await FeedAsync(StoreSamples.Spectrum(StoreSamples.Start, seq: 1));
+		await Waits.UntilAsync(() => Count("spectrum") == 1);
+		await StopAsync();
+
+		(await File.ReadAllBytesAsync(setAside, TestContext.Current.CancellationToken)).Should().Equal(damaged);
+		Scalar("PRAGMA user_version").Should().Be(1L);
+		var entry = Panel.Entries.Should().ContainSingle().Subject;
+		entry.View.Title.Should().Be(Resources.StoreFileReplacedTitle);
+		entry.View.Severity.Should().Be(MessageSeverity.Warning);
+		Logger.Collector.GetSnapshot()
+			.Where(record => record.Level == LogLevel.Warning
+				&& record.Message.Contains(StorePath, StringComparison.Ordinal)
+				&& record.Message.Contains(setAside, StringComparison.Ordinal))
+			.Should().ContainSingle();
+		Logger.Levels().Should().NotContain(LogLevel.Error);
+		Logger.Failures().Should().ContainSingle().Which.Should().BeOfType<SqliteException>()
+			.Which.SqliteErrorCode.Should().Be(26);
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task ADamagedBatchMarksTheFile()
+	{
+		using (var database = SpectrumDatabase.Open(StorePath).Value)
+		{
+			database.Write([StoreSamples.Spectrum(StoreSamples.Start)]).IsSuccess.Should().BeTrue();
+		}
+
+		DamagedPages.Page(StorePath, (long)Scalar("SELECT rootpage FROM sqlite_master WHERE name = 'heartbeat'")!);
+		await StartOpenedAsync(new RetentionClock(StoreSamples.Start));
+		File.Exists(Marker).Should().BeFalse("the open and the retention at open leave the heartbeat table unread");
+
+		using (HoldWriteLock())
+		{
+			Feed(StoreSamples.Heartbeat(StoreSamples.Start));
+			await Waits.UntilAsync(() => Store.DroppedFrames == 1);
+		}
+
+		File.Exists(Marker).Should().BeFalse("a batch that failed on a held lock is no damage");
+		Feed(StoreSamples.Heartbeat(StoreSamples.Start));
+		await Waits.UntilAsync(() => Store.DroppedFrames == 2);
+		await StopAsync();
+
+		File.Exists(Marker).Should().BeTrue();
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task ADamagedRetentionPassMarksTheFile()
+	{
+		using (var database = SpectrumDatabase.Open(StorePath).Value)
+		{
+			database.Write([StoreSamples.Spectrum(StoreSamples.Start)]).IsSuccess.Should().BeTrue();
+		}
+
+		DamagedPages.TablePages(StorePath);
+
+		await StartOpenedAsync(new RetentionClock(StoreSamples.Start.AddHours(25)));
+		await StopAsync();
+
+		File.Exists(Marker).Should().BeTrue();
+		Panel.Entries.Should().BeEmpty("the marker waits for the next open");
+	}
+
+	[Fact(Timeout = TestTimeoutMs)]
+	public async Task AMarkedFileIsSetAsideAtTheNextOpen()
+	{
+		using (var database = SpectrumDatabase.Open(StorePath).Value)
+		{
+			database.Write([StoreSamples.Spectrum(StoreSamples.Start, seq: 7)]).IsSuccess.Should().BeTrue();
+		}
+
+		StoreFiles.MarkDamaged(StorePath);
+		var clock = new RetentionClock(StoreSamples.Start);
+		var setAside = Folder.FileIn($"spectra.broken-{clock.GetLocalNow():yyyyMMdd-HHmmss}.db");
+
+		await StartOpenedAsync(clock);
+		await StopAsync();
+
+		File.Exists(Marker).Should().BeFalse();
+		Count("spectrum").Should().Be(0, "the store starts on a fresh file");
+		using (var setAsideFile = new SqliteConnection($"Data Source={setAside};Pooling=False"))
+		{
+			setAsideFile.Open();
+			Scalar(setAsideFile, "SELECT group_concat(seq) FROM spectrum").Should().Be("7");
+		}
+
+		var entry = Panel.Entries.Should().ContainSingle().Subject;
+		entry.View.Title.Should().Be(Resources.StoreFileReplacedTitle);
+		entry.View.Severity.Should().Be(MessageSeverity.Warning);
+		Logger.Collector.GetSnapshot()
+			.Where(record => record.Level == LogLevel.Warning
+				&& record.Message.Contains(StorePath, StringComparison.Ordinal)
+				&& record.Message.Contains(setAside, StringComparison.Ordinal))
+			.Should().ContainSingle();
+		Logger.Levels().Should().NotContain(LogLevel.Error);
 	}
 
 	private void Execute(string sql)

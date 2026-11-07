@@ -36,7 +36,7 @@ public sealed class TrendFeedRereadTests : TrendFeedTestBase
 	}
 
 	[AvaloniaFact]
-	public void EveryKeyChangeLogsAtDebugWithItsRunningCount()
+	public void EveryKeyChangeLogsAtDebugWithItsGeneration()
 	{
 		Feed.Start();
 		AddAt(0, SampleNm);
@@ -44,12 +44,12 @@ public sealed class TrendFeedRereadTests : TrendFeedTestBase
 		Add(StoreSamples.Spectrum(At(2), nm: OtherNm, delta: 10, seq: NextSeq()));
 
 		var records = FeedLogger.Collector.GetSnapshot()
-			.Where(record => record.Message.StartsWith("The trend key changed", StringComparison.Ordinal))
+			.Where(record => record.Message.StartsWith("The trend re-reads", StringComparison.Ordinal))
 			.ToList();
 		records.Should().AllSatisfy(record => record.Level.Should().Be(LogLevel.Debug));
 		records.Select(record => record.Message).Should().Equal(
-			$"The trend key changed to {OtherNm} nm, delta {SampleDelta}, key change 1",
-			$"The trend key changed to {OtherNm} nm, delta 10, key change 2");
+			$"The trend re-reads the stored history at {OtherNm} nm, delta {SampleDelta}, generation 1",
+			$"The trend re-reads the stored history at {OtherNm} nm, delta 10, generation 2");
 	}
 
 	[AvaloniaFact]
@@ -82,6 +82,7 @@ public sealed class TrendFeedRereadTests : TrendFeedTestBase
 			Switching,
 			ReadPointsAsync,
 			ReadSpectrumAsync,
+			StoreOpened.Task,
 			MessagePanel,
 			uiHop,
 			Throttle,

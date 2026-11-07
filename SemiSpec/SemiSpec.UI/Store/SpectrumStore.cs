@@ -11,7 +11,7 @@ using SemiSpec.UI.Messages;
 
 namespace SemiSpec.UI.Store;
 
-/// <summary>The spectrum store file of this running instance.</summary>
+/// <summary>The spectrum store file the history is kept in across runs.</summary>
 public sealed record StoreFile(string Path);
 
 /// <summary>
@@ -40,6 +40,8 @@ public sealed class SpectrumStore : IDisposable
 	private readonly Lock _droppedGate = new();
 	private readonly Subject<long> _droppedFramesChanged = new();
 	private long _droppedFrames;
+
+	private readonly TaskCompletionSource<bool> _opened = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
 	// Start, StopAsync and Dispose run on the UI thread.
 	private IDisposable? _subscription;
@@ -80,6 +82,12 @@ public sealed class SpectrumStore : IDisposable
 	public IObservable<long> DroppedFramesChanged { get; }
 
 	/// <summary>
+	/// True once the writer opened the history file and ran the retention at open; false when the open failed or a
+	/// stop or dispose came first. Until it completes, no reader may open the file the writer may still replace.
+	/// </summary>
+	public Task<bool> Opened => _opened.Task;
+
+	/// <summary>
 	/// Subscribes to the distributor and starts the writer task once; does nothing after a start or a stop.
 	/// </summary>
 	public void Start()
@@ -95,7 +103,7 @@ public sealed class SpectrumStore : IDisposable
 		var cancellationToken = _cancellation.Token;
 		var drainToken = _drainCancellation.Token;
 		var writer = new StoreWriter(
-			_storeFile, _queue.Reader, CountDropped, _messagePanel, _uiScheduler, _timeProvider, _logger);
+			_storeFile, _queue.Reader, CountDropped, _opened, _messagePanel, _uiScheduler, _timeProvider, _logger);
 		_storeWriter = writer;
 		_subscription = _distributor.Frames.Subscribe(Enqueue);
 		_writer = Task.Run(() => RunWriterAsync(writer, cancellationToken, drainToken), CancellationToken.None);
@@ -109,6 +117,11 @@ public sealed class SpectrumStore : IDisposable
 	public async Task StopAsync(CancellationToken drainToken = default)
 	{
 		_stopped = true;
+		if (!_started)
+		{
+			_opened.TrySetResult(false);
+		}
+
 		_storeWriter?.Stop();
 		if (_subscription is not { } subscription)
 		{

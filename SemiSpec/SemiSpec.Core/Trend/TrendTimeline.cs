@@ -9,6 +9,8 @@ namespace SemiSpec.Core.Trend;
 /// </summary>
 internal sealed class TrendTimeline
 {
+	private static readonly long _silenceLimitMs = (long)LinkTiming.SilenceLimit.TotalMilliseconds;
+
 	private readonly FrameContinuity _continuity = new();
 	private readonly List<TrendBreak> _breaks = [];
 	private readonly List<TrendFailure> _failures = [];
@@ -20,18 +22,13 @@ internal sealed class TrendTimeline
 		: (DateTimeOffset.FromUnixTimeMilliseconds(_points[0].UnixMs),
 			DateTimeOffset.FromUnixTimeMilliseconds(_points[^1].UnixMs));
 
-	/// <summary>Adds the breaks and the failure mark the frame brings, under the continuity rule.</summary>
+	/// <summary>Adds the Loss break and the failure mark the frame brings, under the continuity rule.</summary>
 	public void Observe(ReceivedFrame received)
 	{
 		var continuity = _continuity.Observe(received);
 		if (continuity.Loss is { } loss)
 		{
 			TimeOrdered.Insert(_breaks, loss, TimeOf);
-		}
-
-		if (continuity.NoSpectra is { } noSpectra)
-		{
-			TimeOrdered.Insert(_breaks, noSpectra, TimeOf);
 		}
 
 		if (continuity.Failure is { } failure)
@@ -63,16 +60,27 @@ internal sealed class TrendTimeline
 		TimeOrdered.DropBefore(_failures, unixMs, TimeOf);
 	}
 
+	/// <summary>
+	/// Folds the range; a point more than the silence limit after the point before it, in range or not, adds a
+	/// NoSpectra break at its time.
+	/// </summary>
 	public IntensitySeries Fold(IntensityQuery query)
 	{
 		var fromMs = query.From.ToUnixTimeMilliseconds();
 		var toMs = query.To.ToUnixTimeMilliseconds();
 		var buckets = new IntensityBuckets(query);
-		for (var i = TimeOrdered.LowerBound(_points, fromMs, TimeOf);
-			i < _points.Count && _points[i].UnixMs < toMs;
-			i++)
+		var first = TimeOrdered.LowerBound(_points, fromMs, TimeOf);
+		long? previousMs = first > 0 ? _points[first - 1].UnixMs : null;
+		for (var i = first; i < _points.Count && _points[i].UnixMs < toMs; i++)
 		{
-			buckets.Add(_points[i]);
+			var point = _points[i];
+			buckets.Add(point);
+			if (point.UnixMs - previousMs > _silenceLimitMs)
+			{
+				buckets.AddBreak(DateTimeOffset.FromUnixTimeMilliseconds(point.UnixMs), 0);
+			}
+
+			previousMs = point.UnixMs;
 		}
 
 		for (var i = TimeOrdered.LowerBound(_breaks, fromMs, TimeOf);

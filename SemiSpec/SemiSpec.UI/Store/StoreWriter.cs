@@ -13,12 +13,14 @@ namespace SemiSpec.UI.Store;
 
 /// <summary>
 /// The writer task of the spectrum store: drains the queue into the store file in batches, runs the retention pass
-/// once a minute and closes the file with a checkpoint; every frame it loses goes to countDropped.
+/// at the open and once a minute and closes the file with a checkpoint; every frame it loses goes to countDropped.
+/// It completes opened true once the open and the retention at open ran, false when it ends without that.
 /// </summary>
 internal sealed class StoreWriter(
 	StoreFile storeFile,
 	ChannelReader<ReceivedFrame> queue,
 	Action<long> countDropped,
+	TaskCompletionSource<bool> opened,
 	MessagePanelViewModel messagePanel,
 	IScheduler uiScheduler,
 	TimeProvider timeProvider,
@@ -28,6 +30,7 @@ internal sealed class StoreWriter(
 
 	private static readonly TimeSpan _retentionInterval = TimeSpan.FromMinutes(1);
 
+	private readonly StoreOpening _opening = new(storeFile, messagePanel, uiScheduler, timeProvider, logger);
 	private readonly StoreRetention _retention = new(storeFile, timeProvider, logger);
 
 	// Set by Stop on the UI thread, read by the writer task.
@@ -63,6 +66,7 @@ internal sealed class StoreWriter(
 		{
 			if (!await StoreAsync(cancellationToken, drainToken).ConfigureAwait(false))
 			{
+				opened.TrySetResult(false);
 				await DiscardUntilCompletedAsync(cancellationToken).ConfigureAwait(false);
 			}
 		}
@@ -70,6 +74,10 @@ internal sealed class StoreWriter(
 		{
 			// Dispose ends the writer this way; the file is already closed without a checkpoint.
 			countDropped(DiscardQueued());
+		}
+		finally
+		{
+			opened.TrySetResult(false);
 		}
 	}
 
@@ -79,15 +87,18 @@ internal sealed class StoreWriter(
 		SpectrumDatabase? database = null;
 		try
 		{
-			var opened = OpenDatabase();
-			if (opened.IsFailed)
+			var openResult = _opening.Open();
+			if (openResult.IsFailed)
 			{
-				ReportOpenFailure(opened.Errors);
+				ReportOpenFailure(openResult.Errors);
 				return false;
 			}
 
-			database = opened.Value;
+			database = openResult.Value;
+			RunRetentionUnlessStopped(database);
 			logger.LogInformation("Spectrum store file {Path}", storeFile.Path);
+			cancellationToken.ThrowIfCancellationRequested();
+			opened.TrySetResult(true);
 			await WriteQueuedAsync(database, cancellationToken, drainToken).ConfigureAwait(false);
 			CheckpointAndClose(database);
 			database = null;
@@ -122,14 +133,12 @@ internal sealed class StoreWriter(
 		while (await queue.WaitToReadAsync(cancellationToken).ConfigureAwait(false));
 	}
 
-	private Result<SpectrumDatabase> OpenDatabase()
+	private void RunRetentionUnlessStopped(SpectrumDatabase database)
 	{
-		var path = storeFile.Path;
-		return StoreFiles.Prepare(path).Bind(sweep =>
+		if (!_stopped)
 		{
-			_retention.LogSweep(sweep);
-			return SpectrumDatabase.Open(path);
-		});
+			_retention.Run(database);
+		}
 	}
 
 	private void ReportOpenFailure(IEnumerable<IError> causes)
@@ -154,11 +163,7 @@ internal sealed class StoreWriter(
 				if (retentionDue.IsCompleted)
 				{
 					await retentionDue.ConfigureAwait(false);
-					if (!_stopped)
-					{
-						_retention.Run(database);
-					}
-
+					RunRetentionUnlessStopped(database);
 					retentionDue = Task.Delay(_retentionInterval, timeProvider, retentionCancellation.Token);
 				}
 
@@ -216,6 +221,7 @@ internal sealed class StoreWriter(
 		}
 
 		countDropped(batch.Count);
+		MarkOnDamage(written.Errors);
 		_failedBatches++;
 		_failedFrames += batch.Count;
 		if (_failedBatches == 1)
@@ -272,9 +278,19 @@ internal sealed class StoreWriter(
 		_checkpoint = closed;
 		if (closed.IsFailed)
 		{
+			MarkOnDamage(closed.Errors);
 			logger.LogWarning(
 				ResultReporting.CauseOf(closed.Errors),
 				"The spectrum store WAL could not be checkpointed");
+		}
+	}
+
+	/// <summary>The running writer keeps the file; the marker makes the next open set it aside.</summary>
+	private void MarkOnDamage(IEnumerable<IError> errors)
+	{
+		if (StoreDamage.IsDamage(errors))
+		{
+			StoreFiles.MarkDamaged(storeFile.Path);
 		}
 	}
 }

@@ -56,6 +56,7 @@ public sealed class TrendFeedFailureTests : TrendFeedTestBase
 				return Result.Fail<IntensityChunk>("the store file is locked");
 			},
 			(_, _) => Task.FromResult(Result.Ok<StoredSpectrum?>(null)),
+			StoreOpened.Task,
 			MessagePanel,
 			AvaloniaScheduler.Instance,
 			Throttle,
@@ -85,6 +86,7 @@ public sealed class TrendFeedFailureTests : TrendFeedTestBase
 			Switching,
 			history.IntensityPointsAsync,
 			history.SpectrumAtAsync,
+			StoreOpened.Task,
 			MessagePanel,
 			AvaloniaScheduler.Instance,
 			Throttle,

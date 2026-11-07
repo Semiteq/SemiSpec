@@ -9,7 +9,8 @@ namespace SemiSpec.Core.Trend;
 
 /// <summary>
 /// One intensity point per spectrum at the key of the latest spectrum frame, with the run's breaks and failure marks,
-/// for the last 24 h; a key change recomputes the recent spectra and asks for the older points from the store.
+/// for the last 24 h; a key change recomputes the recent spectra and asks for the older points from the store, and the
+/// start asks for the stored day of earlier runs.
 /// </summary>
 public sealed class IntensityCache : IDisposable
 {
@@ -30,9 +31,9 @@ public sealed class IntensityCache : IDisposable
 	private int _generation;
 	private bool _disposed;
 
-	// All emit after _gate is released, one at a time under _emitGate: _changed from the distributor task and re-read
-	// pool threads, _historyLanded from re-read pool threads, _reReadRequests from the distributor task only. Dispose
-	// takes _emitGate too, so no emit reaches a disposed subject; _subjectsDisposed is read and written under it.
+	// All emit after _gate is released, one at a time under _emitGate: _changed from the distributor and re-read threads,
+	// _historyLanded from re-read threads, _reReadRequests from the distributor and the start read. Dispose takes
+	// _emitGate too, so no emit reaches a disposed subject; _subjectsDisposed is read and written under it.
 	private readonly Lock _emitGate = new();
 	private readonly Subject<Unit> _changed = new();
 	private readonly Subject<Unit> _historyLanded = new();
@@ -42,6 +43,7 @@ public sealed class IntensityCache : IDisposable
 	public IntensityCache(TimeProvider timeProvider)
 	{
 		_timeProvider = timeProvider;
+		RunStart = timeProvider.GetUtcNow();
 		Changed = _changed.AsObservable();
 		HistoryLanded = _historyLanded.AsObservable();
 		ReReadRequested = _reReadRequests.AsObservable();
@@ -53,8 +55,11 @@ public sealed class IntensityCache : IDisposable
 	/// <summary>Signals after a history chunk of the current generation landed, just before its Changed.</summary>
 	public IObservable<Unit> HistoryLanded { get; }
 
-	/// <summary>Raised on every key change.</summary>
+	/// <summary>Raised on every key change and on the first stored day request.</summary>
 	public IObservable<ReReadRequest> ReReadRequested { get; }
+
+	/// <summary>The clock at construction: live frames come after it, the rows of earlier runs before it.</summary>
+	public DateTimeOffset RunStart { get; }
 
 	/// <summary>Null before the first spectrum.</summary>
 	public TrendExtent? Extent
@@ -111,6 +116,33 @@ public sealed class IntensityCache : IDisposable
 		Emit(_changed, Unit.Default);
 	}
 
+	/// <summary>
+	/// Asks for the stored points before the run start, at the live key or else at the stored key; nothing once a key
+	/// change asked, since its re-read covers the stored day too.
+	/// </summary>
+	public void RequestStoredDay(TrendKey storedKey)
+	{
+		ReReadRequest request;
+		lock (_gate)
+		{
+			if (_disposed || _generation != 0)
+			{
+				return;
+			}
+
+			if (_key is null || _windows is null)
+			{
+				_key = storedKey;
+				_windows = new QueryWindows(storedKey.WavelengthNm, storedKey.Delta);
+			}
+
+			_generation++;
+			request = new ReReadRequest(_generation, _key.Value, RunStart);
+		}
+
+		Emit(_reReadRequests, request);
+	}
+
 	/// <summary>Folds the points, breaks and failure marks of the query's range; its key is not checked.</summary>
 	public IntensitySeries Fold(IntensityQuery query)
 	{
@@ -128,6 +160,7 @@ public sealed class IntensityCache : IDisposable
 	{
 		lock (_gate)
 		{
+			DropExpired();
 			if (CurrentExtent() is not { } extent)
 			{
 				return null;

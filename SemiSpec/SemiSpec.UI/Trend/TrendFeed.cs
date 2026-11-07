@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reactive;
 using System.Reactive.Concurrency;
 using System.Reactive.Disposables;
@@ -19,9 +20,9 @@ using SemiSpec.UI.Spectrum;
 namespace SemiSpec.UI.Trend;
 
 /// <summary>
-/// Fills the intensity cache from the distributor, re-reads the stored history after a key change and reads the
-/// spectrum of a clicked moment; a newer request cancels the read in flight of its pipeline, and Back to live cancels
-/// the moment read in flight.
+/// Fills the intensity cache from the distributor, loads the stored day once the store opened, re-reads the stored
+/// history after a key change and reads the spectrum of a clicked moment; a newer request cancels the read in flight of
+/// its pipeline, and Back to live cancels the moment read in flight.
 /// </summary>
 public sealed class TrendFeed(
 	FrameDistributor distributor,
@@ -30,6 +31,7 @@ public sealed class TrendFeed(
 	SwitchingSpectrumSource source,
 	Func<ushort, byte, DateTimeOffset, DateTimeOffset, CancellationToken, Task<Result<IntensityChunk>>> readPoints,
 	Func<DateTimeOffset, CancellationToken, Task<Result<StoredSpectrum?>>> readSpectrum,
+	Task<bool> storeOpened,
 	MessagePanelViewModel messagePanel,
 	IScheduler uiScheduler,
 	IScheduler throttleScheduler,
@@ -53,7 +55,9 @@ public sealed class TrendFeed(
 	// UI thread only: the moment of the last click, null after Back to live; a read of any other moment shows nothing.
 	private DateTimeOffset? _requestedMoment;
 
-	/// <summary>Subscribes the distributor and both read pipelines once; no-op after a start or a stop.</summary>
+	/// <summary>
+	/// Subscribes the distributor, both read pipelines and the start read once; no-op after a start or a stop.
+	/// </summary>
 	public void Start()
 	{
 		if (_started || _stopped)
@@ -62,8 +66,9 @@ public sealed class TrendFeed(
 		}
 
 		_started = true;
-		_subscriptions.Add(cache.ReReadRequested.Subscribe(LogKeyChange, ReportPipelineFailure));
+		_subscriptions.Add(cache.ReReadRequested.Subscribe(LogReRead, ReportPipelineFailure));
 		_subscriptions.Add(SubscribeToHistoryReads());
+		_subscriptions.Add(SubscribeToStartRead());
 		_subscriptions.Add(SubscribeToMomentReads());
 		_subscriptions.Add(source
 			.WhenAnyValue(switching => switching.ShownMoment)
@@ -107,13 +112,64 @@ public sealed class TrendFeed(
 		_momentRequests.Dispose();
 	}
 
-	private void LogKeyChange(ReReadRequest request)
+	private void LogReRead(ReReadRequest request)
 	{
 		logger.LogDebug(
-			"The trend key changed to {WavelengthNm} nm, delta {Delta}, key change {KeyChangeCount}",
+			"The trend re-reads the stored history at {WavelengthNm} nm, delta {Delta}, generation {Generation}",
 			request.Key.WavelengthNm,
 			request.Key.Delta,
 			request.Generation);
+	}
+
+	/// <summary>Disposing the subscription cancels the wait for the store as well as the key read after it.</summary>
+	private IDisposable SubscribeToStartRead()
+	{
+		return Observable.Create<Unit>((_, token) =>
+			{
+				var task = Task.Run(() => ReadStoredDayAsync(token), CancellationToken.None);
+				Track(task);
+				return task;
+			})
+			.Subscribe(_ => { }, ReportPipelineFailure);
+	}
+
+	/// <summary>
+	/// Never throws: once the store opened, asks the cache for the stored day at the key of the last stored spectrum;
+	/// a failed key read reports once, a cancel ends it.
+	/// </summary>
+	private async Task ReadStoredDayAsync(CancellationToken token)
+	{
+		try
+		{
+			if (!await storeOpened.WaitAsync(token).ConfigureAwait(false))
+			{
+				logger.LogDebug("The trend reads no stored history: the spectrum store did not open");
+				return;
+			}
+
+			var last = await readSpectrum(cache.RunStart.AddMilliseconds(-1), token).ConfigureAwait(false);
+			if (last.IsFailed)
+			{
+				ReportHistoryFailure(new TrendHistoryError().CausedBy(last.Errors));
+				return;
+			}
+
+			if (last.Value is not { } spectrum)
+			{
+				logger.LogDebug("The trend reads no stored history: the spectrum store holds no spectrum");
+				return;
+			}
+
+			cache.RequestStoredDay(new TrendKey(spectrum.Measurement.WavelengthNm, spectrum.Measurement.Delta));
+		}
+		catch (OperationCanceledException) when (token.IsCancellationRequested)
+		{
+			// The stop cancelled the start read.
+		}
+		catch (Exception exception)
+		{
+			ReportHistoryFailure(new TrendHistoryError().CausedBy(exception));
+		}
 	}
 
 	private IDisposable SubscribeToHistoryReads()
@@ -137,13 +193,19 @@ public sealed class TrendFeed(
 		});
 	}
 
-	/// <summary>Never throws: the first failed range reports once and ends the read; a cancel ends it.</summary>
+	/// <summary>
+	/// Never throws: the first failed range reports once and ends the read; a cancel ends it; a read that lands every
+	/// range logs its landing times.
+	/// </summary>
 	private async Task ReadHistoryAsync(HistoryRead read, CancellationToken token)
 	{
 		var (request, window) = read;
 		try
 		{
+			var started = Stopwatch.GetTimestamp();
 			var newest = cache.Extent?.Newest ?? request.RecentStart;
+			TimeSpan? firstLanded = null;
+			var points = 0;
 			foreach (var range in TrendHistoryPlan.For(window.From, window.To, newest, request.RecentStart))
 			{
 				var chunk = await readPoints(request.Key.WavelengthNm, request.Key.Delta, range.From, range.To, token)
@@ -155,7 +217,18 @@ public sealed class TrendFeed(
 				}
 
 				cache.LandHistory(request.Generation, chunk.Value);
+				points += chunk.Value.Points.Length;
+				firstLanded ??= Stopwatch.GetElapsedTime(started);
 			}
+
+			var lastLanded = Stopwatch.GetElapsedTime(started);
+			logger.LogInformation(
+				"The trend history read for generation {Generation} landed {Points} points: visible window after "
+				+ "{VisibleMs} ms, last chunk after {LastChunkMs} ms",
+				request.Generation,
+				points,
+				Math.Round((firstLanded ?? lastLanded).TotalMilliseconds, 1),
+				Math.Round(lastLanded.TotalMilliseconds, 1));
 		}
 		catch (OperationCanceledException) when (token.IsCancellationRequested)
 		{
