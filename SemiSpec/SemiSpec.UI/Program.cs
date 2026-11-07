@@ -40,15 +40,29 @@ public static class Program
 		{
 			using var instanceLoggers = new SerilogLoggerFactory(logging.Value.Logger);
 			var instanceLogger = instanceLoggers.CreateLogger(nameof(SingleInstance));
-			using var instance = SingleInstance.Claim(SingleInstance.ProductionName, instanceLogger);
+			var claimed = SingleInstance.Claim(SingleInstance.ProductionName, instanceLogger);
 
-			if (!instance.IsPrimary)
+			if (!claimed.IsPrimary)
 			{
 				// Only the foreground process may hand the foreground on, and this just-launched copy is that process.
 				_ = NativeMethods.AllowSetForegroundWindow(NativeMethods.AnyProcess);
 
-				return SecondLaunch.Run(instance, SecondLaunch.AnswerLimit, ShowWarning, instanceLogger);
+				var outcome = SecondLaunch.Run(
+					claimed,
+					() => SingleInstance.Claim(SingleInstance.ProductionName, instanceLogger),
+					SecondLaunch.AnswerLimit,
+					SecondLaunch.Budget,
+					ShowWarning,
+					instanceLogger);
+				if (outcome.Primary is not { } primary)
+				{
+					return outcome.ExitCode;
+				}
+
+				claimed = primary;
 			}
+
+			using var instance = claimed;
 
 			Log.Information("SemiSpec starting; log folder {LogFolder}", logging.Value.Folder);
 

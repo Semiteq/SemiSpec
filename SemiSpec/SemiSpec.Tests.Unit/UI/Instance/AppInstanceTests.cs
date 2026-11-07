@@ -4,6 +4,8 @@ using AwesomeAssertions;
 
 using Microsoft.Extensions.Logging.Abstractions;
 
+using ReactiveUI.Avalonia;
+
 using SemiSpec.Tests.Unit.UI.Di;
 using SemiSpec.UI.Instance;
 
@@ -22,6 +24,8 @@ public sealed class AppInstanceTests : AppLifecycleTestBase
 	{
 		using var provider = BuildContainer();
 		var window = ShowMainWindow(provider);
+		// As App.Run does after Configure, so the release also has a listener to end.
+		Instance.Listen(AvaloniaScheduler.Instance, window.Activate, NullLogger.Instance);
 		var closed = new TaskCompletionSource();
 		window.Closed += (_, _) => closed.TrySetResult();
 

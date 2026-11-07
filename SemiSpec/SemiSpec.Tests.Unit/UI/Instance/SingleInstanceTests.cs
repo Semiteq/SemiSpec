@@ -60,14 +60,29 @@ public sealed class SingleInstanceTests
 	}
 
 	[Fact]
-	public void AClaimAfterThePrimaryReleasedIsPrimary()
+	public void AClaimAfterThePrimaryAndTheSecondaryReleasedIsPrimary()
 	{
 		using var primary = SingleInstance.Claim(_name, NullLogger.Instance);
+		using var secondary = SingleInstance.Claim(_name, NullLogger.Instance);
 		primary.Release();
+		secondary.Dispose();
 
 		using var next = SingleInstance.Claim(_name, NullLogger.Instance);
 
 		next.IsPrimary.Should().BeTrue();
+	}
+
+	[Fact]
+	public void AClaimWhileASecondaryStillHoldsTheNameIsSecondary()
+	{
+		// The claim is the existence of a handle, so an open secondary keeps the name after the primary released it.
+		using var primary = SingleInstance.Claim(_name, NullLogger.Instance);
+		using var secondary = SingleInstance.Claim(_name, NullLogger.Instance);
+		primary.Release();
+
+		using var next = SingleInstance.Claim(_name, NullLogger.Instance);
+
+		next.IsPrimary.Should().BeFalse();
 	}
 
 	[Fact]
@@ -129,23 +144,33 @@ public sealed class SingleInstanceTests
 	[Fact]
 	public async Task AStaleAnswerDoesNotAnswerTheNextSignal()
 	{
-		var scheduler = new TestScheduler();
+		using var scheduler = new EventLoopScheduler();
 		using var primary = SingleInstance.Claim(_name, NullLogger.Instance);
 		using var secondary = SingleInstance.Claim(_name, NullLogger.Instance);
+		// Each activation hangs until the test lets one through, as a busy UI thread would.
+		using var proceed = new SemaphoreSlim(0);
 		var activations = 0;
-		primary.Listen(scheduler, () => activations++, NullLogger.Instance);
+		primary.Listen(
+			scheduler,
+			() =>
+			{
+				proceed.Wait();
+				Interlocked.Increment(ref activations);
+			},
+			NullLogger.Instance);
 		secondary.AskPrimary(_noAnswerLimit).Should().BeFalse();
-		// The late activation sets the answer with no ask waiting for it.
-		await Waits.UntilAsync(() =>
-		{
-			scheduler.AdvanceBy(1);
-			return activations == 1;
-		});
+		proceed.Release();
+		await Waits.UntilAsync(() => Volatile.Read(ref activations) == 1);
+		// The scheduler runs in order, so once this job ran the late activation has set the answer.
+		using var answerSet = new ManualResetEventSlim();
+		scheduler.Schedule(answerSet.Set);
+		answerSet.Wait(Waits.Limit, TestContext.Current.CancellationToken).Should().BeTrue();
 
 		var answered = secondary.AskPrimary(_noAnswerLimit);
 
 		answered.Should().BeFalse();
-		activations.Should().Be(1);
+		Volatile.Read(ref activations).Should().Be(1);
+		proceed.Release();
 	}
 
 	[Fact]
