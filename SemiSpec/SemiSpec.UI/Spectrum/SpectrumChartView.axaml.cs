@@ -14,6 +14,8 @@ namespace SemiSpec.UI.Spectrum;
 
 public partial class SpectrumChartView : UserControl
 {
+	private static readonly Cursor _handCursor = new(StandardCursorType.Hand);
+
 	private readonly ChartFrames _frames;
 	private readonly AxisFlyout _intensityAxis;
 	private readonly AxisFlyout _wavelengthAxis;
@@ -120,10 +122,7 @@ public partial class SpectrumChartView : UserControl
 		var position = eventArgs.GetPosition(PlotControl);
 		if (_viewModel is not null && eventArgs.GetCurrentPoint(PlotControl).Properties.IsLeftButtonPressed)
 		{
-			var plot = PlotControl.Plot;
-			var flyout = ChartAxisRegion.TryCreateLeft(plot)?.Contains(position) == true ? _intensityAxis
-				: ChartAxisRegion.TryCreateBottom(plot)?.Contains(position) == true ? _wavelengthAxis
-				: null;
+			var flyout = AxisAt(position);
 			if (flyout is not null)
 			{
 				eventArgs.Handled = true;
@@ -142,14 +141,24 @@ public partial class SpectrumChartView : UserControl
 
 	private void OnPlotPointerMoved(object? sender, PointerEventArgs eventArgs)
 	{
+		var point = eventArgs.GetCurrentPoint(PlotControl);
+		PlotControl.Cursor = _pressPosition is null && AxisAt(point.Position) is not null ? _handCursor : null;
 		if (_viewModel is null || _pressPosition is not { } press)
 		{
 			return;
 		}
 
-		var point = eventArgs.GetCurrentPoint(PlotControl);
 		var buttons = point.Properties;
 		var isButtonHeld = buttons.IsLeftButtonPressed || buttons.IsRightButtonPressed || buttons.IsMiddleButtonPressed;
 		_viewModel.Chart.OnHeldMove(press, point.Position, isButtonHeld);
+	}
+
+	/// <summary>The flyout of the axis band under the position, or null over the data area.</summary>
+	private AxisFlyout? AxisAt(Point position)
+	{
+		var plot = PlotControl.Plot;
+		return ChartAxisRegion.TryCreateLeft(plot)?.Contains(position) == true ? _intensityAxis
+			: ChartAxisRegion.TryCreateBottom(plot)?.Contains(position) == true ? _wavelengthAxis
+			: null;
 	}
 }
