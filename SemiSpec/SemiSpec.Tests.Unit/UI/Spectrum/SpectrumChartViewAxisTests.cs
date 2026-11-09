@@ -71,6 +71,23 @@ public sealed class SpectrumChartViewAxisTests : SpectrumChartViewTestBase
 		Chart.Plot.Axes.GetLimits().Top.Should().Be(123456.0);
 	}
 
+	[AvaloniaFact]
+	public void HoveringAnAxisBandShowsTheHandAndTheDataAreaDoesNot()
+	{
+		ShowSpectrum();
+		var data = Chart.Plot.RenderManager.LastRender.Layout.DataRect;
+
+		Window.MouseMove(PlotControl.TranslatePoint(new Point(data.Left - IntoTheBand, data.VerticalCenter), Window)!.Value);
+		var onIntensityAxis = PlotControl.Cursor;
+		Window.MouseMove(PlotControl.TranslatePoint(new Point(data.HorizontalCenter, data.Bottom + IntoTheBand), Window)!.Value);
+		var onWavelengthAxis = PlotControl.Cursor;
+		Window.MouseMove(PlotControl.TranslatePoint(new Point(data.HorizontalCenter, data.VerticalCenter), Window)!.Value);
+
+		onIntensityAxis.Should().NotBeNull("a click on the intensity axis opens its flyout");
+		onWavelengthAxis.Should().NotBeNull("a click on the wavelength axis opens its flyout");
+		PlotControl.Cursor.Should().BeNull("the data area pans and keeps the default pointer");
+	}
+
 	/// <summary>Shows a spectrum and presses inside the intensity axis band; returns the press in window coordinates.</summary>
 	private Point PressIntensityAxis()
 	{
