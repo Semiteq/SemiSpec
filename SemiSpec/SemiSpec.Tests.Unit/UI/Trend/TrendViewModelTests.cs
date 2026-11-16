@@ -22,12 +22,14 @@ namespace SemiSpec.Tests.Unit.UI.Trend;
 public sealed class TrendViewModelTests : TrendFeedTestBase
 {
 	private readonly OverviewViewModel _overview;
+	private readonly TrendNormalizationViewModel _normalization;
 	private readonly TrendViewModel _trend;
 
 	public TrendViewModelTests()
 	{
 		_overview = NewOverview();
-		_trend = new TrendViewModel(Chart, _overview, Feed);
+		_normalization = NewNormalization();
+		_trend = new TrendViewModel(Chart, _overview, _normalization, Feed);
 		Feed.Start();
 	}
 
@@ -165,6 +167,7 @@ public sealed class TrendViewModelTests : TrendFeedTestBase
 	protected override void Dispose(bool disposing)
 	{
 		_trend.Dispose();
+		_normalization.Dispose();
 		_overview.Dispose();
 		base.Dispose(disposing);
 	}

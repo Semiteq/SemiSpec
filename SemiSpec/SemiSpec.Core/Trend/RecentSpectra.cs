@@ -15,8 +15,15 @@ internal sealed class RecentSpectra
 	/// <summary>The millisecond receive time of the oldest held frame; null when none is held.</summary>
 	public long? StartMs => _frames.Count == 0 ? null : UnixMs(_frames[0]);
 
-	/// <summary>The window mean of the measurement at the windows, NaN when its device does not cover them.</summary>
-	public static double IntensityOf(QueryWindows windows, SpectrumMeasurement measurement)
+	/// <summary>The newest held frame; null when none is held.</summary>
+	public ReceivedFrame? Newest => _frames.Count == 0 ? null : _frames[^1];
+
+	/// <summary>
+	/// The window mean of the measurement at the windows, normalized when a reference is given; NaN when its device does
+	/// not cover them.
+	/// </summary>
+	public static double IntensityOf(
+		QueryWindows windows, SpectrumMeasurement measurement, NormalizationReference? reference = null)
 	{
 		if (!windows.Covers(measurement.Device))
 		{
@@ -25,7 +32,7 @@ internal sealed class RecentSpectra
 
 		var window = windows.For(measurement.Device);
 		var pixels = measurement.Pixels.AsSpan(window.First, window.Last - window.First + 1);
-		return QueryWindows.MeanOf(MemoryMarshal.AsBytes(pixels));
+		return QueryWindows.IntensityOf(MemoryMarshal.AsBytes(pixels), measurement.Device, reference);
 	}
 
 	public void Add(ReceivedFrame spectrum)
@@ -38,12 +45,12 @@ internal sealed class RecentSpectra
 		TimeOrdered.DropBefore(_frames, unixMs, UnixMs);
 	}
 
-	public List<TrendPoint> PointsAt(QueryWindows windows)
+	public List<TrendPoint> PointsAt(QueryWindows windows, NormalizationReference? reference)
 	{
 		var points = new List<TrendPoint>(_frames.Count);
 		foreach (var frame in _frames)
 		{
-			points.Add(new TrendPoint(UnixMs(frame), IntensityOf(windows, frame.Frame.Measurement!)));
+			points.Add(new TrendPoint(UnixMs(frame), IntensityOf(windows, frame.Frame.Measurement!, reference)));
 		}
 
 		return points;

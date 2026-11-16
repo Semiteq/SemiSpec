@@ -76,6 +76,43 @@ public sealed class SpectrumHistoryPointsTests : SpectrumHistoryTestBase
 	}
 
 	[Fact]
+	public async Task AReferenceNormalizesEachPixelBeforeTheMean()
+	{
+		var referenceFrame = StoreSamples.Spectrum(Start);
+		var windows = new QueryWindows(StoreSamples.SampleNm, StoreSamples.SampleDelta);
+		var reference = NormalizationReference.From(windows, referenceFrame.Frame.Measurement!, factor: 100).Value;
+		var flat = Enumerable.Repeat((ushort)1000, Spectrometer.Atp8000.PixelCount).ToArray();
+		Store(referenceFrame, StoreSamples.Spectrum(Start.AddSeconds(1), Spectrometer.Atp8000, flat));
+		var meanOfRatios = reference.Pixels.Average(pixel => 1000.0 / pixel) * 100;
+		var ratioOfMeans = 1000.0 / reference.Pixels.Average(pixel => (double)pixel) * 100;
+
+		var result = await History.IntensityPointsAsync(
+			StoreSamples.SampleNm, StoreSamples.SampleDelta, Start, Start.AddSeconds(10), reference, Token);
+
+		result.Value.Points[0].Value.Should().BeApproximately(100.0, 1e-9, "the reference spectrum itself");
+		result.Value.Points[1].Value.Should().BeApproximately(meanOfRatios, 1e-9);
+		meanOfRatios.Should().NotBeApproximately(ratioOfMeans, 1e-6, "the ramp window is not flat");
+	}
+
+	[Fact]
+	public async Task WithAReferenceARowOfTheOtherDeviceIsNaN()
+	{
+		// Both firmware tables cover 950 nm, so only the reference's device tells the rows apart.
+		const ushort OverlapNm = 950;
+		var referenceFrame = StoreSamples.Spectrum(Start, Spectrometer.Atp8000, nm: OverlapNm);
+		var windows = new QueryWindows(OverlapNm, StoreSamples.SampleDelta);
+		var reference = NormalizationReference.From(windows, referenceFrame.Frame.Measurement!, factor: 100).Value;
+		Store(referenceFrame, StoreSamples.Spectrum(Start.AddSeconds(1), Spectrometer.Atp2000, nm: OverlapNm));
+
+		var normalized = await History.IntensityPointsAsync(
+			OverlapNm, StoreSamples.SampleDelta, Start, Start.AddSeconds(10), reference, Token);
+		var raw = await PointsAsync(OverlapNm, StoreSamples.SampleDelta);
+
+		double.IsNaN(normalized.Value.Points[1].Value).Should().BeTrue();
+		double.IsNaN(raw.Points[1].Value).Should().BeFalse("without a reference the ATP-2000 row is a plain mean");
+	}
+
+	[Fact]
 	public async Task ACancelledReadThrowsOperationCanceled()
 	{
 		Store(StoreSamples.Spectrum(Start.AddSeconds(1)));
@@ -85,6 +122,7 @@ public sealed class SpectrumHistoryPointsTests : SpectrumHistoryTestBase
 			StoreSamples.SampleDelta,
 			Start,
 			Start.AddSeconds(10),
+			reference: null,
 			new CancellationToken(canceled: true));
 
 		await read.Should().ThrowAsync<OperationCanceledException>();
@@ -93,7 +131,7 @@ public sealed class SpectrumHistoryPointsTests : SpectrumHistoryTestBase
 	/// <summary>The points of the 10 s from Start.</summary>
 	private async Task<IntensityChunk> PointsAsync(ushort nm, byte delta)
 	{
-		var result = await History.IntensityPointsAsync(nm, delta, Start, Start.AddSeconds(10), Token);
+		var result = await History.IntensityPointsAsync(nm, delta, Start, Start.AddSeconds(10), reference: null, Token);
 		result.IsSuccess.Should().BeTrue();
 		return result.Value;
 	}

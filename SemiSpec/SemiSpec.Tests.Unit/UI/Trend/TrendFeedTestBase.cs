@@ -173,9 +173,14 @@ public abstract class TrendFeedTestBase : TrendChartTestBase
 
 	/// <summary>The fake points reader every feed of the stand uses.</summary>
 	protected async Task<Result<IntensityChunk>> ReadPointsAsync(
-		ushort wavelengthNm, byte delta, DateTimeOffset from, DateTimeOffset to, CancellationToken token)
+		ushort wavelengthNm,
+		byte delta,
+		DateTimeOffset from,
+		DateTimeOffset to,
+		NormalizationReference? reference,
+		CancellationToken token)
 	{
-		var call = new PointsCall(wavelengthNm, delta, from, to, token);
+		var call = new PointsCall(wavelengthNm, delta, from, to, reference, token);
 		var gate = _pointsGate.Task;
 		PointsCalls.Enqueue(call);
 		await gate.ConfigureAwait(false);
@@ -195,7 +200,12 @@ public abstract class TrendFeedTestBase : TrendChartTestBase
 	}
 
 	protected sealed record PointsCall(
-		ushort WavelengthNm, byte Delta, DateTimeOffset From, DateTimeOffset To, CancellationToken Token);
+		ushort WavelengthNm,
+		byte Delta,
+		DateTimeOffset From,
+		DateTimeOffset To,
+		NormalizationReference? Reference,
+		CancellationToken Token);
 
 	protected sealed record SpectrumCall(DateTimeOffset Moment, CancellationToken Token);
 }

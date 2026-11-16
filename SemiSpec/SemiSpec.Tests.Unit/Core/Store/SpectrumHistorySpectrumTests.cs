@@ -154,7 +154,7 @@ public sealed class SpectrumHistorySpectrumTests : SpectrumHistoryTestBase
 		DamagedPages.TablePages(StorePath);
 
 		var result = await History.IntensityPointsAsync(
-			StoreSamples.SampleNm, StoreSamples.SampleDelta, Start, Start.AddSeconds(1), Token);
+			StoreSamples.SampleNm, StoreSamples.SampleDelta, Start, Start.AddSeconds(1), reference: null, Token);
 
 		result.IsFailed.Should().BeTrue();
 		File.Exists(StorePath + ".damaged").Should().BeTrue();

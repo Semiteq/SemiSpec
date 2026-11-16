@@ -209,11 +209,13 @@
                    MaxWidth="480"
                    HorizontalAlignment="Center"
                    VerticalAlignment="Center" />
-        <!-- The view sizes the band to the margin above the data area after each served frame. -->
-        <Panel Name="StateLineBand"
-               IsHitTestVisible="False"
-               HorizontalAlignment="Left"
-               VerticalAlignment="Top">
+        <!-- The view sizes the band to the margin above the data area after each served frame; the band has no
+             background, so a press outside the switch reaches the plot. -->
+        <Grid Name="StateLineBand"
+              ColumnDefinitions="*,Auto"
+              ColumnSpacing="8"
+              HorizontalAlignment="Left"
+              VerticalAlignment="Top">
             <TextBlock Name="StateLine"
                        Text="{Binding StateText}"
                        IsVisible="{Binding StateText, Converter={x:Static StringConverters.IsNotNullOrEmpty}, FallbackValue=False}"
@@ -222,7 +224,63 @@
                        TextWrapping="NoWrap"
                        TextTrimming="CharacterEllipsis"
                        VerticalAlignment="Bottom" />
-        </Panel>
+            <!-- A label and one frame of three joined segments, Semi's radio-button-as-button look, 22 px high to fit the
+                 band over the data area, the 24 px margin less its 2 px gap. The transparent background takes a press on
+                 a disabled segment, which the hit test skips, off the plot. -->
+            <StackPanel Grid.Column="1"
+                        Name="NormalizeSwitch"
+                        Background="Transparent"
+                        Orientation="Horizontal"
+                        Spacing="12"
+                        VerticalAlignment="Bottom">
+                <StackPanel.Styles>
+                    <Style Selector="RadioButton">
+                        <Setter Property="Height" Value="18" />
+                        <Setter Property="MinHeight" Value="0" />
+                        <Setter Property="Margin" Value="0" />
+                        <Setter Property="Padding" Value="8,0" />
+                        <Setter Property="VerticalContentAlignment" Value="Center" />
+                    </Style>
+                </StackPanel.Styles>
+                <TextBlock Name="NormalizeLabel"
+                           Text="{x:Static text:Resources.TrendNormalizeLabel}"
+                           Foreground="{DynamicResource AppSecondaryForegroundBrush}"
+                           VerticalAlignment="Center" />
+                <Border Name="NormalizeSegments"
+                        Height="22"
+                        Padding="2"
+                        Background="{DynamicResource RadioButtonGroupBackground}"
+                        CornerRadius="{DynamicResource RadioButtonGroupCornerRadius}">
+                    <StackPanel Orientation="Horizontal">
+                        <local:MirroredRadioButton Name="NormalizeOff"
+                                                   GroupName="NormalizeOff"
+                                                   Theme="{StaticResource ButtonRadioButton}"
+                                                   Classes="Small"
+                                                   Content="{x:Static text:Resources.TrendNormalizeOff}"
+                                                   Command="{Binding Normalization.TurnOffCommand}"
+                                                   IsChecked="{Binding Normalization.IsOff, Mode=OneWay}" />
+                        <local:MirroredRadioButton Name="NormalizeSmall"
+                                                   GroupName="NormalizeSmall"
+                                                   Theme="{StaticResource ButtonRadioButton}"
+                                                   Classes="Small"
+                                                   Content="{x:Static text:Resources.TrendNormalizeSmall}"
+                                                   Command="{Binding Normalization.NormalizeSmallCommand}"
+                                                   IsChecked="{Binding Normalization.IsSmallFactor, Mode=OneWay}"
+                                                   ToolTip.Tip="{Binding Normalization.UnavailableReason}"
+                                                   ToolTip.ShowOnDisabled="True" />
+                        <local:MirroredRadioButton Name="NormalizeLarge"
+                                                   GroupName="NormalizeLarge"
+                                                   Theme="{StaticResource ButtonRadioButton}"
+                                                   Classes="Small"
+                                                   Content="{x:Static text:Resources.TrendNormalizeLarge}"
+                                                   Command="{Binding Normalization.NormalizeLargeCommand}"
+                                                   IsChecked="{Binding Normalization.IsLargeFactor, Mode=OneWay}"
+                                                   ToolTip.Tip="{Binding Normalization.UnavailableReason}"
+                                                   ToolTip.ShowOnDisabled="True" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
         <Canvas Name="CursorOverlay" IsHitTestVisible="False">
             <Line Name="CrosshairLine"
                   IsVisible="False"

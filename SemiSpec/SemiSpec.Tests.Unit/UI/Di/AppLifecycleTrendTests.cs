@@ -75,7 +75,7 @@ public sealed class AppLifecycleTrendTests : AppLifecycleTestBase
 				container.GetRequiredService<IntensityCache>(),
 				container.GetRequiredService<TrendChartViewModel>(),
 				container.GetRequiredService<SwitchingSpectrumSource>(),
-				async (_, _, from, _, _) =>
+				async (_, _, from, _, _, _) =>
 				{
 					readEntered.TrySetResult();
 					await readGate.Task;

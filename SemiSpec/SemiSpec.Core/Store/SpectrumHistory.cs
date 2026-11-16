@@ -73,16 +73,22 @@ public sealed class SpectrumHistory(string path)
 	}
 
 	/// <summary>
-	/// The window mean of every stored spectrum in [from, to), in receive order; NaN for an uncovered device or a corrupt row.
+	/// The window mean of every stored spectrum in [from, to), in receive order, normalized when a reference is given;
+	/// NaN for an uncovered device, a device other than the reference's, or a corrupt row.
 	/// </summary>
 	public Task<Result<IntensityChunk>> IntensityPointsAsync(
-		ushort wavelengthNm, byte delta, DateTimeOffset from, DateTimeOffset to, CancellationToken token)
+		ushort wavelengthNm,
+		byte delta,
+		DateTimeOffset from,
+		DateTimeOffset to,
+		NormalizationReference? reference,
+		CancellationToken token)
 	{
 		return ReadAsync(
 			connection =>
 			{
 				var windows = new QueryWindows(wavelengthNm, delta);
-				var points = WindowMeans(connection, windows, from, to, token).ToArray();
+				var points = WindowMeans(connection, windows, from, to, reference, token).ToArray();
 				return Result.Ok(new IntensityChunk(from, points));
 			},
 			"The intensity points could not be read",
@@ -94,7 +100,7 @@ public sealed class SpectrumHistory(string path)
 	{
 		var buckets = new IntensityBuckets(query);
 		var windows = new QueryWindows(query.WavelengthNm, query.Delta);
-		foreach (var point in WindowMeans(connection, windows, query.From, query.To, token))
+		foreach (var point in WindowMeans(connection, windows, query.From, query.To, reference: null, token))
 		{
 			buckets.Add(point);
 		}
@@ -103,14 +109,15 @@ public sealed class SpectrumHistory(string path)
 	}
 
 	/// <summary>
-	/// Streams one statement over the range: every row's window cut from its pixels with substr and averaged, NaN for
-	/// an uncovered device or a corrupt row.
+	/// Streams one statement over the range: every row's window cut from its pixels with substr and averaged, or
+	/// normalized to the reference; NaN for an uncovered device, another device than the reference's, or a corrupt row.
 	/// </summary>
 	private static IEnumerable<TrendPoint> WindowMeans(
 		SqliteConnection connection,
 		QueryWindows windows,
 		DateTimeOffset from,
 		DateTimeOffset to,
+		NormalizationReference? reference,
 		CancellationToken token)
 	{
 		using var command = connection.CreateCommand();
@@ -134,8 +141,9 @@ public sealed class SpectrumHistory(string path)
 				continue;
 			}
 
+			var device = (Spectrometer)reader.GetInt64(1);
 			var byteCount = (int)reader.GetBytes(2, 0, buffer, 0, buffer.Length);
-			yield return new TrendPoint(unixMs, QueryWindows.MeanOf(buffer.AsSpan(0, byteCount)));
+			yield return new TrendPoint(unixMs, QueryWindows.IntensityOf(buffer.AsSpan(0, byteCount), device, reference));
 		}
 	}
 

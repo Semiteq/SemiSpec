@@ -72,6 +72,29 @@ public sealed class TrendFeedRereadTests : TrendFeedTestBase
 	}
 
 	[AvaloniaFact]
+	public async Task TheReadAfterAStartCarriesTheReferenceAndTheReadAfterAStopCarriesNone()
+	{
+		Feed.Start();
+		AddSpectra(0, 1200);
+		Cache.StartNormalization(100);
+		PassThrottle();
+
+		await Waits.UntilAsync(() => !PointsCalls.IsEmpty);
+		PointsCalls.Should().AllSatisfy(call => call.Reference.Should().BeSameAs(Requests[^1].Reference));
+		Requests[^1].Reference!.Factor.Should().Be(100);
+		var startCalls = PointsCalls.Count;
+		await Waits.UntilAsync(() => PointsCalls.Count == PlanFor(Chart.From, Chart.To).Count);
+
+		Cache.StopNormalization();
+		var stopCalls = PointsCalls.Count;
+		PassThrottle();
+
+		await Waits.UntilAsync(() => PointsCalls.Count > stopCalls);
+		startCalls.Should().BePositive();
+		PointsCalls.Skip(stopCalls).Should().AllSatisfy(call => call.Reference.Should().BeNull());
+	}
+
+	[AvaloniaFact]
 	public async Task AReadUsesTheWindowFromBeforeItsFirstRangeNotALaterPan()
 	{
 		var uiHop = new TestScheduler();

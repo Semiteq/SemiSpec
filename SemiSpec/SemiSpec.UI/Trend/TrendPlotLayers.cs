@@ -48,9 +48,16 @@ public sealed class TrendPlotLayers
 
 	/// <summary>
 	/// Draws the fold over [from, to]; a null fold clears the line and the strip and keeps the Y range. fromZero runs
-	/// Y from zero to the drawn maximum plus 5 %; a manual range holds Y where the operator typed it.
+	/// Y from zero to the drawn maximum plus 5 %; a manual range holds Y where the operator typed it; a normalization
+	/// factor names itself in the Y label.
 	/// </summary>
-	public void Draw(TrendFold? fold, DateTimeOffset from, DateTimeOffset to, bool fromZero, AxisRange? manualY)
+	public void Draw(
+		TrendFold? fold,
+		DateTimeOffset from,
+		DateTimeOffset to,
+		bool fromZero,
+		AxisRange? manualY,
+		int? normalizationFactor)
 	{
 		var columns = fold is null ? [] : EnvelopeColumn.Map(fold.Series, LocalTimeAxis.ToAxis);
 		var failures = fold is null ? [] : TrendColumns.FailureRanges(fold.Series);
@@ -71,9 +78,12 @@ public sealed class TrendPlotLayers
 				_plot.Axes.SetLimitsY(bottom, top);
 			}
 
-			_plot.Axes.Left.Label.Text = fold?.Extent.Key is { } key
-				? Resources.FormatTrendAxisIntensityFormat(key.WavelengthNm, key.Delta)
-				: Resources.TrendAxisIntensity;
+			_plot.Axes.Left.Label.Text = (fold?.Extent.Key, normalizationFactor) switch
+			{
+				({ } key, { } factor) => Resources.FormatTrendAxisNormalizedFormat(factor, key.WavelengthNm, key.Delta),
+				({ } key, null) => Resources.FormatTrendAxisIntensityFormat(key.WavelengthNm, key.Delta),
+				_ => Resources.TrendAxisIntensity,
+			};
 		}
 	}
 

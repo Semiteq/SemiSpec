@@ -28,7 +28,8 @@ public abstract class TrendChartViewTestBase : TrendFeedTestBase
 	protected TrendChartViewTestBase()
 	{
 		Overview = NewOverview();
-		Trend = new TrendViewModel(Chart, Overview, Feed);
+		Normalization = NewNormalization();
+		Trend = new TrendViewModel(Chart, Overview, Normalization, Feed);
 		Feed.Start();
 		View = new TrendChartView { DataContext = Trend };
 		Window = new Window
@@ -40,6 +41,8 @@ public abstract class TrendChartViewTestBase : TrendFeedTestBase
 	}
 
 	protected OverviewViewModel Overview { get; }
+
+	protected TrendNormalizationViewModel Normalization { get; }
 
 	protected TrendViewModel Trend { get; }
 
@@ -106,6 +109,7 @@ public abstract class TrendChartViewTestBase : TrendFeedTestBase
 	{
 		Window.Close();
 		Trend.Dispose();
+		Normalization.Dispose();
 		Overview.Dispose();
 		base.Dispose(disposing);
 	}

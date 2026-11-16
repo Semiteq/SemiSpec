@@ -67,8 +67,9 @@ the trend's folds and re-reads.
 | `IntensityQuery`, `IntensityBuckets`, `IntensitySeries` | Core | The validated series request with its epoch-aligned column grid, the fold of window means, breaks and failure marks into columns on that grid (min, max, last value, counts, the OR of the failure bits), and its result (`Core/Store/`) |
 | `SpectrumHistory` | Core | The query service: the stored spectrum at a moment, the intensity series, the intensity points and the stored range, each on its own reader connection; a read that fails on a damaged file marks it (`Core/Store/`) |
 | `FrameContinuity` | Core | Turns spectra and heartbeats, in receive order, into the trend's Loss breaks and failure marks (`Core/Trend/`) |
-| `IntensityCache` | Core | One intensity point per spectrum at the key of the latest spectrum frame, with the run's breaks and failure marks, for the last 24 h; the recent spectra, the key change and its re-read request, the run start and the stored day request, the landing of stored chunks, the completion of a re-read, the fold of the current extent under one lock hold and the moment lookup; `TrendTimeline` holds the key's points, breaks and failure marks in time order and folds them, with a NoSpectra break at each gap of more than 10 s between points. `TrendKey`, `TrendExtent`, `TrendFold` and `ReReadRequest` are its results (`Core/Trend/`) |
+| `IntensityCache` | Core | One intensity point per spectrum at the key of the latest spectrum frame, with the run's breaks and failure marks, for the last 24 h; the recent spectra, the key change and its re-read request, the run start and the stored day request, the landing of stored chunks, the completion of a re-read, the fold of the current extent under one lock hold, the moment lookup, and the normalization's start, stop and reset on a key change; `TrendTimeline` holds the key's points, breaks and failure marks in time order and folds them, with a NoSpectra break at each gap of more than 10 s between points. `TrendKey`, `TrendExtent`, `TrendFold`, `ReReadRequest` and `NormalizationState` are its results (`Core/Trend/`) |
 | `TrendHistoryPlan` | Core | The store ranges a re-read runs, in order: the visible window, then the rest of the day in hour chunks, newest first (`Core/Trend/`) |
+| `NormalizationReference` | Core | The window pixels of the spectrum fixed at a normalize press, its device and the factor; built from a measurement, refused with `NormalizationUnavailableError` for an uncovered wavelength and `DarkReferenceError` for an all-zero window; `QueryWindows.NormalizedMeanOf` divides each pixel by its own reference pixel and averages (`Core/Store/`) |
 | `IntensityChunk`, `TrendPoint` | Core | The result of the store's points read: its start and one `(UnixMs, Value)` point per spectrum; `IntensityBuckets.Add(TrendPoint)` folds a NaN point as uncovered (`Core/Store/`) |
 | `TrendNavigationModel` | Core | The trend's visible window in UTC: width 10 s to 24 h, follow, pan, zoom around an anchor, set width, set an exact window, the pan floor at the first point, and the rule that a pan or a zoom leaving now outside the window stops following (`Core/Trend/`) |
 | `TrendColumns` | Core | The column width for a data area, the fold query that includes its end, the gap rule and the joined failure ranges (`Core/Trend/`) |
@@ -114,7 +115,8 @@ the trend's folds and re-reads.
 | `TrendReadout` | UI | The hover text of one folded column: local time, value or gap reason, failures (`UI/Trend/`) |
 | `TrendPresets` | UI | The time window presets 1 min, 10 min, 1 h, 6 h and 24 h, 10 min by default (`UI/Trend/`) |
 | `TrendFeed` | UI | Fills the cache from the distributor, loads the stored day once the store has opened, logs each re-read request, runs the re-read after a key change or the stored day request and the read of a clicked moment, each as a pipeline where a newer request cancels the read in flight, and cancels the moment read on Back to live (`UI/Trend/`) |
-| `TrendViewModel` | UI | The trend: the chart, the overview, the time window form, the intensity form, From zero, Autoscale, Follow live, the state line and the click to a moment (`UI/Trend/`) |
+| `TrendViewModel` | UI | The trend: the chart, the overview, the normalization switch, the time window form, the intensity form, From zero, Autoscale, Follow live, the state line and the click to a moment (`UI/Trend/`) |
+| `TrendNormalizationViewModel`, `MirroredRadioButton` | UI | The normalization switch, Off, ×100 and ×1000: the presses, the factor segments' availability and the mirror of the cache's normalization state; the radio button that never checks itself, so a refused press leaves the switch as it was (`UI/Trend/`) |
 | `TimeWindowPanelViewModel` | UI | The time axis flyout: the window's local start and end (time and date), its width and the presets, ported from SemiPlot's time window panel without its archive calendar (`UI/Trend/`) |
 | `OverviewViewModel`, `OverviewBand` | UI | The overview strip: the whole cache folded to 250 columns, the window's place along it, and the press that moves the trend there; the band control draws it (`UI/Trend/`) |
 | `TrendHistoryError`, `TrendMomentError` | UI | The stored points at a new key could not be read; the stored spectrum of a clicked moment could not be read (`UI/Trend/`) |
@@ -122,7 +124,7 @@ the trend's folds and re-reads.
 | `StoreOpenError`, `StoreWriteError`, `StoreStoppedError`, `StoreFileReplacedError` | UI | The store file could not be prepared or opened; a batch could not be written; an unexpected failure after the open ended the writer; a damaged history file was set aside and a new one started (`UI/Store/`) |
 | `AppLogging` | UI | Picks the log folder (`C:\DISTR\Logs\SemiSpec`, or the fallback when the write check or the logger's open there fails), creates it and the Serilog logger: `semispec.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
-| `AddUi(LoggingSetup, AppDataPaths, SettingsFile)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` `spectra.db` under the store folder, `SpectrumStore`, `SpectrumHistory` over the `StoreFile`, `IntensityCache`, `LiveSpectrumSource`, `SwitchingSpectrumSource` over it, the message panel, the `SettingsFile` it is given, `DisplaySettingsViewModel`, the connection row, the status bar, the spectrum view model, `TrendChartViewModel`, `OverviewViewModel`, `TrendFeed` built over `SpectrumHistory.IntensityPointsAsync`, `SpectrumAtAsync` and `SpectrumStore.Opened` with `DefaultScheduler.Instance` for its throttle, `TrendViewModel` and the main window view model, all singletons |
+| `AddUi(LoggingSetup, AppDataPaths, SettingsFile)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` `spectra.db` under the store folder, `SpectrumStore`, `SpectrumHistory` over the `StoreFile`, `IntensityCache`, `LiveSpectrumSource`, `SwitchingSpectrumSource` over it, the message panel, the `SettingsFile` it is given, `DisplaySettingsViewModel`, the connection row, the status bar, the spectrum view model, `TrendChartViewModel`, `OverviewViewModel`, `TrendNormalizationViewModel` over `SerialLink.StatusUpdates`, `TrendFeed` built over `SpectrumHistory.IntensityPointsAsync`, `SpectrumAtAsync` and `SpectrumStore.Opened` with `DefaultScheduler.Instance` for its throttle, `TrendViewModel` and the main window view model, all singletons |
 | `SingleInstance` | UI | The claim on one copy per Windows session: a named mutex in `Local\`, the ask and answer events through which a second launch has the first copy activate its window, the listener that runs the activation on the UI scheduler and answers, and the release (`UI/Instance/`) |
 | `SecondLaunch`, `NativeMethods` | UI | What a launch that finds a running copy does: asks it in rounds of 2 s for up to 10 s, closes its claim after each ask and claims the name again, logs one line, and returns an exit code, or the new claim when the name became free; with no answer in the budget it shows the not-responding message box with no handle open; `NativeMethods` holds the three `user32.dll` calls `MessageBoxW`, `AllowSetForegroundWindow` and `ShowWindow` (`UI/Instance/`) |
 | `Program` | UI | Entry point: paths, logging, the single-instance claim and the second launch, the settings file, container, `App.Run` with the logger for unhandled exceptions and the claim |
@@ -579,10 +581,12 @@ Both charts reserve a 24 px top margin (`ChartStateLine.TopMargin`, the top axis
 text over the data area. `ChartStateLine.Place` sizes the line's band to the data area's width and the margin's height
 after each served frame, and the spectrum view also after a size change, so the line starts at the data area's left
 edge. The line is one `TextBlock` in `AppSecondaryForegroundBrush`, `NoWrap` with an ellipsis, hidden while its text is
-empty, so no state changes the chart's layout.
+empty, so no state changes the chart's layout. The trend's band is a grid that also holds the two normalize buttons in
+its right column (Normalization).
 At the minimum width the longest spectrum line, a data-age text with all four modes, measures 561.9 px in Russian
-(English 462.8 px) over 878.2 px of data area, and the longest trend line 429.7 px (335.7 px) over 1190.2 px
-(`MainWindowTextFitChartTests`), so neither line trims.
+(English 462.8 px) over 878.2 px of data area, and the longest trend line, normalization included, 578.3 px (472.4 px)
+plus the 8 px gap and the switch, 299 px (292.2 px), over 1190.2 px (`MainWindowTextFitChartTests`), so neither line
+trims.
 
 `SpectrumViewModel.StateText` joins its parts with " · " (`ChartStateSeparator`):
 
@@ -627,7 +631,7 @@ SNR has no unit, because the board sends a ratio. The update time is `ReceivedAt
 
 The trend's intensity of a spectrum is the mean of its pixels in the `SpectrometerCalibration.Window(nm, delta)` of its
 device, dark frames included, the value the store's series computes. The key is the `(WavelengthNm, Delta)` of the
-latest spectrum frame.
+latest spectrum frame. While the trend is normalized, a point is the normalized mean instead (Normalization).
 
 ### The intensity cache
 
@@ -840,8 +844,50 @@ the culture's short date format: "Time, {date}" (`TrendAxisTimeFormat`), or "Tim
 (`TrendAxisTimeRangeFormat`) for a window across midnight, in local time.
 
 `TrendViewModel.StateText` is the trend's state line (The state line): the window width, a preset's label or hours,
-minutes and seconds, then "Not following the data" while not following and "Scale frozen" while a Y range is held,
-joined by " · ". While a moment is shown, the shown-moment line stands at it in `AppMarkerLineBrush`.
+minutes and seconds, then "Not following the data" while not following, "Scale frozen" while a Y range is held and
+"Normalized ×100" or "Normalized ×1000" while normalized, joined by " · ". While a moment is shown, the shown-moment line
+stands at it in `AppMarkerLineBrush`.
+
+### Normalization
+
+The normalization switch sits at the right end of the state line's band, its right edge on the data area's right
+edge: the label "Normalization" in `AppSecondaryForegroundBrush`, a 12 px gap, and one 22 px frame in
+`RadioButtonGroupBackground` with three joined 18 px segments, Off, ×100 and ×1000, in Semi's `ButtonRadioButton` theme.
+Off is checked while the trend shows raw intensity. A press on a factor segment fixes the reference: the window pixels of the newest live spectrum,
+with its device (`NormalizationReference`). From then on every point is the mean of each window pixel divided by its
+own reference pixel, times 100 or 1000 (`QueryWindows.NormalizedMeanOf`); a reference pixel of 0 is left out, and a
+window with none left is NaN. A point of a device other than the reference's is NaN: the two firmware tables overlap
+at 898 to 1028 nm, and their windows differ. The reference is one frame, so the operator presses on a steady sample.
+
+`IntensityCache.StartNormalization(factor)` fixes the reference under the cache's lock, recomputes the recent spectra
+normalized and raises a re-read that carries the reference, so `TrendFeed` reads the stored day through
+`SpectrumHistory.IntensityPointsAsync` normalized the same way; the stored rows never change. A start with no spectrum
+at the key, or an uncovered wavelength, fails with `NormalizationUnavailableError`; an all-zero window fails with
+`DarkReferenceError`, which reaches the message panel as a Warning; a failed start changes nothing.
+`StopNormalization` does the same with no reference. Off stops; a press on the checked factor segment changes
+nothing; a press on the other factor segment fixes a new reference with its factor. A key change clears the reference under the same lock, so a press racing a key
+change never leaves a reference of the old window, and `NormalizationChanged` reports the stop with
+`EndedByKeyChange`; the switch then adds one Info line, "Normalization switched off". Normalization is not saved
+across a restart.
+
+The cache is the state's one writer. `TrendNormalizationViewModel` mirrors it and binds the segments' `IsChecked`
+one-way. `MirroredRadioButton` overrides `Toggle` to do nothing, so a click only runs the command and a refused press
+leaves the switch as it was; each segment has its own `GroupName`, so no radio group logic writes `IsChecked`. The strip
+behind the switch has a transparent background, so a press on a disabled segment, which the hit test skips, never
+reaches the plot as a click on the trend. Off is enabled whenever the trend is normalized, also while the factor
+segments are disabled, so a stale link never locks normalization on. The factor segments are enabled while the newest live spectrum covers the wavelength and is not
+stale by `SpectrumStaleness`: the link is Receiving and the spectrum is at most 10 s old, checked once a second.
+While they are disabled, their tooltip, shown on disabled controls too, says that a live spectrum at the current
+wavelength, not older than 10 s, is needed. Every
+normalization change clears a held Y range, as a From zero toggle does, because raw and normalized values share no
+scale; the Y label's first line names the factor, "Normalized ×1000" over the key. The overview refolds on the re-read
+request as on a key change.
+
+The band over the data area is 22 px, the 24 px top margin less its 2 px gap, so the frame is 22 px with a 2 px inset
+and the segments are 18 px, set by a `RadioButton` style on the switch with `MinHeight` 0, `Margin` 0 and `Padding`
+"8,0"; the selector names `RadioButton`, because `MirroredRadioButton`'s style key is `RadioButton`. At the minimum width
+the longest Russian state line, the gap and the switch take 885.3 px of the 1190.2 px data area, and the normalized Y label at the
+widest key takes 164.1 px of the 179.8 px the trend's floor leaves (`MainWindowTextFitChartTests`).
 
 ### Navigation
 

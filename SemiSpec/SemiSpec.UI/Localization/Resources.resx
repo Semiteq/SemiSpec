@@ -439,4 +439,47 @@
   <data name="MenuViewTrendAsLines" xml:space="preserve">
     <value>Trend as lines</value>
   </data>
+  <data name="TrendNormalizeSmall" xml:space="preserve">
+    <value>×100</value>
+  </data>
+  <data name="TrendNormalizeLarge" xml:space="preserve">
+    <value>×1000</value>
+  </data>
+  <data name="TrendStateNormalizedFormat" xml:space="preserve">
+    <value>Normalized ×{0}</value>
+  </data>
+  <data name="TrendAxisNormalizedFormat" xml:space="preserve">
+    <value>Normalized ×{0}
+{1} nm ±{2} nm</value>
+  </data>
+  <data name="NormalizationDarkTitle" xml:space="preserve">
+    <value>The trend cannot be normalized</value>
+  </data>
+  <data name="NormalizationDarkDetail" xml:space="preserve">
+    <value>Every value in the measurement window is 0.</value>
+  </data>
+  <data name="NormalizationDarkRemedy" xml:space="preserve">
+    <value>Press the button again once the window shows a signal.</value>
+  </data>
+  <data name="NormalizationUnavailableTitle" xml:space="preserve">
+    <value>The trend cannot be normalized</value>
+  </data>
+  <data name="NormalizationUnavailableDetail" xml:space="preserve">
+    <value>No spectrum at the current wavelength has arrived.</value>
+  </data>
+  <data name="NormalizationResetTitle" xml:space="preserve">
+    <value>Normalization switched off</value>
+  </data>
+  <data name="NormalizationResetDetail" xml:space="preserve">
+    <value>The wavelength or the measurement window changed.</value>
+  </data>
+  <data name="TrendNormalizeLabel" xml:space="preserve">
+    <value>Normalization</value>
+  </data>
+  <data name="TrendNormalizeOff" xml:space="preserve">
+    <value>Off</value>
+  </data>
+  <data name="TrendNormalizeUnavailableTip" xml:space="preserve">
+    <value>Needs a live spectrum at the current wavelength, not older than 10 s.</value>
+  </data>
 </root>

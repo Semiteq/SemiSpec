@@ -439,4 +439,47 @@
   <data name="MenuViewTrendAsLines" xml:space="preserve">
     <value>Тренд линиями</value>
   </data>
+  <data name="TrendNormalizeSmall" xml:space="preserve">
+    <value>×100</value>
+  </data>
+  <data name="TrendNormalizeLarge" xml:space="preserve">
+    <value>×1000</value>
+  </data>
+  <data name="TrendStateNormalizedFormat" xml:space="preserve">
+    <value>Нормировка ×{0}</value>
+  </data>
+  <data name="TrendAxisNormalizedFormat" xml:space="preserve">
+    <value>Нормировано ×{0}
+{1} нм ±{2} нм</value>
+  </data>
+  <data name="NormalizationDarkTitle" xml:space="preserve">
+    <value>Нормировка невозможна</value>
+  </data>
+  <data name="NormalizationDarkDetail" xml:space="preserve">
+    <value>В окне измерения все значения равны 0.</value>
+  </data>
+  <data name="NormalizationDarkRemedy" xml:space="preserve">
+    <value>Нажмите кнопку снова, когда в окне появится сигнал.</value>
+  </data>
+  <data name="NormalizationUnavailableTitle" xml:space="preserve">
+    <value>Нормировка невозможна</value>
+  </data>
+  <data name="NormalizationUnavailableDetail" xml:space="preserve">
+    <value>Спектр на текущей длине волны ещё не пришёл.</value>
+  </data>
+  <data name="NormalizationResetTitle" xml:space="preserve">
+    <value>Нормировка выключена</value>
+  </data>
+  <data name="NormalizationResetDetail" xml:space="preserve">
+    <value>Изменились длина волны или окно измерения.</value>
+  </data>
+  <data name="TrendNormalizeLabel" xml:space="preserve">
+    <value>Нормировка</value>
+  </data>
+  <data name="TrendNormalizeOff" xml:space="preserve">
+    <value>Выкл</value>
+  </data>
+  <data name="TrendNormalizeUnavailableTip" xml:space="preserve">
+    <value>Нужен свежий спектр на текущей длине волны, не старше 10 с.</value>
+  </data>
 </root>
