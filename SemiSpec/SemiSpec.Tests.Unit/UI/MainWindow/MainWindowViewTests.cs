@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using ReactiveUI.Avalonia;
 
 using SemiSpec.Tests.Unit.UI.Link;
+using SemiSpec.Tests.Unit.UI.Settings;
 using SemiSpec.Tests.Unit.UI.Spectrum;
 using SemiSpec.Tests.Unit.UI.Store;
 using SemiSpec.Tests.Unit.UI.Trend;
@@ -36,6 +37,7 @@ namespace SemiSpec.Tests.Unit.UI.MainWindow;
 public sealed class MainWindowViewTests : IDisposable
 {
 	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
+	private readonly DisplaySettingsStand _display;
 	private readonly SerialLink _serialLink;
 	private readonly UnstartedStore _store;
 	private readonly ConnectionBarViewModel _connectionBar;
@@ -65,6 +67,7 @@ public sealed class MainWindowViewTests : IDisposable
 			AvaloniaScheduler.Instance,
 			NullLogger<AppStatusBarViewModel>.Instance);
 		_switchingSource = new SwitchingSpectrumSource(_spectrumSource);
+		_display = new DisplaySettingsStand(_messagePanel);
 		_spectrum = new SpectrumViewModel(
 			_switchingSource,
 			_serialLink,
@@ -79,6 +82,7 @@ public sealed class MainWindowViewTests : IDisposable
 			_statusBar,
 			_spectrum,
 			_trend.Trend,
+			_display.Display,
 			new LogLevelControl(),
 			NullLogger<MainWindowViewModel>.Instance);
 		_window = new MainWindowView { DataContext = _viewModel };
@@ -192,6 +196,26 @@ public sealed class MainWindowViewTests : IDisposable
 	}
 
 	[AvaloniaFact]
+	public async Task TheDisplayItemsFollowTheirSettings()
+	{
+		Realise();
+		var bar = Named<AppMenuBar>(_window, "MenuBar");
+		var qFactor = Named<MenuItem>(bar, "ViewQFactor");
+		var lines = Named<MenuItem>(bar, "ViewTrendAsLines");
+		qFactor.Header.Should().Be(Resources.MenuViewQFactor);
+		lines.Header.Should().Be(Resources.MenuViewTrendAsLines);
+		qFactor.IsChecked.Should().BeFalse();
+		lines.IsChecked.Should().BeFalse();
+
+		await _display.Display.ToggleQFactorCommand.Execute();
+		await _display.Display.ToggleTrendAsLinesCommand.Execute();
+		Dispatcher.UIThread.RunJobs();
+
+		qFactor.IsChecked.Should().BeTrue();
+		lines.IsChecked.Should().BeTrue();
+	}
+
+	[AvaloniaFact]
 	public async Task ExitClosesTheWindow()
 	{
 		var closed = false;
@@ -216,6 +240,7 @@ public sealed class MainWindowViewTests : IDisposable
 		_statusBar.Dispose();
 		_serialLink.Dispose();
 		_store.Dispose();
+		_display.Dispose();
 		_messagePanel.Dispose();
 	}
 

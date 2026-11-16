@@ -415,4 +415,28 @@
   <data name="SingleInstanceNotResponding" xml:space="preserve">
     <value>SemiSpec уже запущена, но не отвечает. Закройте её в диспетчере задач и запустите снова.</value>
   </data>
+  <data name="SettingsReadTitle" xml:space="preserve">
+    <value>Не удалось прочитать настройки</value>
+  </data>
+  <data name="SettingsReadDetail" xml:space="preserve">
+    <value>Файл настроек повреждён или не открывается; приложение использует настройки отображения по умолчанию.</value>
+  </data>
+  <data name="SettingsReadRemedy" xml:space="preserve">
+    <value>Измените любой пункт в меню «Вид», чтобы записать файл заново.</value>
+  </data>
+  <data name="SettingsWriteTitle" xml:space="preserve">
+    <value>Не удалось сохранить настройки</value>
+  </data>
+  <data name="SettingsWriteDetail" xml:space="preserve">
+    <value>Изменённая настройка действует до закрытия приложения.</value>
+  </data>
+  <data name="SettingsWriteRemedy" xml:space="preserve">
+    <value>Проверьте права на запись в C:\DISTR\Config\SemiSpec.</value>
+  </data>
+  <data name="MenuViewQFactor" xml:space="preserve">
+    <value>Добротность</value>
+  </data>
+  <data name="MenuViewTrendAsLines" xml:space="preserve">
+    <value>Тренд линиями</value>
+  </data>
 </root>

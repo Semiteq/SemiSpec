@@ -83,7 +83,8 @@
                 <ScrollViewer Name="SidePaneScroll"
                               HorizontalScrollBarVisibility="Disabled"
                               VerticalScrollBarVisibility="Auto">
-                    <spectrum:SpectrumPanel DataContext="{Binding Spectrum}" />
+                    <spectrum:SpectrumPanel DataContext="{Binding Spectrum}"
+                                            ShowQFactor="{Binding #SignalPane.((local:MainWindowViewModel)DataContext).Display.ShowQFactor}" />
                 </ScrollViewer>
             </Border>
 

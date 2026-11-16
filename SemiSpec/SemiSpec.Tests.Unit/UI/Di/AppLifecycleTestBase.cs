@@ -13,6 +13,7 @@ using SemiSpec.UI;
 using SemiSpec.UI.Instance;
 using SemiSpec.UI.Link;
 using SemiSpec.UI.Logging;
+using SemiSpec.UI.Settings;
 using SemiSpec.UI.Store;
 
 using Serilog;
@@ -76,7 +77,7 @@ public abstract class AppLifecycleTestBase : IAsyncDisposable
 	protected ServiceProvider BuildContainer(Action<IServiceCollection>? replace = null)
 	{
 		var services = new ServiceCollection()
-			.AddUi(_logging, _paths)
+			.AddUi(_logging, _paths, new SettingsFile(Path.Combine(_root.Root, SettingsFile.FileName)))
 			.Replace(ServiceDescriptor.Singleton<ISerialPortProvider>(PortProvider));
 		replace?.Invoke(services);
 		var provider = services.BuildServiceProvider();

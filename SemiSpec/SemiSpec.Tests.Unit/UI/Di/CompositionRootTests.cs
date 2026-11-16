@@ -21,6 +21,7 @@ using SemiSpec.UI.Link;
 using SemiSpec.UI.Logging;
 using SemiSpec.UI.MainWindow;
 using SemiSpec.UI.Messages;
+using SemiSpec.UI.Settings;
 using SemiSpec.UI.Spectrum;
 using SemiSpec.UI.Store;
 using SemiSpec.UI.Trend;
@@ -46,6 +47,7 @@ public sealed class CompositionRootTests : IAsyncDisposable
 	// Every test in the process gets the same instance file name, so each test owns its root.
 	private readonly TempFolder _root = new();
 	private readonly AppDataPaths _paths;
+	private readonly SettingsFile _settings;
 	private readonly List<SpectrumStore> _stores = [];
 
 	public CompositionRootTests()
@@ -56,12 +58,13 @@ public sealed class CompositionRootTests : IAsyncDisposable
 			.CreateLogger();
 		_logging = new LoggingSetup(logger, _logLevelControl, _root.Root);
 		_paths = AppDataPaths.Under(_root.Root).Value;
+		_settings = new SettingsFile(Path.Combine(_root.Root, SettingsFile.FileName));
 	}
 
 	[AvaloniaFact]
 	public void EveryRegisteredServiceResolves()
 	{
-		var services = new ServiceCollection().AddUi(_logging, _paths);
+		var services = new ServiceCollection().AddUi(_logging, _paths, _settings);
 		using var provider = services.BuildServiceProvider();
 
 		foreach (var descriptor in services.Where(descriptor => !descriptor.ServiceType.IsGenericTypeDefinition))
@@ -227,7 +230,7 @@ public sealed class CompositionRootTests : IAsyncDisposable
 
 	private ServiceProvider BuildContainer()
 	{
-		var provider = new ServiceCollection().AddUi(_logging, _paths).BuildServiceProvider();
+		var provider = new ServiceCollection().AddUi(_logging, _paths, _settings).BuildServiceProvider();
 		_stores.Add(provider.GetRequiredService<SpectrumStore>());
 
 		return provider;

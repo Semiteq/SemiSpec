@@ -5,6 +5,7 @@ using Microsoft.Reactive.Testing;
 using SemiSpec.Core.Protocol;
 using SemiSpec.Core.Trend;
 using SemiSpec.Tests.Unit.Core.Store;
+using SemiSpec.Tests.Unit.UI.Settings;
 using SemiSpec.Tests.Unit.UI.Spectrum;
 using SemiSpec.UI.Messages;
 using SemiSpec.UI.Spectrum;
@@ -28,9 +29,11 @@ public abstract class TrendChartTestBase : IDisposable
 	{
 		Cache = new IntensityCache(Time);
 		Switching = new SwitchingSpectrumSource(_live);
+		DisplayStand = new DisplaySettingsStand(MessagePanel);
 		Chart = new TrendChartViewModel(
 			Cache,
 			Switching,
+			DisplayStand.Display,
 			MessagePanel,
 			Time,
 			Scheduler,
@@ -38,6 +41,8 @@ public abstract class TrendChartTestBase : IDisposable
 	}
 
 	protected FakeTimeProvider Time { get; } = new(Start);
+
+	private protected DisplaySettingsStand DisplayStand { get; }
 
 	protected TestScheduler Scheduler { get; } = new();
 
@@ -60,6 +65,7 @@ public abstract class TrendChartTestBase : IDisposable
 		Chart.Dispose();
 		Switching.Dispose();
 		Cache.Dispose();
+		DisplayStand.Dispose();
 		_live.Dispose();
 	}
 

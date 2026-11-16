@@ -32,6 +32,17 @@
                       Command="{Binding ToggleVerboseLoggingCommand}"
                       ToggleType="CheckBox"
                       IsChecked="{Binding IsVerboseLogging, Mode=OneWay}" />
+            <Separator />
+            <MenuItem Name="ViewQFactor"
+                      Header="{x:Static text:Resources.MenuViewQFactor}"
+                      Command="{Binding Display.ToggleQFactorCommand}"
+                      ToggleType="CheckBox"
+                      IsChecked="{Binding Display.ShowQFactor, Mode=OneWay}" />
+            <MenuItem Name="ViewTrendAsLines"
+                      Header="{x:Static text:Resources.MenuViewTrendAsLines}"
+                      Command="{Binding Display.ToggleTrendAsLinesCommand}"
+                      ToggleType="CheckBox"
+                      IsChecked="{Binding Display.TrendAsLines, Mode=OneWay}" />
         </MenuItem>
 
     </Menu>

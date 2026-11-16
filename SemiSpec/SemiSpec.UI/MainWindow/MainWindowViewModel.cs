@@ -9,6 +9,7 @@ using ReactiveUI;
 
 using SemiSpec.UI.Logging;
 using SemiSpec.UI.Messages;
+using SemiSpec.UI.Settings;
 using SemiSpec.UI.Spectrum;
 using SemiSpec.UI.Trend;
 
@@ -28,6 +29,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 		AppStatusBarViewModel statusBar,
 		SpectrumViewModel spectrum,
 		TrendViewModel trend,
+		DisplaySettingsViewModel display,
 		LogLevelControl logLevelControl,
 		ILogger<MainWindowViewModel> logger)
 	{
@@ -36,6 +38,7 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 		StatusBar = statusBar;
 		Spectrum = spectrum;
 		Trend = trend;
+		Display = display;
 		_logLevelControl = logLevelControl;
 		_logger = logger;
 
@@ -54,6 +57,9 @@ public sealed class MainWindowViewModel : ReactiveObject, IDisposable
 	public SpectrumViewModel Spectrum { get; }
 
 	public TrendViewModel Trend { get; }
+
+	/// <summary>The display choices behind the View menu's Q factor and Trend as lines items.</summary>
+	public DisplaySettingsViewModel Display { get; }
 
 	public IObservable<Unit> ExitRequests => _exitRequests.AsObservable();
 

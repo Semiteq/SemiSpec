@@ -18,6 +18,8 @@
 
 ; The log folder of every Semi application on the site: docs/architecture/overview.md, Release
 #define LogRoot      "C:\DISTR\Logs\SemiSpec"
+; The settings folder of every Semi application on the site, as SemiPlot and SemiStep use it
+#define ConfigRoot   "C:\DISTR\Config\SemiSpec"
 
 [Setup]
 AppId={#AppId}
@@ -65,7 +67,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [InstallDelete]
-; No 2.x file outlives the upgrade. The spectra live under %LOCALAPPDATA% and the logs under {#LogRoot}, outside {app}
+; No 2.x file outlives the upgrade. The spectra live under %LOCALAPPDATA%, the logs under {#LogRoot} and the settings
+; under {#ConfigRoot}, outside {app}
 Type: filesandordirs; Name: "{app}\*"
 ; The old shortcuts point at the removed exe; [Icons] recreates the chosen ones.
 ; SpectrumVisualizer.lnk is the name the 2.x and 3.0 installers gave them
@@ -75,8 +78,9 @@ Type: files; Name: "{autoprograms}\SpectrumVisualizer.lnk"
 Type: files; Name: "{autodesktop}\SpectrumVisualizer.lnk"
 
 [Dirs]
-; The operator, not the installing admin, writes the log; uninstall keeps it
+; The operator, not the installing admin, writes the log and the settings; uninstall keeps both
 Name: "{#LogRoot}"; Permissions: users-modify; Flags: uninsneveruninstall
+Name: "{#ConfigRoot}"; Permissions: users-modify; Flags: uninsneveruninstall
 
 [Files]
 Source: "{#SrcBinDir}\*"; Excludes: "*.pdb,SemiSpec.xml,SemiSpec.*.xml"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

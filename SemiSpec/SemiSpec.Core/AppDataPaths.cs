@@ -3,13 +3,14 @@ using FluentResults;
 namespace SemiSpec.Core;
 
 /// <summary>
-/// Folders the application owns under the per-user local application data root: the store, and the log folder used
-/// when the site log folder cannot be written.
+/// Folders the application owns under the per-user local application data root: the store, and the log and settings
+/// folders used when the site folders cannot be written.
 /// </summary>
-public sealed record AppDataPaths(string FallbackLogFolder, string StoreFolder)
+public sealed record AppDataPaths(string FallbackLogFolder, string FallbackSettingsFolder, string StoreFolder)
 {
 	private const string AppFolderName = "SemiSpec";
 	private const string LogFolderName = "Logs";
+	private const string SettingsFolderName = "Config";
 	private const string StoreFolderName = "Spectra";
 
 	public static Result<AppDataPaths> Under(string localAppDataRoot)
@@ -23,6 +24,7 @@ public sealed record AppDataPaths(string FallbackLogFolder, string StoreFolder)
 		var appFolder = Path.Combine(localAppDataRoot, AppFolderName);
 		return new AppDataPaths(
 			Path.Combine(appFolder, LogFolderName),
+			Path.Combine(appFolder, SettingsFolderName),
 			Path.Combine(appFolder, StoreFolderName));
 	}
 }

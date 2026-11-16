@@ -22,6 +22,14 @@ public sealed class AppDataPathsTests
 	}
 
 	[Fact]
+	public void TheFallbackSettingsFolderSitsInsideTheAppFolder()
+	{
+		var paths = AppDataPaths.Under(_root).Value;
+
+		paths.FallbackSettingsFolder.Should().Be(Path.Combine(_root, "SemiSpec", "Config"));
+	}
+
+	[Fact]
 	public void TheStoreFolderSitsInsideTheAppFolder()
 	{
 		var paths = AppDataPaths.Under(_root).Value;

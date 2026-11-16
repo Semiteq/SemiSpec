@@ -1,3 +1,5 @@
+using System.Reactive.Linq;
+
 using Avalonia.Headless.XUnit;
 
 using AwesomeAssertions;
@@ -5,6 +7,7 @@ using AwesomeAssertions;
 using ScottPlot;
 
 using SemiSpec.Core.Protocol;
+using SemiSpec.UI.Trend;
 
 using Xunit;
 
@@ -34,6 +37,24 @@ public sealed class TrendChartViewModelRenderTests : TrendChartTestBase
 
 		limits.Bottom.Should().BeApproximately(90.0, 1e-9);
 		limits.Top.Should().BeApproximately(310.0, 1e-9);
+	}
+
+	[AvaloniaFact]
+	public async Task TheTrendDrawsDotsUntilTheLinesChoiceAndRedrawsOnTheSwitch()
+	{
+		var envelope = Chart.Plot.GetPlottables().OfType<EnvelopeLine>().Single();
+		var redraws = 0;
+		using var counting = Chart.RedrawRequested.Subscribe(_ => redraws++);
+		envelope.AsDots.Should().BeTrue("dots are the default");
+
+		await DisplayStand.Display.ToggleTrendAsLinesCommand.Execute();
+
+		envelope.AsDots.Should().BeFalse();
+		redraws.Should().Be(1);
+
+		await DisplayStand.Display.ToggleTrendAsLinesCommand.Execute();
+
+		envelope.AsDots.Should().BeTrue();
 	}
 
 	[AvaloniaFact]
