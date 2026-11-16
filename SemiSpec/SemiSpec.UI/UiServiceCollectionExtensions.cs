@@ -58,6 +58,17 @@ public static class UiServiceCollectionExtensions
 		services.AddSingleton<OverviewViewModel>();
 		services.AddSingleton(provider =>
 		{
+			var uiScheduler = provider.GetRequiredService<IScheduler>();
+			return new TrendNormalizationViewModel(
+				provider.GetRequiredService<IntensityCache>(),
+				provider.GetRequiredService<SerialLink>().StatusUpdates(uiScheduler),
+				provider.GetRequiredService<MessagePanelViewModel>(),
+				provider.GetRequiredService<TimeProvider>(),
+				uiScheduler,
+				provider.GetRequiredService<ILogger<TrendNormalizationViewModel>>());
+		});
+		services.AddSingleton(provider =>
+		{
 			var history = provider.GetRequiredService<SpectrumHistory>();
 			return new TrendFeed(
 				provider.GetRequiredService<FrameDistributor>(),

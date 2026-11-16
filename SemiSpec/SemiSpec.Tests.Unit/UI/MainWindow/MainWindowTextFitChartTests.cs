@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 
 using AwesomeAssertions;
 
@@ -53,7 +54,12 @@ public sealed class MainWindowTextFitChartTests : MainWindowTextFitTestBase
 		Dispatcher.UIThread.RunJobs();
 
 		var dataRect = plot.RenderManager.LastRender.Layout.DataRect;
-		var text = Resources.FormatTrendAxisIntensityFormat(WidestWavelength, WidestDelta);
+		var text = new[]
+			{
+				Resources.FormatTrendAxisIntensityFormat(WidestWavelength, WidestDelta),
+				Resources.FormatTrendAxisNormalizedFormat(TrendNormalizationViewModel.LargeFactor, WidestWavelength, WidestDelta),
+			}
+			.MaxBy(candidate => ScottPlotTextWidth(candidate, label.FontName, label.FontSize, label.Bold))!;
 		var length = ScottPlotTextWidth(text, label.FontName, label.FontSize, label.Bold);
 		var oneLine = ScottPlotTextWidth(text.Replace('\n', ' '), label.FontName, label.FontSize, label.Bold);
 		var room = dataRect.Height + (2 * dataRect.Top);
@@ -86,13 +92,21 @@ public sealed class MainWindowTextFitChartTests : MainWindowTextFitTestBase
 			.Max(line => RenderedText.Width(line, stateLine.FontFamily, stateLine.FontSize));
 		var trendWidth = LongestTrendStateLines()
 			.Max(line => RenderedText.Width(line, stateLine.FontFamily, stateLine.FontSize));
+		var normalizeSwitch = Named<StackPanel>(trendPane, "NormalizeSwitch");
+		var label = Named<TextBlock>(trendPane, "NormalizeLabel");
+		var segments = Named<Border>(trendPane, "NormalizeSegments");
+		var switchWidth = RenderedText.Width(label.Text!, label.FontFamily, label.FontSize) + normalizeSwitch.Spacing
+			+ segments.Padding.Left + segments.Padding.Right
+			+ segments.GetVisualDescendants().OfType<RadioButton>().Sum(ButtonWidth);
+		var band = Named<Grid>(trendPane, "StateLineBand");
 
 		TestContext.Current.TestOutputHelper?.WriteLine(
 			$"{culture}: spectrum state line {spectrumWidth:0.#} px over {spectrumData:0.#} px of data, "
-			+ $"trend state line {trendWidth:0.#} px over {trendData:0.#} px");
+			+ $"trend state line {trendWidth:0.#} px and switch {switchWidth:0.#} px over {trendData:0.#} px");
 		stateLine.TextWrapping.Should().Be(TextWrapping.NoWrap);
 		spectrumWidth.Should().BeLessThanOrEqualTo(spectrumData, "the whole spectrum state shows over its data area");
-		trendWidth.Should().BeLessThanOrEqualTo(trendData, "the whole trend state shows over its data area");
+		(trendWidth + band.ColumnSpacing + switchWidth).Should().BeLessThanOrEqualTo(
+			trendData, "the whole trend state and the normalization switch show over its data area");
 	}
 
 	[AvaloniaTheory]
@@ -196,7 +210,7 @@ public sealed class MainWindowTextFitChartTests : MainWindowTextFitTestBase
 			.Select(age => string.Join(Resources.ChartStateSeparator, modes.Prepend(age)));
 	}
 
-	/// <summary>The widest window widths with both trend states.</summary>
+	/// <summary>The widest window widths with every trend state.</summary>
 	private static IEnumerable<string> LongestTrendStateLines()
 	{
 		TimeSpan[] widths = [new(23, 59, 0), new(0, 59, 59), TimeSpan.FromHours(24)];
@@ -205,7 +219,15 @@ public sealed class MainWindowTextFitChartTests : MainWindowTextFitTestBase
 			Resources.ChartStateSeparator,
 			TrendViewModel.WidthText(width),
 			Resources.TrendStateNotFollowing,
-			Resources.SpectrumStateFrozen));
+			Resources.SpectrumStateFrozen,
+			Resources.FormatTrendStateNormalizedFormat(TrendNormalizationViewModel.LargeFactor)));
+	}
+
+	/// <summary>A button's text measured through SkiaSharp plus its padding and border; the headless stub has no widths.</summary>
+	private static double ButtonWidth(Button button)
+	{
+		return RenderedText.Width((string)button.Content!, button.FontFamily, button.FontSize)
+			+ button.Padding.Left + button.Padding.Right + button.BorderThickness.Left + button.BorderThickness.Right;
 	}
 
 	/// <summary>The width ScottPlot gives the text's longest line in the axis label's face.</summary>

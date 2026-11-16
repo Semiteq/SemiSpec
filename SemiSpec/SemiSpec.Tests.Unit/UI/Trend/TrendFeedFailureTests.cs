@@ -49,7 +49,7 @@ public sealed class TrendFeedFailureTests : TrendFeedTestBase
 			Cache,
 			Chart,
 			Switching,
-			async (_, _, _, _, _) =>
+			async (_, _, _, _, _, _) =>
 			{
 				entered.TrySetResult();
 				await gate.Task;

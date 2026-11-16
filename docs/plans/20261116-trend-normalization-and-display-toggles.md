@@ -7,14 +7,14 @@
 - The trend draws dots by default: one 3 px square at each pixel column's minimum and one at its maximum, and no
   connecting line. A View menu check item "Trend as lines" ("Тренд линиями") brings back today's line.
 - The two View menu choices persist in `C:\DISTR\Config\SemiSpec\settings.yaml` across restarts.
-- Two toggle buttons, "Normalize 100" and "Normalize 1000" ("Нормировать 100", "Нормировать 1000"), sit at the
+- A normalization switch, the label "Нормировка" and three joined segments "Выкл", "×100" and "×1000", sits at the
   right end of the trend's top margin, opposite the state line.
 - A press fixes the reference: the pixels inside the current window (wavelength ± delta) of the newest live
   spectrum. From then on every trend point is the mean of `pixel / reference pixel` over the window, times 100 or
   1000: each pixel is divided by its own reference pixel first, and the ratios are averaged after. Points before
   the press are read again from the store and normalized the same way.
-- A second press on the active button turns normalization off. A press on the other button fixes a new reference
-  with its own factor.
+- "Выкл" turns normalization off and stays enabled while the trend is normalized. A press on the other factor
+  segment fixes a new reference with its own factor; a press on the checked one changes nothing.
 - A change of wavelength or delta from the board turns normalization off, clears a held Y range and adds an Info line
   to the message panel.
 - While normalization is on, the state line shows "Normalized ×100" or "Normalized ×1000", the Y label's first line
@@ -28,15 +28,16 @@
 
 | Situation | The app does | Decided by | Checked by |
 |---|---|---|---|
-| No live spectrum at the current key, or the live spectrum is stale (`SpectrumStaleness`: link not Receiving or over 10 s old) | Both buttons are disabled | agent: the reference must be the current live value | headless test |
+| No live spectrum at the current key, or the live spectrum is stale (`SpectrumStaleness`: link not Receiving or over 10 s old) | The factor segments are disabled, with a tooltip that says why; Off stays enabled while normalized | agent: the reference must be the current live value; designer review: a stale link must not lock normalization on | headless test |
 | The device does not cover the wavelength (every point NaN) | Buttons disabled, as above | agent: `RecentSpectra.IntensityOf` gives NaN | headless test |
 | Some reference pixels are 0 | Those pixels are left out of every later mean | agent: division by 0 | unit test |
 | Every reference pixel is 0 (a dark frame) | No normalization, the button stays released, a Warning in the message panel names the reason | agent | headless test |
 | A point from a device other than the reference's device, live or stored | NaN: drawn as no data | agent: the windows differ per device (`QueryWindows.For`); the ranges overlap at 898-1028 nm (`SpectrometerCalibration`) | unit test |
 | Press while a past moment is shown | The reference is still the newest live spectrum, not the shown moment | agent: the reference is the current live value | headless test |
-| Second press on the active button | Normalization off; the trend reads the raw history again | operator | headless test |
+| "Выкл" pressed | Normalization off; the trend reads the raw history again | operator | headless test |
+| The checked factor segment pressed again | Nothing changes | operator: the segmented switch | headless test |
 | Press on the other button while one is active | New reference, new factor, history read again | operator: approved on the demo | headless test |
-| Board changes wavelength or delta | Normalization off, both buttons released, a held Y range cleared, an Info line in the panel | operator; the range clear is agent: raw values fall outside a normalized range | headless test |
+| Board changes wavelength or delta | Normalization off, "Выкл" checked, a held Y range cleared, an Info line in the panel | operator; the range clear is agent: raw values fall outside a normalized range | headless test |
 | Normalization toggled while a Y range is held | The held range is cleared, as a From zero toggle does today | agent: `TrendChartViewModel.SetFromZero` clears `ManualVerticalRange` | headless test |
 | History read fails during a normalized read | One `TrendHistoryError` as today; the trend keeps the last 120 s recomputed from the recent spectra and the points after them | agent: existing key change path | existing tests |
 | `settings.yaml` missing | Defaults (Q hidden, dots); the file appears at the first toggle | agent | unit test |
@@ -126,16 +127,18 @@
 The operator approved the throwaway demo (a separate Avalonia project in the session scratchpad, Semi theme, synthetic
 24 h oscillating history) with two-state toggle buttons. The two Gates still show the built result before each PR.
 
-- Trend top margin: the state line on the left, the two toggle buttons on the right, 8 px apart, right edge at the
-  data area's right edge. A checked button carries the accent; its text names the factor, so colour does not carry
-  the state alone.
+- Trend top margin: the state line on the left, the switch on the right, its right edge at the data area's right
+  edge: the grey label, a 12 px gap, a 22 px frame in Semi's radio-button-as-button look with three joined 18 px
+  segments. The checked segment names its state, so colour does not carry it alone. The operator chose this over two
+  toggle buttons after a designer review: Off is visible, and the checked state is quieter than a solid accent block.
 - View menu, after "Verbose logging": a separator, then "Q factor" and "Trend as lines" as check items.
+- The frame is 22 px and the segments 18 px: the band over the data area is 22 px.
 
 ## Gates
 
 - Before PR 1: screenshots of the trend in dots mode on an oscillating emulator signal at the 10 min, 1 h and 24 h
   windows, the readout pane with the Q row hidden, and the View menu, go to the operator for approval.
-- Before PR 2: a screenshot of the trend with both buttons, at the minimum window width in Russian, goes to the
+- Before PR 2: a screenshot of the trend with the switch, at the minimum window width in Russian, goes to the
   operator for approval. A button taller than the 24 px margin stops the run at Task 7.
 - Task 9: any build or test failure caused by a package on `net11.0` stops the run for an operator decision.
 
@@ -154,12 +157,12 @@ The operator approved the throwaway demo (a separate Avalonia project in the ses
   1. Start the app with no `settings.yaml` → Q row hidden, trend draws dots.
   2. View, "Q factor" on, restart → the Q row shows; `C:\DISTR\Config\SemiSpec\settings.yaml` holds the choice.
   3. View, "Trend as lines" on → the trend draws today's line; off → dots again.
-  4. Press "Normalize 100" on a steady signal → the newest points sit near 100, the history before the press is
+  4. Press "×100" on a steady signal → the newest points sit near 100, the history before the press is
      normalized too, the state line reads "Normalized ×100".
-  5. Press "Normalize 100" again → raw values return.
-  6. Press "Normalize 100", then "Normalize 1000" → points near 1000.
-  7. Restart the emulator with another `--wavelength` → both buttons release, the panel shows the reset line.
-  8. Stop the emulator and wait 10 s → both buttons are disabled.
+  5. Press "Выкл" → raw values return.
+  6. Press "×100", then "×1000" → points near 1000.
+  7. Restart the emulator with another `--wavelength` → "Выкл" is checked, the panel shows the reset line.
+  8. Stop the emulator and wait 10 s → "×100" and "×1000" are disabled with a tooltip, "Выкл" stays enabled.
   9. Run the installer on a clean PC → `icacls C:\DISTR\Config\SemiSpec` lists `BUILTIN\Users` with `(M)`.
 - not visible to headless tests: the real button height in the margin, the dot look, the installer's folder rights.
 
@@ -243,12 +246,12 @@ The operator approved the throwaway demo (a separate Avalonia project in the ses
 **Goal:** PR 1 meets its Acceptance items and the docs describe it
 **Entry:** the plan's `## Acceptance` and `## Gates`
 
-- [ ] the build, test, format and terse commands pass; smoke steps 1 to 3 and 9 hold
-- [ ] the Gate before PR 1: screenshots to the operator, approval recorded in `## UI design`
-- [ ] `overview.md`: stack (YamlDotNet), components, readout pane, trend chart, settings, installer `[Dirs]`
-- [ ] `docs/architecture/README.md`: rewrite the Startup row of the locked decisions
-- [ ] `CLAUDE.md`: the `Settings` test area
-- [ ] `readme.md` (Russian): the two View items; `readme.md:25` no longer lists "добротность" among the shown
+- [x] the build, test, format and terse commands pass; smoke steps 1 to 3 and 9 hold
+- [x] the Gate before PR 1: screenshots to the operator, approval recorded in `## UI design`
+- [x] `overview.md`: stack (YamlDotNet), components, readout pane, trend chart, settings, installer `[Dirs]`
+- [x] `docs/architecture/README.md`: rewrite the Startup row of the locked decisions
+- [x] `CLAUDE.md`: the `Settings` test area
+- [x] `readme.md` (Russian): the two View items; `readme.md:25` no longer lists "добротность" among the shown
   values by default; the operator approves the wording before the commit
 
 ### Task 5: Normalized mean and the store read
@@ -258,11 +261,11 @@ The operator approved the throwaway demo (a separate Avalonia project in the ses
 **Likely touches:** `QueryWindows.cs`, `SpectrumHistory.cs`, `UiServiceCollectionExtensions.cs`,
 `Tools.StoreBenchmark/BenchmarkRun.cs`
 
-- [ ] the normalized mean beside `MeanOf`: each pixel over its reference pixel, then the mean; zero reference
+- [x] the normalized mean beside `MeanOf`: each pixel over its reference pixel, then the mean; zero reference
   pixels left out, NaN when none is left
-- [ ] the points read takes an optional reference with its device; a row of another device is NaN
-- [ ] tests: the 75-not-66.7 case, zero pixels, a row of the other device, a raw read unchanged
-- [ ] run tests - must pass before the next task
+- [x] the points read takes an optional reference with its device; a row of another device is NaN
+- [x] tests: the 75-not-66.7 case, zero pixels, a row of the other device, a raw read unchanged
+- [x] run tests - must pass before the next task
 
 ### Task 6: Normalization in the cache
 
@@ -270,12 +273,12 @@ The operator approved the throwaway demo (a separate Avalonia project in the ses
 **Entry:** `Core/Trend/IntensityCache.cs`
 **Likely touches:** `IntensityCache.cs`, `RecentSpectra.cs`, `ReReadRequest.cs`, `TrendFeed.cs`
 
-- [ ] start and stop under the cache lock, per Boundaries; start fixes the newest spectrum at the key
-- [ ] start, stop and a new reference recompute the recent spectra and raise a re-read that carries the reference
-- [ ] a key change stops normalization with the key change reason
-- [ ] tests: a refused all-zero start, the reset on a key change, live points normalized, a press racing a key change
+- [x] start and stop under the cache lock, per Boundaries; start fixes the newest spectrum at the key
+- [x] start, stop and a new reference recompute the recent spectra and raise a re-read that carries the reference
+- [x] a key change stops normalization with the key change reason
+- [x] tests: a refused all-zero start, the reset on a key change, live points normalized, a press racing a key change
   on two threads, the 75-not-66.7 case on the cache path
-- [ ] run tests - must pass before the next task
+- [x] run tests - must pass before the next task
 
 ### Task 7: Normalization buttons and labels
 
@@ -284,16 +287,16 @@ The operator approved the throwaway demo (a separate Avalonia project in the ses
 **Likely touches:** `TrendViewModel.cs`, `TrendChartViewModel.cs`, `TrendChartView.axaml`, `OverviewViewModel.cs`,
 `UI/Chart/ChartStateLine.cs`, both resx files, `MainWindowTextFit*Tests`
 
-- [ ] first: a headless measure of the button in the 24 px margin; a taller button stops the run (Gates)
-- [ ] two toggle buttons in the top margin, right end, mirroring the cache's state; disabled per the Flow branches,
+- [x] first: a headless measure of the button in the 24 px margin; a taller button stops the run (Gates)
+- [x] two toggle buttons in the top margin, right end, mirroring the cache's state; disabled per the Flow branches,
   `SpectrumStaleness` included
-- [ ] state line, Y label and readout reflect the factor; a toggle and a key change reset clear a held Y range; the
+- [x] state line, Y label and readout reflect the factor; a toggle and a key change reset clear a held Y range; the
   overview refolds on start and stop
-- [ ] the refusal Warning and the reset Info reach the message panel
-- [ ] text-fit tests cover the button labels, the longest state line with them and the normalized Y label at the
+- [x] the refusal Warning and the reset Info reach the message panel
+- [x] text-fit tests cover the button labels, the longest state line with them and the normalized Y label at the
   trend's floor, in both languages
-- [ ] tests: the Flow branches marked headless test, including a refused press that leaves the button released
-- [ ] run tests - must pass before the next task
+- [x] tests: the Flow branches marked headless test, including a refused press that leaves the button released
+- [x] run tests - must pass before the next task
 
 ### Task 8: PR 2 acceptance and docs
 

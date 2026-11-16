@@ -2,6 +2,8 @@ using System.Reactive;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 
+using FluentResults;
+
 using SemiSpec.Core.Protocol;
 using SemiSpec.Core.Store;
 
@@ -28,16 +30,18 @@ public sealed class IntensityCache : IDisposable
 	private readonly RecentSpectra _recent = new();
 	private TrendKey? _key;
 	private QueryWindows? _windows;
+	private NormalizationReference? _reference;
 	private int _generation;
 	private bool _disposed;
 
-	// All emit after _gate is released, one at a time under _emitGate: _changed from the distributor and re-read threads,
-	// _historyLanded from re-read threads, _reReadRequests from the distributor and the start read. Dispose takes
-	// _emitGate too, so no emit reaches a disposed subject; _subjectsDisposed is read and written under it.
+	// All emit after _gate is released, one at a time under _emitGate, from the distributor, re-read, start read and UI
+	// threads. Dispose takes _emitGate too, so no emit reaches a disposed subject; _subjectsDisposed is read and written
+	// under it.
 	private readonly Lock _emitGate = new();
 	private readonly Subject<Unit> _changed = new();
 	private readonly Subject<Unit> _historyLanded = new();
 	private readonly Subject<ReReadRequest> _reReadRequests = new();
+	private readonly Subject<NormalizationState> _normalizationChanges = new();
 	private bool _subjectsDisposed;
 
 	public IntensityCache(TimeProvider timeProvider)
@@ -47,6 +51,7 @@ public sealed class IntensityCache : IDisposable
 		Changed = _changed.AsObservable();
 		HistoryLanded = _historyLanded.AsObservable();
 		ReReadRequested = _reReadRequests.AsObservable();
+		NormalizationChanged = _normalizationChanges.AsObservable();
 	}
 
 	/// <summary>Signals after every added frame and every landed history chunk.</summary>
@@ -55,8 +60,48 @@ public sealed class IntensityCache : IDisposable
 	/// <summary>Signals after a history chunk of the current generation landed, just before its Changed.</summary>
 	public IObservable<Unit> HistoryLanded { get; }
 
-	/// <summary>Raised on every key change and on the first stored day request.</summary>
+	/// <summary>Raised on every key change, every normalization start and stop, and on the first stored day request.</summary>
 	public IObservable<ReReadRequest> ReReadRequested { get; }
+
+	/// <summary>Raised on every normalization start and stop, the stop a key change causes included.</summary>
+	public IObservable<NormalizationState> NormalizationChanged { get; }
+
+	public NormalizationState Normalization
+	{
+		get
+		{
+			lock (_gate)
+			{
+				return _reference is { } reference ? new NormalizationState(reference.Factor) : NormalizationState.Off;
+			}
+		}
+	}
+
+	/// <summary>The receive time of the newest live spectrum; null before the first one.</summary>
+	public DateTimeOffset? NewestSpectrumAt
+	{
+		get
+		{
+			lock (_gate)
+			{
+				return _recent.Newest?.ReceivedAt;
+			}
+		}
+	}
+
+	/// <summary>True while the newest spectrum is at the key and its spectrometer covers the wavelength.</summary>
+	public bool CanNormalize
+	{
+		get
+		{
+			lock (_gate)
+			{
+				return _windows is { } windows
+					&& _recent.Newest?.Frame.Measurement is { } newest
+					&& windows.Covers(newest.Device);
+			}
+		}
+	}
 
 	/// <summary>The clock at construction: live frames come after it, the rows of earlier runs before it.</summary>
 	public DateTimeOffset RunStart { get; }
@@ -76,6 +121,7 @@ public sealed class IntensityCache : IDisposable
 	public void Add(ReceivedFrame received)
 	{
 		ReReadRequest? request;
+		var normalizationEnded = false;
 		lock (_gate)
 		{
 			if (_disposed)
@@ -84,8 +130,15 @@ public sealed class IntensityCache : IDisposable
 			}
 
 			_timeline.Observe(received);
-			request = received.Frame.Measurement is { } measurement ? AddSpectrum(received, measurement) : null;
+			request = received.Frame.Measurement is { } measurement
+				? AddSpectrum(received, measurement, out normalizationEnded)
+				: null;
 			DropExpired();
+		}
+
+		if (normalizationEnded)
+		{
+			Emit(_normalizationChanges, NormalizationState.Off with { EndedByKeyChange = true });
 		}
 
 		if (request is { } changed)
@@ -93,6 +146,58 @@ public sealed class IntensityCache : IDisposable
 			Emit(_reReadRequests, changed);
 		}
 
+		Emit(_changed, Unit.Default);
+	}
+
+	/// <summary>
+	/// Fixes the newest spectrum's window pixels as the reference and normalizes the recent spectra and, through a
+	/// re-read, the stored points; a running normalization is replaced. Fails with no spectrum at hand, an uncovered
+	/// wavelength or an all-zero window, and then changes nothing.
+	/// </summary>
+	public Result StartNormalization(int factor)
+	{
+		ReReadRequest request;
+		lock (_gate)
+		{
+			if (_disposed || _key is not { } key || _windows is not { } windows
+				|| _recent.Newest?.Frame.Measurement is not { } newest)
+			{
+				return Result.Fail(new NormalizationUnavailableError());
+			}
+
+			var reference = NormalizationReference.From(windows, newest, factor);
+			if (reference.IsFailed)
+			{
+				return reference.ToResult();
+			}
+
+			_reference = reference.Value;
+			request = RecomputeRecent(key);
+		}
+
+		Emit(_normalizationChanges, new NormalizationState(factor));
+		Emit(_reReadRequests, request);
+		Emit(_changed, Unit.Default);
+		return Result.Ok();
+	}
+
+	/// <summary>Returns the recent spectra and, through a re-read, the stored points to raw values; nothing when off.</summary>
+	public void StopNormalization()
+	{
+		ReReadRequest request;
+		lock (_gate)
+		{
+			if (_disposed || _reference is null || _key is not { } key)
+			{
+				return;
+			}
+
+			_reference = null;
+			request = RecomputeRecent(key);
+		}
+
+		Emit(_normalizationChanges, NormalizationState.Off);
+		Emit(_reReadRequests, request);
 		Emit(_changed, Unit.Default);
 	}
 
@@ -194,6 +299,7 @@ public sealed class IntensityCache : IDisposable
 			_changed.Dispose();
 			_historyLanded.Dispose();
 			_reReadRequests.Dispose();
+			_normalizationChanges.Dispose();
 		}
 	}
 
@@ -214,11 +320,13 @@ public sealed class IntensityCache : IDisposable
 		return _key is { } key && _timeline.Span is { } span ? new TrendExtent(key, span.First, span.Newest) : null;
 	}
 
-	private ReReadRequest? AddSpectrum(ReceivedFrame received, SpectrumMeasurement measurement)
+	private ReReadRequest? AddSpectrum(
+		ReceivedFrame received, SpectrumMeasurement measurement, out bool normalizationEnded)
 	{
 		var unixMs = received.ReceivedAt.ToUnixTimeMilliseconds();
 		_recent.Add(received);
 		_recent.DropBefore(unixMs - RecentSpanMs);
+		normalizationEnded = false;
 
 		var key = new TrendKey(measurement.WavelengthNm, measurement.Delta);
 		if (_key is null || _windows is null)
@@ -228,21 +336,32 @@ public sealed class IntensityCache : IDisposable
 		}
 		else if (key != _key)
 		{
+			normalizationEnded = _reference is not null;
 			return ChangeKey(key);
 		}
 
-		_timeline.Insert(new TrendPoint(unixMs, RecentSpectra.IntensityOf(_windows, measurement)));
+		_timeline.Insert(new TrendPoint(unixMs, RecentSpectra.IntensityOf(_windows, measurement, _reference)));
 		return null;
 	}
 
+	/// <summary>A new key ends normalization: its reference belongs to the old window.</summary>
 	private ReReadRequest ChangeKey(TrendKey key)
 	{
-		var recentStartMs = _recent.StartMs!.Value;
 		_key = key;
 		_windows = new QueryWindows(key.WavelengthNm, key.Delta);
-		_timeline.ReplacePoints(_recent.PointsAt(_windows));
+		_reference = null;
+		return RecomputeRecent(key);
+	}
+
+	/// <summary>
+	/// Replaces the points with the recent spectra at the current windows and reference, and asks for the older points.
+	/// </summary>
+	private ReReadRequest RecomputeRecent(TrendKey key)
+	{
+		var recentStartMs = _recent.StartMs ?? _timeProvider.GetUtcNow().ToUnixTimeMilliseconds();
+		_timeline.ReplacePoints(_recent.PointsAt(_windows!, _reference));
 		_generation++;
-		return new ReReadRequest(_generation, key, DateTimeOffset.FromUnixTimeMilliseconds(recentStartMs));
+		return new ReReadRequest(_generation, key, DateTimeOffset.FromUnixTimeMilliseconds(recentStartMs), _reference);
 	}
 
 	private void DropExpired()

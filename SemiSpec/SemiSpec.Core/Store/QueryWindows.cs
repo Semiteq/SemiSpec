@@ -54,6 +54,50 @@ public sealed class QueryWindows(ushort wavelengthNm, byte delta)
 		return (double)sum / pixels.Length;
 	}
 
+	/// <summary>
+	/// The window mean, or with a reference the mean of each pixel over its reference pixel times the factor; NaN for a
+	/// device other than the reference's.
+	/// </summary>
+	public static double IntensityOf(
+		ReadOnlySpan<byte> windowBytes, Spectrometer device, NormalizationReference? reference)
+	{
+		if (reference is null)
+		{
+			return MeanOf(windowBytes);
+		}
+
+		return device == reference.Device ? NormalizedMeanOf(windowBytes, reference) : double.NaN;
+	}
+
+	/// <summary>
+	/// Each pixel divided by its own reference pixel, then averaged, times the factor; reference pixels of 0 are left
+	/// out, and NaN remains when none is left or the window lengths differ.
+	/// </summary>
+	public static double NormalizedMeanOf(ReadOnlySpan<byte> windowBytes, NormalizationReference reference)
+	{
+		var pixels = MemoryMarshal.Cast<byte, ushort>(windowBytes);
+		if (pixels.Length != reference.Pixels.Length)
+		{
+			return double.NaN;
+		}
+
+		var ratios = 0.0;
+		var count = 0;
+		for (var index = 0; index < pixels.Length; index++)
+		{
+			var referencePixel = reference.Pixels[index];
+			if (referencePixel == 0)
+			{
+				continue;
+			}
+
+			ratios += (double)pixels[index] / referencePixel;
+			count++;
+		}
+
+		return count == 0 ? double.NaN : ratios / count * reference.Factor;
+	}
+
 	private static bool InFirmwareTable(Spectrometer device, ushort wavelengthNm)
 	{
 		var calibration = SpectrometerCalibration.For(device);

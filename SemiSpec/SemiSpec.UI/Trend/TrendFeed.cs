@@ -29,7 +29,7 @@ public sealed class TrendFeed(
 	IntensityCache cache,
 	TrendChartViewModel chart,
 	SwitchingSpectrumSource source,
-	Func<ushort, byte, DateTimeOffset, DateTimeOffset, CancellationToken, Task<Result<IntensityChunk>>> readPoints,
+	Func<ushort, byte, DateTimeOffset, DateTimeOffset, NormalizationReference?, CancellationToken, Task<Result<IntensityChunk>>> readPoints,
 	Func<DateTimeOffset, CancellationToken, Task<Result<StoredSpectrum?>>> readSpectrum,
 	Task<bool> storeOpened,
 	MessagePanelViewModel messagePanel,
@@ -208,7 +208,8 @@ public sealed class TrendFeed(
 			var points = 0;
 			foreach (var range in TrendHistoryPlan.For(window.From, window.To, newest, request.RecentStart))
 			{
-				var chunk = await readPoints(request.Key.WavelengthNm, request.Key.Delta, range.From, range.To, token)
+				var chunk = await readPoints(
+						request.Key.WavelengthNm, request.Key.Delta, range.From, range.To, request.Reference, token)
 					.ConfigureAwait(false);
 				if (chunk.IsFailed)
 				{

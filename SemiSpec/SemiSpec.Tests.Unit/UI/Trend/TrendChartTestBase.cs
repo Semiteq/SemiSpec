@@ -1,3 +1,5 @@
+using System.Reactive.Subjects;
+
 using Microsoft.Extensions.Logging.Testing;
 using Microsoft.Extensions.Time.Testing;
 using Microsoft.Reactive.Testing;
@@ -7,6 +9,7 @@ using SemiSpec.Core.Trend;
 using SemiSpec.Tests.Unit.Core.Store;
 using SemiSpec.Tests.Unit.UI.Settings;
 using SemiSpec.Tests.Unit.UI.Spectrum;
+using SemiSpec.UI.Link;
 using SemiSpec.UI.Messages;
 using SemiSpec.UI.Spectrum;
 using SemiSpec.UI.Trend;
@@ -54,6 +57,17 @@ public abstract class TrendChartTestBase : IDisposable
 
 	protected TrendChartViewModel Chart { get; }
 
+	/// <summary>The link statuses the normalize buttons read; Receiving from the start.</summary>
+	protected BehaviorSubject<LinkStatus> LinkStatuses { get; } =
+		new(new LinkStatus(LinkState.Receiving, "COM3", null, 0, null));
+
+	/// <summary>The normalize buttons over the stand's cache, link, panel, clock and UI scheduler.</summary>
+	protected TrendNormalizationViewModel NewNormalization()
+	{
+		return new TrendNormalizationViewModel(
+			Cache, LinkStatuses, MessagePanel, Time, Scheduler, new FakeLogger<TrendNormalizationViewModel>());
+	}
+
 	public void Dispose()
 	{
 		Dispose(disposing: true);
@@ -63,6 +77,7 @@ public abstract class TrendChartTestBase : IDisposable
 	protected virtual void Dispose(bool disposing)
 	{
 		Chart.Dispose();
+		LinkStatuses.Dispose();
 		Switching.Dispose();
 		Cache.Dispose();
 		DisplayStand.Dispose();

@@ -1,5 +1,7 @@
 using FluentResults;
 
+using SemiSpec.Core.Store;
+
 using SemiSpec.UI.Link;
 using SemiSpec.UI.Localization;
 using SemiSpec.UI.Settings;
@@ -78,6 +80,16 @@ public static class ErrorMessageMapper
 				Resources.TrendMomentTitle,
 				Resources.TrendMomentDetail,
 				Resources.TrendMomentRemedy,
+				MessageSeverity.Warning),
+			DarkReferenceError => new MessageView(
+				Resources.NormalizationDarkTitle,
+				Resources.NormalizationDarkDetail,
+				Resources.NormalizationDarkRemedy,
+				MessageSeverity.Warning),
+			NormalizationUnavailableError => new MessageView(
+				Resources.NormalizationUnavailableTitle,
+				Resources.NormalizationUnavailableDetail,
+				string.Empty,
 				MessageSeverity.Warning),
 			SettingsReadError => new MessageView(
 				Resources.SettingsReadTitle,

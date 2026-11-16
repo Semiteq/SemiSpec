@@ -166,7 +166,7 @@ public static class BenchmarkRun
 			for (var i = 0; i < ranges.Count; i++)
 			{
 				var chunk = await history.IntensityPointsAsync(
-					wavelengthNm, BenchmarkFile.Delta, ranges[i].From, ranges[i].To, measured.Token);
+					wavelengthNm, BenchmarkFile.Delta, ranges[i].From, ranges[i].To, reference: null, measured.Token);
 				BenchmarkFile.ThrowIfFailed(chunk);
 				cache.LandHistory(reRead.Generation, chunk.Value);
 				landedPoints += chunk.Value.Points.Length;

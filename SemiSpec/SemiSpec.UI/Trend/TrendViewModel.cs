@@ -10,7 +10,8 @@ using SemiSpec.UI.Localization;
 namespace SemiSpec.UI.Trend;
 
 /// <summary>
-/// The trend: the chart, the overview, the axis flyouts' forms, From zero, Follow live and the click to a moment.
+/// The trend: the chart, the overview, the axis flyouts' forms, From zero, Follow live, the normalize buttons and the
+/// click to a moment.
 /// </summary>
 public sealed class TrendViewModel : ReactiveObject, IDisposable
 {
@@ -18,10 +19,15 @@ public sealed class TrendViewModel : ReactiveObject, IDisposable
 	private readonly ObservableAsPropertyHelper<string> _stateText;
 	private readonly CompositeDisposable _disposables = [];
 
-	public TrendViewModel(TrendChartViewModel chart, OverviewViewModel overview, TrendFeed feed)
+	public TrendViewModel(
+		TrendChartViewModel chart,
+		OverviewViewModel overview,
+		TrendNormalizationViewModel normalization,
+		TrendFeed feed)
 	{
 		Chart = chart;
 		Overview = overview;
+		Normalization = normalization;
 		_feed = feed;
 		_disposables.Add(TimeWindow = new TimeWindowPanelViewModel(chart));
 		_disposables.Add(VerticalForm = new AxisRangeForm(chart.VerticalRange, chart.SetVerticalRange));
@@ -31,7 +37,11 @@ public sealed class TrendViewModel : ReactiveObject, IDisposable
 				trend => trend.Width,
 				trend => trend.IsFollowing,
 				trend => trend.IsVerticalAutoscaled,
-				StateTextOf)
+				(width, isFollowing, isVerticalAutoscaled) => (width, isFollowing, isVerticalAutoscaled))
+			.CombineLatest(
+				normalization.WhenAnyValue(buttons => buttons.Factor),
+				(chartState, factor) => StateTextOf(
+					chartState.width, chartState.isFollowing, chartState.isVerticalAutoscaled, factor))
 			.ToProperty(this, trend => trend.StateText, out _stateText));
 		_disposables.Add(FollowLiveCommand = ReactiveCommand.Create(
 			chart.FollowLive,
@@ -52,6 +62,8 @@ public sealed class TrendViewModel : ReactiveObject, IDisposable
 
 	public OverviewViewModel Overview { get; }
 
+	public TrendNormalizationViewModel Normalization { get; }
+
 	/// <summary>The time axis flyout.</summary>
 	public TimeWindowPanelViewModel TimeWindow { get; }
 
@@ -61,7 +73,7 @@ public sealed class TrendViewModel : ReactiveObject, IDisposable
 	/// <summary>Y follows the data again, or holds where it stands while it follows.</summary>
 	public ReactiveCommand<Unit, Unit> VerticalAutoscaleCommand { get; }
 
-	/// <summary>The window width, then "Not following" and "Scale frozen" while they apply.</summary>
+	/// <summary>The window width, then "Not following", "Scale frozen" and the normalization while they apply.</summary>
 	public string StateText => _stateText.Value;
 
 	/// <summary>Jumps to now and follows it; enabled only while not following.</summary>
@@ -108,7 +120,7 @@ public sealed class TrendViewModel : ReactiveObject, IDisposable
 		return string.Join(" ", parts);
 	}
 
-	private static string StateTextOf(TimeSpan width, bool isFollowing, bool isVerticalAutoscaled)
+	private static string StateTextOf(TimeSpan width, bool isFollowing, bool isVerticalAutoscaled, int? factor)
 	{
 		List<string> parts = [WidthText(width)];
 		if (!isFollowing)
@@ -119,6 +131,11 @@ public sealed class TrendViewModel : ReactiveObject, IDisposable
 		if (!isVerticalAutoscaled)
 		{
 			parts.Add(Resources.SpectrumStateFrozen);
+		}
+
+		if (factor is { } normalizedTo)
+		{
+			parts.Add(Resources.FormatTrendStateNormalizedFormat(normalizedTo));
 		}
 
 		return string.Join(Resources.ChartStateSeparator, parts);

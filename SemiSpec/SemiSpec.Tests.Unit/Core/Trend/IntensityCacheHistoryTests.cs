@@ -110,7 +110,7 @@ public sealed class IntensityCacheHistoryTests : IntensityCacheTestBase
 		Cache.Add(StoreSamples.Spectrum(At(300), nm: OtherNm, seq: 46));
 		var request = Requests.Single();
 		var chunk = await History.IntensityPointsAsync(
-			OtherNm, SampleDelta, At(300) - TimeSpan.FromDays(1), request.RecentStart, Token);
+			OtherNm, SampleDelta, At(300) - TimeSpan.FromDays(1), request.RecentStart, request.Reference, Token);
 		Cache.LandHistory(request.Generation, chunk.Value);
 
 		var reRead = SecondColumns(0, 180);

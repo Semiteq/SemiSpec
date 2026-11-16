@@ -1,3 +1,4 @@
+using System.Reactive.Linq;
 using System.Threading.Channels;
 
 using FluentResults;
@@ -30,6 +31,7 @@ public sealed class TrendStand : IDisposable
 	private readonly OverviewViewModel _overview;
 	private readonly FrameDistributor _distributor;
 	private readonly TrendFeed _feed;
+	private readonly TrendNormalizationViewModel _normalization;
 
 	public TrendStand(SwitchingSpectrumSource source, MessagePanelViewModel messagePanel)
 	{
@@ -56,14 +58,21 @@ public sealed class TrendStand : IDisposable
 			_cache,
 			_chart,
 			source,
-			(_, _, from, _, _) => Task.FromResult(Result.Ok(new IntensityChunk(from, []))),
+			(_, _, from, _, _, _) => Task.FromResult(Result.Ok(new IntensityChunk(from, []))),
 			(_, _) => Task.FromResult(Result.Ok<StoredSpectrum?>(null)),
 			Task.FromResult(false),
 			messagePanel,
 			uiScheduler,
 			uiScheduler,
 			NullLogger<TrendFeed>.Instance);
-		Trend = new TrendViewModel(_chart, _overview, _feed);
+		_normalization = new TrendNormalizationViewModel(
+			_cache,
+			Observable.Return(new LinkStatus(LinkState.Disconnected, null, null, 0, null)),
+			messagePanel,
+			TimeProvider.System,
+			uiScheduler,
+			NullLogger<TrendNormalizationViewModel>.Instance);
+		Trend = new TrendViewModel(_chart, _overview, _normalization, _feed);
 	}
 
 	public TrendViewModel Trend { get; }
@@ -88,6 +97,7 @@ public sealed class TrendStand : IDisposable
 	public void Dispose()
 	{
 		Trend.Dispose();
+		_normalization.Dispose();
 		_feed.Dispose();
 		_distributor.Dispose();
 		_overview.Dispose();

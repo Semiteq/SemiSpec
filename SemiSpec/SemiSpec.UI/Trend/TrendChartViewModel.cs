@@ -42,6 +42,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	private readonly TrendNavigationModel _navigation;
 	private double _dataAreaPixels = TrendColumns.MaximumColumns;
 	private TrendFold? _lastFold;
+	private int? _normalizationFactor;
 	private bool _disposed;
 
 	public TrendChartViewModel(
@@ -75,6 +76,9 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		_disposables.Add(display
 			.WhenAnyValue(settings => settings.TrendAsLines)
 			.Subscribe(DrawAsLines, ReportPipelineFailure));
+		_disposables.Add(cache.NormalizationChanged
+			.ObserveOn(uiScheduler)
+			.Subscribe(OnNormalizationChanged, ReportPipelineFailure));
 	}
 
 	public Plot Plot { get; } = new();
@@ -271,7 +275,8 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		try
 		{
 			_lastFold = _cache.FoldCurrent(FollowExtent);
-			_layers.Draw(_lastFold, _navigation.From, _navigation.To, IsFromZero, ManualVerticalRange);
+			_layers.Draw(
+				_lastFold, _navigation.From, _navigation.To, IsFromZero, ManualVerticalRange, _normalizationFactor);
 
 			HasPoints = _lastFold is not null;
 			Width = _navigation.Width;
@@ -317,6 +322,14 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	{
 		_layers.MarkMoment(moment);
 		RequestRedraw();
+	}
+
+	/// <summary>Raw and normalized values share no scale, so a held Y range is dropped on every change.</summary>
+	private void OnNormalizationChanged(NormalizationState state)
+	{
+		_normalizationFactor = state.Factor;
+		ManualVerticalRange = null;
+		Refresh();
 	}
 
 	private void DrawAsLines(bool asLines)
