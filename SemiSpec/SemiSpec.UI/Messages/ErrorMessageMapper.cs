@@ -2,6 +2,7 @@ using FluentResults;
 
 using SemiSpec.UI.Link;
 using SemiSpec.UI.Localization;
+using SemiSpec.UI.Settings;
 using SemiSpec.UI.Store;
 using SemiSpec.UI.Trend;
 
@@ -77,6 +78,16 @@ public static class ErrorMessageMapper
 				Resources.TrendMomentTitle,
 				Resources.TrendMomentDetail,
 				Resources.TrendMomentRemedy,
+				MessageSeverity.Warning),
+			SettingsReadError => new MessageView(
+				Resources.SettingsReadTitle,
+				Resources.SettingsReadDetail,
+				Resources.SettingsReadRemedy,
+				MessageSeverity.Warning),
+			SettingsWriteError => new MessageView(
+				Resources.SettingsWriteTitle,
+				Resources.SettingsWriteDetail,
+				Resources.SettingsWriteRemedy,
 				MessageSeverity.Warning),
 			IExceptionalError thrown => MapThrown(thrown),
 			_ => MapUnknown(error)

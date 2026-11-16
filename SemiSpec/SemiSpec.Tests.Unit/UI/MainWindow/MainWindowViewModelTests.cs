@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 using SemiSpec.Tests.Unit.UI.Link;
 using SemiSpec.Tests.Unit.UI.Logging;
+using SemiSpec.Tests.Unit.UI.Settings;
 using SemiSpec.Tests.Unit.UI.Spectrum;
 using SemiSpec.Tests.Unit.UI.Store;
 using SemiSpec.Tests.Unit.UI.Trend;
@@ -38,6 +39,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 	private readonly Logger _serilogLogger;
 	private readonly SerilogLoggerFactory _loggerFactory;
 	private readonly MessagePanelViewModel _messagePanel = new(TimeProvider.System);
+	private readonly DisplaySettingsStand _display;
 	private readonly SerialLink _serialLink;
 	private readonly UnstartedStore _store;
 	private readonly ConnectionBarViewModel _connectionBar;
@@ -71,6 +73,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 			ImmediateScheduler.Instance,
 			NullLogger<AppStatusBarViewModel>.Instance);
 		_switchingSource = new SwitchingSpectrumSource(_spectrumSource);
+		_display = new DisplaySettingsStand(_messagePanel);
 		_spectrum = new SpectrumViewModel(
 			_switchingSource,
 			_serialLink,
@@ -85,6 +88,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 			_statusBar,
 			_spectrum,
 			_trend.Trend,
+			_display.Display,
 			_logLevelControl,
 			_loggerFactory.CreateLogger<MainWindowViewModel>());
 	}
@@ -211,6 +215,7 @@ public sealed class MainWindowViewModelTests : IDisposable
 		_statusBar.Dispose();
 		_serialLink.Dispose();
 		_store.Dispose();
+		_display.Dispose();
 		_messagePanel.Dispose();
 		_loggerFactory.Dispose();
 		_serilogLogger.Dispose();

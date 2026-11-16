@@ -75,6 +75,27 @@ public static class EnvelopePath
 		}
 	}
 
+	/// <summary>The dots of the columns: one at each column's min and one at its max, one when they are equal.</summary>
+	public static void BuildDots(
+		IReadOnlyList<EnvelopeColumn> columns, int first, int lastExclusive, List<EnvelopePoint> destination)
+	{
+		destination.Clear();
+		for (var index = first; index < lastExclusive; index++)
+		{
+			var column = columns[index];
+			if (column.IsGap)
+			{
+				continue;
+			}
+
+			destination.Add(new EnvelopePoint(column.X, column.Min, StartsSegment: true));
+			if (!column.Max.Equals(column.Min))
+			{
+				destination.Add(new EnvelopePoint(column.X, column.Max, StartsSegment: true));
+			}
+		}
+	}
+
 	/// <summary>True for a vertex that opens a segment no next vertex continues.</summary>
 	public static bool IsLone(IReadOnlyList<EnvelopePoint> points, int index)
 	{

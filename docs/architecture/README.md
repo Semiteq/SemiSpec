@@ -25,7 +25,7 @@ None.
 | Desktop shell | Avalonia 12 (Win32, Skia, HarfBuzz), ReactiveUI MVVM, Semi.Avalonia theme with the palette shared with SemiPlot |
 | Conventions | SemiPlot (`Semiteq/SemiPlot`) is the reference app: same package pins, build gates, folder shape and error route |
 | Layout | The projects under `SemiSpec/` with their own `Directory.Build.props`, `Directory.Packages.props` and `.editorconfig`; `SemiSpec.slnx` at the root lists them; the Inno Setup script sits in `Installer/` |
-| Startup | No launch keys and no config files: every site runs the same setup |
+| Startup | No launch keys; one settings file, `C:\DISTR\Config\SemiSpec\settings.yaml` as in SemiPlot and SemiStep, holds the two display choices (Q factor, Trend as lines), and every site starts from the same defaults (`overview.md`, Settings) |
 | Logging | Serilog to `C:\DISTR\Logs\SemiSpec`, the Semi site folder SemiPlot and SemiStep share, which the installer creates; `%LOCALAPPDATA%\SemiSpec\Logs` with a Warning when that folder cannot be written; the operator raises the level to Debug from the menu at run time; the level is not persisted |
 | Errors | FluentResults for failures; one route to the message panel, with an Info, Warning or Error severity per entry; ReactiveUI's unhandled exceptions and exceptions that escape a dispatcher job reach the same panel and the app keeps running; before the panel exists an escaped exception ends the app and is logged as Fatal |
 | Text | resx: English neutral set, Russian satellite; the UI culture follows Windows |

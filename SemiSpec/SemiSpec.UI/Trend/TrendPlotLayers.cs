@@ -77,6 +77,15 @@ public sealed class TrendPlotLayers
 		}
 	}
 
+	/// <summary>Draws the trend as a line through the columns, or as dots without one.</summary>
+	public void SetLines(bool asLines)
+	{
+		lock (_plot.Sync)
+		{
+			_envelope.AsDots = !asLines;
+		}
+	}
+
 	public void Recolor(ChartColors colors)
 	{
 		lock (_plot.Sync)

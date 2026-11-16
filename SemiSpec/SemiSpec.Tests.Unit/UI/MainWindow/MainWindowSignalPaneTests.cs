@@ -38,7 +38,7 @@ public sealed class MainWindowSignalPaneTests : MainWindowLayoutTestBase
 	[AvaloniaFact]
 	public void TheSignalPaneRealisesEveryRowAndControl()
 	{
-		var panel = SignalPanel(Realise());
+		var panel = SignalPanel(RealiseWithQFactor());
 
 		PaneLabels.Concat(PaneValues).Select(name => Named<TextBlock>(panel, name))
 			.Should().OnlyContain(text => text.IsEffectivelyVisible && text.Bounds.Width > 0);
@@ -58,7 +58,7 @@ public sealed class MainWindowSignalPaneTests : MainWindowLayoutTestBase
 	[AvaloniaFact]
 	public void TheSignalPaneInsetsReadOffTheSpacingTable()
 	{
-		var window = Realise();
+		var window = RealiseWithQFactor();
 		var pane = Named<Border>(window, "SignalPane");
 		var form = (Grid)pane.GetVisualDescendants().OfType<SpectrumPanel>().Single().Content!;
 		var formOrigin = form.TranslatePoint(default, pane)!.Value;
@@ -94,9 +94,36 @@ public sealed class MainWindowSignalPaneTests : MainWindowLayoutTestBase
 	}
 
 	[AvaloniaFact]
-	public void AtTheMinimumWidthTheSignalPaneShowsEveryRowAndTheChartKeepsItsFloor()
+	public void TheQFactorRowIsHiddenByDefaultAndTheOtherRowsKeepTheirSpacing()
+	{
+		var pane = Named<Border>(Realise(), "SignalPane");
+
+		Named<TextBlock>(pane, "QLabel").IsVisible.Should().BeFalse();
+		Named<TextBlock>(pane, "QValue").IsVisible.Should().BeFalse();
+		var snr = Named<Control>(pane, "SnrLabel").TranslatePoint(default, pane)!.Value.Y;
+		var wavelength = Named<Control>(pane, "WavelengthLabel").TranslatePoint(default, pane)!.Value.Y;
+		var device = Named<Control>(pane, "DeviceLabel").TranslatePoint(default, pane)!.Value.Y;
+		var updated = Named<Control>(pane, "UpdatedLabel").TranslatePoint(default, pane)!.Value.Y;
+		(updated - snr).Should().Be(wavelength - device, "the hidden row leaves no extra gap");
+	}
+
+	[AvaloniaFact]
+	public async Task TheViewMenuChoiceShowsTheQFactorRow()
 	{
 		var window = Realise();
+
+		await Display.ToggleQFactorCommand.Execute();
+		Dispatcher.UIThread.RunJobs();
+
+		var pane = Named<Border>(window, "SignalPane");
+		Named<TextBlock>(pane, "QLabel").IsEffectivelyVisible.Should().BeTrue();
+		Named<TextBlock>(pane, "QValue").IsEffectivelyVisible.Should().BeTrue();
+	}
+
+	[AvaloniaFact]
+	public void AtTheMinimumWidthTheSignalPaneShowsEveryRowAndTheChartKeepsItsFloor()
+	{
+		var window = RealiseWithQFactor();
 		MessagePanel.ReportFailure(new Error("port busy"), NullLogger.Instance);
 
 		window.Width = 400;
@@ -185,6 +212,13 @@ public sealed class MainWindowSignalPaneTests : MainWindowLayoutTestBase
 			MainWindowView.SpectrumRowMinHeight,
 			opening.Chart.Height - 1,
 			"the spectrum row gives up its share of the message panel's height down to its floor");
+	}
+
+	/// <summary>The pane with every row shown, its tallest state.</summary>
+	private MainWindowView RealiseWithQFactor()
+	{
+		Display.ToggleQFactorCommand.Execute().Subscribe();
+		return Realise();
 	}
 
 	private static List<Point> PaneOffsets(Border pane)

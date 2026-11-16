@@ -5,6 +5,7 @@ using SemiSpec.Core;
 using SemiSpec.UI.Instance;
 using SemiSpec.UI.Logging;
 using SemiSpec.UI.Messages;
+using SemiSpec.UI.Settings;
 
 using Serilog;
 using Serilog.Extensions.Logging;
@@ -66,8 +67,18 @@ public static class Program
 
 			Log.Information("SemiSpec starting; log folder {LogFolder}", logging.Value.Folder);
 
+			var settings = SettingsFile.Choose(
+				SettingsFile.SiteFolder, paths.Value.FallbackSettingsFolder, SettingsFile.CanWrite);
+			if (settings.InFallbackFolder)
+			{
+				Log.Warning(
+					"The settings folder {SiteFolder} cannot be created or written; settings go to {SettingsFile}",
+					SettingsFile.SiteFolder,
+					settings.FullPath);
+			}
+
 			using var serviceProvider = new ServiceCollection()
-				.AddUi(logging.Value, paths.Value)
+				.AddUi(logging.Value, paths.Value, settings)
 				.BuildServiceProvider();
 			var loggerFactory = serviceProvider.GetRequiredService<ILoggerFactory>();
 

@@ -28,6 +28,7 @@ the trend's folds and re-reads.
 - Microsoft.Extensions.DependencyInjection for the composition root.
 - Serilog with the file sink, bridged to `Microsoft.Extensions.Logging` through Serilog.Extensions.Logging.
 - FluentResults 4.0.0 for failures returned as values.
+- YamlDotNet 18.1.0 for the settings file.
 - Microsoft.CodeAnalysis.ResxSourceGenerator for the text accessor (`ui-text.md`).
 - System.IO.Pipelines and System.Threading.Channels from the shared framework for the frame reader, the link and the
   store queue.
@@ -43,7 +44,7 @@ the trend's folds and re-reads.
 
 | Component | Project | Responsibility |
 | --- | --- | --- |
-| `AppDataPaths` | Core | Resolves the store folder `SemiSpec\Spectra` and the fallback log folder `SemiSpec\Logs` under the local app data root; fails on a root that is not fully qualified |
+| `AppDataPaths` | Core | Resolves the store folder `SemiSpec\Spectra`, the fallback log folder `SemiSpec\Logs` and the fallback settings folder `SemiSpec\Config` under the local app data root; fails on a root that is not fully qualified |
 | `Crc16Modbus` | Core | CRC-16/MODBUS of the frame, over a span |
 | `BoardFrame`, `SpectrumMeasurement` | Core | One decoded frame: state, `seq` and the measurement of a spectrum frame; the measurement rejects a pixel count that does not match its device |
 | `ReceivedFrame` | Core | A decoded frame with its receive time; the item of the link's channel and of the store queue (`Core/Protocol/`) |
@@ -91,6 +92,9 @@ the trend's folds and re-reads.
 | `SwitchingSpectrumSource` | UI | The `IDisplayedSpectrumSource` the app reads: the live source's spectrum, or the spectrum of a past moment until the operator returns to live; `ShownMoment` is that moment's receive time (`UI/Spectrum/`) |
 | `SpectrumChartViewModel` | UI | Owns the ScottPlot `Plot`: one line per spectrometer (`DeviceLine`), the window band, the centre line, the axis type, From zero and the follow or frozen scale; reads and sets the drawn axis ranges for the flyouts and names a range the intensity axis cannot show; asks the view for a redraw |
 | `SignalInfoViewModel` | UI | The seven readout pane texts of the shown spectrum |
+| `SettingsFile`, `DisplaySettings` | UI | The settings file `settings.yaml` in `C:\DISTR\Config\SemiSpec` or the fallback folder, its write check, its load and its save; the two display choices it holds, Q factor and Trend as lines (`UI/Settings/`) |
+| `DisplaySettingsViewModel` | UI | The one writer of the display choices: loads them at construction and saves the file on each toggle of the View menu's Q factor and Trend as lines items (`UI/Settings/`) |
+| `SettingsReadError`, `SettingsWriteError` | UI | The settings file could not be read, so the run starts with the defaults; it could not be written, so the changed choice holds for the run only (`UI/Settings/`) |
 | `SpectrumViewModel` | UI | The spectrum screen: applies the source's latest spectrum to the chart and the readout pane; the Invert, Logarithmic, From zero and Autoscale commands, the two axis forms and Back to live; composes the chart's state line from `ShownMoment`, the staleness and the modes |
 | `SpectrumStaleness` | UI | Whether the shown live spectrum is stale: the link is not Receiving, or the last live spectrum is more than 10 s old (`UI/Spectrum/`) |
 | `IAxisFlyoutForm`, `AxisFlyout` | UI | The form behind an axis flyout (seed on open, commit on close, Escape cancels) and the view helper that opens the flyout at the pointer, closes the drop-downs inside it first on hide, and hides it when the window starts to close (`UI/Chart/`) |
@@ -100,7 +104,7 @@ the trend's folds and re-reads.
 | `ChartFrames` | UI | A chart view's redraws: joins redraw requests into one animation frame and repaints the plot and the series on a theme change; both chart views own one (`UI/Chart/`) |
 | `ChartPalette` | UI | Paints ScottPlot's figure, data area, grid and axes from the palette, and resolves the colours of the spectrum line, the band, the centre line, the trend's envelope, the shown-moment line and the failure strip |
 | `LogTickGenerator` | UI | ScottPlot's tick generator over `LogAxis`: the labels under the current culture, and a cache of the last two results keyed on the limits, the length and the culture |
-| `EnvelopeLine`, `EnvelopePath` | UI | The trend's ScottPlot plottable: the min/max envelope path over the envelope columns, broken at each gap column; the chart writes it under `Plot.Sync`, which every ScottPlot render holds (`UI/Trend/`) |
+| `EnvelopeLine`, `EnvelopePath` | UI | The trend's ScottPlot plottable: a 3 px square at each envelope column's min and max, or the min/max envelope path over the envelope columns, broken at each gap column; the chart writes it under `Plot.Sync`, which every ScottPlot render holds (`UI/Trend/`) |
 | `EnvelopeColumn` | UI | One envelope column at chart X; maps folded columns to envelope columns and gaps, and the Y range (`UI/Trend/`) |
 | `TrendMarkerStrip` | UI | A 4 px bar along the bottom of the trend's data area over each failure range, converted to axis X in its own buffer (`UI/Trend/`) |
 | `TrendPlotLayers` | UI | The trend's layers on its plot: the envelope, the failure strip, the shown-moment line and the axes, written under `Plot.Sync` (`UI/Trend/`) |
@@ -118,12 +122,12 @@ the trend's folds and re-reads.
 | `StoreOpenError`, `StoreWriteError`, `StoreStoppedError`, `StoreFileReplacedError` | UI | The store file could not be prepared or opened; a batch could not be written; an unexpected failure after the open ended the writer; a damaged history file was set aside and a new one started (`UI/Store/`) |
 | `AppLogging` | UI | Picks the log folder (`C:\DISTR\Logs\SemiSpec`, or the fallback when the write check or the logger's open there fails), creates it and the Serilog logger: `semispec.log`, 5 MB per file, 5 files kept, shared between processes, invariant culture, process id in every line |
 | `LogLevelControl` | UI | Wraps the logger's `LoggingLevelSwitch`; `IsVerbose` moves it between Information and Debug |
-| `AddUi(LoggingSetup, AppDataPaths)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` `spectra.db` under the store folder, `SpectrumStore`, `SpectrumHistory` over the `StoreFile`, `IntensityCache`, `LiveSpectrumSource`, `SwitchingSpectrumSource` over it, the message panel, the connection row, the status bar, the spectrum view model, `TrendChartViewModel`, `OverviewViewModel`, `TrendFeed` built over `SpectrumHistory.IntensityPointsAsync`, `SpectrumAtAsync` and `SpectrumStore.Opened` with `DefaultScheduler.Instance` for its throttle, `TrendViewModel` and the main window view model, all singletons |
+| `AddUi(LoggingSetup, AppDataPaths, SettingsFile)` | UI | The composition root: registers Microsoft.Extensions.Logging over the Serilog logger, the log level control, `TimeProvider.System`, `AvaloniaScheduler.Instance` as the `IScheduler`, the port provider, `SerialLink` built with `DefaultScheduler.Instance`, `FrameDistributor` over `SerialLink.Frames`, the `StoreFile` `spectra.db` under the store folder, `SpectrumStore`, `SpectrumHistory` over the `StoreFile`, `IntensityCache`, `LiveSpectrumSource`, `SwitchingSpectrumSource` over it, the message panel, the `SettingsFile` it is given, `DisplaySettingsViewModel`, the connection row, the status bar, the spectrum view model, `TrendChartViewModel`, `OverviewViewModel`, `TrendFeed` built over `SpectrumHistory.IntensityPointsAsync`, `SpectrumAtAsync` and `SpectrumStore.Opened` with `DefaultScheduler.Instance` for its throttle, `TrendViewModel` and the main window view model, all singletons |
 | `SingleInstance` | UI | The claim on one copy per Windows session: a named mutex in `Local\`, the ask and answer events through which a second launch has the first copy activate its window, the listener that runs the activation on the UI scheduler and answers, and the release (`UI/Instance/`) |
 | `SecondLaunch`, `NativeMethods` | UI | What a launch that finds a running copy does: asks it in rounds of 2 s for up to 10 s, closes its claim after each ask and claims the name again, logs one line, and returns an exit code, or the new claim when the name became free; with no answer in the budget it shows the not-responding message box with no handle open; `NativeMethods` holds the three `user32.dll` calls `MessageBoxW`, `AllowSetForegroundWindow` and `ShowWindow` (`UI/Instance/`) |
-| `Program` | UI | Entry point: paths, logging, the single-instance claim and the second launch, container, `App.Run` with the logger for unhandled exceptions and the claim |
+| `Program` | UI | Entry point: paths, logging, the single-instance claim and the second launch, the settings file, container, `App.Run` with the logger for unhandled exceptions and the claim |
 | `App` | UI | Builds the Avalonia app with the exception handler, subscribes dispatcher exceptions, sets Semi's control strings to the UI culture, starts the single-instance listener, creates the main window from the container, refreshes the port list and starts the spectrum store, the trend feed and then the frame distributor when the window opens, and at the first close releases the claim and stops the link, the distributor, the trend feed and the store, in that order, before it closes |
-| `MainWindowViewModel` | UI | Exit request, the verbose-logging command, and the panel, connection row, status bar, spectrum and trend view models; it disposes none of them, the container owns them |
+| `MainWindowViewModel` | UI | Exit request, the verbose-logging command, and the panel, connection row, status bar, spectrum, trend and display settings view models; it disposes none of them, the container owns them |
 | `ConnectionBarViewModel` | UI | The port list, the selection and the Refresh, Connect and Disconnect commands; reports a failed listing to the panel |
 | `AppStatusBarViewModel` | UI | The status bar texts and dot tone from `SerialLink.Status`, and the dropped-frames text from the link's and the store's counts; reports each fault and the restored entry to the panel |
 | `MessagePanelViewModel` | UI | The bounded, newest-first list of messages the operator reads, the newest entry and the count of the rest, and whether the panel row is shown |
@@ -153,9 +157,10 @@ benchmark references Core only, so it times the same cache and plan the app runs
    `AllowSetForegroundWindow` and runs `SecondLaunch.Run`. It returns that exit code, so it builds no container and
    opens no window, port or store, or it continues as the primary when the name became free. The primary names the
    log folder in its Information line "SemiSpec starting".
-4. `AddUi` builds the service provider with the paths; the store's history file is named here, and nothing touches
-   the store folder until the window opens.
-5. `App.Run` receives a logger from the container's `ILoggerFactory`, which writes to that logger, and the claim; it
+4. `SettingsFile.Choose` picks the settings file (Settings, below).
+5. `AddUi` builds the service provider with the paths and the settings file; the store's history file is named here,
+   and nothing touches the store folder until the window opens.
+6. `App.Run` receives a logger from the container's `ILoggerFactory`, which writes to that logger, and the claim; it
    builds the `UnhandledErrorObserver` with the container's `IScheduler` and builds the Avalonia app. In `AfterSetup` it
    subscribes `Dispatcher.UIThread.UnhandledException`, which exists only once the platform is set up, `App.Configure`
    resolves `MainWindowViewModel`, `MessagePanelViewModel`, `SerialLink`, `FrameDistributor`, `TrendFeed`,
@@ -178,6 +183,23 @@ on screen for the fallback.
 The check is a `Func<string, bool>` parameter of `AppLogging.Create`, so the tests choose its answer and never touch
 `C:\DISTR`. A user who may create folders under `C:\` gets the site folder even without the installer. The spectrum
 store stays under `%LOCALAPPDATA%` (Spectrum store).
+
+### Settings
+
+The settings file is `settings.yaml` in `SettingsFile.SiteFolder`, `C:\DISTR\Config\SemiSpec`, the folder where
+SemiPlot and SemiStep keep their settings on an operator PC; the installer creates it with modify rights for users
+(Release). `SettingsFile.CanWrite` creates the folder and creates and deletes a probe file in it. When the check
+fails, the file goes to `%LOCALAPPDATA%\SemiSpec\Config` and `Program` logs a Warning that names both places; the
+fallback exists for a run without the installer. The check is a parameter of `SettingsFile.Choose`, so no test touches
+`C:\DISTR`.
+
+The file holds two keys, `show_q_factor` and `trend_as_lines`, both false by default: the Q factor row hidden and the
+trend drawn as dots. `DisplaySettingsViewModel` loads the file once at construction. A missing or empty file gives the
+defaults; unknown keys are ignored and dropped at the next save. A file that cannot be read or parsed gives the
+defaults and one `SettingsReadError` Warning in the message panel; the next toggle writes the file again. Each toggle
+saves the whole file through a temporary file moved over the old one. A failed save reports one `SettingsWriteError`
+Warning, and the choice holds for the run. The View menu's Q factor and Trend as lines items read the choices one-way
+and write only through their commands, so the view model is the choices' single writer.
 
 No ReactiveUI object is constructed before `AppBuilder.Setup()`. ReactiveUI takes its exception handler once, on first
 use, so a command or property helper built earlier would make the handler that `BuildAvaloniaApp` installs a silent
@@ -275,7 +297,7 @@ exit.
 
 | Row | Height | Content |
 | --- | --- | --- |
-| Menu | `Auto` | `AppMenuBar`: File, Exit; View, Message panel, Verbose logging |
+| Menu | `Auto` | `AppMenuBar`: File, Exit; View, Message panel, Verbose logging, Q factor, Trend as lines |
 | Connection row | `Auto` | `ConnectionBar`: label "Port", a 240 px port list, Refresh, Connect, Disconnect; then a 1 px separator, Back to live and Follow live |
 | Content | `*` | `ContentArea`, columns `*,Auto` and rows `3*,2*,Auto`: `SpectrumPane` with `SpectrumChartView` and the 312 px `SignalPane` with `SpectrumPanel` in the first row; `TrendPane` with `TrendChartView` and `OverviewPane` with `OverviewView` across both columns in the second and third rows |
 | Message panel | `Auto` | `MessagePanelView`, `MainWindow.MessagePanelHeight` 93 px high, shown while `MessagePanelViewModel.IsVisible` is true |
@@ -335,9 +357,10 @@ and the readout pane keeps its width.
 `SignalPane` is a `Border` with a 1 px left border and `Padding="16,12"`, `SpectrumPanel.PaneWidth` wide, beside the
 spectrum chart only. Inside it a `ScrollViewer` (`SidePaneScroll`) scrolls vertically only, so the pane scrolls
 instead of clipping when the spectrum row is at its floor. `SpectrumPanel` is one form grid: a label column, a 12 px
-gap and a field column of at least 120 px, the number width, with 8 px between rows. It holds the seven label and value
-rows of the readout (The readout pane) and no header and no control: the chart's options sit in the axis flyouts (The
-axis flyouts).
+gap and a field column of at least 120 px, the number width, with 8 px between rows. The 8 px is a top margin on
+every row's texts but the first, not the grid's row spacing, so the hidden Q factor row leaves no extra gap. It holds the
+label and value rows of the readout (The readout pane) and no header and no control: the chart's options sit in the
+axis flyouts (The axis flyouts).
 
 Every text in the pane stays on one line: a pane-scoped style sets `NoWrap` on every `TextBlock`. `PaneWidth` is
 312 px: the 1 px border, 16 padding, the label column, 12, the field column, 16 padding and 24 px slack, rounded up to
@@ -577,7 +600,9 @@ status on the UI scheduler and a 1 s tick, so a spectrum turns stale on screen w
 
 `SignalInfoViewModel` holds the shown `DisplayedSpectrum` and raises its seven texts from that one setter, which
 compares by reference: spectrometer, wavelength (`{0} nm`), window (`±{0} nm`), amplitude, SNR, Q factor and the update
-time. Amplitude, SNR and Q are the board's values in `G6` under the current culture; a NaN or infinite value reads "-".
+time. The Q factor row shows only while the View menu's Q factor item is on, off by default (Settings):
+`SpectrumPanel.ShowQFactor` binds to `DisplaySettingsViewModel.ShowQFactor`, and both texts of the row collapse while it
+is false. Amplitude, SNR and Q are the board's values in `G6` under the current culture; a NaN or infinite value reads "-".
 SNR has no unit, because the board sends a ratio. The update time is `ReceivedAt` in the `TimeProvider`'s local zone as
 `HH:mm:ss.fff`. Before the first spectrum every row reads "-", so every row exists in every state.
 
@@ -784,7 +809,18 @@ and `EnvelopePath` breaks the line there; a break in a column that also holds va
 column at every zoom, so at the 24 h width one lost spectrum shows as a one-column cut. The envelope line is 1 px in
 `AppAccentBrush`. A value column between two gaps with one value is a lone vertex, which a stroke cannot draw, so
 `EnvelopeLine` fills a 3 px square there in the same colour; spectra more than 10 s apart, as the angle and zone
-trigger modes send them, show as a row of squares. A column with a failure mark draws the strip, 4 px high at the
+trigger modes send them, show as a row of squares.
+
+The line is the Trend as lines mode of the View menu, off by default (Settings). By default `EnvelopeLine` draws dots:
+a 3 px square in `AppAccentBrush` at each visible value column's `Min` and one at its `Max`, one square when they are
+equal, and no line (`EnvelopePath.BuildDots`). A column holds both extremes, so an oscillating sample keeps its low and
+high bands instead of a comb of vertical strokes; at the 10 min window and 2 spectra per second a column holds about one
+spectrum, so the dots are close to one per spectrum. Gap columns draw nothing in either mode, so in dots mode a lost
+spectrum shows only as a missing dot, and the readout still names it. `TrendChartViewModel` follows
+`DisplaySettingsViewModel.TrendAsLines` for the process and switches the mode under `Plot.Sync`, then requests a redraw.
+The overview strip stays a band in both modes.
+
+A column with a failure mark draws the strip, 4 px high at the
 bottom of the data area in `AppSeverityErrorBrush` and at least 1 px wide, so one failed spectrum shows at 24 h;
 failed columns less than 5 s apart join into one span, so a steady failure draws one bar instead of dashes. The readout names the failure, so
 colour never carries it alone.
@@ -1273,7 +1309,8 @@ its paths relative to `Installer/`; the compiled `SemiSpecInstaller.exe` goes to
   `{autopf}\SpectrumVisualizer`. The wizard gives the operator no way to pick another folder.
 - `[InstallDelete]` empties the program folder before the copy, so no 2.x file outlives the upgrade. This is safe
   because the folder is the app's own and the app keeps nothing in it at run time: the spectra live under
-  `%LOCALAPPDATA%\SemiSpec` and the logs under `C:\DISTR\Logs\SemiSpec`. A 2.x install that an operator once put into a shared folder loses the
+  `%LOCALAPPDATA%\SemiSpec`, the logs under `C:\DISTR\Logs\SemiSpec` and the settings under
+  `C:\DISTR\Config\SemiSpec`. A 2.x install that an operator once put into a shared folder loses the
   other files there.
 - `[InstallDelete]` also deletes the Start menu and desktop shortcuts under both names, `SemiSpec.lnk` and
   `SpectrumVisualizer.lnk` of the 2.x and 3.0 installers, which point at a removed exe. `[Icons]` creates the Start
@@ -1282,7 +1319,8 @@ its paths relative to `Installer/`; the compiled `SemiSpecInstaller.exe` goes to
   installing administrator, can write the log, and `Flags: uninsneveruninstall`, so uninstall keeps the logs. The
   entry is SemiPlot's. After an upgrade over a folder that already existed, check the rights by hand on the target
   PC: `icacls C:\DISTR\Logs\SemiSpec` lists `BUILTIN\Users` with modify rights (`(M)`); without them the app logs to
-  the fallback folder.
+  the fallback folder. A second entry creates `C:\DISTR\Config\SemiSpec` (`ConfigRoot`) the same way, as SemiPlot's
+  `C:\DISTR\Config\SemiPlot`; without modify rights there the settings go to the fallback folder (Settings).
 - `[Files]` copies the publish folder without `*.pdb` and the `SemiSpec.xml` and `SemiSpec.*.xml` doc files.
 - `CloseApplications=yes` asks to close a running copy before the files change, the 3.0 `SpectrumVisualizer.UI.exe`
   and the 2.x `SpectrumVisualizer.Uart.exe` included, since both sit under the `{app}\*` that the wipe covers.
@@ -1291,8 +1329,8 @@ its paths relative to `Installer/`; the compiled `SemiSpecInstaller.exe` goes to
   administrator's.
 - The wizard offers Russian and English and preselects the Windows language. `UsePreviousLanguage=no` keeps it from
   reusing the English that the 2.x installer recorded.
-- Uninstall removes the program folder and the shortcuts and leaves `%LOCALAPPDATA%\SemiSpec` and
-  `C:\DISTR\Logs\SemiSpec`.
+- Uninstall removes the program folder and the shortcuts and leaves `%LOCALAPPDATA%\SemiSpec`,
+  `C:\DISTR\Logs\SemiSpec` and `C:\DISTR\Config\SemiSpec`.
 - Nothing migrates or deletes `%LOCALAPPDATA%\SpectrumVisualizer`, the data folder of the builds named
   SpectrumVisualizer. The app starts every run with an empty store, so it reads nothing from that folder; the folder
   stays on disk until the operator deletes it.

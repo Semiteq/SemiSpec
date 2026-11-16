@@ -30,6 +30,25 @@ public sealed class EnvelopePathTests
 	}
 
 	[Fact]
+	public void DotsTakeEachColumnsMinAndMaxAndSkipGaps()
+	{
+		var columns = new[]
+		{
+			new EnvelopeColumn(0.0, 1.0, 3.0, 2.0),
+			new EnvelopeColumn(1.0, double.NaN, double.NaN, double.NaN),
+			new EnvelopeColumn(2.0, 4.0, 4.0, 4.0),
+		};
+		var points = new List<EnvelopePoint>();
+
+		EnvelopePath.BuildDots(columns, 0, columns.Length, points);
+
+		points.Should().Equal(
+			new EnvelopePoint(0.0, 1.0, true),
+			new EnvelopePoint(0.0, 3.0, true),
+			new EnvelopePoint(2.0, 4.0, true));
+	}
+
+	[Fact]
 	public void BuildDegenerateColumnIsOnePoint()
 	{
 		var points = Build([new EnvelopeColumn(0.0, 4.0, 4.0, 4.0)]);

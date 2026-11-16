@@ -14,12 +14,13 @@
         <Style Selector="TextBlock">
             <Setter Property="TextWrapping" Value="NoWrap" />
             <Setter Property="VerticalAlignment" Value="Center" />
+            <!-- The row gap rides on the text, not on RowSpacing, so the hidden Q factor row takes its gap with it. -->
+            <Setter Property="Margin" Value="0,8,0,0" />
         </Style>
     </UserControl.Styles>
 
     <!-- The readout of the shown spectrum; 120 px is the number width. -->
     <Grid ColumnSpacing="12"
-          RowSpacing="8"
           RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="Auto" />
@@ -29,10 +30,12 @@
 
         <TextBlock Grid.Row="0"
                    Name="DeviceLabel"
+                   Margin="0"
                    Text="{x:Static text:Resources.SignalDevice}" />
         <TextBlock Grid.Row="0"
                    Grid.Column="1"
                    Name="DeviceValue"
+                   Margin="0"
                    Text="{Binding SignalInfo.SpectrometerText}" />
 
         <TextBlock Grid.Row="1"
@@ -69,10 +72,12 @@
 
         <TextBlock Grid.Row="5"
                    Name="QLabel"
+                   IsVisible="{Binding $parent[local:SpectrumPanel].ShowQFactor}"
                    Text="{x:Static text:Resources.SignalQ}" />
         <TextBlock Grid.Row="5"
                    Grid.Column="1"
                    Name="QValue"
+                   IsVisible="{Binding $parent[local:SpectrumPanel].ShowQFactor}"
                    Text="{Binding SignalInfo.QText}" />
 
         <TextBlock Grid.Row="6"

@@ -76,7 +76,7 @@ public sealed class EnvelopeLineTests
 	[Fact]
 	public void AGapColumnLeavesTheGapCentreBlankWhileBothSidesCarryTheLine()
 	{
-		var line = new EnvelopeLine();
+		var line = new EnvelopeLine { AsDots = false };
 		line.Recolor(Colors.Red);
 		using var plot = new Plot();
 		plot.Add.Plottable(line);
@@ -99,7 +99,7 @@ public sealed class EnvelopeLineTests
 	[Fact]
 	public void ALoneColumnWithOneValueDrawsAMark()
 	{
-		var line = new EnvelopeLine();
+		var line = new EnvelopeLine { AsDots = false };
 		line.Recolor(Colors.Red);
 		using var plot = new Plot();
 		plot.Add.Plottable(line);
@@ -126,6 +126,32 @@ public sealed class EnvelopeLineTests
 
 		StrokeProbe.ColumnCarriesRed(pixels, dataRect, PixelColumnAt(plot, LoneColumnSpacing / 2.0))
 			.Should().BeFalse("the gaps still break the line between the marks");
+	}
+
+	[Fact]
+	public void ByDefaultAColumnDrawsADotAtItsMinAndItsMaxAndNothingBetween()
+	{
+		var line = new EnvelopeLine();
+		line.Recolor(Colors.Red);
+		using var plot = new Plot();
+		plot.Add.Plottable(line);
+		line.ReplaceColumns([new EnvelopeColumn(50.0, 20.0, 80.0, 60.0)]);
+		plot.Axes.SetLimits(0, 100, AxisMin, AxisMax);
+
+		using var image = plot.GetImage(PlotWidth, PlotHeight);
+		var pixels = image.GetArrayRGB();
+
+		bool RedAt(double y)
+		{
+			var pixel = plot.GetPixel(new Coordinates(50.0, y));
+			return StrokeProbe.IsRed(pixels, (int)Math.Round(pixel.Y), (int)Math.Round(pixel.X));
+		}
+
+		line.AsDots.Should().BeTrue();
+		RedAt(20.0).Should().BeTrue("the minimum carries a dot");
+		RedAt(80.0).Should().BeTrue("the maximum carries a dot");
+		RedAt(60.0).Should().BeFalse("no line joins the dots, the last value included");
+		RedAt(50.0).Should().BeFalse("no line joins the dots");
 	}
 
 	private static List<EnvelopeColumn> Columns(int count)

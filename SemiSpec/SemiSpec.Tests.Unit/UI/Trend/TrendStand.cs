@@ -9,6 +9,7 @@ using SemiSpec.Core.Protocol;
 using SemiSpec.Core.Store;
 using SemiSpec.Core.Trend;
 using SemiSpec.Tests.Unit.Core.Store;
+using SemiSpec.Tests.Unit.UI.Settings;
 using SemiSpec.UI.Link;
 using SemiSpec.UI.Messages;
 using SemiSpec.UI.Spectrum;
@@ -23,6 +24,7 @@ namespace SemiSpec.Tests.Unit.UI.Trend;
 public sealed class TrendStand : IDisposable
 {
 	private readonly TestScheduler _uiScheduler = new();
+	private readonly DisplaySettingsStand _display;
 	private readonly IntensityCache _cache;
 	private readonly TrendChartViewModel _chart;
 	private readonly OverviewViewModel _overview;
@@ -33,8 +35,15 @@ public sealed class TrendStand : IDisposable
 	{
 		var uiScheduler = _uiScheduler;
 		_cache = new IntensityCache(TimeProvider.System);
+		_display = new DisplaySettingsStand(messagePanel);
 		_chart = new TrendChartViewModel(
-			_cache, source, messagePanel, TimeProvider.System, uiScheduler, NullLogger<TrendChartViewModel>.Instance);
+			_cache,
+			source,
+			_display.Display,
+			messagePanel,
+			TimeProvider.System,
+			uiScheduler,
+			NullLogger<TrendChartViewModel>.Instance);
 		_overview = new OverviewViewModel(
 			_cache, _chart, messagePanel, uiScheduler, NullLogger<OverviewViewModel>.Instance);
 		_distributor = new FrameDistributor(
@@ -84,5 +93,6 @@ public sealed class TrendStand : IDisposable
 		_overview.Dispose();
 		_chart.Dispose();
 		_cache.Dispose();
+		_display.Dispose();
 	}
 }

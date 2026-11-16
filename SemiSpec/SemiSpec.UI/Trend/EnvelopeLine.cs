@@ -5,21 +5,24 @@ using SkiaSharp;
 namespace SemiSpec.UI.Trend;
 
 /// <summary>
-/// The trend drawn as one stroked polyline through each visible column's min and max; a lone vertex, a column with
-/// one value between gaps, draws as a 3 px square, since a stroke needs two vertices.
+/// The trend drawn as 3 px squares at each visible column's min and max, or as one stroked polyline through them,
+/// where a lone vertex, a column with one value between gaps, draws as a 3 px square, since a stroke needs two vertices.
 /// </summary>
 public sealed class EnvelopeLine : IPlottable
 {
-	private const float LoneVertexHalfSize = 1.5f;
+	private const float SquareHalfSize = 1.5f;
 
 	private readonly LineStyle _stroke = new() { Width = 1f, Color = Colors.Black };
-	private readonly FillStyle _loneFill = new() { Color = Colors.Black };
+	private readonly FillStyle _squareFill = new() { Color = Colors.Black };
 	private readonly List<EnvelopePoint> _pathPoints = [];
 
 	// The UI thread writes the columns and the colour under Plot.Sync; ScottPlot renders under the same lock.
 	private readonly List<EnvelopeColumn> _columns = [];
 
 	public bool IsVisible { get; set; } = true;
+
+	/// <summary>Squares without a line, the default; set under Plot.Sync.</summary>
+	public bool AsDots { get; set; } = true;
 
 	public IAxes Axes { get; set; } = new Axes();
 
@@ -34,8 +37,18 @@ public sealed class EnvelopeLine : IPlottable
 	public void Render(RenderPack rp)
 	{
 		var (first, lastExclusive) = EnvelopePath.VisibleRange(_columns, Axes.XAxis.Min, Axes.XAxis.Max);
-		EnvelopePath.Build(_columns, first, lastExclusive, _pathPoints);
+		if (AsDots)
+		{
+			EnvelopePath.BuildDots(_columns, first, lastExclusive, _pathPoints);
+			foreach (var point in _pathPoints)
+			{
+				FillSquare(rp, Axes.XAxis.GetPixel(point.X, rp.DataRect), Axes.YAxis.GetPixel(point.Y, rp.DataRect));
+			}
 
+			return;
+		}
+
+		EnvelopePath.Build(_columns, first, lastExclusive, _pathPoints);
 		if (_pathPoints.Count == 0)
 		{
 			return;
@@ -49,9 +62,7 @@ public sealed class EnvelopeLine : IPlottable
 			var y = Axes.YAxis.GetPixel(point.Y, rp.DataRect);
 			if (EnvelopePath.IsLone(_pathPoints, index))
 			{
-				var square = new PixelRect(
-					x - LoneVertexHalfSize, x + LoneVertexHalfSize, y + LoneVertexHalfSize, y - LoneVertexHalfSize);
-				Drawing.FillRectangle(rp.Canvas, square, rp.Paint, _loneFill);
+				FillSquare(rp, x, y);
 			}
 			else if (point.StartsSegment)
 			{
@@ -70,7 +81,7 @@ public sealed class EnvelopeLine : IPlottable
 	public void Recolor(Color color)
 	{
 		_stroke.Color = color;
-		_loneFill.Color = color;
+		_squareFill.Color = color;
 	}
 
 	/// <summary>Replaces every column with the given ascending ones; called under Plot.Sync.</summary>
@@ -78,5 +89,11 @@ public sealed class EnvelopeLine : IPlottable
 	{
 		_columns.Clear();
 		_columns.AddRange(columns);
+	}
+
+	private void FillSquare(RenderPack rp, float x, float y)
+	{
+		var square = new PixelRect(x - SquareHalfSize, x + SquareHalfSize, y + SquareHalfSize, y - SquareHalfSize);
+		Drawing.FillRectangle(rp.Canvas, square, rp.Paint, _squareFill);
 	}
 }

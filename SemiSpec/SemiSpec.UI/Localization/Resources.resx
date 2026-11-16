@@ -415,4 +415,28 @@
   <data name="SingleInstanceNotResponding" xml:space="preserve">
     <value>SemiSpec is already running but does not respond. Close it in Task Manager and start it again.</value>
   </data>
+  <data name="SettingsReadTitle" xml:space="preserve">
+    <value>The settings could not be read</value>
+  </data>
+  <data name="SettingsReadDetail" xml:space="preserve">
+    <value>The settings file is damaged or cannot be opened; the app uses the default display choices.</value>
+  </data>
+  <data name="SettingsReadRemedy" xml:space="preserve">
+    <value>Change a choice in the View menu to write the file again.</value>
+  </data>
+  <data name="SettingsWriteTitle" xml:space="preserve">
+    <value>The settings could not be saved</value>
+  </data>
+  <data name="SettingsWriteDetail" xml:space="preserve">
+    <value>The changed choice holds until the app closes.</value>
+  </data>
+  <data name="SettingsWriteRemedy" xml:space="preserve">
+    <value>Check the write rights to C:\DISTR\Config\SemiSpec.</value>
+  </data>
+  <data name="MenuViewQFactor" xml:space="preserve">
+    <value>Q factor</value>
+  </data>
+  <data name="MenuViewTrendAsLines" xml:space="preserve">
+    <value>Trend as lines</value>
+  </data>
 </root>

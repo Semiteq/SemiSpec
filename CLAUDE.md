@@ -32,7 +32,7 @@ dotnet test SemiSpec.slnx --filter "Area=Messages"
 
 `SemiSpec/SemiSpec.Tests.Unit` is the only test project: xUnit, AwesomeAssertions,
 Avalonia.Headless. Every test class carries three traits: `Component` (`Core|UI|Tools`), `Area`
-(`Calibration|Chart|Di|Emulator|Instance|Link|Logging|MainWindow|Messages|Paths|Protocol|Resources|Spectrum|Store|Trend`) and
+(`Calibration|Chart|Di|Emulator|Instance|Link|Logging|MainWindow|Messages|Paths|Protocol|Resources|Settings|Spectrum|Store|Trend`) and
 `Category` (`Unit`).
 `xunit.runner.json` sets `failSkips`, so a skipped test fails the run. A hung run leaves
 `SemiSpec.Tests.Unit.exe` locked, and the next build fails with MSB3027 until the process is killed.

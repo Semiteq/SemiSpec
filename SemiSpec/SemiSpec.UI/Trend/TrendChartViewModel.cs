@@ -17,6 +17,7 @@ using SemiSpec.Core.Store;
 using SemiSpec.Core.Trend;
 using SemiSpec.UI.Chart;
 using SemiSpec.UI.Messages;
+using SemiSpec.UI.Settings;
 using SemiSpec.UI.Spectrum;
 
 namespace SemiSpec.UI.Trend;
@@ -46,6 +47,7 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	public TrendChartViewModel(
 		IntensityCache cache,
 		SwitchingSpectrumSource source,
+		DisplaySettingsViewModel display,
 		MessagePanelViewModel messagePanel,
 		TimeProvider timeProvider,
 		IScheduler uiScheduler,
@@ -70,6 +72,9 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 		_disposables.Add(source
 			.WhenAnyValue(switching => switching.ShownMoment)
 			.Subscribe(MarkMoment, ReportPipelineFailure));
+		_disposables.Add(display
+			.WhenAnyValue(settings => settings.TrendAsLines)
+			.Subscribe(DrawAsLines, ReportPipelineFailure));
 	}
 
 	public Plot Plot { get; } = new();
@@ -311,6 +316,12 @@ public sealed class TrendChartViewModel : ReactiveObject, IDisposable
 	private void MarkMoment(DateTimeOffset? moment)
 	{
 		_layers.MarkMoment(moment);
+		RequestRedraw();
+	}
+
+	private void DrawAsLines(bool asLines)
+	{
+		_layers.SetLines(asLines);
 		RequestRedraw();
 	}
 

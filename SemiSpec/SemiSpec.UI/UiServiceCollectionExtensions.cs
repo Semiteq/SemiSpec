@@ -12,6 +12,7 @@ using SemiSpec.UI.Link;
 using SemiSpec.UI.Logging;
 using SemiSpec.UI.MainWindow;
 using SemiSpec.UI.Messages;
+using SemiSpec.UI.Settings;
 using SemiSpec.UI.Spectrum;
 using SemiSpec.UI.Store;
 using SemiSpec.UI.Trend;
@@ -22,7 +23,8 @@ namespace SemiSpec.UI;
 
 public static class UiServiceCollectionExtensions
 {
-	public static IServiceCollection AddUi(this IServiceCollection services, LoggingSetup logging, AppDataPaths paths)
+	public static IServiceCollection AddUi(
+		this IServiceCollection services, LoggingSetup logging, AppDataPaths paths, SettingsFile settings)
 	{
 		// Program owns the Serilog logger and flushes it after the container is gone.
 		services.AddLogging(builder => builder.AddSerilog(logging.Logger, dispose: false));
@@ -47,6 +49,8 @@ public static class UiServiceCollectionExtensions
 		services.AddSingleton(provider =>
 			new SwitchingSpectrumSource(provider.GetRequiredService<LiveSpectrumSource>()));
 		services.AddSingleton<MessagePanelViewModel>();
+		services.AddSingleton(settings);
+		services.AddSingleton<DisplaySettingsViewModel>();
 		services.AddSingleton<ConnectionBarViewModel>();
 		services.AddSingleton<AppStatusBarViewModel>();
 		services.AddSingleton<SpectrumViewModel>();

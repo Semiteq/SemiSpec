@@ -9,6 +9,7 @@ using Microsoft.Reactive.Testing;
 using ReactiveUI.Avalonia;
 
 using SemiSpec.Tests.Unit.UI.Link;
+using SemiSpec.Tests.Unit.UI.Settings;
 using SemiSpec.Tests.Unit.UI.Spectrum;
 using SemiSpec.Tests.Unit.UI.Store;
 using SemiSpec.Tests.Unit.UI.Trend;
@@ -16,6 +17,7 @@ using SemiSpec.UI.Link;
 using SemiSpec.UI.Logging;
 using SemiSpec.UI.MainWindow;
 using SemiSpec.UI.Messages;
+using SemiSpec.UI.Settings;
 using SemiSpec.UI.Spectrum;
 
 using MainWindowView = SemiSpec.UI.MainWindow.MainWindow;
@@ -56,6 +58,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 		Store = new UnstartedStore(MessagePanel);
 		SwitchingSource = new SwitchingSpectrumSource(SpectrumSource);
 		Trend = new TrendStand(SwitchingSource, MessagePanel);
+		DisplayStand = new DisplaySettingsStand(MessagePanel);
 	}
 
 	protected TestScheduler LinkScheduler { get; } = new();
@@ -76,6 +79,10 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 
 	private protected TrendStand Trend { get; }
 
+	private protected DisplaySettingsStand DisplayStand { get; }
+
+	protected DisplaySettingsViewModel Display => DisplayStand.Display;
+
 	protected AppStatusBarViewModel StatusBar =>
 		_statusBar ?? throw new InvalidOperationException("Realise the window first.");
 
@@ -90,6 +97,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 		_statusBar?.Dispose();
 		_spectrum?.Dispose();
 		Trend.Dispose();
+		DisplayStand.Dispose();
 		SwitchingSource.Dispose();
 		SpectrumSource.Dispose();
 		SerialLink.Dispose();
@@ -158,6 +166,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 			_statusBar,
 			_spectrum,
 			Trend.Trend,
+			Display,
 			new LogLevelControl(),
 			NullLogger<MainWindowViewModel>.Instance);
 		_window = new MainWindowView { DataContext = _viewModel };
