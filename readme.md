@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Semiteq/SemiSpec/actions/workflows/ci.yml/badge.svg)](https://github.com/Semiteq/SemiSpec/actions/workflows/ci.yml)
 ![C#](https://img.shields.io/badge/C%23-.NET-blue)
-![.NET](https://img.shields.io/badge/.NET-10-512BD4)
+![.NET](https://img.shields.io/badge/.NET-11-512BD4)
 ![Platform](https://img.shields.io/badge/platform-Windows-informational)
 
 <div align="center">

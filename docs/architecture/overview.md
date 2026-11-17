@@ -22,7 +22,8 @@ the trend's folds and re-reads.
 
 ## Stack
 
-- .NET 10, C# 14, Windows (`net10.0`, published win-x64 self-contained).
+- .NET 11, C# 14, Windows (`net11.0`, published win-x64 self-contained). The `terse` local tool targets `net10.0` and
+  rolls forward (`rollForward: true` in `.config/dotnet-tools.json`), so it runs where only the .NET 11 SDK is installed.
 - Avalonia 12.0.5 with Win32, Skia and HarfBuzz; Semi.Avalonia 12.0.3; ReactiveUI.Avalonia 12.0.3; System.Reactive 6.1.0.
 - ScottPlot.Avalonia 5.1.59 for the spectrum chart and the trend chart.
 - Microsoft.Extensions.DependencyInjection for the composition root.

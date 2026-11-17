@@ -1,7 +1,7 @@
 # SemiSpec
 
 SemiSpec is the operator's desktop viewer for the spectrometer board: it reads the board's frames over a
-serial port and shows the spectrum. The application under `SemiSpec/` is a .NET 10 (C# 14) Windows desktop
+serial port and shows the spectrum. The application under `SemiSpec/` is a .NET 11 (C# 14) Windows desktop
 app on Avalonia 12, ReactiveUI and Semi.Avalonia.
 
 `SemiSpec.slnx` at the root lists every project. Their build gates
@@ -18,7 +18,7 @@ dotnet run --project SemiSpec/SemiSpec.Tools.BoardEmulator -- --help
 dotnet run -c Release --project SemiSpec/SemiSpec.Tools.StoreBenchmark -- --help
 ```
 
-`global.json` pins SDK 10.0.100 (`latestFeature`); `nuget.config` clears inherited sources and keeps nuget.org only.
+`global.json` pins SDK 11.0.100 (`latestFeature`); `nuget.config` clears inherited sources and keeps nuget.org only.
 Package versions are pinned centrally in `SemiSpec/Directory.Packages.props`. Build output goes to
 `SemiSpec/Artifacts/` (gitignored).
 
