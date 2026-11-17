@@ -64,6 +64,22 @@ The version is the `Version` element in `SemiSpec/Directory.Build.props`. To rel
 `master`, then push the annotated tag; `docs/architecture/overview.md`, Release, describes the installer script and
 `release.yml`.
 
+## Screenshots
+
+The readme images in `docs/img/` come from `docs/img/shots.ps1`, which starts the board emulator and the app,
+sets up each scene and renders it from the app's own windows. `-Lib` is the path to the window-capture helper
+library it dot-sources (PrintWindow rendering, UI Automation, posted clicks):
+
+```powershell
+dotnet build SemiSpec.slnx -c Release
+powershell -NoProfile -ExecutionPolicy Bypass -File docs/img/shots.ps1 -Lib <path>\lib.ps1
+```
+
+It needs the com0com pair COM3<->COM4, default display settings (no `true` in `settings.yaml`) and no running
+SemiSpec, writes to `%TEMP%\semispec-shots`, and fails instead of saving when a scene's popup count is wrong.
+Look at the three PNGs, then copy them into `docs/img/`. A layout change can move the time axis and trend points
+the script clicks at; re-check them when a scene fails.
+
 ## Layout
 
 ```
