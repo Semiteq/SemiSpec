@@ -8,13 +8,21 @@ using PixelRect = ScottPlot.PixelRect;
 
 namespace SemiSpec.UI.Trend;
 
-/// <summary>The trend's hover line over the data area and the readout box beside it; runs on the UI thread.</summary>
+/// <summary>
+/// The trend's hover line over the data area and the readout box at the pointer; runs on the UI thread.
+/// </summary>
 internal sealed class TrendCursorOverlay(Canvas canvas, Line crosshairLine, Border readoutBox, TextBlock readoutText)
 {
+	/// <summary>Clear of the arrow pointer, which reaches about 12 px right of and 19 px below its hot spot.</summary>
+	public const double PointerClearanceX = 16.0;
+
+	public const double PointerClearanceY = 20.0;
+
 	/// <summary>
-	/// Shows the line at the time with the readout; hides both outside the data area or without a readout.
+	/// Shows the line at the time and the readout below and right of the pointer, flipped left at the view's right edge
+	/// and above at the data area's bottom; hides both outside the data area or without a readout.
 	/// </summary>
-	public void ShowAt(Plot plot, DateTimeOffset time, string? readout)
+	public void ShowAt(Plot plot, DateTimeOffset time, double pointerY, string? readout)
 	{
 		var cursorPixelX = plot.GetPixel(new Coordinates(LocalTimeAxis.ToAxis(time), 0.0)).X;
 		if (ProjectLine(cursorPixelX, plot.LastRender.DataRect, plot.ScaleFactor) is not { } line || readout is null)
@@ -31,10 +39,17 @@ internal sealed class TrendCursorOverlay(Canvas canvas, Line crosshairLine, Bord
 		readoutBox.IsVisible = true;
 		readoutText.Text = readout;
 		readoutBox.Measure(Size.Infinity);
-		var readoutWidth = readoutBox.DesiredSize.Width;
-		var fitsRightOfLine = line.X + readoutWidth <= canvas.Bounds.Width;
-		Canvas.SetLeft(readoutBox, fitsRightOfLine ? line.X : Math.Max(0.0, line.X - readoutWidth));
-		Canvas.SetTop(readoutBox, line.Top);
+		var size = readoutBox.DesiredSize;
+		var right = line.X + PointerClearanceX;
+		var left = right + size.Width <= canvas.Bounds.Width
+			? right
+			: Math.Max(0.0, line.X - PointerClearanceX - size.Width);
+		var below = pointerY + PointerClearanceY;
+		var top = below + size.Height <= line.Bottom
+			? below
+			: Math.Max(line.Top, pointerY - PointerClearanceY - size.Height);
+		Canvas.SetLeft(readoutBox, left);
+		Canvas.SetTop(readoutBox, top);
 	}
 
 	public void Hide()

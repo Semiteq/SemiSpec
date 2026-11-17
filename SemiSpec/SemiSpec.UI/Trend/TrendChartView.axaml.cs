@@ -37,6 +37,7 @@ public partial class TrendChartView : UserControl
 	private IDisposable? _windowClosing;
 	private ChartDrag? _drag;
 	private DateTimeOffset? _hoverTime;
+	private double _hoverY;
 
 	public TrendChartView()
 	{
@@ -228,6 +229,7 @@ public partial class TrendChartView : UserControl
 		}
 
 		_hoverTime = TimeAt(current);
+		_hoverY = current.Y;
 		RepositionCursorOverlay();
 	}
 
@@ -289,7 +291,7 @@ public partial class TrendChartView : UserControl
 			return;
 		}
 
-		_overlay.ShowAt(PlotControl.Plot, hoverTime, _viewModel.Chart.ReadoutAt(hoverTime));
+		_overlay.ShowAt(PlotControl.Plot, hoverTime, _hoverY, _viewModel.Chart.ReadoutAt(hoverTime));
 	}
 
 	private bool HasDataArea()
