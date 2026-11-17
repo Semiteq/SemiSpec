@@ -30,7 +30,7 @@ public abstract class MainWindowLayoutTestBase : IDisposable
 	protected const string PortName = "COM3";
 
 	/// <summary>A chart width at which the ATP-8000 wavelength axis still carries four labelled ticks.</summary>
-	protected const int ChartFloorWidth = 400;
+	protected const int ChartFloorWidth = 440;
 
 	protected const double LargeWidth = 2560;
 

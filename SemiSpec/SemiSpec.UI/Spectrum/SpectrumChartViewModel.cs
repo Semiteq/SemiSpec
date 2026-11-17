@@ -51,6 +51,7 @@ public sealed class SpectrumChartViewModel : ReactiveObject, IDisposable
 		Plot.Axes.Left.Label.Text = Resources.SpectrumAxisIntensity;
 		Plot.Font.Automatic();
 		Plot.Axes.Top.MinimumSize = ChartStateLine.TopMargin;
+		ChartAxisRegion.PinLeftPanel(Plot);
 		SetEmptyLimits();
 	}
 

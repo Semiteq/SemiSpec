@@ -44,6 +44,7 @@ public sealed class TrendPlotLayers
 		plot.Axes.SetLimitsY(0.0, 1.0);
 		plot.Font.Automatic();
 		plot.Axes.Top.MinimumSize = ChartStateLine.TopMargin;
+		ChartAxisRegion.PinLeftPanel(plot);
 	}
 
 	/// <summary>

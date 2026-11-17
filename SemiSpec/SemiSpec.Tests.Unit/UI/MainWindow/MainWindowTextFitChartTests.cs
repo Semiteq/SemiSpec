@@ -9,6 +9,7 @@ using Avalonia.VisualTree;
 using AwesomeAssertions;
 
 using SemiSpec.Core.Protocol;
+using SemiSpec.UI.Chart;
 using SemiSpec.UI.Localization;
 using SemiSpec.UI.Messages;
 using SemiSpec.UI.Spectrum;
@@ -71,6 +72,32 @@ public sealed class MainWindowTextFitChartTests : MainWindowTextFitTestBase
 		trendPane.Bounds.Height
 			.Should().Be(MainWindowView.TrendRowMinHeight, "the message panel holds the row at its floor");
 		length.Should().BeLessThanOrEqualTo(room, "the label centres on the data area and shows whole inside the plot");
+	}
+
+	[AvaloniaTheory]
+	[InlineData("en")]
+	[InlineData("ru")]
+	public void TheWidestTickAndYLabelFitThePinnedLeftPanelOfBothCharts(string culture)
+	{
+		using var cultureScope = new CultureScope(culture);
+		Realise();
+		var trendLabel = new[]
+			{
+				Resources.FormatTrendAxisIntensityFormat(WidestWavelength, WidestDelta),
+				Resources.FormatTrendAxisNormalizedFormat(TrendNormalizationViewModel.LargeFactor, WidestWavelength, WidestDelta),
+			}
+			.MaxBy(text => text.Length)!;
+
+		Spectrum.Chart.Plot.Axes.Left.MinimumSize.Should().Be(ChartAxisRegion.LeftPanelWidth);
+		Trend.Trend.Chart.Plot.Axes.Left.MaximumSize.Should().Be(ChartAxisRegion.LeftPanelWidth);
+		var spectrum = UnpinnedLeftPanel(Spectrum.Chart.Plot, Resources.SpectrumAxisIntensity);
+		var trend = UnpinnedLeftPanel(Trend.Trend.Chart.Plot, trendLabel);
+
+		TestContext.Current.TestOutputHelper?.WriteLine(
+			$"{culture}: the left panel needs {spectrum:0.#} px on the spectrum and {trend:0.#} px on the trend "
+			+ $"for \"{WidestTickLabel()}\"; pinned at {ChartAxisRegion.LeftPanelWidth} px");
+		spectrum.Should().BeLessThanOrEqualTo(ChartAxisRegion.LeftPanelWidth);
+		trend.Should().BeLessThanOrEqualTo(ChartAxisRegion.LeftPanelWidth);
 	}
 
 	[AvaloniaTheory]
@@ -183,6 +210,31 @@ public sealed class MainWindowTextFitChartTests : MainWindowTextFitTestBase
 		TestContext.Current.TestOutputHelper?.WriteLine(
 			$"{ChartFloorWidth} px: {labelled.Count} labelled ticks ({string.Join(", ", labelled)})");
 		labelled.Should().HaveCountGreaterThanOrEqualTo(MinimumLabelledTicks);
+	}
+
+	/// <summary>
+	/// The widest Y tick the charts print: the largest raw intensity with the two fraction digits a near-flat signal's
+	/// ticks carry, in the current culture.
+	/// </summary>
+	private static string WidestTickLabel()
+	{
+		return 65535.25.ToString("#,0.##########", CultureInfo.CurrentCulture);
+	}
+
+	/// <summary>The left panel ScottPlot sizes for the widest tick and the label once the pin is lifted.</summary>
+	private static float UnpinnedLeftPanel(ScottPlot.Plot plot, string label)
+	{
+		var axis = plot.Axes.Left;
+		var ticks = new ScottPlot.TickGenerators.NumericManual();
+		ticks.AddMajor(0, WidestTickLabel());
+		axis.TickGenerator = ticks;
+		axis.Label.Text = label;
+		axis.MinimumSize = 0f;
+		axis.MaximumSize = float.MaxValue;
+		plot.Axes.SetLimitsY(-1, 1);
+
+		plot.RenderInMemory(800, 300);
+		return plot.RenderManager.LastRender.Layout.PanelSizes[axis];
 	}
 
 	/// <summary>The data area's width when the plot renders at the pane's arranged size.</summary>
