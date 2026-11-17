@@ -7,6 +7,12 @@ namespace SemiSpec.UI.Chart;
 /// <summary>The band of one axis panel of the last render, for a press on the axis; ported from SemiPlot.</summary>
 public sealed class ChartAxisRegion
 {
+	/// <summary>
+	/// The left axis panel's fixed width on both charts, so a scale change never moves the data area and the two data
+	/// areas line up; MainWindowTextFitChartTests holds the widest tick label and Y label inside it.
+	/// </summary>
+	public const float LeftPanelWidth = 112f;
+
 	private readonly float _left;
 	private readonly float _right;
 	private readonly float _top;
@@ -20,6 +26,13 @@ public sealed class ChartAxisRegion
 		_top = top;
 		_bottom = bottom;
 		_scale = scale;
+	}
+
+	/// <summary>Pins the plot's left axis panel to LeftPanelWidth, as SemiPlot pins its axis panels.</summary>
+	public static void PinLeftPanel(Plot plot)
+	{
+		plot.Axes.Left.MinimumSize = LeftPanelWidth;
+		plot.Axes.Left.MaximumSize = LeftPanelWidth;
 	}
 
 	/// <summary>The left axis band beside the data area; null before the first render.</summary>

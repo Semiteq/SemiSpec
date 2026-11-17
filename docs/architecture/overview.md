@@ -101,7 +101,7 @@ the trend's folds and re-reads.
 | `SpectrumStaleness` | UI | Whether the shown live spectrum is stale: the link is not Receiving, or the last live spectrum is more than 10 s old (`UI/Spectrum/`) |
 | `IAxisFlyoutForm`, `AxisFlyout` | UI | The form behind an axis flyout (seed on open, commit on close, Escape cancels) and the view helper that opens the flyout at the pointer, closes the drop-downs inside it first on hide, and hides it when the window starts to close (`UI/Chart/`) |
 | `AxisRangeForm` | UI | The two number fields of an axis flyout, seeded from the drawn range, validated, and written back when a valid pair differs from the seed; takes the axis's own rule (`UI/Chart/`) |
-| `ChartAxisRegion` | UI | The band of the left or bottom axis panel of the last render, for a press on the axis (`UI/Chart/`) |
+| `ChartAxisRegion` | UI | The band of the left or bottom axis panel of the last render, for a press on the axis; pins the left axis panel of both charts to `LeftPanelWidth`, 112 px (`UI/Chart/`) |
 | `ChartStateLine` | UI | Places a chart's one-line state text in the 24 px top margin over the data area (`UI/Chart/`) |
 | `ChartFrames` | UI | A chart view's redraws: joins redraw requests into one animation frame and repaints the plot and the series on a theme change; both chart views own one (`UI/Chart/`) |
 | `ChartPalette` | UI | Paints ScottPlot's figure, data area, grid and axes from the palette, and resolves the colours of the spectrum line, the band, the centre line, the trend's envelope, the shown-moment line and the failure strip |
@@ -314,8 +314,8 @@ Exit is view work: the view model emits on
 `MainWindow.MinimumWidth` is 1256 px, the window's `MinWidth`. It is the widest of the rows with their longest texts and
 the content row's floor, rounded up to the 8 px grid: the Russian status bar with `COM256`, six-digit lost and dropped
 counts and "Порт недоступен, переподключение" measures 1252.2 px (English 1085.2 px), the connection row with Back to
-live and Follow live 1049.3 px in Russian (English 835.4 px), and the readout pane plus a 400 px chart floor 712 px. At
-400 px an ATP-8000 spectrum keeps at least four labelled wavelength ticks; the measured axis shows eight, 1000 to
+live and Follow live 1049.3 px in Russian (English 835.4 px), and the readout pane plus a 440 px chart floor 752 px. At
+440 px an ATP-8000 spectrum keeps at least four labelled wavelength ticks; the measured axis shows eight, 1000 to
 2400 nm. At the minimum width the spectrum chart gets 944 px (1256 minus the 312 px pane) and the trend the full
 1256 px, where 10 min of trend keep at least four labelled time ticks. The
 headless text stub gives no real widths, so the `MainWindowTextFit*Tests` add the realised row chrome to each text
@@ -493,6 +493,18 @@ zero. ScottPlot has no log axis, so the log state lives in the axis's tick gener
 minor gridlines, or a fresh `NumericAutomatic` with none. A major tick reads `10^position` as `"0.###"` under the
 current culture, and a label that repeats turns into a minor tick.
 
+### The left axis panel
+
+ScottPlot sizes an axis panel to its widest tick label, so a scale change from "100" to "15 000" moved the data area
+by about 15 px. Both charts pin the left axis panel to `ChartAxisRegion.LeftPanelWidth`, 112 px, through `MinimumSize`
+and `MaximumSize`, as SemiPlot pins its axis panels (`ChartAxisBinder.AxisPanelWidth`). The data area therefore never
+moves on a scale change, and the spectrum's and the trend's data areas start at the same x. The width holds the widest
+tick label the charts print, "65 535,25", the largest raw intensity with the two fraction digits of a near-flat
+signal's ticks, beside the trend's two-line normalized Y label: it needs 107.7 px in Russian (107 px English), the
+spectrum 86.5 px (`MainWindowTextFitChartTests`). A label wider than the panel would overflow into the figure margin
+instead of moving the data area. The spectrum chart's 440 px floor keeps four labelled wavelength ticks with the pinned
+panel; the window's minimum width does not change, because the status bar sets it.
+
 ### The scale
 
 The scale either follows the data or is frozen. `SpectrumScale` computes the limits; ScottPlot's autoscale never
@@ -585,8 +597,8 @@ edge. The line is one `TextBlock` in `AppSecondaryForegroundBrush`, `NoWrap` wit
 empty, so no state changes the chart's layout. The trend's band is a grid that also holds the two normalize buttons in
 its right column (Normalization).
 At the minimum width the longest spectrum line, a data-age text with all four modes, measures 561.9 px in Russian
-(English 462.8 px) over 878.2 px of data area, and the longest trend line, normalization included, 578.3 px (472.4 px)
-plus the 8 px gap and the switch, 299 px (292.2 px), over 1190.2 px (`MainWindowTextFitChartTests`), so neither line
+(English 462.8 px) over 817 px of data area, and the longest trend line, normalization included, 578.3 px (472.4 px)
+plus the 8 px gap and the switch, 299 px (292.2 px), over 1129 px (`MainWindowTextFitChartTests`), so neither line
 trims.
 
 `SpectrumViewModel.StateText` joins its parts with " · " (`ChartStateSeparator`):
@@ -887,7 +899,7 @@ request as on a key change.
 The band over the data area is 22 px, the 24 px top margin less its 2 px gap, so the frame is 22 px with a 2 px inset
 and the segments are 18 px, set by a `RadioButton` style on the switch with `MinHeight` 0, `Margin` 0 and `Padding`
 "8,0"; the selector names `RadioButton`, because `MirroredRadioButton`'s style key is `RadioButton`. At the minimum width
-the longest Russian state line, the gap and the switch take 885.3 px of the 1190.2 px data area, and the normalized Y label at the
+the longest Russian state line, the gap and the switch take 885.3 px of the 1129 px data area, and the normalized Y label at the
 widest key takes 164.1 px of the 179.8 px the trend's floor leaves (`MainWindowTextFitChartTests`).
 
 ### Navigation
