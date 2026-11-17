@@ -946,7 +946,11 @@ Until the first point a line over the plot reads "No trend yet. It appears with 
 An Avalonia `Canvas` over the cached plot holds the hover line, 1 px in `AppSecondaryForegroundBrush`, and the readout,
 a `Border` in `AppPanelBackgroundBrush` with a 1 px `AppBorderBrush` border and 12 px text. Both follow the pointer
 without a plot redraw, hide while dragging, outside the data area and on pointer exit, and move again after each served
-redraw. The readout sits right of the line, and left of it when it would run past the view's right edge.
+redraw. The readout follows the pointer: it sits 16 px right of and 20 px below the pointer's hot spot, clear of the
+arrow pointer, which reaches about 12 px right and 19 px down (`TrendCursorOverlay.PointerClearanceX` and
+`PointerClearanceY`). It flips left of the pointer when it would run past the view's right edge, and above it when it
+would run past the data area's bottom, never above the data area's top. The operator moves it off the data by moving
+the pointer, since a box fixed at the top covered a signal near the axis maximum.
 
 The text comes from the column under the pointer in the last fold (`TrendReadout`): the column's start in local time
 as `HH:mm:ss`, then one value or "min – max" in `G6` under the current culture with "Spectra: {n}", or the gap reason,

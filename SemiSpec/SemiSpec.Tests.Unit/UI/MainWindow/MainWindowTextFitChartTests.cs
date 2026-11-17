@@ -158,8 +158,8 @@ public sealed class MainWindowTextFitChartTests : MainWindowTextFitTestBase
 			$"{culture}: widest readout box {readoutWidth:0.#} px, trend {chartWidth} px wide at the minimum");
 		readoutText.TextWrapping.Should().Be(TextWrapping.NoWrap);
 		double.IsNaN(readoutBox.Width).Should().BeTrue("the readout box sizes to its content");
-		readoutWidth.Should()
-			.BeLessThanOrEqualTo(chartWidth / 2, "the box fits on either side of a central hover line");
+		(readoutWidth + TrendCursorOverlay.PointerClearanceX).Should()
+			.BeLessThanOrEqualTo(chartWidth / 2, "the box fits clear of the pointer on either side of a central hover line");
 	}
 
 	[AvaloniaFact]

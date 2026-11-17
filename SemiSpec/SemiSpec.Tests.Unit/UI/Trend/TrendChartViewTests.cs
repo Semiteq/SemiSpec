@@ -10,6 +10,7 @@ using Avalonia.Threading;
 using AwesomeAssertions;
 
 using SemiSpec.UI.Localization;
+using SemiSpec.UI.Trend;
 
 using Xunit;
 
@@ -185,7 +186,9 @@ public sealed class TrendChartViewTests : TrendChartViewTestBase
 		CrosshairLine.EndPoint.Y.Should().BeApproximately(DataRect.Bottom, 1.0);
 		ReadoutBox.IsVisible.Should().BeTrue();
 		Canvas.GetLeft(ReadoutBox).Should().BeApproximately(
-			CrosshairLine.StartPoint.X, 0.5, "away from the right edge the box starts at the hover line");
+			hover.X + TrendCursorOverlay.PointerClearanceX, 0.5, "the box starts clear of the pointer, right of it");
+		Canvas.GetTop(ReadoutBox).Should().BeApproximately(
+			hover.Y + TrendCursorOverlay.PointerClearanceY, 0.5, "the box starts clear of the pointer, below it");
 		ReadoutText.Text.Should().Be(Chart.ReadoutAt(TimeAt(hover)));
 		ReadoutText.Text.Should().NotBeNullOrEmpty();
 
@@ -207,9 +210,26 @@ public sealed class TrendChartViewTests : TrendChartViewTestBase
 		var left = Canvas.GetLeft(ReadoutBox);
 		var width = ReadoutBox.DesiredSize.Width;
 		width.Should().BeGreaterThan(0);
-		(left + width).Should().BeApproximately(CrosshairLine.StartPoint.X, 0.5, "the box ends at the hover line");
+		(left + width).Should().BeApproximately(
+			CrosshairLine.StartPoint.X - TrendCursorOverlay.PointerClearanceX, 0.5, "the box ends clear of the pointer");
 		left.Should().BeGreaterThanOrEqualTo(0);
 		(left + width).Should().BeLessThanOrEqualTo(View.Bounds.Width, "the box never runs over the side pane");
+	}
+
+	[AvaloniaFact]
+	public void NearTheBottomTheReadoutFlipsAboveThePointerAndStaysInTheDataArea()
+	{
+		ShowTrend();
+		var hover = new Point(DataRect.Left + (DataRect.Width * 0.25), DataRect.Bottom - 2);
+
+		Window.MouseMove(InWindow(hover));
+
+		var top = Canvas.GetTop(ReadoutBox);
+		var height = ReadoutBox.DesiredSize.Height;
+		height.Should().BeGreaterThan(0);
+		(top + height).Should().BeApproximately(
+			hover.Y - TrendCursorOverlay.PointerClearanceY, 0.5, "the box ends clear of the pointer, above it");
+		top.Should().BeGreaterThanOrEqualTo(DataRect.Top - 0.5);
 	}
 
 	[AvaloniaFact]
