@@ -303,11 +303,11 @@ The operator approved the throwaway demo (a separate Avalonia project in the ses
 **Goal:** PR 2 meets its Acceptance items and the docs describe it
 **Entry:** the plan's `## Acceptance` and `## Gates`
 
-- [ ] every Behavior line and Flow branch on normalization holds; smoke steps 4 to 8 hold
-- [ ] the Gate before PR 2: the screenshot to the operator
-- [ ] full test suite: `dotnet test SemiSpec.slnx`
-- [ ] `overview.md`: the intensity cache, the store read, the trend chart, the overview refold
-- [ ] `readme.md` (Russian): the buttons, the reset rule, the steady-sample requirement, normalization not saved
+- [x] every Behavior line and Flow branch on normalization holds; smoke steps 4 to 8 hold
+- [x] the Gate before PR 2: the screenshot to the operator
+- [x] full test suite: `dotnet test SemiSpec.slnx`
+- [x] `overview.md`: the intensity cache, the store read, the trend chart, the overview refold
+- [x] `readme.md` (Russian): the buttons, the reset rule, the steady-sample requirement, normalization not saved
   across a restart; the operator approves the wording before the commit
 
 ### Task 9: Upgrade to .NET 11
@@ -317,22 +317,22 @@ The operator approved the throwaway demo (a separate Avalonia project in the ses
 **Likely touches:** `global.json`, `Directory.Build.props`, `Directory.Packages.props`, `.config/dotnet-tools.json`,
 `.github/workflows/ci.yml`
 
-- [ ] pin SDK 11.0.100 and `net11.0`; `LangVersion` stays 14
-- [ ] move the Microsoft packages with an 11.0.0 release to it; keep the rest
-- [ ] make `terse` run in `ci.yml` (Caveats)
-- [ ] fix any new analyzer warning the SDK raises
-- [ ] tests: the existing suite passes unchanged
-- [ ] run tests - must pass before the next task
+- [x] pin SDK 11.0.100 and `net11.0`; `LangVersion` stays 14
+- [x] move the Microsoft packages with an 11.0.0 release to it; keep the rest
+- [x] make `terse` run in `ci.yml` (Caveats)
+- [x] fix any new analyzer warning the SDK raises
+- [x] tests: the existing suite passes unchanged
+- [x] run tests - must pass before the next task
 
 ### Task 10: PR 3 acceptance and docs
 
 **Goal:** PR 3 meets its Acceptance items and the docs describe it
 **Entry:** the plan's `## Acceptance`
 
-- [ ] the PR 3 Acceptance items pass, the green CI run included
-- [ ] `CLAUDE.md`: .NET 11, the SDK pin
-- [ ] `overview.md` stack and `docs/architecture/README.md` Platform row: .NET 11 (`net11.0`), C# 14
-- [ ] `docs/architecture/README.md`: remove the Conventions row
+- [x] the PR 3 Acceptance items pass, the green CI run included
+- [x] `CLAUDE.md`: .NET 11, the SDK pin
+- [x] `overview.md` stack and `docs/architecture/README.md` Platform row: .NET 11 (`net11.0`), C# 14
+- [x] `docs/architecture/README.md`: remove the Conventions row
 
 ## Post-Completion
 

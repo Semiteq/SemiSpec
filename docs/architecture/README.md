@@ -21,9 +21,8 @@ None.
 
 | Area | Decision |
 | --- | --- |
-| Platform | .NET 10 (`net10.0`), C# 14, Windows only |
+| Platform | .NET 11 (`net11.0`), C# 14, Windows only |
 | Desktop shell | Avalonia 12 (Win32, Skia, HarfBuzz), ReactiveUI MVVM, Semi.Avalonia theme with the palette shared with SemiPlot |
-| Conventions | SemiPlot (`Semiteq/SemiPlot`) is the reference app: same package pins, build gates, folder shape and error route |
 | Layout | The projects under `SemiSpec/` with their own `Directory.Build.props`, `Directory.Packages.props` and `.editorconfig`; `SemiSpec.slnx` at the root lists them; the Inno Setup script sits in `Installer/` |
 | Startup | No launch keys; one settings file, `C:\DISTR\Config\SemiSpec\settings.yaml` as in SemiPlot and SemiStep, holds the two display choices (Q factor, Trend as lines), and every site starts from the same defaults (`overview.md`, Settings) |
 | Logging | Serilog to `C:\DISTR\Logs\SemiSpec`, the Semi site folder SemiPlot and SemiStep share, which the installer creates; `%LOCALAPPDATA%\SemiSpec\Logs` with a Warning when that folder cannot be written; the operator raises the level to Debug from the menu at run time; the level is not persisted |

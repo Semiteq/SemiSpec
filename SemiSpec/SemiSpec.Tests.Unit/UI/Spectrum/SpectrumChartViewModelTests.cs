@@ -207,7 +207,9 @@ public sealed class SpectrumChartViewModelTests : IDisposable
 		held.Wait(Waits.Limit).Should().BeTrue();
 
 		var apply = Task.Run(() => _chart.ApplyPalette(colors));
-		var first = await Task.WhenAny(apply, Task.Delay(TimeSpan.FromMilliseconds(200)));
+		using var delayTimer = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+		var first = await Task.WhenAny(apply, Task.Delay(TimeSpan.FromMilliseconds(200), delayTimer.Token));
+		await delayTimer.CancelAsync();
 
 		first.Should().NotBeSameAs(apply);
 		release.Set();

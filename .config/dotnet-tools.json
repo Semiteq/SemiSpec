@@ -7,7 +7,7 @@
       "commands": [
         "terse"
       ],
-      "rollForward": false
+      "rollForward": true
     }
   }
 }
