@@ -48,6 +48,7 @@ public sealed class CompositionRootTests : IAsyncDisposable
 	private readonly TempFolder _root = new();
 	private readonly AppDataPaths _paths;
 	private readonly SettingsFile _settings;
+	private readonly List<TrendFeed> _feeds = [];
 	private readonly List<SpectrumStore> _stores = [];
 
 	public CompositionRootTests()
@@ -231,6 +232,7 @@ public sealed class CompositionRootTests : IAsyncDisposable
 	private ServiceProvider BuildContainer()
 	{
 		var provider = new ServiceCollection().AddUi(_logging, _paths, _settings).BuildServiceProvider();
+		_feeds.Add(provider.GetRequiredService<TrendFeed>());
 		_stores.Add(provider.GetRequiredService<SpectrumStore>());
 
 		return provider;
@@ -238,7 +240,13 @@ public sealed class CompositionRootTests : IAsyncDisposable
 
 	public async ValueTask DisposeAsync()
 	{
-		// Showing the window starts the store; a writer still open would hold the instance file and fail the delete.
+		// Showing the window starts the feed and the store; a trend read in flight or a writer still open would hold the
+		// history file and fail the delete, so they stop in the app's close order.
+		foreach (var feed in _feeds)
+		{
+			await feed.StopAsync().WaitAsync(_storeStopLimit);
+		}
+
 		foreach (var store in _stores)
 		{
 			await store.StopAsync().WaitAsync(_storeStopLimit);

@@ -15,6 +15,7 @@ using SemiSpec.UI.Link;
 using SemiSpec.UI.Logging;
 using SemiSpec.UI.Settings;
 using SemiSpec.UI.Store;
+using SemiSpec.UI.Trend;
 
 using Serilog;
 
@@ -35,6 +36,7 @@ public abstract class AppLifecycleTestBase : IAsyncDisposable
 	// Every test gets the same history file name, so each test owns its root.
 	private readonly TempFolder _root = new();
 	private readonly AppDataPaths _paths;
+	private readonly List<TrendFeed> _feeds = [];
 	private readonly List<SpectrumStore> _stores = [];
 
 	protected AppLifecycleTestBase()
@@ -61,7 +63,13 @@ public abstract class AppLifecycleTestBase : IAsyncDisposable
 
 	public async ValueTask DisposeAsync()
 	{
-		// A writer still open would hold the history file and fail the root's delete.
+		// The app's close order: a trend read still in flight holds a reader connection, and a writer still open holds
+		// the history file; either fails the root's delete.
+		foreach (var feed in _feeds)
+		{
+			await feed.StopAsync().WaitAsync(_storeStopLimit);
+		}
+
 		foreach (var store in _stores)
 		{
 			await store.StopAsync().WaitAsync(_storeStopLimit);
@@ -81,6 +89,7 @@ public abstract class AppLifecycleTestBase : IAsyncDisposable
 			.Replace(ServiceDescriptor.Singleton<ISerialPortProvider>(PortProvider));
 		replace?.Invoke(services);
 		var provider = services.BuildServiceProvider();
+		_feeds.Add(provider.GetRequiredService<TrendFeed>());
 		_stores.Add(provider.GetRequiredService<SpectrumStore>());
 
 		return provider;
