@@ -22,7 +22,7 @@
 
   <!-- The single source of the app version: release.yml fails unless the vX.Y.Z tag equals it. -->
   <PropertyGroup>
-    <Version>3.0.0</Version>
+    <Version>3.1.0</Version>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
